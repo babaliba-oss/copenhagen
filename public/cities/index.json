@@ -86,6 +86,53 @@
     "gradeSpikes": 4,
     "source": "Elevation: National Land Survey of Finland, Elevation model 2 m, CC BY 4.0, via Mapterhorn terrain tiles (mapterhorn.com)."
    }
+  },
+  {
+   "id": "copenhagen",
+   "name": "Copenhagen",
+   "country": "Denmark",
+   "dataRoot": "/cities/copenhagen",
+   "origin": [
+    12.585,
+    55.679
+   ],
+   "radius": 1400,
+   "projection": "+proj=tmerc +lat_0=55.679 +lon_0=12.585 +k=1 +x_0=0 +y_0=0 +ellps=GRS80 +units=m +no_defs",
+   "defaultStart": "Nyhavn",
+   "status": "draft",
+   "maintainers": [
+    "Daniel Sfita"
+   ],
+   "attribution": "Map data © OpenStreetMap contributors, ODbL 1.0 (openstreetmap.org/copyright). Building heights from OSM tags or estimated by building type. Elevation: Mapterhorn terrain tiles (mapterhorn.com); see mapterhorn.com/attribution for the sources and licences of your area.",
+   "fetchedAt": "2026-10-12",
+   "counts": {
+    "official": {},
+    "buildings": 7159,
+    "roads": 3120,
+    "pavement": 4851,
+    "parks": 893,
+    "water": 108,
+    "trees": 7491,
+    "roadEdges": 11801,
+    "walkEdges": 33294,
+    "signals": 0,
+    "starts": 8,
+    "tramRoutes": 0,
+    "tramLines": "",
+    "busRoutes": 0,
+    "busCorridors": 0,
+    "stops": 0
+   },
+   "terrain": {
+    "file": "terrain.pack",
+    "cell": 3,
+    "base": 3,
+    "min": -1.6,
+    "max": 14.5,
+    "bridges": 171,
+    "gradeSpikes": 0,
+    "source": "Elevation: Mapterhorn terrain tiles (mapterhorn.com); see mapterhorn.com/attribution for the sources and licences of your area."
+   }
   }
  ]
 }

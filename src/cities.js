@@ -8,6 +8,8 @@ export const CITIES={
   attribution:'City of Helsinki and HSL open data, CC BY 4.0'}
 };
 export const DEFAULT_CITY='helsinki';
+// This fork's site opens on Copenhagen when no ?city= is given (falls back to Helsinki if it isn't built).
+export const SITE_CITY='copenhagen';
 
 // Cities built with `npm run city:build` are listed in public/cities/index.json.
 export function registerCities(list=[]){for(const c of list)if(c?.id&&!CITIES[c.id])CITIES[c.id]={radius:1500,...c};return CITIES;}
@@ -23,7 +25,7 @@ export function slug(text){
 }
 
 export function selectCity(search=''){
- const id=slug(new URLSearchParams(search).get('city')||DEFAULT_CITY);
+ const id=slug(new URLSearchParams(search).get('city')||(CITIES[SITE_CITY]?SITE_CITY:DEFAULT_CITY));
  const city=CITIES[id];
  if(!city)throw Error(`City “${id}” is not in this build yet. Available: ${Object.values(CITIES).map(c=>c.name).join(', ')}.`);
  return city;

@@ -1,0 +1,21 @@
+{
+ "schemaVersion": 1,
+ "id": "copenhagen",
+ "name": "Copenhagen",
+ "country": "Denmark",
+ "origin": [12.5850, 55.6790],
+ "radiusMetres": 1400,
+ "maintainers": ["Daniel Sfita"],
+ "status": "draft",
+ "starts": [
+  {"name": "Nyhavn", "at": [12.5905, 55.6798]},
+  {"name": "Kongens Nytorv", "at": [12.5856, 55.6797]},
+  {"name": "Rådhuspladsen", "at": [12.5695, 55.6759]},
+  {"name": "Amalienborg", "at": [12.5930, 55.6840]},
+  {"name": "Christiansborg", "at": [12.5799, 55.6761]},
+  {"name": "Rundetårn", "at": [12.5758, 55.6814]},
+  {"name": "Tivoli", "at": [12.5682, 55.6737]},
+  {"name": "Christianshavn", "at": [12.5935, 55.6730]}
+ ],
+ "source": {"geocoder": "manual", "displayName": "København, Denmark"}
+}
