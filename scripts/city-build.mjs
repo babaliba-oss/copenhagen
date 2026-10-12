@@ -312,7 +312,7 @@ function dissolve(){
 }
 const rendered=dissolve();
 const chunks=surfaceChunks(rendered);const surfaceIndex=[];
-for(const [k,values] of chunks){const file=`surfaces/${k}.bin`;fs.writeFileSync(path.join(OUT,file+'.pack'),gzipSync(Buffer.from(new Float32Array(values).buffer),{level:9}));surfaceIndex.push(surfaceRecord(file,values));}
+for(const [k,values] of chunks){const file=`surfaces/${k.replace(",","_")}.bin`; /* no commas: static hosts redirect-loop on them */fs.writeFileSync(path.join(OUT,file+'.pack'),gzipSync(Buffer.from(new Float32Array(values).buffer),{level:9}));surfaceIndex.push(surfaceRecord(file,values));}
 fs.writeFileSync(path.join(OUT,'surface-index.json'),JSON.stringify(surfaceIndex));
 fs.writeFileSync(path.join(OUT,'mobility.json'),JSON.stringify(mobility));
 fs.writeFileSync(path.join(OUT,'trams.json'),JSON.stringify({source:'OpenStreetMap route=tram relations, ODbL',limitations:['Route geometry as mapped in OSM; timetables and frequencies are simulated.'],paths:tramPaths,stops:transitStops.filter(s=>s.tram).map(({bus,...s})=>s)}));
