@@ -8,6 +8,8 @@ export function cutLowerYard(material){
  const original=material.onBeforeCompile.bind(material),cache=material.customProgramCacheKey.bind(material);
  material.onBeforeCompile=shader=>{original(shader);shader.vertexShader='varying vec3 vYardWorld;\n'+shader.vertexShader.replace('#include <begin_vertex>','#include <begin_vertex>\nvYardWorld=(modelMatrix*vec4(position,1.0)).xyz;');shader.fragmentShader='varying vec3 vYardWorld;\n'+shader.fragmentShader.replace('#include <clipping_planes_fragment>',`#include <clipping_planes_fragment>
  float yardWest=110.0+(vYardWorld.z-742.0)*0.738+0.5;
+#ifndef NO_PORT_YARD
  if(vYardWorld.y > -1.0 && vYardWorld.y < 0.15 && vYardWorld.z>720.0 && vYardWorld.z<900.0 && vYardWorld.x>yardWest && vYardWorld.x<yardWest+35.0)discard;
+#endif
  `);};material.customProgramCacheKey=()=>cache()+'-lower-port-yard';material.needsUpdate=true;
 }
