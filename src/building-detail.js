@@ -107,6 +107,8 @@ export function createModelledBuilding(array,part,pixels,texture=null,includeHer
   else if(!pixels&&!f.windows.length&&![23,1707,324].includes(part.ratu)){
    f.windows=provisionalWindows(f);if(f.windows.length){provisional=true;f.color=[.73,.72,.67];}
   }
+  // Untextured meshes from a city's official model can carry their own wall and roof colours.
+  if(!pixels&&!described&&!corridor&&!clean&&part.roofColor&&part.color)f.color=part.color;
   triangles(f.triangles,clean?clean.wallRGB:part.ratu===324?[.65,.55,.47]:part.ratu===23?[.83,.8,.71]:f.color,walls,wallColours);
   for(const w of f.windows){const s=w.x+w.w/2,y=w.y+w.h/2,frame=.085;windows++;
    // Opaque glazing sits behind the raised reveal and frame, producing real depth.
@@ -122,7 +124,7 @@ export function createModelledBuilding(array,part,pixels,texture=null,includeHer
   for(const t of f.triangles)for(let i=0;i<3;i++){const a=t.local[i],b=t.local[(i+1)%3];if(Math.abs(a[1]-b[1])>.03||Math.abs(a[0]-b[0])<1)continue;const key=[a[0],b[0]].sort((a,b)=>a-b).map(x=>x.toFixed(2)).join(':')+':'+a[1].toFixed(2);if(edges.has(key))edges.delete(key);else edges.set(key,[a,b]);}
   for(const [a,b] of edges.values())if(a[1]>f.y0+3&&!front&&!described){box(f,(a[0]+b[0])/2,a[1]-.10,Math.abs(a[0]-b[0]),.20,.28,.08,trim);}
  }
- for(const t of analysis.roof)triangles([t],described?hexRGB(Math.abs(t.n.y)>.25?described.roof:described.wall):corridor?(t.n.y>.25?hexRGB(corridor.roof):hexRGB(corridor.wall)):clean?(t.n.y>.25?clean.roofRGB:clean.wallRGB):part.ratu===405?(t.n.y>.25?[.35,.34,.30]:[.64,.63,.59]):part.ratu===324?(t.n.y>.25?[.28,.39,.35]:[.65,.55,.47]):part.ratu===23?(t.n.y>.12&&t.v.every(v=>v[1]>6)?[.29,.34,.33]:[.83,.8,.71]):provisional&&t.n.y>.12?[.30,.34,.35]:colour(t.samples,false),roofs,roofColours);
+ for(const t of analysis.roof)triangles([t],!pixels&&!described&&!corridor&&!clean&&part.roofColor?(t.n.y>.25?part.roofColor:part.color):described?hexRGB(Math.abs(t.n.y)>.25?described.roof:described.wall):corridor?(t.n.y>.25?hexRGB(corridor.roof):hexRGB(corridor.wall)):clean?(t.n.y>.25?clean.roofRGB:clean.wallRGB):part.ratu===405?(t.n.y>.25?[.35,.34,.30]:[.64,.63,.59]):part.ratu===324?(t.n.y>.25?[.28,.39,.35]:[.65,.55,.47]):part.ratu===23?(t.n.y>.12&&t.v.every(v=>v[1]>6)?[.29,.34,.33]:[.83,.8,.71]):provisional&&t.n.y>.12?[.30,.34,.35]:colour(t.samples,false),roofs,roofColours);
  // Mesh-space roof seams accent the genuine pitches and ridgelines.
  const edgeMap=new Map();
  for(const t of analysis.roof)for(let i=0;i<3;i++){const a=t.v[i].slice(0,3),b=t.v[(i+1)%3].slice(0,3),key=[a.map(v=>v.toFixed(2)).join(','),b.map(v=>v.toFixed(2)).join(',')].sort().join('|');const prev=edgeMap.get(key);if(prev){if(Math.abs(prev.normal.dot(t.n))<.92)prev.ridge=true;}else edgeMap.set(key,{a,b,normal:t.n,ridge:false});}
