@@ -9,10 +9,11 @@ const box=(w,h,d,x,y,z,hex)=>paint(new THREE.BoxGeometry(w,h,d).translate(x,y,z)
 const cyl=(r0,r1,h,x,y,z,hex,seg=6)=>paint(new THREE.CylinderGeometry(r0,r1,h,seg).translate(x,y,z),hex);
 // A hull: a box with the bow pinched to a point and the bottom narrowed. Length along Z, bow at -Z.
 function hull(w,h,len,hex,deck='#c9b48a',sheer=.15){
- const g=new THREE.BoxGeometry(w,h,len,1,1,4),p=g.attributes.position;
+ const g=new THREE.BoxGeometry(w,h,len,2,2,10),p=g.attributes.position;
  for(let i=0;i<p.count;i++){let x=p.getX(i),y=p.getY(i),z=p.getZ(i);const t=(z+len/2)/len; // 0 bow, 1 stern
-  const pinch=t<.35?Math.pow(t/.35,.7):1;x*=pinch;if(y<0)x*=.55;if(t<.1)y+=sheer;p.setXYZ(i,x,y,z);}
- g.computeVertexNormals();return [paint(g.translate(0,h/2-.3,0),hex),box(w*.88,.05,len*.7,0,h-.28,len*.12,deck)];
+  const bow=t<.4?Math.sin(t/.4*Math.PI/2):1,stern=t>.85?1-(t-.85)/.15*.3:1;x*=Math.max(.02,bow)*stern;
+  const keel=(y+h/2)/h;x*=.45+.55*keel;y+=sheer*Math.pow(1-t,3)*(y>0?1:0);p.setXYZ(i,x,y,z);}
+ g.computeVertexNormals();return [paint(g.translate(0,h/2-.3,0),hex),box(w*.84,.05,len*.62,0,h-.3,len*.16,deck)];
 }
 const sail=()=>mergeGeometries([...hull(2.4,1.1,8,'#f4f4f0'),box(1.3,.6,2.2,0,1.05,.8,'#e8e6de'),cyl(.06,.08,11,0,6.2,-.6,'#c9ccce'),box(.07,.07,3.6,0,2,1.2,'#c9ccce'),box(.9,.5,3.2,0,1.0,-.1,'#1f3b5b')]);
 const motor=()=>mergeGeometries([...hull(2.2,1.0,6.5,'#e9e6dc'),box(1.5,.9,2.4,0,1.15,.6,'#f2f0ea'),box(1.52,.4,1.6,0,1.35,.3,'#2b3a44')]);
