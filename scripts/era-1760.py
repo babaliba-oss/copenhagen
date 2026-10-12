@@ -176,5 +176,6 @@ for b in bastions:
     c = b.centroid; mills.append([round(c.x, 1), round(-c.y, 1)])
 os.makedirs('public/cities/copenhagen-1760', exist_ok=True)
 json.dump({'mills': mills}, open('public/cities/copenhagen-1760/era.json', 'w'))
+json.dump({'mills': mills}, open(f'{DST}/era-public.json', 'w'))  # city-build clears the public folder; anchors.py copies this back
 json.dump({'zone': mapping(ZONE), 'rampart': mapping(rampart), 'moat': mapping(moat), 'wall': WALL}, open(f'{DST}/era.json', 'w'))
 print('starts', [s['name'] for s in c2['starts']])

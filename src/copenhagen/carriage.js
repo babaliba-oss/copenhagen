@@ -50,7 +50,7 @@ export function createCarriage(){
 
 // NPC coaches for 1760 traffic: one static merged geometry (legs mid-stride), instanced over the mobility cars.
 export function createCarriageTraffic(actors){
- const c=createCarriage();c.updateMatrixWorld(true);const gs=[];c.traverse(o=>{if(o.isMesh){const g=o.geometry.clone();g.applyMatrix4(o.matrixWorld);gs.push(g.index?g.toNonIndexed():g);}});
+ const c=createCarriage();c.updateMatrixWorld(true);const gs=[];c.traverse(o=>{if(o.isMesh){const g=o.geometry.clone();g.applyMatrix4(o.matrixWorld);gs.push(g.index?g.toNonIndexed():g);}});const shared=new Set();c.traverse(o=>{if(o.isMesh){shared.add(o.geometry);shared.add(o.material);}});shared.forEach(x=>x.dispose());
  const mesh=new THREE.InstancedMesh(mergeGeometries(gs),new THREE.MeshStandardMaterial({vertexColors:true,roughness:.55,metalness:.12}),Math.max(1,actors.length));mesh.castShadow=true;mesh.frustumCulled=false;mesh.name='Coaches';
  const m4=new THREE.Matrix4(),q=new THREE.Quaternion(),v=new THREE.Vector3(),one=new THREE.Vector3(1,1,1),zero=new THREE.Vector3(0,0,0),UP=new THREE.Vector3(0,1,0);
  return {group:mesh,update(groundAt){actors.forEach((a,i)=>{const on=!!a.edge&&!a.playerTaken;m4.compose(v.set(a.x||0,on?groundAt(a.x,a.z):-100,a.z||0),q.setFromAxisAngle(UP,a.heading||0),on?one:zero);mesh.setMatrixAt(i,m4);});mesh.instanceMatrix.needsUpdate=true;}};

@@ -643,6 +643,7 @@ window.addEventListener('keydown',e=>{
  if(e.repeat)return;
  if(police?.busted){if(finale.ended&&e.code==='Tab')return;e.preventDefault();if(!finale.ended)return;if(e.code==='Enter'||e.code==='Escape')continueDriving();else if(e.code==='KeyR')restart();return;} // BUSTED screen: Enter/Esc continue, R restarts; Tab moves between its two buttons (the HUD is inert)
  if(!started){if(!ready)return;if(e.code==='Enter'){e.preventDefault();start();return;}if(!['KeyW','KeyA','KeyS','KeyD','ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.code))return;}
+ if(e.code==='Escape'&&cph?.blocking?.()&&cph.key(e.code)){e.preventDefault();return;}
  if(e.code==='Escape'){if(marketShop?.close()){refreshMarketUI();return;}if(peopleInteraction?.close())return;if(!mapOpen)setPaused(!paused);return;}
  if(mapOpen)return;
  if(cph&&started&&cph.key(e.code)){e.preventDefault();return;}
@@ -703,7 +704,7 @@ function updateHUD(now){
  const speed=displayedSpeedKmh(car.speed);$('speed').title='Game-style indicated speed: 70% of world speed';$('gear').textContent=car.speed<-.2?'REVERSE':speed>1?'DRIVING':'PARKED & READY';$('distance').textContent=(car.distance/1000).toFixed(2);
  const road=world.roads.at(car.x,car.z),pave=world.pavement.at(car.x,car.z);$('street').textContent=road?.name||pave?.name||'Off the beaten path';
  if(car.damage>.02)$('gear').textContent=`DAMAGE ${Math.round(car.damage*100)}% · R TO RESET`;
- if(car.battery===0)$('gear').textContent='R TO RECHARGE';else if(car.battery<=.2)$('gear').textContent='LOW BATTERY · R TO RECHARGE';
+ if(city?.era===1760){}else if(car.battery===0)$('gear').textContent='R TO RECHARGE';else if(car.battery<=.2)$('gear').textContent='LOW BATTERY · R TO RECHARGE';
  if(!driving){$('gear').textContent=TRAVEL_MODES[travel.mode].label.toUpperCase();$('speed').title='Speed in kilometres per hour';}
  let nearest=data.landmarks[0],best=Infinity;for(const l of data.landmarks){const d=Math.hypot(l.x-car.x,l.z-car.z);if(d<best){best=d;nearest=l;}}$('district-label').textContent=nearest.district.toUpperCase();
  if(areaLabel){const caption=document.querySelector('.minimap-caption')?.firstChild,text=`${areaLabel(car.x,car.z,now)} `;if(caption&&caption.textContent!==text)caption.textContent=text;}
@@ -753,7 +754,7 @@ function frame(now){
   }
   knockables?.update();streetLife.update(dt,car);tramRenderer.update(car);cyclistRenderer.update(car);npcScooterRenderer.update(car,dt);policeRenderer.update(dt);roadblock?.update(dt,car);
   if(police.message){toast(police.message);police.message=null;}
-  if(cph&&car)cph.update(dt,car,travel.mode,{running:started});if(carriage&&car)carriage.userData.update(car.speed||0,dt);coaches?.update(groundAt);parkedCars?.update(car);boats?.update(dt,car);landmarks?.update(dt);trains?.update(dt);
+  if(cph&&car)cph.update(dt,car,travel.mode,{running:started});if(carriage&&car){carriage.userData.update(car.speed||0,dt);car.battery=1;}coaches?.update(groundAt);parkedCars?.update(car);boats?.update(dt,car);landmarks?.update(dt);trains?.update(dt);
  }else if(ready&&police?.busted){policeRenderer.update(dt);roadblock?.update(dt,car);if(finale.cinematicStep(dt,roadblock?.playing)){$('busted-overlay').classList.toggle('live',!!roadblock?.active);$('busted-overlay').hidden=false;$('busted-continue').focus();}} // arrest cinematic: strobes keep flashing, then the end screen
  if(car){
    speedometer.update(car,dt,{mode:travel.mode});
@@ -950,8 +951,8 @@ async function boot(){
     // Copenhagen's game layer (src/copenhagen): jobs, GPS line, sagas and the characters who give them.
     // The characters are spread across the city, so the crowd's single-centre culling is overridden.
     if(city.era===1760&&!carriage){const starter=carGroup.children[0];if(starter){starter.traverse(m=>{if(m.isMesh)m.visible=false;});carriage=createCarriage();starter.add(carriage);}} // 1760: the player's car becomes a coach and horses
-    if(city.id.startsWith('copenhagen')){cph?.dispose?.();cph=createCopenhagenGame({scene,city,mobilityData,cityData:data,toast});const npc=createInstancedPeople(cph.people,{name:'Copenhagen characters',center:{x:0,z:0}});
-     npc.update=(u=>(dt,player)=>{u(dt,player);npc.group.visible=true;})(npc.update);cityModel.add(npc.group);marketLife={...life(),...npc,group:npc.group};detailPeople=npc.people;}
+    if(city.id.startsWith('copenhagen')){cph?.dispose?.();cph=createCopenhagenGame({scene,city,mobilityData,cityData:data,toast});const npcCentre={x:0,z:0},npc=createInstancedPeople(cph.people,{name:'Copenhagen characters',center:npcCentre});
+     npc.update=(u=>(dt,player)=>{if(player){npcCentre.x=player.x;npcCentre.z=player.z;}u(dt,player);npc.group.visible=true;})(npc.update);cityModel.add(npc.group);marketLife={...life(),...npc,group:npc.group};detailPeople=npc.people;}
     harbour={group:new THREE.Group(),obstacles:[],knockables:null};knockables=combineKnockables([breakableSigns]); // traffic-signal posts bend when hit, in every city
     finale.zone=null; // station tram scheduling is Helsinki-specific
     const streetObstacles=[];for(const pl of places){const p=createPlace(pl,{textureUrl:dataUrl});cityModel.add(settleObject(p.group));streetObstacles.push(...p.obstacles);}
@@ -981,8 +982,8 @@ async function boot(){
    setStart(firstStart);history.replaceState(null,'',startUrl(location,city,firstStart));
    progress(58,'Preparing the driving map');await new Promise(r=>setTimeout(r,30));drawMapBase();
    progress(68,'Loading buildings and textures');focus.set(car.x,0,car.z);await Promise.all([ensureCityModel(),updateTiles()]);
-   progress(88,'Loading traffic and pedestrians');mobility=helsinki?new Mobility(correctHarbourLanes(mobilityData),world,{stationCars:16,corridorCars:HARBOUR_CORRIDOR_CARS,corridor:harbourCorridor(world.roads)}):new Mobility(mobilityData,world,city.era===1760?{cars:26,people:220}:city.id==='copenhagen'?{cars:60,people:240}:undefined);mobility.reset(car);angryDrivers=createAngryDrivers({vehicleOf:a=>streetLife?.traffic?.vehicleOf(a)});scene.add(angryDrivers.group);mobility.onCrash=a=>angryDrivers.trigger(a,mobility.time);streetLife=createStreetLife(scene,mobility);streetLife.update(0,car);if(city.era===1760){streetLife.traffic.group.visible=false;coaches=createCarriageTraffic(mobility.cars);scene.add(coaches.group);} // 1760: the traffic is coaches and horsesworld.objects.add(breakableSigns.bodies);
-   trafficCars=mobility.cars.map(actor=>{const visual=streetLife.traffic.vehicleOf(actor);return {id:`traffic-${actor.id}`,label:visual?.type==='taxi'?'Taxi':'Car',actor,visual:{type:visual?.type||'sedan',paint:visual?.paint.getStyle()},claim(){if(actor.playerTaken||actor.edge===null||Math.abs(actor.speed)>1.2)return false;actor.playerTaken=true;actor.edge=null;actor.speed=0;return true;},release(){delete actor.playerTaken;}};});
+   progress(88,'Loading traffic and pedestrians');mobility=helsinki?new Mobility(correctHarbourLanes(mobilityData),world,{stationCars:16,corridorCars:HARBOUR_CORRIDOR_CARS,corridor:harbourCorridor(world.roads)}):new Mobility(mobilityData,world,city.era===1760?{cars:26,people:220}:city.id==='copenhagen'?{cars:60,people:240}:undefined);mobility.reset(car);angryDrivers=createAngryDrivers({vehicleOf:a=>streetLife?.traffic?.vehicleOf(a)});scene.add(angryDrivers.group);mobility.onCrash=a=>angryDrivers.trigger(a,mobility.time);streetLife=createStreetLife(scene,mobility);streetLife.update(0,car);if(city.era===1760){streetLife.traffic.group.visible=false;coaches=createCarriageTraffic(mobility.cars);scene.add(coaches.group);}world.objects.add(breakableSigns.bodies); // 1760: the traffic is coaches and horses
+   trafficCars=city.era===1760?[]:mobility.cars.map(actor=>{const visual=streetLife.traffic.vehicleOf(actor);return {id:`traffic-${actor.id}`,label:visual?.type==='taxi'?'Taxi':'Car',actor,visual:{type:visual?.type||'sedan',paint:visual?.paint.getStyle()},claim(){if(actor.playerTaken||actor.edge===null||Math.abs(actor.speed)>1.2)return false;actor.playerTaken=true;actor.edge=null;actor.speed=0;return true;},release(){delete actor.playerTaken;}};});
    police=new PoliceSimulation(mobility.roads,world);police.relaxed=city.id.startsWith('copenhagen');policeRenderer=createPoliceRenderer(scene,police);police.onIncident=(...incident)=>finale.incident(...incident);roadblock=createRoadblock(scene,{world,police,carModel:carGroup,playerLook:travelRenderer.look,isVisible:trafficInView,obstacles:()=>[...mobility.cars.filter(c=>c.edge),...(tramSim?.bodies||[]),...(buses?.bodies||[]),...travel.parkedBodies(),...police.obstacles],onWarning:message=>toast(message,{important:true})});
    tramSim=new TramSimulation(tramData,world);tramSim.reset(car);tramRenderer=createTramRenderer(scene,tramSim);tramRenderer.update(car);
    cyclists=city.id==='copenhagen'?new CityCyclists(mobility.roads,world,42):new Cyclists(data);cyclistRenderer=createCyclistRenderer(scene,cyclists);cyclistRenderer.update(car);

@@ -7,7 +7,7 @@ import * as THREE from 'three';
 const MODERN_WALLS=['#d9d4c7','#b9b2a5','#8f8b84','#c7b79a','#a5634c','#e6e1d6','#7d8790','#c9c2b4','#9b5a46','#d2c5ad'];
 const MODERN_ROOFS=['#4a4d50','#5b5f63','#3e4144','#6a6e70'];
 const hash=s=>{let h=2166136261;for(const c of String(s))h=Math.imul(h^c.charCodeAt(0),16777619)>>>0;return h;};
-const lin=hex=>{const c=new THREE.Color(hex).convertSRGBToLinear();return [c.r,c.g,c.b];};
+const lin=hex=>{const c=new THREE.Color(hex);return [c.r,c.g,c.b];}; // THREE.Color(hex) is already linear
 const linArr=a=>{const c=new THREE.Color(a[0],a[1],a[2]).convertSRGBToLinear();return [c.r,c.g,c.b];};
 
 export function partColours(part){
@@ -18,7 +18,7 @@ export function partColours(part){
 // Give untextured parts colours their own colour too (so estimated façades can apply to them as well).
 export function ensurePartColours(part){
  if(part.color&&part.roofColor)return part;
- const h=hash(part.id),hex=x=>{const c=new THREE.Color(x);return [c.r,c.g,c.b].map(v=>+v.toFixed(3));};
+ const h=hash(part.id),hex=x=>{const o={};new THREE.Color(x).getRGB(o,THREE.SRGBColorSpace);return [o.r,o.g,o.b].map(v=>+v.toFixed(3));};
  part.color=hex(MODERN_WALLS[h%MODERN_WALLS.length]);part.roofColor=hex(MODERN_ROOFS[(h>>>8)%MODERN_ROOFS.length]);part.modern=true;return part;
 }
 

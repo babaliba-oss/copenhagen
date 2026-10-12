@@ -17,7 +17,7 @@ export function createTrains(rails,{count=6}={}){
  const group=new THREE.Group();group.name='S-trains';
  const lines=(rails?.tracks||[]).map(t=>{let len=0;const cum=[0];for(let i=1;i<t.p.length;i++){len+=Math.hypot(t.p[i][0]-t.p[i-1][0],t.p[i][1]-t.p[i-1][1]);cum.push(len);}return {p:t.p,cum,len};}).filter(l=>l.len>600).sort((a,b)=>b.len-a.len).slice(0,count);
  if(!lines.length)return {group,update(){}};
- const cars=4,mesh=new THREE.InstancedMesh(carGeometry(),new THREE.MeshStandardMaterial({vertexColors:true,roughness:.4,metalness:.3}),lines.length*cars);mesh.castShadow=true;mesh.frustumCulled=false;group.add(mesh);
+ const cars=4,mesh=new THREE.InstancedMesh(carGeometry(),new THREE.MeshStandardMaterial({vertexColors:true,roughness:.4,metalness:.3}),lines.length*cars);mesh.castShadow=true;mesh.frustumCulled=false;mesh.userData.shadowLod=true;group.add(mesh);
  const trains=lines.map((l,i)=>({l,s:cars*CAR+((i*397)%Math.max(1,l.len-2*cars*CAR)),dir:1,wait:0}));
  const at=(l,s)=>{s=Math.max(0,Math.min(l.len,s));let k=1;while(k<l.cum.length-1&&l.cum[k]<s)k++;const a=l.p[k-1],b=l.p[k],f=(s-l.cum[k-1])/Math.max(.01,l.cum[k]-l.cum[k-1]);return [a[0]+(b[0]-a[0])*f,a[1]+(b[1]-a[1])*f];};
  const m4=new THREE.Matrix4(),q=new THREE.Quaternion(),UP=new THREE.Vector3(0,1,0),one=new THREE.Vector3(1,1,1),v=new THREE.Vector3();

@@ -99,7 +99,7 @@ export function createMappedFurniture(layer,{player=()=>null,mobility=()=>null,c
  const group=new THREE.Group();group.name='Mapped street furniture';
  const items=layer?.items||[],obstacles=[],chunks=new Map(),lights=[];
  const painted=new THREE.MeshStandardMaterial({vertexColors:true,roughness:.6,metalness:.2});
- const atlas=canvas&&layer.faces?.length?signAtlas(layer.faces):null;
+ const atlas=canvas&&layer.faces?.length?signAtlas(layer.faces):null;layer.faces??=[];
  const plates=new THREE.MeshStandardMaterial({map:atlas?.texture||null,alphaTest:.5,roughness:.55,side:THREE.FrontSide});
  const templates=new Map(),m4=new THREE.Matrix4(),q=new THREE.Quaternion(),UP=new THREE.Vector3(0,1,0),one=new THREE.Vector3(1,1,1),zero=new THREE.Vector3(),v=new THREE.Vector3();
  const chunkOf=(x,z)=>{const key=`${Math.floor(x/CHUNK)},${Math.floor(z/CHUNK)}`;
@@ -204,28 +204,31 @@ export function createMappedFurniture(layer,{player=()=>null,mobility=()=>null,c
  // Lamp light after dark (weather.js night look): a bright head that blooms and a warm pool on the ground.
  const HEAD={lantern:[0,2.62,.42],lamp:[0,8.2,1.5],'mast-lamp':[0,5.42,0],'park-lamp':[0,2.85,0],'wire-lamp':[0,7.28,0]};
  const heads=items.filter(it=>HEAD[it.k]).map(it=>{const [hx,hy,hz]=HEAD[it.k],yaw=it.yaw||0,x=it.x+Math.sin(yaw)*hz,z=it.z+Math.cos(yaw)*hz;return {x,z,y:groundAt(it.x,it.z)+hy,k:it.k};});
- let glow=null,pools=null;
+ // Chunked (300 m) so only lights near the player are drawn after dark.
+ const lightChunks=[];let glowMat=null,poolMat=null;
  if(heads.length){
-  const glowMat=new THREE.MeshBasicMaterial({color:'#ffd9a3',toneMapped:false,fog:false});
-  glow=new THREE.InstancedMesh(new THREE.SphereGeometry(.2,8,6),glowMat,heads.length);glow.name='Lamp heads lit';glow.frustumCulled=false;glow.visible=false;
+  glowMat=new THREE.MeshBasicMaterial({color:'#ffd9a3',toneMapped:false,fog:false});
   const c=document.createElement('canvas');c.width=c.height=64;const g=c.getContext('2d'),grad=g.createRadialGradient(32,32,0,32,32,32);
   grad.addColorStop(0,'rgba(255,255,255,1)');grad.addColorStop(.25,'rgba(255,255,255,.6)');grad.addColorStop(.6,'rgba(255,255,255,.18)');grad.addColorStop(1,'rgba(255,255,255,0)');g.fillStyle=grad;g.fillRect(0,0,64,64);
-  const poolMat=new THREE.MeshBasicMaterial({color:'#ffc98a',fog:true,alphaMap:new THREE.CanvasTexture(c),transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,polygonOffset:true,polygonOffsetFactor:-4,opacity:0});
-  pools=new THREE.InstancedMesh(new THREE.PlaneGeometry(1,1).rotateX(-Math.PI/2),poolMat,heads.length);pools.name='Lamp light pools';pools.frustumCulled=false;pools.visible=false;pools.renderOrder=2;
-  const R={lantern:6,lamp:12,'mast-lamp':9,'park-lamp':5.5,'wire-lamp':10},sc=new THREE.Vector3();
-  heads.forEach((h,i)=>{glow.setMatrixAt(i,m4.compose(v.set(h.x,h.y,h.z),q.identity(),h.k==='park-lamp'?sc.set(.8,.8,.8):one));
-   const r=R[h.k];pools.setMatrixAt(i,m4.compose(v.set(h.x,groundAt(h.x,h.z)+.32,h.z),q.identity(),sc.set(r,1,r)));});
-  group.add(glow,pools);
+  poolMat=new THREE.MeshBasicMaterial({color:'#ffc98a',fog:true,alphaMap:new THREE.CanvasTexture(c),transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,polygonOffset:true,polygonOffsetFactor:-4,opacity:0});
+  const sphere=new THREE.SphereGeometry(.2,8,6),plane=new THREE.PlaneGeometry(1,1).rotateX(-Math.PI/2);
+  const R={lantern:6,lamp:12,'mast-lamp':9,'park-lamp':5.5,'wire-lamp':10},sc=new THREE.Vector3(),by=new Map();
+  for(const h of heads){const k=`${Math.floor(h.x/300)},${Math.floor(h.z/300)}`;if(!by.has(k))by.set(k,[]);by.get(k).push(h);}
+  for(const list of by.values()){
+   const glow=new THREE.InstancedMesh(sphere,glowMat,list.length),pools=new THREE.InstancedMesh(plane,poolMat,list.length);glow.name='Lamp heads lit';pools.name='Lamp light pools';pools.renderOrder=2;
+   let cx=0,cz=0;list.forEach((h,i)=>{glow.setMatrixAt(i,m4.compose(v.set(h.x,h.y,h.z),q.identity(),h.k==='park-lamp'?sc.set(.8,.8,.8):one));const r=R[h.k];pools.setMatrixAt(i,m4.compose(v.set(h.x,groundAt(h.x,h.z)+.32,h.z),q.identity(),sc.set(r,1,r)));cx+=h.x;cz+=h.z;});
+   glow.computeBoundingSphere();pools.computeBoundingSphere();glow.visible=pools.visible=false;group.add(glow,pools);lightChunks.push({glow,pools,x:cx/list.length,z:cz/list.length});
+  }
  }
- let litShown=-1;
- function updateLights(){
-  const n=WEATHER_UNIFORMS.night.value;if(!glow||Math.abs(n-litShown)<.01)return;litShown=n;
-  glow.visible=pools.visible=n>.03;glow.material.color.setRGB(2.6*n+.2,2.0*n+.17,1.25*n+.12);pools.material.opacity=.2*n;
+ let litShown=-1,litOn=false;
+ function updateLights(p){
+  const n=WEATHER_UNIFORMS.night.value;if(!glowMat)return;
+  if(Math.abs(n-litShown)>=.01){litShown=n;litOn=n>.03;glowMat.color.setRGB(2.6*n+.2,2.0*n+.17,1.25*n+.12);poolMat.opacity=.2*n;}
+  for(const c of lightChunks){const on=litOn&&(!p||Math.hypot(c.x-p.x,c.z-p.z)<650);c.glow.visible=c.pools.visible=on;}
  }
  // Distance culling for post chunks; lenses follow the player.
  function update(){
-  updateLights();
-  const p=player();if(!p)return;
+  const p=player();updateLights(p);if(!p)return;
   for(const c of chunks.values())c.group.visible=Math.hypot(c.centre[0]-p.x,c.centre[1]-p.z)<VIEW_RANGE+CHUNK*.71;
   updateLenses(p);
  }

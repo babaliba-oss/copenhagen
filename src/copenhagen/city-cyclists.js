@@ -8,7 +8,7 @@ const RANGE=420;
 export class CityCyclists{
  constructor(roads,world,count=36,random=Math.random){
   this.roads=roads;this.world=world;this.random=random;this.offsets=new Map();
-  this.riders=Array.from({length:count},(_,id)=>({id,travelMode:'bike',x:1e6,z:1e6,heading:0,speed:0,cruise:4.2+random()*1.8,phase:random()*6,route:null,leg:0,s:0}));
+  this.riders=Array.from({length:count},(_,id)=>({id,travelMode:'bike',halfWidth:.34,halfLength:.9,x:1e6,z:1e6,heading:0,speed:0,cruise:4.2+random()*1.8,phase:random()*6,route:null,leg:0,s:0}));
  }
  offset(e){
   if(this.offsets.has(e.id))return this.offsets.get(e.id);
@@ -24,6 +24,7 @@ export class CityCyclists{
   for(let tries=0;tries<40;tries++){
    const e=E[Math.floor(this.random()*E.length)];if(e.length<15||e.crossing)continue;
    const m=e.points[Math.floor(e.points.length/2)],d=Math.hypot(m[0]-player.x,m[1]-player.z);if(d<40||d>340)continue;
+   if(d<160&&player.heading!==undefined){const fx=-Math.sin(player.heading),fz=-Math.cos(player.heading);if(((m[0]-player.x)*fx+(m[1]-player.z)*fz)/d>.2)continue;} // not popping up ahead
    if(this.offset(e)===null)continue;
    const route=[e];let total=e.length,cur=e;
    while(total<700){const next=(this.roads.outgoing[cur.to]||[]).map(i=>typeof i==='number'?E[i]:i).filter(n=>n.to!==cur.from&&n.length>4&&!n.crossing&&this.offset(n)!==null);if(!next.length)break;cur=next[Math.floor(this.random()*next.length)];route.push(cur);total+=cur.length;}
@@ -31,6 +32,7 @@ export class CityCyclists{
   }
   r.route=null;return false;
  }
+ snapshot(){return this.riders.filter(r=>!r.playerTaken&&r.route).map(({id,x,z,heading,speed})=>({id,x,z,heading,speed}));}
  step(dt,player){
   if(!player)return;
   for(const r of this.riders){

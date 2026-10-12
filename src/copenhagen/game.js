@@ -71,7 +71,7 @@ export function createCopenhagenGame({scene,city,mobilityData,cityData,toast}){
  const jobs=(ERA==='h'?JOBS_1760:JOBS).map(j=>({...j,A:ll(j.a),B:ll(j.b),aName:j.a[2],bName:j.b[2]}));
  const sagas=SAGAS.filter(s=>inEra(s.era)).map(s=>({...s,steps:s.steps.map(st=>({...st,p:ll(st.at)}))}));
  const byId=Object.fromEntries(sagas.map(s=>[s.id,s]));
- const people=cast.map(c=>{const [x,z]=ll(c.at);return {id:`cph-${c.id}`,script:c.id,x,z,heading:0,pose:'chat',walking:false,talkable:true,...(c.look.height?{height:c.look.height}:{})};});
+ const people=cast.map(c=>{const [x,z]=ll(c.at);return {id:`cph-${c.id}`,script:c.id,x,z,heading:0,pose:'chat',walking:false,talkable:true,shirt:c.look.coat,coat:.7,...(c.look.height?{height:c.look.height}:{})};});
 
  // ---- save ----
  let save={money:0,job:0,done:{},lore:[],active:null};
@@ -154,13 +154,14 @@ export function createCopenhagenGame({scene,city,mobilityData,cityData,toast}){
  }
  function rebuild(){const t=target();routeFor=t.p;const G=mode==='car'?road:walk;const a=G.nearest(player.x,player.z),b=G.nearest(t.p[0],t.p[1]);const pts=G.route(a,b);line.set(pts?[[player.x,player.z],...pts,t.p]:null);}
 
+ let hudClock=1;const setHtml=(el,h)=>{if(el&&el.__h!==h){el.__h=h;el.innerHTML=h;}};
  function updateHud(){
   $('cph-money').textContent=fmtKr(save.money)+' '+UNIT;
   const j=job(),t=state==='a'?j.A:j.B,d=line.points?line.remaining():dist(t,[player.x,player.z]);
-  $('cph-job').innerHTML=`<p class="cph-kick">Job ${save.job%jobs.length+1}/${jobs.length}</p><h3>${esc(j.t)}</h3><p>${esc(j.d)}</p><p class="cph-go">${state==='a'?'Pick up at':'Deliver to'} <b>${esc(state==='a'?j.aName:j.bName)}</b> · ${d>1000?(d/1000).toFixed(1)+' km':Math.round(d/10)*10+' m'}${state==='b'?` · <span class="${timer<15?'cph-low':''}">${Math.max(0,timer).toFixed(0)} s</span>`:''}</p>`;
+  setHtml($('cph-job'),`<p class="cph-kick">Job ${save.job%jobs.length+1}/${jobs.length}</p><h3>${esc(j.t)}</h3><p>${esc(j.d)}</p><p class="cph-go">${state==='a'?'Pick up at':'Deliver to'} <b>${esc(state==='a'?j.aName:j.bName)}</b> · ${d>1000?(d/1000).toFixed(1)+' km':Math.round(d/10)*10+' m'}${state==='b'?` · <span class="${timer<15?'cph-low':''}">${Math.max(0,timer).toFixed(0)} s</span>`:''}</p>`);
   const sg=$('cph-saga');if(!save.active){sg.hidden=true;return;}sg.hidden=false;
   const q=byId[save.active.id],f=frontier();
-  sg.innerHTML=`<p class="cph-kick">Saga · <kbd>J</kbd> journal${q.steps.some(s=>s.clue)?' · <kbd>K</kbd> map':''}</p><h3>${esc(q.title)}</h3><ol>${q.steps.map((s,k)=>{const dn=save.active.done.includes(k),c=f.includes(k),dd=dist(s.p,[player.x,player.z]);return `<li class="${dn?'d':c?'c':''}">${esc(s.name)}${c?` <span>${s.clue?warmth(dd):dd>1000?(dd/1000).toFixed(1)+' km':Math.round(dd/10)*10+' m'}</span>`:''}</li>`;}).join('')}</ol>${q.limit?`<p class="cph-timer ${save.active.t<30?'cph-low':''}">${Math.max(0,save.active.t).toFixed(0)} s</p>`:''}`;
+  setHtml(sg,`<p class="cph-kick">Saga · <kbd>J</kbd> journal${q.steps.some(s=>s.clue)?' · <kbd>K</kbd> map':''}</p><h3>${esc(q.title)}</h3><ol>${q.steps.map((s,k)=>{const dn=save.active.done.includes(k),c=f.includes(k),dd=dist(s.p,[player.x,player.z]);return `<li class="${dn?'d':c?'c':''}">${esc(s.name)}${c?` <span>${s.clue?warmth(dd):dd>1000?(dd/1000).toFixed(1)+' km':Math.round(dd/10)*10+' m'}</span>`:''}</li>`;}).join('')}</ol>${q.limit?`<p class="cph-timer ${save.active.t<30?'cph-low':''}">${Math.max(0,save.active.t).toFixed(0)} s</p>`:''}`);
  }
 
  function update(dt,actor,travelMode,{running=true}={}){
@@ -196,7 +197,7 @@ export function createCopenhagenGame({scene,city,mobilityData,cityData,toast}){
   routeT-=dt;const tg=target();
   if(!routeFor||dist(routeFor,tg.p)>1||routeT<=0&&line.progress(actor.x,actor.z)>25){routeT=3;rebuild();}
   line.progress(actor.x,actor.z);
-  updateHud();
+  hudClock+=dt;if(hudClock>.2){hudClock=0;updateHud();} // 5 Hz is plenty for distances and timers
  }
 
  function key(code){

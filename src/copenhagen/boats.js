@@ -26,25 +26,26 @@ const BUILD={sail,motor,wooden,ship,tour};
 export function createBoats(data,{waterY=-1.2,era=null}={}){
  const group=new THREE.Group();group.name='Boats';
  const boats=data?.boats||[],mat=new THREE.MeshStandardMaterial({vertexColors:true,roughness:.6,metalness:.05});
- const byKind={};for(const b of boats)(byKind[b[3]]??=[]).push(b);
+ // Chunked by 300 m and kind: chunks frustum-cull, hide past 1 km, and only those near the player bob.
+ const chunks=new Map(),geos={};
+ for(const bt of boats){if(!BUILD[bt[3]])continue;const k=`${Math.floor(bt[0]/300)},${Math.floor(bt[1]/300)}`;if(!chunks.has(k))chunks.set(k,{list:{},x:0,z:0,n:0});const c=chunks.get(k);(c.list[bt[3]]??=[]).push(bt);c.x+=bt[0];c.z+=bt[1];c.n++;}
  const meshes=[],m4=new THREE.Matrix4(),q=new THREE.Quaternion(),e=new THREE.Euler(),v=new THREE.Vector3(),s=new THREE.Vector3();
- for(const [kind,list] of Object.entries(byKind)){if(!BUILD[kind])continue;
-  const im=new THREE.InstancedMesh(BUILD[kind](),mat,list.length);im.castShadow=true;im.name=`Moored ${kind} boats`;group.add(im);meshes.push({im,list});}
+ for(const c of chunks.values()){c.x/=c.n;c.z/=c.n;c.meshes=[];
+  for(const [kind,list] of Object.entries(c.list)){const im=new THREE.InstancedMesh(geos[kind]??=BUILD[kind](),mat,list.length);im.name=`Moored ${kind} boats`;im.userData.shadowLod=true;group.add(im);const entry={im,list,chunk:c};meshes.push(entry);c.meshes.push(entry);}}
  // Tour boats: two per loop (modern only), spaced along the route.
  const movers=[];
  if(era!==1760)for(const r of data?.routes||[]){const pts=[...r,r[0]];let len=0;const cum=[0];for(let i=1;i<pts.length;i++){len+=Math.hypot(pts[i][0]-pts[i-1][0],pts[i][1]-pts[i-1][1]);cum.push(len);}
   for(let k=0;k<2;k++)movers.push({pts,cum,len,s:len*k/2});}
- let tourMesh=null;if(movers.length){tourMesh=new THREE.InstancedMesh(tour(),mat,movers.length);tourMesh.castShadow=true;tourMesh.frustumCulled=false;tourMesh.name='Canal tour boats';group.add(tourMesh);}
+ let tourMesh=null;if(movers.length){tourMesh=new THREE.InstancedMesh(tour(),mat,movers.length);tourMesh.castShadow=true;tourMesh.frustumCulled=false;tourMesh.userData.shadowLod=true;tourMesh.name='Canal tour boats';group.add(tourMesh);}
  let t=0;
- function place(){
-  for(const {im,list} of meshes){list.forEach((b,i)=>{const [x,z,yaw,,sc]=b,ph=x*.13+z*.07;e.set(Math.sin(t*.9+ph)*.025,yaw,Math.sin(t*.7+ph)*.035);m4.compose(v.set(x,waterY+Math.sin(t*1.1+ph)*.06,z),q.setFromEuler(e),s.set(sc,sc,sc));im.setMatrixAt(i,m4);});im.instanceMatrix.needsUpdate=true;}
- }
- place();for(const {im} of meshes)im.computeBoundingSphere();
+ function placeMesh(im,list){for(let i=0;i<list.length;i++){const b=list[i],x=b[0],z=b[1],sc=b[4],ph=x*.13+z*.07;e.set(Math.sin(t*.9+ph)*.025,b[2],Math.sin(t*.7+ph)*.035);m4.compose(v.set(x,waterY+Math.sin(t*1.1+ph)*.06,z),q.setFromEuler(e),s.set(sc,sc,sc));im.setMatrixAt(i,m4);}im.instanceMatrix.needsUpdate=true;}
+ function place(player){for(const c of chunks.values()){const d=player?Math.hypot(c.x-player.x,c.z-player.z):0;const vis=d<1000;for(const en of c.meshes){en.im.visible=vis;en.im.castShadow=d<350;if(vis&&d<400)placeMesh(en.im,en.list);}}}
+ for(const {im,list} of meshes){placeMesh(im,list);im.computeBoundingSphere();}
  let acc=0;
  return {group,update(dt,player){
   t+=dt;acc+=dt;
   if(tourMesh){movers.forEach((m,i)=>{m.s=(m.s+dt*3.2)%m.len;let k=1;while(k<m.cum.length-1&&m.cum[k]<m.s)k++;const a=m.pts[k-1],b=m.pts[k],f=(m.s-m.cum[k-1])/Math.max(.01,m.cum[k]-m.cum[k-1]);
    const x=a[0]+(b[0]-a[0])*f,z=a[1]+(b[1]-a[1])*f,yaw=Math.atan2(-(b[0]-a[0]),-(b[1]-a[1]));e.set(0,yaw,Math.sin(t+i)*.02);m4.compose(v.set(x,waterY+.05,z),q.setFromEuler(e),s.set(1,1,1));tourMesh.setMatrixAt(i,m4);});tourMesh.instanceMatrix.needsUpdate=true;}
-  if(acc>.12){acc=0;place();} // bobbing at ~8 Hz is plenty
+  if(acc>.12){acc=0;place(player);} // bobbing at ~8 Hz is plenty
  }};
 }

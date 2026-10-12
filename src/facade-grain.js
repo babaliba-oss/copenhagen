@@ -19,7 +19,7 @@ export function facadeGrain(material,{windows=false}={}){
 #define GRAIN_WINDOWS ${windows?1:0}
 uniform float uNight;
 varying vec3 vGrainPos;varying vec3 vGrainNormal;
-float gHash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
+float gHash(vec2 p){return fract(sin(mod(dot(p,vec2(1.,57.)),997.)*1.371)*4375.85);}
 float gNoise(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);return mix(mix(gHash(i),gHash(i+vec2(1,0)),f.x),mix(gHash(i+vec2(0,1)),gHash(i+vec2(1,1)),f.x),f.y);}`)
    .replace('#include <color_fragment>',`#include <color_fragment>
 float vWinLit=0.;
@@ -49,7 +49,7 @@ float vWinLit=0.;
   float open=step(.29,wf.x)*step(wf.x,.71)*step(.3,wf.y)*step(wf.y,.83);
   float frame=step(.25,wf.x)*step(wf.x,.75)*step(.26,wf.y)*step(wf.y,.87)-open;
   float sharp=1.-smoothstep(.12,.45,fw);
-  float h=fract(sin(dot(wc,vec2(12.9898,78.233)))*43758.5453);
+  float h=fract(sin(mod(dot(wc,vec2(1.,57.)),997.)*1.371)*4375.85);
   vec3 glass=vec3(.05,.07,.09)+vec3(.04,.05,.06)*h;
   vec3 withWin=mix(mix(c,c*1.18+.05,frame),glass,open);
   c=mix(mix(c,c*.8,.0+.35*(1.-sharp)),withWin,sharp);
@@ -68,7 +68,7 @@ float vWinLit=0.;
  }
  diffuseColor.rgb=c;
 }`)
-   .replace('#include <emissivemap_fragment>','#include <emissivemap_fragment>\ntotalEmissiveRadiance+=vec3(1.,.72,.4)*vWinLit*1.1;');
+   .replace('#include <emissivemap_fragment>','#include <emissivemap_fragment>\ntotalEmissiveRadiance+=vec3(1.,.62,.28)*vWinLit*.65;');
  };
  const key=material.customProgramCacheKey?.bind(material);
  material.customProgramCacheKey=()=>(key?key():'')+'|facade-grain'+(windows?'-w':'');

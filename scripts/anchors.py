@@ -15,3 +15,5 @@ for t in d['tiles']:
                 a = arr[p['start']:p['start'] + p['count']]; i = a[:, 1].argmax()
                 out[k] = [round(float(a[i, 0]), 2), round(float(a[i, 1]), 2), round(float(a[i, 2]), 2), p['height']]
 json.dump(out, open(f'{OUT}/anchors.json', 'w')); print(out)
+import os, shutil
+if os.path.exists(f'data/raw/cities/{cid}/era-public.json'): shutil.copy(f'data/raw/cities/{cid}/era-public.json', f'{OUT}/era.json')
