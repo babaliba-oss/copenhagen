@@ -48,3 +48,5 @@ body:not(.driving) #cph-hud,body.busted #cph-hud,body.clean-capture #cph-hud{vis
 #era-card p{margin:0;font-size:14px;letter-spacing:.06em;color:#d8c9a8}
 #era-card p:first-child{text-transform:uppercase;font-size:11px;letter-spacing:.2em}
 .nav-btn{white-space:nowrap}
+/* 1760: a coach has no battery */
+body.era-1760 .battery-row,body.era-1760 #battery-gauge{visibility:hidden}

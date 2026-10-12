@@ -102,7 +102,16 @@ for e in areas:
     out.append(e)
 # open land outside the walls: grass over the whole square except water and the town
 ext = cfg['radiusMetres'] * 1.25 * 1.45
-field = Polygon([(-ext, -ext), (ext, -ext), (ext, ext), (-ext, ext)]).difference(ZONE.buffer(10))
+wet = []
+for e in out:
+    t = e.get('tags', {})
+    if t.get('natural') != 'water' and t.get('waterway') != 'riverbank': continue
+    rings = [e['geometry']] if e.get('geometry') else [m['geometry'] for m in e.get('members', []) if m.get('role') == 'outer' and m.get('geometry')]
+    for g in rings:
+        if len(g) > 3:
+            try: wet.append(Polygon([fwd(q['lon'], q['lat']) for q in g]).buffer(0))
+            except Exception: pass
+field = Polygon([(-ext, -ext), (ext, -ext), (ext, ext), (-ext, ext)]).difference(ZONE.buffer(10)).difference(unary_union(wet).buffer(1))
 for i, g in enumerate(ring_geo(field)): out.append({'type': 'way', 'id': -(50000 + i), 'tags': {'landuse': 'meadow', 'name': 'Fælled'}, 'geometry': g})
 # the town's open ground (yards, squares, the strip between street and house) is cobbled
 greens = []

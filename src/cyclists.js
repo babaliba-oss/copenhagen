@@ -42,7 +42,7 @@ export class Cyclists{
 
 export function createCyclistRenderer(scene,sim){
  const group=new THREE.Group();group.name='Cyclists on dedicated harbour cycleway';scene.add(group);
- const mats={frame:new THREE.MeshStandardMaterial({color:'#caa72b',roughness:.5,metalness:.3}),dark:new THREE.MeshStandardMaterial({color:'#25312f',roughness:.9}),metal:new THREE.MeshStandardMaterial({color:'#9aa9aa',roughness:.38,metalness:.6})};
+ const mats={frame:new THREE.MeshStandardMaterial({color:'#ffffff',roughness:.5,metalness:.3}),dark:new THREE.MeshStandardMaterial({color:'#25312f',roughness:.9}),metal:new THREE.MeshStandardMaterial({color:'#9aa9aa',roughness:.38,metalness:.6})};
  const parts=new Map();
  function tube(a,b,r,mat){const av=new THREE.Vector3(...a),bv=new THREE.Vector3(...b),d=bv.clone().sub(av),g=new THREE.CylinderGeometry(r,r,d.length(),6);g.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,1,0),d.normalize()));g.translate(...av.add(bv).multiplyScalar(.5).toArray());if(!parts.has(mat))parts.set(mat,[]);parts.get(mat).push(g.toNonIndexed());}
  // Saddle height fits a ~1.75 m rider whose foot reaches the pedal at the bottom of the stroke.
@@ -51,7 +51,8 @@ export function createCyclistRenderer(scene,sim){
  tube(head,[0,1.17,-.46],.024,'metal');tube([-.29,1.17,-.46],[.29,1.17,-.46],.027,'dark');tube([0,.85,.25],[0,.93,.26],.022,'metal');tube([0,.96,.14],[0,.96,.36],.05,'dark');
  const count=sim.riders.length,tmp=new THREE.Object3D(),specs=[];
  function batch(geometry,mat,pose){const mesh=new THREE.InstancedMesh(geometry,mats[mat],count);mesh.castShadow=true;mesh.frustumCulled=false;group.add(mesh);specs.push({mesh,pose});return mesh;}
- for(const [mat,gs] of parts){batch(mergeGeometries(gs),mat,()=>[0,0,0,0,0]);gs.forEach(g=>g.dispose());}
+ const FRAMES=['#caa72b','#1d1f22','#e8e6df','#2d4f7a','#7a2a20','#3f5d45','#9aa0a6','#c8202a','#e0b4c0','#1f6f6a'];
+ for(const [mat,gs] of parts){const m=batch(mergeGeometries(gs),mat,()=>[0,0,0,0,0]);if(mat==='frame'){const c=new THREE.Color();for(let i=0;i<count;i++)m.setColorAt(i,c.set(FRAMES[(i*7+3)%FRAMES.length]));}gs.forEach(g=>g.dispose());}
  const tire=new THREE.TorusGeometry(.335,.032,6,20);tire.rotateY(Math.PI/2);
  const rim=new THREE.TorusGeometry(.293,.011,4,20);rim.rotateY(Math.PI/2);
  for(const z of [-.61,.61]){batch(tire,'dark',r=>[0,.37,z,r.phase,0]);batch(rim,'metal',r=>[0,.37,z,r.phase,0]);}
