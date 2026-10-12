@@ -73,6 +73,7 @@ import {createBoats} from './copenhagen/boats.js';
 import {createLandmarks} from './copenhagen/landmarks.js';
 import {CityCyclists} from './copenhagen/city-cyclists.js';
 import {createTrains} from './copenhagen/trains.js';
+import {createCafes} from './copenhagen/cafes.js';
 import {PERIOD as PERSON_PERIOD} from './person-model.js';
 import {WATER_LEVEL as CPH_WATER} from './quay.js';
 import {createBirds,shoreSamples,inWater} from './birds.js';
@@ -849,6 +850,7 @@ async function boot(){
    const terrainData=city.terrain?.file?unpack(dataUrl(city.terrain.file)).then(decodeTerrain).catch(e=>{console.warn('Terrain unavailable; the city stays flat:',e);return null;}):null; // ground elevation (src/terrain.js)
    const anchorData=city.id.startsWith('copenhagen')?json(dataUrl('anchors.json')).catch(()=>null):null,eraData=city.era===1760?json(dataUrl('era.json')).catch(()=>null):null;
    const boatData=city.id.startsWith('copenhagen')?json(dataUrl('boats.json')).catch(()=>null):null;
+   const cafeData=city.id==='copenhagen'?json(dataUrl('cafes.json')).catch(()=>null):null;
    const railData=city.id==='copenhagen'?json(dataUrl('rails.json')).catch(()=>null):null;
    const parkedData=city.id==='copenhagen'?json(dataUrl('parked.json')).catch(()=>null):null; // kerbside parked cars (scripts/parked-cars.py)
    const furnitureData=city.furniture?json(dataUrl(city.furniture)).catch(()=>null):null; // street furniture detected in street-level photos (optional, any city)
@@ -962,6 +964,7 @@ async function boot(){
    // Detected street furniture: solid boxes join the obstacles; posts, bins and barriers can be knocked down.
    {const an=anchorData&&await anchorData;if(an){const ed=eraData&&await eraData;landmarks=createLandmarks({era:city.era,anchors:an,mills:ed?.mills||[]});cityModel.add(landmarks.group);}}
    {const bd=boatData&&await boatData;if(bd){boats=createBoats(bd,{waterY:CPH_WATER+(sea?.group?.position?.y||0),era:city.era});cityModel.add(boats.group);}}
+   {const cd=cafeData&&await cafeData;if(cd){const c=createCafes(cd);cityModel.add(c.group);streetObstacles.push(...(c.obstacles||[]));}}
    {const rd=railData&&await railData;if(rd){cityModel.add(createRails(rd).group);trains=createTrains(rd);cityModel.add(trains.group);}}
    {const pd=parkedData&&await parkedData;if(pd){parkedCars=createParkedCars(pd);cityModel.add(parkedCars.group);streetObstacles.push(...parkedCars.obstacles);}}
    const mapped=furnitureData&&await furnitureData;let mappedFurniture=null;

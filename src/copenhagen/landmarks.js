@@ -72,6 +72,26 @@ function sails(){
  return mergeGeometries(p);
 }
 
+// Tivoli (1843): Himmelskibet's 80 m swing tower, the Golden Tower, a small wheel and carousels, all turning.
+function tivoli(add,mat,spinners){
+ const T=[];
+ // Himmelskibet
+ add(mergeGeometries([paint(new THREE.CylinderGeometry(.9,1.3,80,10).translate(0,40,0),'#e9e4d6'),paint(new THREE.CylinderGeometry(3,3,1.2,16).translate(0,1,0),'#8a2f35')]),-510,813);
+ const sky=new THREE.Mesh(mergeGeometries([paint(new THREE.CylinderGeometry(6,6.5,1.5,16).translate(0,0,0),'#c8202a'),...Array.from({length:12},(_,i)=>{const a=i/12*Math.PI*2;return paint(new THREE.BoxGeometry(.6,.9,.6).translate(Math.cos(a)*9,-6,Math.sin(a)*9),'#d4a637');}),...Array.from({length:12},(_,i)=>{const a=i/12*Math.PI*2;return paint(new THREE.CylinderGeometry(.03,.03,8,3).rotateX(Math.cos(a)*.35).rotateZ(-Math.sin(a)*.35).translate(Math.cos(a)*7.5,-3,Math.sin(a)*7.5),'#9aa0a6');})]),mat);
+ sky.position.set(-510,groundAt(-510,813)+72,813);spinners.push({m:sky,rate:.9,bob:true});T.push(sky);
+ // Det Gyldne Tårn
+ add(mergeGeometries([paint(new THREE.CylinderGeometry(1.2,1.8,58,8).translate(0,29,0),'#3a3d42'),paint(new THREE.ConeGeometry(2.6,6,8).translate(0,61,0),GOLD),paint(new THREE.TorusGeometry(2.4,.4,6,16).rotateX(Math.PI/2).translate(0,20,0),GOLD)]),-332,745);
+ // Ballongyngen (small wheel)
+ const wheel=new THREE.Mesh(mergeGeometries([paint(new THREE.TorusGeometry(7,.18,6,28),'#e9e4d6'),...Array.from({length:10},(_,i)=>paint(new THREE.CylinderGeometry(.07,.07,14,4).rotateZ(i/10*Math.PI),'#e9e4d6')),...Array.from({length:10},(_,i)=>{const a=i/10*Math.PI*2;return paint(new THREE.SphereGeometry(.9,10,8).translate(Math.cos(a)*7,Math.sin(a)*7,0),['#c8202a','#2d4f7a','#d4a637','#3f5d45'][i%4]);})]),mat);
+ wheel.position.set(-531,groundAt(-531,786)+9,786);spinners.push({m:wheel,rate:.25,axis:'z'});T.push(wheel);
+ add(mergeGeometries([paint(new THREE.CylinderGeometry(.25,.4,9,6).translate(-1.5,4.5,0).rotateZ(.15),'#8a8f94'),paint(new THREE.CylinderGeometry(.25,.4,9,6).translate(1.5,4.5,0).rotateZ(-.15),'#8a8f94')]),-531,786);
+ // carousels
+ for(const [x,z,c] of [[-499,760,'#c8202a'],[-437,733,'#2d4f7a'],[-308,744,'#3f5d45']]){
+  const top=new THREE.Mesh(mergeGeometries([paint(new THREE.ConeGeometry(7,3,16).translate(0,6.5,0),c),paint(new THREE.CylinderGeometry(7,7,.6,16).translate(0,4.8,0),'#e9e3d4'),paint(new THREE.CylinderGeometry(6.5,6.5,.4,16).translate(0,.4,0),'#7a5a3a'),...Array.from({length:10},(_,i)=>{const a=i/10*Math.PI*2;return paint(new THREE.CylinderGeometry(.05,.05,4.4,4).translate(Math.cos(a)*5,2.6,Math.sin(a)*5),GOLD);}),...Array.from({length:10},(_,i)=>{const a=i/10*Math.PI*2;return paint(new THREE.BoxGeometry(.5,1,1.4).translate(Math.cos(a)*5,1.6,Math.sin(a)*5),['#efe7d3','#5b3a24','#2a2420'][i%3]);})]),mat);
+  top.position.set(x,groundAt(x,z),z);spinners.push({m:top,rate:.5});T.push(top);
+ }
+ return T;
+}
 export function createLandmarks({era=null,mills=[],anchors={}}={}){
  const group=new THREE.Group();group.name='Hand-built landmarks';
  const mat=new THREE.MeshStandardMaterial({vertexColors:true,roughness:.45,metalness:.35});
@@ -81,7 +101,9 @@ export function createLandmarks({era=null,mills=[],anchors={}}={}){
  if(anchors.vorFrelsers?.[3]>60)scaled(vorFrelsers(),anchors.vorFrelsers,86);
  if(anchors.borsen?.[3]>35)scaled(borsen(),anchors.borsen,53);
  const flagTops=[];if(anchors.christiansborg?.[3]>80)flagTops.push([anchors.christiansborg[0],anchors.christiansborg[2],anchors.christiansborg[1]]);
+ const spinners=[];
  if(today){
+  for(const m of tivoli(add,mat,spinners)){m.castShadow=true;group.add(m);}
   add(mermaid(),1465.3,-1438.7,{y:-1.2,rot:2.2});
   add(rider(4.5),1076.2,-438.8,{rot:.12});add(rider(3.6,'#4d6a59'),191.9,194.8,{rot:-1.2});add(gefion(),1371.2,-729.5,{rot:-.6});
  }
@@ -89,5 +111,5 @@ export function createLandmarks({era=null,mills=[],anchors={}}={}){
  for(const [x,z,h] of flagTops){const pole=add(mergeGeometries([paint(new THREE.CylinderGeometry(.08,.1,8,6).translate(0,4,0),'#e9e6dc')]),x,z,{y:groundAt(x,z)+h});const f=flag();f.position.set(x,groundAt(x,z)+h+7.2,z);group.add(f);flags.push(f);}
  if(era===1760)for(const [x,z] of mills){add(windmill(),x,z,{y:groundAt(x,z)+7});const r=new THREE.Mesh(sails(),mat);r.position.set(x,groundAt(x,z)+14.6,z+2.3);group.add(r);rotors.push(r);}
  let t=0,acc=0;
- return {group,update(dt){t+=dt;acc+=dt;for(const r of rotors)r.rotation.z-=dt*.6;if(acc>.05){acc=0;for(const f of flags)f.userData.wave?.(t);}}};
+ return {group,update(dt){t+=dt;acc+=dt;for(const r of rotors)r.rotation.z-=dt*.6;for(const sp of spinners){if(sp.axis==='z')sp.m.rotation.z+=dt*sp.rate;else sp.m.rotation.y+=dt*sp.rate;}if(acc>.05){acc=0;for(const f of flags)f.userData.wave?.(t);}}};
 }
