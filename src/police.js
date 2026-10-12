@@ -98,7 +98,10 @@ export class PoliceSimulation{
  }
  report(kind,id,speed){
   if(this.busted||this.time<this.grace)return false;
-  const add=incidentHeat(kind,speed);if(!add)return false;
+  // Relaxed cities (Copenhagen): only running people over or ramming a patrol car brings the police, and at one star less.
+  if(this.relaxed&&kind!=='pedestrian'&&kind!=='police')return false;
+  let add=incidentHeat(kind,speed);if(!add)return false;
+  if(this.relaxed)add=Math.max(3,add-3);
   const key=`${kind}:${id}`,last=this.contacts.get(key)??-Infinity;this.contacts.set(key,this.time);
   if(this.time-last<CONTACT_COOLDOWN)return false;
   const before=this.level;
@@ -265,7 +268,7 @@ export class PoliceSimulation{
   const atCar=this.units.some(u=>distance(u,player)<CONTACT_BUST.range);
   this.contact=atCar&&Math.abs(player.speed)<CONTACT_BUST.speed?this.contact+dt:0;
   if(this.bust>=this.bustTime||this.contact>=CONTACT_BUST.time){this.busted=true;this.heat=0;this.bust=this.bustTime;this.escape=0;player.speed=0;for(const u of this.units)u.speed=0;this.message='Busted — pursuit ended.';}
-  else if(this.escape>=escapeTime(this.level)*(surge?SURGE.escapeScale:1)){
+  else if(this.escape>=escapeTime(this.level)*(surge?SURGE.escapeScale:1)*(this.relaxed?.5:1)){
    const was=this.level;this.heat=0;this.units=[...(this.parked||[])];this.lastSeen=null;this.intercept=null;
    this.recentIncidents=[];this.contacts.clear();this.recklessSeconds=0;this.recklessAt=-Infinity;this.surgeUntil=-Infinity;
    this.message=!was?null:was<=1?'The patrol gave up — wanted level cleared.':'Escaped — wanted level cleared.';

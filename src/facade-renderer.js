@@ -1,5 +1,4 @@
 import * as THREE from 'three';
-import {litWindows} from './night-windows.js';
 import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';
 import {storeyBands,storeyStyle} from './facade-data.js';
 
@@ -118,7 +117,7 @@ function groundStorey(F,G,B,band,g,c){
 export function createFacade(faces,spec){
  const c={glass:linear(spec.windows.glass),frame:linear(spec.windows.frame),trim:linear(spec.trim||spec.windows.frame),
   shop:linear('#7d7a70'),band:linear(spec.ground?.band||'#2e3134'),groundFrame:linear(spec.ground?.frame||'#2b2d2f'),
-  awning:linear(spec.ground?.awning||'#2b2d2f'),canopy:linear(spec.ground?.canopy||'#2b2d2f'),lower:spec.wallLower&&linear(spec.wallLower),cornice:linear(spec.cornice||spec.trim||spec.wall)};
+  awning:linear(spec.ground?.awning||'#2b2d2f'),canopy:linear(spec.ground?.canopy||'#2b2d2f'),door:linear(spec.door||'#3a2a20'),lower:spec.wallLower&&linear(spec.wallLower),cornice:linear(spec.cornice||spec.trim||spec.wall)};
  const G=new Batch(),B=new Batch();let windows=0;
  for(const face of faces){
   const F=new FaceFrame(face),width=F.s1-F.s0,height=F.y1-F.y0;
@@ -127,6 +126,13 @@ export function createFacade(faces,spec){
   // A differently clad base (granite, brick) over the lower storeys.
   if(c.lower){const top=bands[Math.min(bands.length-1,spec.lowerStoreys-1)].y1;for(const [a,b] of runs(F,F.y0+1,[F.s0,F.s1]))slab(F,B,(a+b)/2,(F.y0+top)/2,.0,b-a,top-F.y0,.02,c.lower);}
   for(const band of bands){
+   if(band.index===0&&spec.storeys>1&&spec.ground?.type==='solid'&&spec.estimated){
+    // Estimated fronts: windows on the ground floor too, and a street door in the widest run.
+    windows+=upperStorey(F,G,B,band,storeyStyle(spec,1,spec.storeys),c);
+    let best=null;for(const [a,b] of runs(F,band.y0+1.2,[F.s0,F.s1]))if(!best||b-a>best[1]-best[0])best=[a,b];
+    if(best&&best[1]-best[0]>3){const s=(best[0]+best[1])/2+((F.s0*7.3)%1-.5)*(best[1]-best[0])*.4;
+     slab(F,B,s,band.y0+1.25,.03,1.3,2.5,.16,c.door);slab(F,B,s,band.y0+2.62,.03,1.5,.14,.2,c.cornice);}
+    continue;}
    if(band.index===0&&spec.storeys>1){windows+=groundStorey(F,G,B,band,spec.ground,c);continue;}
    windows+=upperStorey(F,G,B,band,storeyStyle(spec,band.index,spec.storeys),c);
    // String course between storeys of masonry fronts.
@@ -141,5 +147,5 @@ export function createFacade(faces,spec){
 
 // Materials for the two batches; the shell itself keeps the building's own material.
 export function facadeMaterials(){
- return {glass:litWindows(new THREE.MeshStandardMaterial({vertexColors:true,roughness:.3,metalness:.1})),relief:new THREE.MeshStandardMaterial({vertexColors:true,roughness:.78})};
+ return {glass:new THREE.MeshStandardMaterial({vertexColors:true,roughness:.3,metalness:.1}),relief:new THREE.MeshStandardMaterial({vertexColors:true,roughness:.78})};
 }

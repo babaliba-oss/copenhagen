@@ -4,7 +4,7 @@ import * as THREE from 'three';
 // grazing a corner must not alternate between solid and see-through each frame.
 export function advanceOcclusion(state, blocked, dt) {
  state.clearTime=blocked?0:(state.clearTime||0)+dt;
- const target=blocked||state.clearTime<.25?.18:1;
+ const target=blocked||state.clearTime<.25?.28:1;
  state.opacity=(state.opacity??1)+(target-(state.opacity??1))*(1-Math.exp(-dt*5));
  if(Math.abs(state.opacity-target)<.001)state.opacity=target;
  return state.opacity;
