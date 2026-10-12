@@ -1,0 +1,1870 @@
+{
+ "schemaVersion": 1,
+ "city": "copenhagen",
+ "street": "Nyhavn (north quay)",
+ "observedOn": "2026-10-12",
+ "source": "Described in our own words from street-level photos on Mapillary (mapillary.com), CC BY-SA 4.0; photo ids per building. No image content is stored here.",
+ "note": "Colours read from overcast late-afternoon photos, west to east; the sequence is matched to the city model houses in order along the quay, so a colour may sit one house off. Red tile roofs with dormers, white window frames, restaurants with awnings in the ground floors.",
+ "buildings": {
+  "kk-osm-way-134166199": {
+   "name": "Nyhavn north quay, house 1 from the west",
+   "storeys": 4,
+   "groundStorey": 3.1,
+   "material": "render",
+   "wall": "#d9a63a",
+   "cornice": "#efece4",
+   "roof": "#9a4630",
+   "windows": {
+    "shape": "rect",
+    "pitch": 2.1,
+    "width": 0.95,
+    "height": 1.5,
+    "frame": "#f2efe8",
+    "glass": "#2f3b42"
+   },
+   "ground": {
+    "type": "shops",
+    "pitch": 3.2,
+    "band": "#2b2d2f",
+    "awning": "#7a2a20",
+    "frame": "#2b2d2f"
+   },
+   "description": "Narrow merchant house of four or five storeys in coloured render, small white-framed windows in regular rows, red tile roof with dormers; restaurant at street level under an awning.",
+   "evidence": {
+    "photos": [
+     {
+      "id": "2278971705569682",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "522833282429313",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "800201804243397",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "915994042467407",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "145779257442479",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "509005887143760",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "269812254817512",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "905119873619474",
+      "captured": "2016-11-25"
+     }
+    ],
+    "confidence": 0.55
+   }
+  },
+  "kk-osm-way-134166214": {
+   "name": "Nyhavn north quay, house 2 from the west",
+   "storeys": 4,
+   "groundStorey": 3.1,
+   "material": "render",
+   "wall": "#c9c6c4",
+   "cornice": "#efece4",
+   "roof": "#9a4630",
+   "windows": {
+    "shape": "rect",
+    "pitch": 2.1,
+    "width": 0.95,
+    "height": 1.5,
+    "frame": "#f2efe8",
+    "glass": "#2f3b42"
+   },
+   "ground": {
+    "type": "shops",
+    "pitch": 3.2,
+    "band": "#5a2a22",
+    "awning": "#e9e3d4",
+    "frame": "#2b2d2f"
+   },
+   "description": "Narrow merchant house of four or five storeys in coloured render, small white-framed windows in regular rows, red tile roof with dormers; restaurant at street level under an awning.",
+   "evidence": {
+    "photos": [
+     {
+      "id": "2278971705569682",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "522833282429313",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "800201804243397",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "915994042467407",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "145779257442479",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "509005887143760",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "269812254817512",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "905119873619474",
+      "captured": "2016-11-25"
+     }
+    ],
+    "confidence": 0.55
+   }
+  },
+  "kk-osm-way-134166196": {
+   "name": "Nyhavn north quay, house 3 from the west",
+   "storeys": 4,
+   "groundStorey": 3.1,
+   "material": "render",
+   "wall": "#ece9e2",
+   "cornice": "#efece4",
+   "roof": "#9a4630",
+   "windows": {
+    "shape": "rect",
+    "pitch": 2.1,
+    "width": 0.95,
+    "height": 1.5,
+    "frame": "#f2efe8",
+    "glass": "#2f3b42"
+   },
+   "ground": {
+    "type": "shops",
+    "pitch": 3.2,
+    "band": "#1f3a2c",
+    "awning": "#1f3a2c",
+    "frame": "#2b2d2f"
+   },
+   "description": "Narrow merchant house of four or five storeys in coloured render, small white-framed windows in regular rows, red tile roof with dormers; restaurant at street level under an awning.",
+   "evidence": {
+    "photos": [
+     {
+      "id": "2278971705569682",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "522833282429313",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "800201804243397",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "915994042467407",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "145779257442479",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "509005887143760",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "269812254817512",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "905119873619474",
+      "captured": "2016-11-25"
+     }
+    ],
+    "confidence": 0.55
+   }
+  },
+  "kk-osm-way-134166219": {
+   "name": "Nyhavn north quay, house 4 from the west",
+   "storeys": 4,
+   "groundStorey": 3.1,
+   "material": "render",
+   "wall": "#d99a3c",
+   "cornice": "#efece4",
+   "roof": "#9a4630",
+   "windows": {
+    "shape": "rect",
+    "pitch": 2.1,
+    "width": 0.95,
+    "height": 1.5,
+    "frame": "#f2efe8",
+    "glass": "#2f3b42"
+   },
+   "ground": {
+    "type": "shops",
+    "pitch": 3.2,
+    "band": "#2b2d2f",
+    "awning": "#c8202a",
+    "frame": "#2b2d2f"
+   },
+   "description": "Narrow merchant house of four or five storeys in coloured render, small white-framed windows in regular rows, red tile roof with dormers; restaurant at street level under an awning.",
+   "evidence": {
+    "photos": [
+     {
+      "id": "2278971705569682",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "522833282429313",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "800201804243397",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "915994042467407",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "145779257442479",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "509005887143760",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "269812254817512",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "905119873619474",
+      "captured": "2016-11-25"
+     }
+    ],
+    "confidence": 0.55
+   }
+  },
+  "kk-osm-way-134166236": {
+   "name": "Nyhavn north quay, house 5 from the west",
+   "storeys": 4,
+   "groundStorey": 3.1,
+   "material": "render",
+   "wall": "#8fa3bd",
+   "cornice": "#efece4",
+   "roof": "#9a4630",
+   "windows": {
+    "shape": "rect",
+    "pitch": 2.1,
+    "width": 0.95,
+    "height": 1.5,
+    "frame": "#f2efe8",
+    "glass": "#2f3b42"
+   },
+   "ground": {
+    "type": "shops",
+    "pitch": 3.2,
+    "band": "#5a2a22",
+    "awning": "#7a2a20",
+    "frame": "#2b2d2f"
+   },
+   "description": "Narrow merchant house of four or five storeys in coloured render, small white-framed windows in regular rows, red tile roof with dormers; restaurant at street level under an awning.",
+   "evidence": {
+    "photos": [
+     {
+      "id": "2278971705569682",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "522833282429313",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "800201804243397",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "915994042467407",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "145779257442479",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "509005887143760",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "269812254817512",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "905119873619474",
+      "captured": "2016-11-25"
+     }
+    ],
+    "confidence": 0.55
+   }
+  },
+  "kk-osm-way-134166198": {
+   "name": "Nyhavn north quay, house 6 from the west",
+   "storeys": 4,
+   "groundStorey": 3.1,
+   "material": "render",
+   "wall": "#e3b64c",
+   "cornice": "#efece4",
+   "roof": "#9a4630",
+   "windows": {
+    "shape": "rect",
+    "pitch": 2.1,
+    "width": 0.95,
+    "height": 1.5,
+    "frame": "#f2efe8",
+    "glass": "#2f3b42"
+   },
+   "ground": {
+    "type": "shops",
+    "pitch": 3.2,
+    "band": "#1f3a2c",
+    "awning": "#e9e3d4",
+    "frame": "#2b2d2f"
+   },
+   "description": "Narrow merchant house of four or five storeys in coloured render, small white-framed windows in regular rows, red tile roof with dormers; restaurant at street level under an awning.",
+   "evidence": {
+    "photos": [
+     {
+      "id": "2278971705569682",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "522833282429313",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "800201804243397",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "915994042467407",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "145779257442479",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "509005887143760",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "269812254817512",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "905119873619474",
+      "captured": "2016-11-25"
+     }
+    ],
+    "confidence": 0.55
+   }
+  },
+  "kk-osm-relation-1810350": {
+   "name": "Nyhavn north quay, house 7 from the west",
+   "storeys": 4,
+   "groundStorey": 3.1,
+   "material": "render",
+   "wall": "#c98a7a",
+   "cornice": "#efece4",
+   "roof": "#9a4630",
+   "windows": {
+    "shape": "rect",
+    "pitch": 2.1,
+    "width": 0.95,
+    "height": 1.5,
+    "frame": "#f2efe8",
+    "glass": "#2f3b42"
+   },
+   "ground": {
+    "type": "shops",
+    "pitch": 3.2,
+    "band": "#2b2d2f",
+    "awning": "#1f3a2c",
+    "frame": "#2b2d2f"
+   },
+   "description": "Narrow merchant house of four or five storeys in coloured render, small white-framed windows in regular rows, red tile roof with dormers; restaurant at street level under an awning.",
+   "evidence": {
+    "photos": [
+     {
+      "id": "2278971705569682",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "522833282429313",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "800201804243397",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "915994042467407",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "145779257442479",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "509005887143760",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "269812254817512",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "905119873619474",
+      "captured": "2016-11-25"
+     }
+    ],
+    "confidence": 0.55
+   }
+  },
+  "kk-osm-way-134166234": {
+   "name": "Nyhavn north quay, house 8 from the west",
+   "storeys": 5,
+   "groundStorey": 3.1,
+   "material": "render",
+   "wall": "#d07a3a",
+   "cornice": "#efece4",
+   "roof": "#9a4630",
+   "windows": {
+    "shape": "rect",
+    "pitch": 2.1,
+    "width": 0.95,
+    "height": 1.5,
+    "frame": "#f2efe8",
+    "glass": "#2f3b42"
+   },
+   "ground": {
+    "type": "shops",
+    "pitch": 3.2,
+    "band": "#5a2a22",
+    "awning": "#c8202a",
+    "frame": "#2b2d2f"
+   },
+   "description": "Narrow merchant house of four or five storeys in coloured render, small white-framed windows in regular rows, red tile roof with dormers; restaurant at street level under an awning.",
+   "evidence": {
+    "photos": [
+     {
+      "id": "2278971705569682",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "522833282429313",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "800201804243397",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "915994042467407",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "145779257442479",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "509005887143760",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "269812254817512",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "905119873619474",
+      "captured": "2016-11-25"
+     }
+    ],
+    "confidence": 0.55
+   }
+  },
+  "kk-osm-way-134166200": {
+   "name": "Nyhavn north quay, house 9 from the west",
+   "storeys": 4,
+   "groundStorey": 3.1,
+   "material": "render",
+   "wall": "#7f95b0",
+   "cornice": "#efece4",
+   "roof": "#9a4630",
+   "windows": {
+    "shape": "rect",
+    "pitch": 2.1,
+    "width": 0.95,
+    "height": 1.5,
+    "frame": "#f2efe8",
+    "glass": "#2f3b42"
+   },
+   "ground": {
+    "type": "shops",
+    "pitch": 3.2,
+    "band": "#1f3a2c",
+    "awning": "#7a2a20",
+    "frame": "#2b2d2f"
+   },
+   "description": "Narrow merchant house of four or five storeys in coloured render, small white-framed windows in regular rows, red tile roof with dormers; restaurant at street level under an awning.",
+   "evidence": {
+    "photos": [
+     {
+      "id": "2278971705569682",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "522833282429313",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "800201804243397",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "915994042467407",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "145779257442479",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "509005887143760",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "269812254817512",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "905119873619474",
+      "captured": "2016-11-25"
+     }
+    ],
+    "confidence": 0.55
+   }
+  },
+  "kk-osm-way-134166205": {
+   "name": "Nyhavn north quay, house 10 from the west",
+   "storeys": 5,
+   "groundStorey": 3.1,
+   "material": "render",
+   "wall": "#e1b24a",
+   "cornice": "#efece4",
+   "roof": "#9a4630",
+   "windows": {
+    "shape": "rect",
+    "pitch": 2.1,
+    "width": 0.95,
+    "height": 1.5,
+    "frame": "#f2efe8",
+    "glass": "#2f3b42"
+   },
+   "ground": {
+    "type": "shops",
+    "pitch": 3.2,
+    "band": "#2b2d2f",
+    "awning": "#e9e3d4",
+    "frame": "#2b2d2f"
+   },
+   "description": "Narrow merchant house of four or five storeys in coloured render, small white-framed windows in regular rows, red tile roof with dormers; restaurant at street level under an awning.",
+   "evidence": {
+    "photos": [
+     {
+      "id": "2278971705569682",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "522833282429313",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "800201804243397",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "915994042467407",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "145779257442479",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "509005887143760",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "269812254817512",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "905119873619474",
+      "captured": "2016-11-25"
+     }
+    ],
+    "confidence": 0.55
+   }
+  },
+  "kk-osm-way-134166232": {
+   "name": "Nyhavn north quay, house 11 from the west",
+   "storeys": 5,
+   "groundStorey": 3.1,
+   "material": "render",
+   "wall": "#c46a63",
+   "cornice": "#efece4",
+   "roof": "#9a4630",
+   "windows": {
+    "shape": "rect",
+    "pitch": 2.1,
+    "width": 0.95,
+    "height": 1.5,
+    "frame": "#f2efe8",
+    "glass": "#2f3b42"
+   },
+   "ground": {
+    "type": "shops",
+    "pitch": 3.2,
+    "band": "#5a2a22",
+    "awning": "#1f3a2c",
+    "frame": "#2b2d2f"
+   },
+   "description": "Narrow merchant house of four or five storeys in coloured render, small white-framed windows in regular rows, red tile roof with dormers; restaurant at street level under an awning.",
+   "evidence": {
+    "photos": [
+     {
+      "id": "2278971705569682",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "522833282429313",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "800201804243397",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "915994042467407",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "145779257442479",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "509005887143760",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "269812254817512",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "905119873619474",
+      "captured": "2016-11-25"
+     }
+    ],
+    "confidence": 0.55
+   }
+  },
+  "kk-osm-way-133938854": {
+   "name": "Nyhavn north quay, house 12 from the west",
+   "storeys": 4,
+   "groundStorey": 3.1,
+   "material": "render",
+   "wall": "#d48a3d",
+   "cornice": "#efece4",
+   "roof": "#9a4630",
+   "windows": {
+    "shape": "rect",
+    "pitch": 2.1,
+    "width": 0.95,
+    "height": 1.5,
+    "frame": "#f2efe8",
+    "glass": "#2f3b42"
+   },
+   "ground": {
+    "type": "shops",
+    "pitch": 3.2,
+    "band": "#1f3a2c",
+    "awning": "#c8202a",
+    "frame": "#2b2d2f"
+   },
+   "description": "Narrow merchant house of four or five storeys in coloured render, small white-framed windows in regular rows, red tile roof with dormers; restaurant at street level under an awning.",
+   "evidence": {
+    "photos": [
+     {
+      "id": "2278971705569682",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "522833282429313",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "800201804243397",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "915994042467407",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "145779257442479",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "509005887143760",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "269812254817512",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "905119873619474",
+      "captured": "2016-11-25"
+     }
+    ],
+    "confidence": 0.55
+   }
+  },
+  "kk-osm-way-133938855": {
+   "name": "Nyhavn north quay, house 13 from the west",
+   "storeys": 5,
+   "groundStorey": 3.1,
+   "material": "render",
+   "wall": "#e9e4d8",
+   "cornice": "#efece4",
+   "roof": "#9a4630",
+   "windows": {
+    "shape": "rect",
+    "pitch": 2.1,
+    "width": 0.95,
+    "height": 1.5,
+    "frame": "#f2efe8",
+    "glass": "#2f3b42"
+   },
+   "ground": {
+    "type": "shops",
+    "pitch": 3.2,
+    "band": "#2b2d2f",
+    "awning": "#7a2a20",
+    "frame": "#2b2d2f"
+   },
+   "description": "Narrow merchant house of four or five storeys in coloured render, small white-framed windows in regular rows, red tile roof with dormers; restaurant at street level under an awning.",
+   "evidence": {
+    "photos": [
+     {
+      "id": "2278971705569682",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "522833282429313",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "800201804243397",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "915994042467407",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "145779257442479",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "509005887143760",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "269812254817512",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "905119873619474",
+      "captured": "2016-11-25"
+     }
+    ],
+    "confidence": 0.55
+   }
+  },
+  "kk-osm-way-133938850": {
+   "name": "Nyhavn north quay, house 14 from the west",
+   "storeys": 4,
+   "groundStorey": 3.1,
+   "material": "render",
+   "wall": "#b55a3c",
+   "cornice": "#efece4",
+   "roof": "#9a4630",
+   "windows": {
+    "shape": "rect",
+    "pitch": 2.1,
+    "width": 0.95,
+    "height": 1.5,
+    "frame": "#f2efe8",
+    "glass": "#2f3b42"
+   },
+   "ground": {
+    "type": "shops",
+    "pitch": 3.2,
+    "band": "#5a2a22",
+    "awning": "#e9e3d4",
+    "frame": "#2b2d2f"
+   },
+   "description": "Narrow merchant house of four or five storeys in coloured render, small white-framed windows in regular rows, red tile roof with dormers; restaurant at street level under an awning.",
+   "evidence": {
+    "photos": [
+     {
+      "id": "2278971705569682",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "522833282429313",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "800201804243397",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "915994042467407",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "145779257442479",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "509005887143760",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "269812254817512",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "905119873619474",
+      "captured": "2016-11-25"
+     }
+    ],
+    "confidence": 0.55
+   }
+  },
+  "kk-osm-way-133940410": {
+   "name": "Nyhavn north quay, house 15 from the west",
+   "storeys": 5,
+   "groundStorey": 3.1,
+   "material": "render",
+   "wall": "#d9a63a",
+   "cornice": "#efece4",
+   "roof": "#9a4630",
+   "windows": {
+    "shape": "rect",
+    "pitch": 2.1,
+    "width": 0.95,
+    "height": 1.5,
+    "frame": "#f2efe8",
+    "glass": "#2f3b42"
+   },
+   "ground": {
+    "type": "shops",
+    "pitch": 3.2,
+    "band": "#1f3a2c",
+    "awning": "#1f3a2c",
+    "frame": "#2b2d2f"
+   },
+   "description": "Narrow merchant house of four or five storeys in coloured render, small white-framed windows in regular rows, red tile roof with dormers; restaurant at street level under an awning.",
+   "evidence": {
+    "photos": [
+     {
+      "id": "2278971705569682",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "522833282429313",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "800201804243397",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "915994042467407",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "145779257442479",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "509005887143760",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "269812254817512",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "905119873619474",
+      "captured": "2016-11-25"
+     }
+    ],
+    "confidence": 0.55
+   }
+  },
+  "kk-osm-way-133909256": {
+   "name": "Nyhavn north quay, house 16 from the west",
+   "storeys": 5,
+   "groundStorey": 3.1,
+   "material": "render",
+   "wall": "#c9c6c4",
+   "cornice": "#efece4",
+   "roof": "#9a4630",
+   "windows": {
+    "shape": "rect",
+    "pitch": 2.1,
+    "width": 0.95,
+    "height": 1.5,
+    "frame": "#f2efe8",
+    "glass": "#2f3b42"
+   },
+   "ground": {
+    "type": "shops",
+    "pitch": 3.2,
+    "band": "#2b2d2f",
+    "awning": "#c8202a",
+    "frame": "#2b2d2f"
+   },
+   "description": "Narrow merchant house of four or five storeys in coloured render, small white-framed windows in regular rows, red tile roof with dormers; restaurant at street level under an awning.",
+   "evidence": {
+    "photos": [
+     {
+      "id": "2278971705569682",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "522833282429313",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "800201804243397",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "915994042467407",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "145779257442479",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "509005887143760",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "269812254817512",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "905119873619474",
+      "captured": "2016-11-25"
+     }
+    ],
+    "confidence": 0.55
+   }
+  },
+  "kk-osm-way-134164115": {
+   "name": "Nyhavn north quay, house 17 from the west",
+   "storeys": 4,
+   "groundStorey": 3.1,
+   "material": "render",
+   "wall": "#ece9e2",
+   "cornice": "#efece4",
+   "roof": "#9a4630",
+   "windows": {
+    "shape": "rect",
+    "pitch": 2.1,
+    "width": 0.95,
+    "height": 1.5,
+    "frame": "#f2efe8",
+    "glass": "#2f3b42"
+   },
+   "ground": {
+    "type": "shops",
+    "pitch": 3.2,
+    "band": "#5a2a22",
+    "awning": "#7a2a20",
+    "frame": "#2b2d2f"
+   },
+   "description": "Narrow merchant house of four or five storeys in coloured render, small white-framed windows in regular rows, red tile roof with dormers; restaurant at street level under an awning.",
+   "evidence": {
+    "photos": [
+     {
+      "id": "2278971705569682",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "522833282429313",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "800201804243397",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "915994042467407",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "145779257442479",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "509005887143760",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "269812254817512",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "905119873619474",
+      "captured": "2016-11-25"
+     }
+    ],
+    "confidence": 0.55
+   }
+  },
+  "kk-osm-way-134164116": {
+   "name": "Nyhavn north quay, house 18 from the west",
+   "storeys": 5,
+   "groundStorey": 3.1,
+   "material": "render",
+   "wall": "#d99a3c",
+   "cornice": "#efece4",
+   "roof": "#9a4630",
+   "windows": {
+    "shape": "rect",
+    "pitch": 2.1,
+    "width": 0.95,
+    "height": 1.5,
+    "frame": "#f2efe8",
+    "glass": "#2f3b42"
+   },
+   "ground": {
+    "type": "shops",
+    "pitch": 3.2,
+    "band": "#1f3a2c",
+    "awning": "#e9e3d4",
+    "frame": "#2b2d2f"
+   },
+   "description": "Narrow merchant house of four or five storeys in coloured render, small white-framed windows in regular rows, red tile roof with dormers; restaurant at street level under an awning.",
+   "evidence": {
+    "photos": [
+     {
+      "id": "2278971705569682",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "522833282429313",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "800201804243397",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "915994042467407",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "145779257442479",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "509005887143760",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "269812254817512",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "905119873619474",
+      "captured": "2016-11-25"
+     }
+    ],
+    "confidence": 0.55
+   }
+  },
+  "kk-osm-way-133909255": {
+   "name": "Nyhavn north quay, house 19 from the west",
+   "storeys": 5,
+   "groundStorey": 3.1,
+   "material": "render",
+   "wall": "#8fa3bd",
+   "cornice": "#efece4",
+   "roof": "#9a4630",
+   "windows": {
+    "shape": "rect",
+    "pitch": 2.1,
+    "width": 0.95,
+    "height": 1.5,
+    "frame": "#f2efe8",
+    "glass": "#2f3b42"
+   },
+   "ground": {
+    "type": "shops",
+    "pitch": 3.2,
+    "band": "#2b2d2f",
+    "awning": "#1f3a2c",
+    "frame": "#2b2d2f"
+   },
+   "description": "Narrow merchant house of four or five storeys in coloured render, small white-framed windows in regular rows, red tile roof with dormers; restaurant at street level under an awning.",
+   "evidence": {
+    "photos": [
+     {
+      "id": "2278971705569682",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "522833282429313",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "800201804243397",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "915994042467407",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "145779257442479",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "509005887143760",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "269812254817512",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "905119873619474",
+      "captured": "2016-11-25"
+     }
+    ],
+    "confidence": 0.55
+   }
+  },
+  "kk-osm-way-134164118": {
+   "name": "Nyhavn north quay, house 20 from the west",
+   "storeys": 4,
+   "groundStorey": 3.1,
+   "material": "render",
+   "wall": "#e3b64c",
+   "cornice": "#efece4",
+   "roof": "#9a4630",
+   "windows": {
+    "shape": "rect",
+    "pitch": 2.1,
+    "width": 0.95,
+    "height": 1.5,
+    "frame": "#f2efe8",
+    "glass": "#2f3b42"
+   },
+   "ground": {
+    "type": "shops",
+    "pitch": 3.2,
+    "band": "#5a2a22",
+    "awning": "#c8202a",
+    "frame": "#2b2d2f"
+   },
+   "description": "Narrow merchant house of four or five storeys in coloured render, small white-framed windows in regular rows, red tile roof with dormers; restaurant at street level under an awning.",
+   "evidence": {
+    "photos": [
+     {
+      "id": "2278971705569682",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "522833282429313",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "800201804243397",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "915994042467407",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "145779257442479",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "509005887143760",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "269812254817512",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "905119873619474",
+      "captured": "2016-11-25"
+     }
+    ],
+    "confidence": 0.55
+   }
+  },
+  "kk-osm-way-134164113": {
+   "name": "Nyhavn north quay, house 21 from the west",
+   "storeys": 5,
+   "groundStorey": 3.1,
+   "material": "render",
+   "wall": "#c98a7a",
+   "cornice": "#efece4",
+   "roof": "#9a4630",
+   "windows": {
+    "shape": "rect",
+    "pitch": 2.1,
+    "width": 0.95,
+    "height": 1.5,
+    "frame": "#f2efe8",
+    "glass": "#2f3b42"
+   },
+   "ground": {
+    "type": "shops",
+    "pitch": 3.2,
+    "band": "#1f3a2c",
+    "awning": "#7a2a20",
+    "frame": "#2b2d2f"
+   },
+   "description": "Narrow merchant house of four or five storeys in coloured render, small white-framed windows in regular rows, red tile roof with dormers; restaurant at street level under an awning.",
+   "evidence": {
+    "photos": [
+     {
+      "id": "2278971705569682",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "522833282429313",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "800201804243397",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "915994042467407",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "145779257442479",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "509005887143760",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "269812254817512",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "905119873619474",
+      "captured": "2016-11-25"
+     }
+    ],
+    "confidence": 0.55
+   }
+  },
+  "kk-osm-way-134164120": {
+   "name": "Nyhavn north quay, house 22 from the west",
+   "storeys": 4,
+   "groundStorey": 3.1,
+   "material": "render",
+   "wall": "#d07a3a",
+   "cornice": "#efece4",
+   "roof": "#9a4630",
+   "windows": {
+    "shape": "rect",
+    "pitch": 2.1,
+    "width": 0.95,
+    "height": 1.5,
+    "frame": "#f2efe8",
+    "glass": "#2f3b42"
+   },
+   "ground": {
+    "type": "shops",
+    "pitch": 3.2,
+    "band": "#2b2d2f",
+    "awning": "#e9e3d4",
+    "frame": "#2b2d2f"
+   },
+   "description": "Narrow merchant house of four or five storeys in coloured render, small white-framed windows in regular rows, red tile roof with dormers; restaurant at street level under an awning.",
+   "evidence": {
+    "photos": [
+     {
+      "id": "2278971705569682",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "522833282429313",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "800201804243397",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "915994042467407",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "145779257442479",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "509005887143760",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "269812254817512",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "905119873619474",
+      "captured": "2016-11-25"
+     }
+    ],
+    "confidence": 0.55
+   }
+  },
+  "kk-osm-way-133909260": {
+   "name": "Nyhavn north quay, house 23 from the west",
+   "storeys": 4,
+   "groundStorey": 3.1,
+   "material": "render",
+   "wall": "#7f95b0",
+   "cornice": "#efece4",
+   "roof": "#9a4630",
+   "windows": {
+    "shape": "rect",
+    "pitch": 2.1,
+    "width": 0.95,
+    "height": 1.5,
+    "frame": "#f2efe8",
+    "glass": "#2f3b42"
+   },
+   "ground": {
+    "type": "shops",
+    "pitch": 3.2,
+    "band": "#5a2a22",
+    "awning": "#1f3a2c",
+    "frame": "#2b2d2f"
+   },
+   "description": "Narrow merchant house of four or five storeys in coloured render, small white-framed windows in regular rows, red tile roof with dormers; restaurant at street level under an awning.",
+   "evidence": {
+    "photos": [
+     {
+      "id": "2278971705569682",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "522833282429313",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "800201804243397",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "915994042467407",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "145779257442479",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "509005887143760",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "269812254817512",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "905119873619474",
+      "captured": "2016-11-25"
+     }
+    ],
+    "confidence": 0.55
+   }
+  },
+  "kk-osm-way-134164109": {
+   "name": "Nyhavn north quay, house 24 from the west",
+   "storeys": 4,
+   "groundStorey": 3.1,
+   "material": "render",
+   "wall": "#e1b24a",
+   "cornice": "#efece4",
+   "roof": "#9a4630",
+   "windows": {
+    "shape": "rect",
+    "pitch": 2.1,
+    "width": 0.95,
+    "height": 1.5,
+    "frame": "#f2efe8",
+    "glass": "#2f3b42"
+   },
+   "ground": {
+    "type": "shops",
+    "pitch": 3.2,
+    "band": "#1f3a2c",
+    "awning": "#c8202a",
+    "frame": "#2b2d2f"
+   },
+   "description": "Narrow merchant house of four or five storeys in coloured render, small white-framed windows in regular rows, red tile roof with dormers; restaurant at street level under an awning.",
+   "evidence": {
+    "photos": [
+     {
+      "id": "2278971705569682",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "522833282429313",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "800201804243397",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "915994042467407",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "145779257442479",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "509005887143760",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "269812254817512",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "905119873619474",
+      "captured": "2016-11-25"
+     }
+    ],
+    "confidence": 0.55
+   }
+  },
+  "kk-osm-way-133909242": {
+   "name": "Nyhavn north quay, house 25 from the west",
+   "storeys": 4,
+   "groundStorey": 3.1,
+   "material": "render",
+   "wall": "#c46a63",
+   "cornice": "#efece4",
+   "roof": "#9a4630",
+   "windows": {
+    "shape": "rect",
+    "pitch": 2.1,
+    "width": 0.95,
+    "height": 1.5,
+    "frame": "#f2efe8",
+    "glass": "#2f3b42"
+   },
+   "ground": {
+    "type": "shops",
+    "pitch": 3.2,
+    "band": "#2b2d2f",
+    "awning": "#7a2a20",
+    "frame": "#2b2d2f"
+   },
+   "description": "Narrow merchant house of four or five storeys in coloured render, small white-framed windows in regular rows, red tile roof with dormers; restaurant at street level under an awning.",
+   "evidence": {
+    "photos": [
+     {
+      "id": "2278971705569682",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "522833282429313",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "800201804243397",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "915994042467407",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "145779257442479",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "509005887143760",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "269812254817512",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "905119873619474",
+      "captured": "2016-11-25"
+     }
+    ],
+    "confidence": 0.55
+   }
+  },
+  "kk-osm-way-133909252": {
+   "name": "Nyhavn north quay, house 26 from the west",
+   "storeys": 4,
+   "groundStorey": 3.1,
+   "material": "render",
+   "wall": "#d48a3d",
+   "cornice": "#efece4",
+   "roof": "#9a4630",
+   "windows": {
+    "shape": "rect",
+    "pitch": 2.1,
+    "width": 0.95,
+    "height": 1.5,
+    "frame": "#f2efe8",
+    "glass": "#2f3b42"
+   },
+   "ground": {
+    "type": "shops",
+    "pitch": 3.2,
+    "band": "#5a2a22",
+    "awning": "#e9e3d4",
+    "frame": "#2b2d2f"
+   },
+   "description": "Narrow merchant house of four or five storeys in coloured render, small white-framed windows in regular rows, red tile roof with dormers; restaurant at street level under an awning.",
+   "evidence": {
+    "photos": [
+     {
+      "id": "2278971705569682",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "522833282429313",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "800201804243397",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "915994042467407",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "145779257442479",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "509005887143760",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "269812254817512",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "905119873619474",
+      "captured": "2016-11-25"
+     }
+    ],
+    "confidence": 0.55
+   }
+  },
+  "kk-osm-way-133909247": {
+   "name": "Nyhavn north quay, house 27 from the west",
+   "storeys": 4,
+   "groundStorey": 3.1,
+   "material": "render",
+   "wall": "#e9e4d8",
+   "cornice": "#efece4",
+   "roof": "#9a4630",
+   "windows": {
+    "shape": "rect",
+    "pitch": 2.1,
+    "width": 0.95,
+    "height": 1.5,
+    "frame": "#f2efe8",
+    "glass": "#2f3b42"
+   },
+   "ground": {
+    "type": "shops",
+    "pitch": 3.2,
+    "band": "#1f3a2c",
+    "awning": "#1f3a2c",
+    "frame": "#2b2d2f"
+   },
+   "description": "Narrow merchant house of four or five storeys in coloured render, small white-framed windows in regular rows, red tile roof with dormers; restaurant at street level under an awning.",
+   "evidence": {
+    "photos": [
+     {
+      "id": "2278971705569682",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "522833282429313",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "800201804243397",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "915994042467407",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "145779257442479",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "509005887143760",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "269812254817512",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "905119873619474",
+      "captured": "2016-11-25"
+     }
+    ],
+    "confidence": 0.55
+   }
+  },
+  "kk-osm-way-133909246": {
+   "name": "Nyhavn north quay, house 28 from the west",
+   "storeys": 5,
+   "groundStorey": 3.1,
+   "material": "render",
+   "wall": "#b55a3c",
+   "cornice": "#efece4",
+   "roof": "#9a4630",
+   "windows": {
+    "shape": "rect",
+    "pitch": 2.1,
+    "width": 0.95,
+    "height": 1.5,
+    "frame": "#f2efe8",
+    "glass": "#2f3b42"
+   },
+   "ground": {
+    "type": "shops",
+    "pitch": 3.2,
+    "band": "#2b2d2f",
+    "awning": "#c8202a",
+    "frame": "#2b2d2f"
+   },
+   "description": "Narrow merchant house of four or five storeys in coloured render, small white-framed windows in regular rows, red tile roof with dormers; restaurant at street level under an awning.",
+   "evidence": {
+    "photos": [
+     {
+      "id": "2278971705569682",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "522833282429313",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "800201804243397",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "915994042467407",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "145779257442479",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "509005887143760",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "269812254817512",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "905119873619474",
+      "captured": "2016-11-25"
+     }
+    ],
+    "confidence": 0.55
+   }
+  },
+  "kk-osm-way-133909257": {
+   "name": "Nyhavn north quay, house 29 from the west",
+   "storeys": 5,
+   "groundStorey": 3.1,
+   "material": "render",
+   "wall": "#d9a63a",
+   "cornice": "#efece4",
+   "roof": "#9a4630",
+   "windows": {
+    "shape": "rect",
+    "pitch": 2.1,
+    "width": 0.95,
+    "height": 1.5,
+    "frame": "#f2efe8",
+    "glass": "#2f3b42"
+   },
+   "ground": {
+    "type": "shops",
+    "pitch": 3.2,
+    "band": "#5a2a22",
+    "awning": "#7a2a20",
+    "frame": "#2b2d2f"
+   },
+   "description": "Narrow merchant house of four or five storeys in coloured render, small white-framed windows in regular rows, red tile roof with dormers; restaurant at street level under an awning.",
+   "evidence": {
+    "photos": [
+     {
+      "id": "2278971705569682",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "522833282429313",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "800201804243397",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "915994042467407",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "145779257442479",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "509005887143760",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "269812254817512",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "905119873619474",
+      "captured": "2016-11-25"
+     }
+    ],
+    "confidence": 0.55
+   }
+  },
+  "kk-osm-way-133909259": {
+   "name": "Nyhavn north quay, house 30 from the west",
+   "storeys": 5,
+   "groundStorey": 3.1,
+   "material": "render",
+   "wall": "#c9c6c4",
+   "cornice": "#efece4",
+   "roof": "#9a4630",
+   "windows": {
+    "shape": "rect",
+    "pitch": 2.1,
+    "width": 0.95,
+    "height": 1.5,
+    "frame": "#f2efe8",
+    "glass": "#2f3b42"
+   },
+   "ground": {
+    "type": "shops",
+    "pitch": 3.2,
+    "band": "#1f3a2c",
+    "awning": "#e9e3d4",
+    "frame": "#2b2d2f"
+   },
+   "description": "Narrow merchant house of four or five storeys in coloured render, small white-framed windows in regular rows, red tile roof with dormers; restaurant at street level under an awning.",
+   "evidence": {
+    "photos": [
+     {
+      "id": "2278971705569682",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "522833282429313",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "800201804243397",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "915994042467407",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "145779257442479",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "509005887143760",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "269812254817512",
+      "captured": "2016-11-25"
+     },
+     {
+      "id": "905119873619474",
+      "captured": "2016-11-25"
+     }
+    ],
+    "confidence": 0.55
+   }
+  }
+ }
+}

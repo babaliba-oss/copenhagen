@@ -103,7 +103,7 @@
    "maintainers": [
     "Daniel Sfita"
    ],
-   "attribution": "Map data © OpenStreetMap contributors, ODbL 1.0 (openstreetmap.org/copyright). Street furniture positions from Mapillary map features (mapillary.com), under Mapillary Terms of Use (mapillary.com/terms). Building heights from OSM tags or estimated by building type. Elevation: Mapterhorn terrain tiles (mapterhorn.com); see mapterhorn.com/attribution for the sources and licences of your area. Buildings: København 3D bymodel © Københavns Kommune 2013, CC BY 4.0. Street trees, street lights, bike racks and bollards: City of Copenhagen open data (CC BY 4.0).",
+   "attribution": "Map data © OpenStreetMap contributors, ODbL 1.0 (openstreetmap.org/copyright). Street furniture positions from Mapillary map features (mapillary.com), under Mapillary Terms of Use (mapillary.com/terms). Building heights from OSM tags or estimated by building type. Elevation: Mapterhorn terrain tiles (mapterhorn.com); see mapterhorn.com/attribution for the sources and licences of your area. Buildings: København 3D bymodel © Københavns Kommune 2013, CC BY 4.0. Street trees, street lights, bike racks and bollards: City of Copenhagen open data (CC BY 4.0). Façade colours and details described from Mapillary street-level photos (mapillary.com), CC BY-SA 4.0.",
    "fetchedAt": "2026-10-12",
    "counts": {
     "official": {},
@@ -150,7 +150,8 @@
     "source": "Elevation: Mapterhorn terrain tiles (mapterhorn.com); see mapterhorn.com/attribution for the sources and licences of your area."
    },
    "estimatedFacades": true,
-   "furniture": "furniture.json"
+   "furniture": "furniture.json",
+   "facades": "facades.json"
   },
   {
    "id": "copenhagen-1760",
@@ -175,8 +176,8 @@
     "official": {},
     "buildings": 3517,
     "roads": 1410,
-    "pavement": 1564,
-    "parks": 1908,
+    "pavement": 1568,
+    "parks": 1918,
     "water": 210,
     "trees": 3792,
     "roadEdges": 3208,

@@ -111,7 +111,7 @@ for e in out:
         if len(g) > 3:
             try: wet.append(Polygon([fwd(q['lon'], q['lat']) for q in g]).buffer(0))
             except Exception: pass
-field = Polygon([(-ext, -ext), (ext, -ext), (ext, ext), (-ext, ext)]).difference(ZONE.buffer(10)).difference(unary_union(wet).buffer(1))
+field = Polygon([(-ext, -ext), (ext, -ext), (ext, ext), (-ext, ext)]).difference(ZONE.buffer(10)).difference(unary_union(wet).buffer(1)).difference(moat.buffer(2))
 for i, g in enumerate(ring_geo(field)): out.append({'type': 'way', 'id': -(50000 + i), 'tags': {'landuse': 'meadow', 'name': 'Fælled'}, 'geometry': g})
 # the town's open ground (yards, squares, the strip between street and house) is cobbled
 greens = []

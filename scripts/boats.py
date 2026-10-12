@@ -46,7 +46,7 @@ for w in city['water']:
                         taken.add(key)
                         canal = min(math.hypot(px - NYHAVN[0], pz - NYHAVN[1]), math.hypot(px - CHAVN[0], pz - CHAVN[1])) < 260
                         if rnd.random() < (.9 if canal else (.18 if ERA else .32)):
-                            kind = ('ship' if math.hypot(px, pz) < 1700 and rnd.random() < .3 else 'wooden') if ERA else ('wooden' if canal and rnd.random() < .6 else rnd.choice(['sail', 'sail', 'motor']))
+                            kind = ('ship' if math.hypot(px, pz) < 1700 and wet(x + nx * 40, z + nz * 40) and wet(x + nx * 70, z + nz * 70) and rnd.random() < .45 else 'wooden') if ERA else ('wooden' if canal and rnd.random() < .6 else rnd.choice(['sail', 'sail', 'motor']))
                             boats.append([round(px, 2), round(pz, 2), round(math.atan2(ux, uz) + (math.pi if rnd.random() < .5 else 0), 3), kind, round(.85 + rnd.random() * .5, 2)])
                         break
                 s += 7.5 + rnd.random() * 5
