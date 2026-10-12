@@ -50,3 +50,14 @@ body:not(.driving) #cph-hud,body.busted #cph-hud,body.clean-capture #cph-hud{vis
 .nav-btn{white-space:nowrap}
 /* 1760: a coach has no battery */
 body.era-1760 .battery-row,body.era-1760 #battery-gauge{visibility:hidden}
+/* The morning paper */
+#cph-paper{position:fixed;inset:0;z-index:45;display:grid;place-items:center;padding:16px;background:rgba(30,30,28,.35)}
+.cph-paper-card{width:min(720px,100%);max-height:calc(100vh - 32px);overflow:auto;padding:22px 26px 18px;background:#f4efe2;color:#22201c;box-shadow:0 24px 70px rgba(0,0,0,.45);font-family:Spectral,Georgia,serif;transform:rotate(-.6deg);display:grid;gap:10px}
+.cph-paper-card h2{margin:0;text-align:center;font-family:Spectral,Georgia,serif;font-style:italic;font-size:clamp(22px,4.2vw,36px);font-weight:700;letter-spacing:-.01em;border-top:3px double #22201c;border-bottom:3px double #22201c;padding:6px 0}
+.cph-paper-date{margin:0;text-align:center;font:600 11px Manrope,sans-serif;letter-spacing:.16em;text-transform:uppercase;color:#6b665b}
+.cph-paper-cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px}
+.cph-paper-cols article{border-top:1px solid rgba(34,32,28,.35);padding-top:6px}
+.cph-paper-cols h3{margin:0 0 4px;font-size:17px;line-height:1.15}
+.cph-paper-cols p{margin:0;font-size:13.5px;line-height:1.45}
+.cph-paper-card button{justify-self:end;cursor:pointer;border:0;border-radius:999px;padding:8px 16px;background:#22201c;color:#f4efe2;font:600 12px Manrope,sans-serif}
+.cph-paper-card kbd{margin-left:6px;font-size:10px}

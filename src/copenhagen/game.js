@@ -164,8 +164,28 @@ export function createCopenhagenGame({scene,city,mobilityData,cityData,toast}){
   setHtml(sg,`<p class="cph-kick">Saga · <kbd>J</kbd> journal${q.steps.some(s=>s.clue)?' · <kbd>K</kbd> map':''}</p><h3>${esc(q.title)}</h3><ol>${q.steps.map((s,k)=>{const dn=save.active.done.includes(k),c=f.includes(k),dd=dist(s.p,[player.x,player.z]);return `<li class="${dn?'d':c?'c':''}">${esc(s.name)}${c?` <span>${s.clue?warmth(dd):dd>1000?(dd/1000).toFixed(1)+' km':Math.round(dd/10)*10+' m'}</span>`:''}</li>`;}).join('')}</ol>${q.limit?`<p class="cph-timer ${save.active.t<30?'cph-low':''}">${Math.max(0,save.active.t).toFixed(0)} s</p>`:''}`);
  }
 
+ // The morning paper: once per session, the first time the game runs.
+ const PAPER={m:{name:'Morgenavisen København',date:()=>new Date().toLocaleDateString('da-DK',{weekday:'long',day:'numeric',month:'long',year:'numeric'}),
+   items:[['Harbour baths open late as the warm spell holds','Islands Brygge and Kalvebod Bølge stay open until ten. Lifeguards ask swimmers to keep clear of the canal boats.'],
+    ['Courier shortage: restaurants turn to cargo bikes','From Nyhavn to Christianshavn, kitchens are paying riders who know the bridges. Ask at the yellow beam.'],
+    ['Old map found in a herring barrel','A retired fisherman at Gammel Strand says it shows the way to Holger Danske. Nobody believes him. Everybody wants to see it.'],
+    ['Night watch on Rundetårn','The tower stays open after dark this week. The view over the lamps on their wires is worth the ramp.']]},
+  h:{name:'Kiøbenhavns Adresse-Contoirs Efterretninger',date:()=>'Anno 1760',
+   items:[['The new palaces at Amalienborg near completion','Four noble houses around one octagonal square. The royal architect asks coachmen to mind the scaffolding.'],
+    ['Errand boys wanted','Merchants at Nyhavn and the Exchange pay in good skilling for quick feet and a closed mouth.'],
+    ['Fire watch doubled','After the great fire of 1728 the watchmen sing every hour. Householders are reminded: no open candles in the hayloft.'],
+    ['A ship from the East India Company lies at Christianshavn','Tea, silk and porcelain from Canton. The auction will be announced at the Exchange.']]}};
+ let paperShown=false;
+ function showPaper(){
+  paperShown=true;try{if(sessionStorage.getItem('cph-paper-'+ERA))return;sessionStorage.setItem('cph-paper-'+ERA,'1');}catch{}
+  const P=PAPER[ERA==='h'?'h':'m'],el=document.createElement('div');el.id='cph-paper';
+  el.innerHTML=`<div class="cph-paper-card" role="dialog"><p class="cph-paper-date">${esc(P.date())}</p><h2>${esc(P.name)}</h2><div class="cph-paper-cols">${P.items.map(([h,b])=>`<article><h3>${esc(h)}</h3><p>${esc(b)}</p></article>`).join('')}</div><button>Read later <kbd>Esc</kbd></button></div>`;
+  document.body.append(el);const close=()=>{el.remove();removeEventListener('keydown',onKey,true);};const onKey=e=>{if(['Escape','Enter','Space'].includes(e.code)){e.preventDefault();e.stopPropagation();close();}};
+  el.querySelector('button').onclick=close;addEventListener('keydown',onKey,true);setTimeout(()=>{if(el.isConnected)close();},14000);
+ }
  function update(dt,actor,travelMode,{running=true}={}){
   player=actor;started=running;if(!actor)return;
+  if(running&&!paperShown)setTimeout(showPaper,1500);if(running)paperShown=true;
   if(travelMode!==mode){mode=travelMode;routeFor=null;}
   const here=[actor.x,actor.z];
   // job
