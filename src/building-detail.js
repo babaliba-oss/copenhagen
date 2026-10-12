@@ -129,6 +129,13 @@ export function createModelledBuilding(array,part,pixels,texture=null,includeHer
  const edgeMap=new Map();
  for(const t of analysis.roof)for(let i=0;i<3;i++){const a=t.v[i].slice(0,3),b=t.v[(i+1)%3].slice(0,3),key=[a.map(v=>v.toFixed(2)).join(','),b.map(v=>v.toFixed(2)).join(',')].sort().join('|');const prev=edgeMap.get(key);if(prev){if(Math.abs(prev.normal.dot(t.n))<.92)prev.ridge=true;}else edgeMap.set(key,{a,b,normal:t.n,ridge:false});}
  for(const e of edgeMap.values())if(e.ridge){const a=new THREE.Vector3(...e.a),b=new THREE.Vector3(...e.b),length=a.distanceTo(b);if(length<1||length>100)continue;const g=new THREE.CylinderGeometry(.055,.055,length,5);g.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,1,0),b.clone().sub(a).normalize()));g.translate(...a.add(b).multiplyScalar(.5).toArray());ridges.push(g);}
+ // Chimney stacks on the ridges of the city model's pitched roofs (houses up to ~30 m): two or three per house.
+ const chimneys=[];
+ if(part.roofColor&&part.height<30&&part.height>6){
+  const ridgesFlat=[...edgeMap.values()].filter(e=>e.ridge&&Math.abs(e.a[1]-e.b[1])<.3).map(e=>({e,l:Math.hypot(e.a[0]-e.b[0],e.a[2]-e.b[2])})).filter(r=>r.l>4).sort((a,b)=>b.l-a.l).slice(0,2);
+  let k=0;for(const {e,l} of ridgesFlat)for(const f of l>14?[.22,.78]:[.5]){if(k++>=3)break;const x=e.a[0]+(e.b[0]-e.a[0])*f,y=e.a[1]+(e.b[1]-e.a[1])*f,z=e.a[2]+(e.b[2]-e.a[2])*f,yaw=Math.atan2(e.b[0]-e.a[0],e.b[2]-e.a[2]);
+   const g=new THREE.BoxGeometry(.75,1.5,1.1);g.rotateY(yaw);g.translate(x,y+.45,z);chimneys.push(g);const c=new THREE.BoxGeometry(.95,.14,1.3);c.rotateY(yaw);c.translate(x,y+1.25,z);chimneys.push(c);}
+ }
  const meshes=[];
  const occlusion={opacity:1,clearTime:1};
  function mesh(g,material){if(!g)return;material.transparent=true;material.forceSinglePass=true;const m=new THREE.Mesh(g,material);m.castShadow=true;m.receiveShadow=true;m.userData.occlusion=occlusion;m.userData.box=new THREE.Box3(new THREE.Vector3(part.bbox[0]-.5,0,part.bbox[1]-.5),new THREE.Vector3(part.bbox[2]+.5,part.height+.5,part.bbox[3]+.5));meshes.push(m);}
@@ -152,7 +159,7 @@ export function createModelledBuilding(array,part,pixels,texture=null,includeHer
  if(part.ratu===23)for(const f of analysis.faces)for(const m of createPalaceWingDetails(f)){mesh(m.geometry,m.material);meshes.at(-1).userData.shell=true;}
  if(corridor){const r=createCorridorFacade(part,analysis.faces,corridor);for(const m of r.meshes){mesh(m.geometry,m.material);meshes.at(-1).userData.shell=true;meshes.at(-1).userData.corridor=true;}windows+=r.windows;}
  if(described){const r=createFacade(analysis.faces,described),m=facadeMaterials();for(const k of ['glass','relief'])if(r[k]){mesh(r[k],m[k]);meshes.at(-1).userData.provisional=true;meshes.at(-1).userData.role='facade-detail';}else m[k].dispose();windows+=r.windows;}
- for(const [geometries,material] of [[trim,new THREE.MeshStandardMaterial({color:part.ratu===324?'#927e60':'#d6d1c4',roughness:.7})],[glazing,new THREE.MeshStandardMaterial({color:'#263e4d',roughness:.19,metalness:.55})],[ridges,new THREE.MeshStandardMaterial({color:'#606869',roughness:.48,metalness:.5})]])if(geometries.length){mesh(mergeGeometries(geometries),material);geometries.forEach(g=>g.dispose());}else material.dispose();
+ for(const [geometries,material] of [[trim,new THREE.MeshStandardMaterial({color:part.ratu===324?'#927e60':'#d6d1c4',roughness:.7})],[glazing,new THREE.MeshStandardMaterial({color:'#263e4d',roughness:.19,metalness:.55})],[ridges,new THREE.MeshStandardMaterial({color:'#606869',roughness:.48,metalness:.5})],[chimneys,new THREE.MeshStandardMaterial({color:'#8b4b3c',roughness:.88})]])if(geometries.length){mesh(mergeGeometries(geometries),material);geometries.forEach(g=>g.dispose());}else material.dispose();
  // Keep the inexpensive interim window batches at follow-camera distance;
  // otherwise a building becomes a blank block again beyond the detail radius.
  if(provisional)for(const m of meshes)if(!m.userData.shell)m.userData.provisional=true;
