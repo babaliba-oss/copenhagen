@@ -100,3 +100,25 @@ export function applyFacadeHeights(array,parts){
   p.height=want;
  }
 }
+
+// Cities whose official 3D model has no photographs (registry flag `estimatedFacades`) get a plausible
+// street front per building instead of flat walls: storeys from the measured height, window rhythm and
+// ground floor varied per building, wall and roof colours from the build. Never used where a building
+// has a photo-described front in facades.json.
+const hexOf=c=>'#'+c.map(v=>Math.round(Math.max(0,Math.min(1,v))*255).toString(16).padStart(2,'0')).join('');
+export function estimatedFacade(p){
+ let seed=0;for(const ch of String(p.id))seed=(seed*31+ch.charCodeAt(0))>>>0;
+ const r=k=>{const x=Math.sin(seed*.0001+k*12.9898)*43758.5453;return x-Math.floor(x);};
+ const wallH=p.height*(p.height>14?.8:.86),storeys=Math.max(1,Math.min(9,Math.round((wallH-.4)/3.15)));
+ const brick=p.color[0]>.5&&p.color[1]<.42&&p.color[2]<.36,lighter=p.color.map(v=>v+(1-v)*.45);
+ return normaliseFacade({
+  wall:hexOf(p.color),roof:hexOf(p.roofColor||[.3,.32,.34]),material:brick?'brick':'render',storeys,
+  groundStorey:storeys>1?3.3+r(1)*.7:undefined,cornice:hexOf(lighter),
+  windows:{shape:r(2)<.12&&storeys<6?'arch':'rect',pitch:[2.4,2.6,2.8,3.1][Math.floor(r(3)*4)],width:1.0+r(4)*.35,height:1.45+r(5)*.45,frame:r(6)<.8?'#ece8de':'#3b3f3c',glass:'#2c3a42'},
+  ground:storeys>=3&&r(7)<.5?{type:'shops',band:['#2e3134','#5a2a22','#1f3a2c','#2a3550'][Math.floor(r(8)*4)]}:{type:'solid'}
+ },p.height);
+}
+export function estimateFacades(index){
+ let n=0;for(const t of index.tiles)for(const p of t.parts)if(!p.facade&&p.roofColor&&p.color&&p.height>=4&&p.height<=34){p.facade=estimatedFacade(p);n++;}
+ return n;
+}

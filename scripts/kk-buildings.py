@@ -184,5 +184,6 @@ credit = 'Buildings: København 3D bymodel © Københavns Kommune 2013, CC BY 4.
 idx = json.load(open('public/cities/index.json'))
 for c in idx['cities']:
     if c['id'] == CITY and credit not in c.get('attribution', ''): c['attribution'] = (c.get('attribution', '') + ' ' + credit).strip()
+    if c['id'] == CITY: c['estimatedFacades'] = True
 json.dump(idx, open('public/cities/index.json', 'w'), indent=1, ensure_ascii=False)
 print(len(out), 'tiles written', flush=True)

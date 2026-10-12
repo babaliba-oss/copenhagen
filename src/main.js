@@ -18,7 +18,7 @@ import {animateVehicle} from './vehicles.js';
 import {Mobility} from './mobility.js';
 import {createStreetLife} from './street-life.js';
 import {buildTileInWorker,materialiseBuilding,createSourceShell} from './building-loader.js';
-import {attachFacades,applyFacadeHeights} from './facade-data.js';
+import {attachFacades,applyFacadeHeights,estimateFacades} from './facade-data.js';
 import {tileLevel,applyTileLod,createMergedShells,freezeTileGroup,freezeMesh,applyTreeLod,createStaticShadowCuller} from './tile-lod.js';
 import {loadTileImages,aheadPoint,tilePriority,createFrameQueue,createDetailScheduler} from './tile-streaming.js';
 import {createSurfaceStreamer} from './surface-streaming.js';
@@ -805,6 +805,7 @@ async function boot(){
    const furnitureData=city.furniture?json(dataUrl(city.furniture)).catch(()=>null):null; // street furniture detected in street-level photos (optional, any city)
    let mobilityData,landcoverData,tramData;[data,roofIndex,surfaceIndex,mobilityData,landcoverData,tramData,extensions]=await Promise.all([d,json(dataUrl('buildings3d-index.json')),json(dataUrl('surface-index.json')),json(dataUrl('mobility.json')),json(dataUrl('landcover.json')),json(dataUrl('trams.json')),loadExtensionIndex(json)]);
    if(city.facades)attachFacades(roofIndex,await json(dataUrl(city.facades)).catch(()=>null)); // photo-described street fronts (optional, any city)
+   if(city.estimatedFacades)estimateFacades(roofIndex); // plausible fronts for untextured official meshes (see facade-data.js)
    // Photo-matched places (squares with their tram stop, trees and landmarks; scripts/place-build.mjs): measured heights,
    // register trees with species heights, and the buildings their landmarks replace.
    places=(await Promise.all((city.places||[]).map(p=>json(dataUrl(`places/${p}.json`)).catch(()=>null)))).filter(Boolean);

@@ -103,7 +103,7 @@
    "maintainers": [
     "Daniel Sfita"
    ],
-   "attribution": "Map data © OpenStreetMap contributors, ODbL 1.0 (openstreetmap.org/copyright). Building heights from OSM tags or estimated by building type. Elevation: Mapterhorn terrain tiles (mapterhorn.com); see mapterhorn.com/attribution for the sources and licences of your area. Buildings: København 3D bymodel © Københavns Kommune 2013, CC BY 4.0.",
+   "attribution": "Map data © OpenStreetMap contributors, ODbL 1.0 (openstreetmap.org/copyright). Street furniture positions from Mapillary map features (mapillary.com), under Mapillary Terms of Use (mapillary.com/terms). Building heights from OSM tags or estimated by building type. Elevation: Mapterhorn terrain tiles (mapterhorn.com); see mapterhorn.com/attribution for the sources and licences of your area. Buildings: København 3D bymodel © Københavns Kommune 2013, CC BY 4.0.",
    "fetchedAt": "2026-10-12",
    "counts": {
     "official": {},
@@ -121,7 +121,23 @@
     "tramLines": "",
     "busRoutes": 0,
     "busCorridors": 0,
-    "stops": 0
+    "stops": 0,
+    "furniture": {
+     "placed": 25111,
+     "barrier": 270,
+     "bench": 1109,
+     "bike-rack": 261,
+     "bin": 1592,
+     "cone": 24,
+     "crossing-light": 1215,
+     "hydrant": 110,
+     "junction-box": 683,
+     "lamp": 6433,
+     "parking-meter": 86,
+     "pole": 3126,
+     "sign": 8015,
+     "traffic-light": 2187
+    }
    },
    "terrain": {
     "file": "terrain.pack",
@@ -132,7 +148,8 @@
     "bridges": 171,
     "gradeSpikes": 0,
     "source": "Elevation: Mapterhorn terrain tiles (mapterhorn.com); see mapterhorn.com/attribution for the sources and licences of your area."
-   }
+   },
+   "furniture": "furniture.json"
   }
  ]
 }

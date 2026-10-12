@@ -255,16 +255,17 @@ export function cellsFor(bbox,{lon=.003,lat=.0015}={}){
  return out;
 }
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
-async function getJson(url){
- for(let attempt=0;attempt<7;attempt++){
+async function getJson(url,tries=7){
+ let status=0;
+ for(let attempt=0;attempt<tries;attempt++){
   try{const r=await fetch(url,{signal:AbortSignal.timeout(90000)});
    if(r.ok)return await r.json();
    if(r.status===401||r.status===403)throw Object.assign(Error(`Mapillary refused the token (HTTP ${r.status}); check MAPILLARY_TOKEN`),{fatal:true});
-   console.log(`  mapillary: HTTP ${r.status}, retry ${attempt+1}`);}
+   status=r.status;console.log(`  mapillary: HTTP ${r.status}, retry ${attempt+1}`);}
   catch(error){if(error.fatal)throw error;console.log(`  mapillary: ${String(error.message).slice(0,60)}, retry ${attempt+1}`);}
   await sleep(Math.min(60000,2000*2**attempt));
  }
- throw Error('Mapillary request kept failing; run again later (finished cells are cached)');
+ throw Object.assign(Error('Mapillary request kept failing; run again later (finished cells are cached)'),{status});
 }
 export async function fetchFeatures(bbox,{token,dir,refresh=false,split=250,depth=3,concurrency=6}={}){
  fs.mkdirSync(dir,{recursive:true});
@@ -272,7 +273,12 @@ export async function fetchFeatures(bbox,{token,dir,refresh=false,split=250,dept
  async function cell(b,level){
   const file=path.join(dir,`${b.join('_')}.json`);let data;
   if(fs.existsSync(file)&&!refresh){data=JSON.parse(fs.readFileSync(file));cached++;}
-  else{data=await getJson(`${API}?access_token=${token}&fields=${FIELDS}&bbox=${b.join(',')}&limit=2000`);requests++;fs.writeFileSync(file,JSON.stringify(data));}
+  else{
+   // Very dense cells (city centres) make the API answer HTTP 500: split those into quarters instead of giving up.
+   try{data=await getJson(`${API}?access_token=${token}&fields=${FIELDS}&bbox=${b.join(',')}&limit=2000`,level<5?3:7);}
+   catch(error){if(error.fatal||error.status!==500||level>=5)throw error;const [w,s,e,n]=b,mx=+((w+e)/2).toFixed(6),my=+((s+n)/2).toFixed(6);
+    console.log(`  mapillary: splitting a dense cell (level ${level+1})`);for(const q of [[w,s,mx,my],[mx,s,e,my],[w,my,mx,n],[mx,my,e,n]])await cell(q,level+1);return;}
+   requests++;fs.writeFileSync(file,JSON.stringify(data));}
   for(const f of data.data||[])byId.set(String(f.id),f);
   if((data.data||[]).length>=split&&level<depth){const [w,s,e,n]=b,mx=+((w+e)/2).toFixed(6),my=+((s+n)/2).toFixed(6);
    for(const q of [[w,s,mx,my],[mx,s,e,my],[w,my,mx,n],[mx,my,e,n]])await cell(q,level+1);}
