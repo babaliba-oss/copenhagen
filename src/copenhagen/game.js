@@ -4,6 +4,7 @@
 // the player's position and travel mode, draws its own markers and HUD, and plugs its characters into the
 // shared conversation system (characters.js).
 import * as THREE from 'three';
+import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';
 import proj4 from 'proj4';
 import {groundAt} from '../terrain.js';
 import {JOBS,JOBS_1760,SAGAS,CHARACTERS} from './data.js';
@@ -74,7 +75,7 @@ export function createCopenhagenGame({scene,city,mobilityData,cityData,toast}){
  const people=cast.map(c=>{const [x,z]=ll(c.at);return {id:`cph-${c.id}`,script:c.id,x,z,heading:0,pose:'chat',walking:false,talkable:true,shirt:c.look.coat,coat:.7,...(c.look.height?{height:c.look.height}:{})};});
 
  // ---- save ----
- let save={money:0,job:0,done:{},lore:[],active:null};
+ let save={money:0,job:0,done:{},lore:[],active:null,nisser:[]};
  const KEY=SAVE_KEY+(ERA==='h'?'-1760':'');try{save={...save,...JSON.parse(localStorage.getItem(KEY)||'{}')};}catch{}
  if(save.active&&(!byId[save.active.id]||byId[save.active.id].limit))save.active=null; // timed sagas restart after a reload
  const persist=()=>{try{localStorage.setItem(KEY,JSON.stringify(save));}catch{}};
@@ -88,6 +89,13 @@ export function createCopenhagenGame({scene,city,mobilityData,cityData,toast}){
  const $=id=>document.getElementById(id);
 
  // ---- world markers ----
+ // ---- hidden nisser: 22 small house-nisse figures tucked away around the city (GTA hidden packages) ----
+ const NISSE_SPOTS=[[55.6797,12.5935],[55.6855,12.5805],[55.6857,12.5772],[55.6871,12.5731],[55.6918,12.5945],[55.6925,12.5988],[55.6866,12.5985],[55.6840,12.5926],[55.6851,12.5893],[55.6765,12.5785],[55.6776,12.5786],[55.6813,12.5760],[55.6837,12.5700],[55.6810,12.5665],[55.6760,12.5690],[55.6738,12.5985],[55.6728,12.5947],[55.6705,12.5760],[55.6880,12.5640],[55.6735,12.5820],[55.6818,12.6000],[55.6770,12.5885]];
+ const nisser=NISSE_SPOTS.map((at,i)=>{const p=ll(at),n=walk.nearest(p[0],p[1]),q=n>=0&&dist(walk.nodes[n],p)<60?walk.nodes[n]:p;return {i,p:[q[0]+.9,q[1]+.6]};});
+ const nisseGeo=(()=>{const parts=[new THREE.ConeGeometry(.17,.42,10).translate(0,.62,0),new THREE.SphereGeometry(.13,10,8).translate(0,.4,0),new THREE.CylinderGeometry(.14,.18,.34,10).translate(0,.17,0),new THREE.SphereGeometry(.035,6,5).translate(0,.84,0)];
+  const cols=['#c8202a','#e9e3d4','#5a6b8a','#f2f2f2'],out=[];parts.forEach((g,k)=>{const n=g.toNonIndexed();const c=new THREE.Color(cols[k]),a=new Float32Array(n.attributes.position.count*3);for(let i=0;i<a.length;i+=3)a.set([c.r,c.g,c.b],i);n.setAttribute('color',new THREE.BufferAttribute(a,3));n.deleteAttribute('uv');out.push(n);});return mergeGeometries(out).scale(1.6,1.6,1.6);})();
+ const nisseMesh=new THREE.InstancedMesh(nisseGeo,new THREE.MeshStandardMaterial({vertexColors:true,roughness:.6,emissive:'#3a1210'}),nisser.length);nisseMesh.castShadow=true;nisseMesh.frustumCulled=false;nisseMesh.name='Hidden nisser';scene.add(nisseMesh);
+ const NT={m:new THREE.Matrix4(),q:new THREE.Quaternion(),v:new THREE.Vector3(),one:new THREE.Vector3(1,1,1),zero:new THREE.Vector3()};
  const mkA=beam(scene,0xf2b134),mkB=beam(scene,0x46c2b0),mkQ=[0,1,2,3,4].map(()=>beam(scene,0xe0313e,100));
  const line=createRouteLine(scene);
  let state='a',timer=0,routeFor=null,routeT=0,player=null,mode='car',started=false;
@@ -156,7 +164,7 @@ export function createCopenhagenGame({scene,city,mobilityData,cityData,toast}){
 
  let hudClock=1;const setHtml=(el,h)=>{if(el&&el.__h!==h){el.__h=h;el.innerHTML=h;}};
  function updateHud(){
-  $('cph-money').textContent=fmtKr(save.money)+' '+UNIT;
+  $('cph-money').textContent=fmtKr(save.money)+' '+UNIT+(save.nisser?.length?` · nisser ${save.nisser.length}/${nisser.length}`:'');
   const j=job(),t=state==='a'?j.A:j.B,d=line.points?line.remaining():dist(t,[player.x,player.z]);
   setHtml($('cph-job'),`<p class="cph-kick">Job ${save.job%jobs.length+1}/${jobs.length}</p><h3>${esc(j.t)}</h3><p>${esc(j.d)}</p><p class="cph-go">${state==='a'?'Pick up at':'Deliver to'} <b>${esc(state==='a'?j.aName:j.bName)}</b> · ${d>1000?(d/1000).toFixed(1)+' km':Math.round(d/10)*10+' m'}${state==='b'?` · <span class="${timer<15?'cph-low':''}">${Math.max(0,timer).toFixed(0)} s</span>`:''}</p>`);
   const sg=$('cph-saga');if(!save.active){sg.hidden=true;return;}sg.hidden=false;
@@ -186,6 +194,10 @@ export function createCopenhagenGame({scene,city,mobilityData,cityData,toast}){
  function update(dt,actor,travelMode,{running=true}={}){
   player=actor;started=running;if(!actor)return;
   if(running&&!paperShown)setTimeout(showPaper,1500);if(running)paperShown=true;
+  {save.nisser??=[];const {m,q,v,one,zero}=NT,now=performance.now()/1000;
+   for(const n of nisser){const got=save.nisser.includes(n.i);if(!got&&running&&Math.hypot(n.p[0]-actor.x,n.p[1]-actor.z)<2.6){save.nisser.push(n.i);save.money+=ERA==='h'?24:150;persist();toast(`Nisse found! ${save.nisser.length}/${nisser.length} · +${ERA==='h'?24:150} ${UNIT}`,{important:true});}
+    nisseMesh.setMatrixAt(n.i,m.compose(v.set(n.p[0],groundAt(n.p[0],n.p[1])+.05+Math.abs(Math.sin(now*2+n.i))*.12,n.p[1]),q.setFromAxisAngle(THREE.Object3D.DEFAULT_UP,now*.8+n.i),save.nisser.includes(n.i)?zero:one));}
+   nisseMesh.instanceMatrix.needsUpdate=true;}
   if(travelMode!==mode){mode=travelMode;routeFor=null;}
   const here=[actor.x,actor.z];
   // job
