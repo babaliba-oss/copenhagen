@@ -1,0 +1,94 @@
+{
+ "schemaVersion": 1,
+ "id": "copenhagen-1760",
+ "name": "Copenhagen 1760",
+ "country": "Denmark",
+ "origin": [
+  12.576,
+  55.68
+ ],
+ "radiusMetres": 2200,
+ "maintainers": [
+  "Daniel Sfita"
+ ],
+ "status": "draft",
+ "starts": [
+  {
+   "name": "Nyhavn",
+   "at": [
+    12.5905,
+    55.6798
+   ]
+  },
+  {
+   "name": "Kongens Nytorv",
+   "at": [
+    12.5856,
+    55.6797
+   ]
+  },
+  {
+   "name": "Rådhuspladsen",
+   "at": [
+    12.5695,
+    55.6759
+   ]
+  },
+  {
+   "name": "Amalienborg",
+   "at": [
+    12.593,
+    55.684
+   ]
+  },
+  {
+   "name": "Christiansborg",
+   "at": [
+    12.5799,
+    55.6761
+   ]
+  },
+  {
+   "name": "Rundetårn",
+   "at": [
+    12.5758,
+    55.6814
+   ]
+  },
+  {
+   "name": "Christianshavn",
+   "at": [
+    12.5935,
+    55.673
+   ]
+  },
+  {
+   "name": "Little Mermaid",
+   "at": [
+    12.599,
+    55.6926
+   ]
+  },
+  {
+   "name": "Vesterport",
+   "at": [
+    12.5684,
+    55.6762
+   ]
+  },
+  {
+   "name": "Nørreport",
+   "at": [
+    12.5716,
+    55.6832
+   ]
+  }
+ ],
+ "source": {
+  "geocoder": "manual",
+  "displayName": "København, Denmark"
+ },
+ "era": 1760,
+ "note": "Copenhagen around 1760: built by scripts/era-1760.py from the 2026 city.",
+ "maxStarts": 16
+}

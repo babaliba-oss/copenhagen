@@ -119,6 +119,6 @@ export function estimatedFacade(p){
  },p.height);
 }
 export function estimateFacades(index){
- let n=0;for(const t of index.tiles)for(const p of t.parts)if(!p.facade&&p.roofColor&&p.color&&p.height>=4&&p.height<=34){p.facade=estimatedFacade(p);n++;}
+ let n=0;for(const t of index.tiles)for(const p of t.parts)if(!p.facade&&!p.noFacade&&p.roofColor&&p.color&&p.height>=4&&p.height<=34){p.facade=estimatedFacade(p);n++;}
  return n;
 }

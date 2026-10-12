@@ -75,10 +75,13 @@ function makeActor(p,mode,distance=0){return {...p,speed:0,steer:0,distance,trav
 
 // Marked rides are gameplay objects, placed on clear ground near each selected
 // start. Their positions do not claim to be real rental stations.
+// Per-city look of the starter rides, e.g. {bike:{kind:'ladcykel',color:'#2d3a33'}} (set by main.js before the game starts).
+export const STARTER_VISUALS={};
 export function starterRides(car,world){
  const origin=exitPosition(car,'car',world),rides=[];
  if(!origin)return rides;
  for(const mode of ['bike','scooter']){
+  if(STARTER_VISUALS.none?.includes(mode))continue;
   let best=null;
   for(let radius=3;radius<=22;radius+=1.5)for(let i=0;i<24;i++){
    const a=i*Math.PI/12,q={x:car.x+Math.cos(a)*radius,z:car.z+Math.sin(a)*radius,heading:car.heading};
@@ -86,7 +89,7 @@ export function starterRides(car,world){
    const pavement=world.pavement?.at(q.x,q.z),score=gap(origin,q)+(pavement&&!world.roads.at(q.x,q.z)?0:14);
    if(!best||score<best.score)best={...q,score};
   }
-  if(best)rides.push({...makeActor({x:best.x,z:best.z,heading:best.heading},mode),id:mode,mode,parked:true});
+  if(best)rides.push({...makeActor({x:best.x,z:best.z,heading:best.heading},mode),id:mode,mode,parked:true,...(STARTER_VISUALS[mode]?{visual:{...STARTER_VISUALS[mode]}}:{})});
  }
  return rides;
 }

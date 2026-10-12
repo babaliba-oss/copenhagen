@@ -13,6 +13,17 @@ export const JOBS = [
   { t: 'Flowers for Strøget', d: 'A bucket of tulips for a shop on Amagertorv. Mind the pedestrians.', a: [55.67910, 12.56750, 'Ørstedsparken'], b: [55.67870, 12.57920, 'Amagertorv'], pay: 300 },
 ];
 
+// Copenhagen 1760 (the copenhagen-1760 city): errands inside the walls, on foot or by cart.
+export const JOBS_1760 = [
+  { t: 'A letter for the Exchange', d: 'A merchant in Nyhavn needs this sealed letter at Børsen before the bell. Ships wait for no one.', a: [55.67990, 12.58955, 'Nyhavn'], b: [55.67568, 12.58380, 'Børsen'], pay: 192 },
+  { t: 'Herring for the Palace kitchens', d: 'Two baskets from the fishwives on Gammel Strand. The cook at Christiansborg is not a patient man.', a: [55.67745, 12.57860, 'Gammel Strand'], b: [55.67620, 12.58010, 'Christiansborg'], pay: 144 },
+  { t: 'Ink for the University', d: 'A crate of ink and quills from Købmagergade to the professors by Vor Frue.', a: [55.68105, 12.57720, 'Købmagergade'], b: [55.67935, 12.57390, 'University'], pay: 144 },
+  { t: 'Beer across the harbour', d: 'A small keg from Christianshavn for the inn on Kongens Nytorv. Over Knippelsbro, mind the toll man.', a: [55.67330, 12.59180, 'Christianshavn'], b: [55.67980, 12.58530, 'Kongens Nytorv'], pay: 192 },
+  { t: 'Plans for Amalienborg', d: 'Rolled drawings from the architect Eigtved\'s office for the new palaces. Keep them dry.', a: [55.67750, 12.58700, 'Holmen'], b: [55.68400, 12.59300, 'Amalienborg'], pay: 288 },
+  { t: 'Bread for the Watch', d: 'Rye loaves for the guard at Nørreport before the gate closes.', a: [55.67810, 12.57350, 'Gammeltorv'], b: [55.68320, 12.57160, 'Nørreport'], pay: 96 },
+  { t: 'Tobacco to the Kastel', d: 'A twist of tobacco for an officer at Kastellet. He says the last boy was slow.', a: [55.68020, 12.58020, 'Østergade'], b: [55.69130, 12.59350, 'Kastellet'], pay: 144 },
+];
+
 export const SAGAS = [
   { id: 'hca', era: 'm', title: 'Andersen\'s Three Homes', giver: 'karen', pay: 600,
     intro: 'Hans Christian Andersen lived on Nyhavn three times. Ride to all three houses in order. Then take this paper swan to the girl at Langelinie. He never met her, but she\'s his.',
@@ -69,10 +80,14 @@ export const SAGAS = [
 
 // Characters who stand at fixed places and give sagas. `script` selects their dialogue in characters.js.
 export const CHARACTERS = [
+  { id: 'ghost', era: 'h', name: 'Christian IV', label: 'A king who died in 1648, Rundetårn', at: [55.68136, 12.57600], look: { coat: '#1c1c22' } },
+  { id: 'watchman', era: 'h', name: 'Vægteren', label: 'Night watchman, Gammeltorv', at: [55.67800, 12.57300], look: { coat: '#3a3226' } },
+  { id: 'maren', era: 'h', name: 'Maren', label: 'Fishwife, Gammel Strand', at: [55.67760, 12.57900], look: { coat: '#6b2b2b' } },
+  { id: 'thurah', era: 'h', name: 'Mester Thurah', label: 'Royal architect, Frederiksstaden', at: [55.68380, 12.59140], look: { coat: '#2d3d5a' } },
   { id: 'karen', name: 'Karen', label: 'Walking tour guide, Nyhavn', at: [55.67972, 12.58930], look: { coat: '#d8402e' } },
   { id: 'aksel', name: 'Aksel', label: 'Regular at the Gefion Fountain', at: [55.68622, 12.59745], look: { coat: '#5a6b4a' } },
-  { id: 'nisse', name: 'Nissefar', label: 'House-nisse, Kongens Have', at: [55.68525, 12.57930], look: { coat: '#7a2a20', height: 1.1 } },
-  { id: 'ole', name: 'Ole', label: 'Retired fisherman, Gammel Strand', at: [55.67745, 12.57860], look: { coat: '#2b3a55' } },
+  { id: 'nisse', name: 'Nissefar', era: 'b', label: 'House-nisse, Kongens Have', at: [55.68525, 12.57930], look: { coat: '#7a2a20', height: 1.1 } },
+  { id: 'ole', name: 'Ole', era: 'b', label: 'Retired fisherman, Gammel Strand', at: [55.67745, 12.57860], look: { coat: '#2b3a55' } },
   { id: 'bent', name: 'Bent', label: 'Pølsevogn, Rådhuspladsen', at: [55.67610, 12.56880], look: { coat: '#f2f2ee' } },
   { id: 'astrid', name: 'Astrid', label: 'Telescope keeper, Rundetårn', at: [55.68152, 12.57560], look: { coat: '#4a3b6b' } },
   { id: 'mette', name: 'Mette', label: 'Lives in Christiania', at: [55.67380, 12.59870], look: { coat: '#3c6b3a' } },

@@ -44,8 +44,26 @@ export function createRideVehicle(visual={},mode='bike'){
  for(let i=0;i<paint.count;i++)if(paint.getX(i)>0)colors.setXYZ(i,tint.r,tint.g,tint.b);
  const root=new THREE.Group();root.name=`Player ${kind}`;root.rotation.order='YXZ';root.userData={kind,color};
  const frame=new THREE.Mesh(geometry,new THREE.MeshStandardMaterial({vertexColors:true,roughness:.55,metalness:.25}));frame.castShadow=true;root.add(frame);
+ if(kind==='ladcykel')root.add(ladcykelBox());
  for(const part of visual.parts||[]){const mesh=new THREE.Mesh(part.geometry.clone(),part.material.clone());mesh.castShadow=true;root.add(mesh);}
  const anchors=kind==='citybike'?PLAYER_CITY_BIKE:PLAYER_BIKE,motion=mode==='bike'?addBicycleMotion(root,anchors):null;
  const geometries=new Set(),materials=new Set();root.traverse(o=>{if(o.geometry)geometries.add(o.geometry);if(o.material)materials.add(o.material);});
  return {root,frame,anchors,motion,lift:visual.lift??.12,dispose(){for(const g of geometries)g.dispose();for(const m of materials)m.dispose();root.removeFromParent();}};
+}
+
+// Christiania-style cargo trike front: a plywood box on two small front wheels, ahead of the handlebars
+// (the bicycle's own front wheel sits under the box's back edge). Local frame: forward is -Z.
+export function ladcykelBox(){
+ const parts=[],paint=(g,hex)=>{const n=g.index?g.toNonIndexed():g;if(n!==g)g.dispose();n.deleteAttribute('uv');const c=new THREE.Color(hex),a=new Float32Array(n.attributes.position.count*3);for(let i=0;i<a.length;i+=3)a.set([c.r,c.g,c.b],i);n.setAttribute('color',new THREE.BufferAttribute(a,3));return n;};
+ const box=(w,h,d,x,y,z,hex)=>parts.push(paint(new THREE.BoxGeometry(w,h,d).translate(x,y,z),hex));
+ const W=.86,D=.78,Z=-1.08,B=.42,H=.5,T=.018,ply='#c89a62',edge='#a87a45';
+ box(W,T,D,0,B,Z,edge); // floor
+ box(W,H,T,0,B+H/2,Z-D/2,ply);box(W,H*.85,T,0,B+H*.42,Z+D/2,ply); // front, back
+ box(T,H,D,-W/2,B+H/2,Z,ply);box(T,H,D,W/2,B+H/2,Z,ply); // sides
+ box(W+.02,.03,.03,0,B+H,Z-D/2,edge);box(.03,.03,D,-W/2,B+H,Z,edge);box(.03,.03,D,W/2,B+H,Z,edge); // rims
+ box(W-.06,.04,.22,0,B+.3,Z+D/2-.14,'#8a6236'); // bench inside
+ box(.05,.05,.7,0,.36,-.62,'#1f2522'); // frame tube to the box
+ box(1.0,.04,.04,0,.36,Z,'#1f2522'); // axle
+ for(const x of [-.5,.5]){parts.push(paint(new THREE.TorusGeometry(.24,.03,6,24).rotateY(Math.PI/2).translate(x,.24,Z),'#1c211f'));parts.push(paint(new THREE.CylinderGeometry(.035,.035,.06,8).rotateZ(Math.PI/2).translate(x,.24,Z),'#a9b2ad'));}
+ const mesh=new THREE.Mesh(mergeGeometries(parts),new THREE.MeshStandardMaterial({vertexColors:true,roughness:.7,metalness:.08}));parts.forEach(g=>g.dispose());mesh.castShadow=true;mesh.name='Ladcykel box';return mesh;
 }

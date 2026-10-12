@@ -7,6 +7,7 @@ import {CHARACTERS} from './data.js';
 const choice=(id,label)=>({id,label}),BYE=choice('bye','Bye'),turn=(response,choices=[BYE],expression='friendly')=>({response,choices,expression});
 let game=null;
 export function connectCharacters(g){game=g;}
+const y1760=()=>game?.era==='h';
 const sagaChoice=id=>game?.sagaChoice(id)||[];
 
 const SCRIPTS={
@@ -18,12 +19,31 @@ const SCRIPTS={
   hello:()=>turn('See her? Gefion. A goddess. Those four oxen she is whipping are her own sons.',[...sagaChoice('gefion'),choice('sons','Her sons?'),BYE]),
   sons:()=>turn('Old story. The Swedish king promised her as much land as she could plough in a day and a night. She ploughed so deep she dragged the land into the sea. That is Zealand. We are standing on it.',[...sagaChoice('gefion'),BYE]),
  },
+ ghost:{
+  hello:()=>turn('You can see me? Good. Christian, by the grace of God King of Denmark and Norway. Dead since 1648, but I like to look in on my tower. Frederik the Fifth sits on the throne now. Builds pretty palaces. I built a city.',[...sagaChoice('eye'),choice('tower','Why a ramp, not stairs?'),choice('city','What did you build?'),BYE],'proud'),
+  tower:()=>turn('So a coach could go up to the observatory. Or a king on a horse. Seven and a half turns, two hundred and nine metres of ramp. Tycho Brahe\'s pupils read the stars up there.',[...sagaChoice('eye'),BYE]),
+  city:()=>turn('Børsen. Rosenborg. Holmens church. Nyboder for my sailors. A whole new town across the water, Christianshavn, canals and all, like Amsterdam. The ramparts you walked through. And debts. Mostly debts.',[...sagaChoice('eye'),BYE]),
+ },
+ watchman:{
+  hello:()=>turn('Hear, ye goodmen, the clock struck ten! Ah, a stranger. I walk this district all night with my morning star and lantern. A city of wood and straw roofs, and one candle can take half of it.',[...sagaChoice('fire'),choice('fire1728','Has it burned before?'),BYE]),
+  fire1728:()=>turn('October 1728. Started in a candlemaker\'s on Vestervold and burned three days. Vor Frue, the university, the town hall, near a third of the city. That is why we rebuild in brick now, and why I sing every hour.',[...sagaChoice('fire'),BYE]),
+ },
+ maren:{
+  hello:()=>turn('Fresh herring! Cod! Plaice from the Sound this morning! You buying or looking, my pretty?',[choice('buy','A herring, please (4 sk.)'),choice('strand','Where do the boats come in?'),BYE]),
+  strand:()=>turn('Right here on Gammel Strand, the old beach, across from the Palace. The men fish, we sell. And we say what we like, the King\'s cook knows it.',[choice('buy','A herring then (4 sk.)'),BYE]),
+  buy:()=>game?.spend(4)?turn('There. Salted, not too much. Eat it before the gulls do.',[BYE]):turn('No coin, no fish. Run errands, the merchants pay.',[BYE]),
+ },
+ thurah:{
+  hello:()=>turn('Careful of the stones! This is Frederiksstaden, the King\'s new town. Four palaces around one square, built for four noblemen. Eigtved drew them, God rest him. I finish the work.',[choice('church','What is that building site?'),choice('statue','What goes in the middle?'),BYE]),
+  church:()=>turn('Frederiks Kirke. A marble church with a dome to rival Rome. The King laid the foundation stone in 1749. It costs a fortune in Norwegian marble. Between you and me, I wonder if anyone alive will see it finished.',[BYE]),
+  statue:()=>turn('King Frederik on horseback, by the Frenchman Saly. He has been working on the model for years. The East India Company is paying, so it will be very large and very expensive.',[BYE]),
+ },
  nisse:{
-  hello:()=>turn('Psst. Down here. Yes, I am a nisse. No, you may not take a photo.',[...sagaChoice('nisse'),choice('job','What does a nisse do?'),BYE]),
+  hello:()=>turn(y1760()?'Psst. Down here. Yes, a nisse. Every good house in this city has one, and you lot have stopped leaving porridge out.':'Psst. Down here. Yes, I am a nisse. No, you may not take a photo.',[...sagaChoice('nisse'),choice('job','What does a nisse do?'),BYE]),
   job:()=>turn('We look after the house, the farm, the animals. Treat us well and things go well. Forget us and the milk goes sour. Fair deal.',[...sagaChoice('nisse'),BYE]),
  },
  ole:{
-  hello:()=>turn('Fifty years I fished out of here. Now I sit on the bench and tell tourists the fish was bigger in my day. It was.',[...sagaChoice('holger'),choice('strand','What was Gammel Strand?'),BYE]),
+  hello:()=>turn(y1760()?'Ole. I fish from here, like my father. If you are looking for my wife, she is the loud one selling it.':'Fifty years I fished out of here. Now I sit on the bench and tell tourists the fish was bigger in my day. It was.',[...sagaChoice('holger'),choice('strand','What was Gammel Strand?'),BYE]),
   strand:()=>turn('The old beach. Fishing boats tied up right here, and the fishwives sold the catch on the quay. There is a statue of one of them along the canal. Fierce women.',[...sagaChoice('holger'),BYE]),
  },
  bent:{

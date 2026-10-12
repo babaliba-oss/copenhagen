@@ -10,7 +10,7 @@ import {GRADE_DEFAULTS} from './post.js';
 //   import {WEATHER_UNIFORMS} from './weather.js';
 //   material.onBeforeCompile = s => { s.uniforms.uWetness = WEATHER_UNIFORMS.wetness; ... }
 // wetness and rain are 0..1 and already smoothed; they never need per-frame copying.
-export const WEATHER_UNIFORMS=Object.freeze({wetness:{value:0},rain:{value:0}});
+export const WEATHER_UNIFORMS=Object.freeze({wetness:{value:0},rain:{value:0},night:{value:0}}); // night: 0..1, street lamps and lit windows
 
 const midday={
  label:'Midday',
@@ -64,8 +64,20 @@ const rain={
  grade:{...GRADE_DEFAULTS,exposure:.95,tint:[.98,1,1.03],lift:[.025,.028,.035],saturation:.84,contrast:1.0,bloomStrength:.1,bloomThreshold:1.2,vignette:.24,haze:.05,hazeColor:[.66,.7,.74],aoStrength:.85},
  wetness:1,rain:1,
 };
-export const LOOKS=Object.freeze({midday,golden,whitenight,overcast,rain});
-export const LOOK_ORDER=Object.freeze(['midday','golden','whitenight','overcast','rain']);
+// Copenhagen winter evening: deep blue sky, moonlit roofs, sodium and LED street lamps on wires and masts.
+// Kept readable on purpose: the hemisphere stays high enough that streets and facades are never black.
+const night={
+ label:'Night',
+ sky:{zenith:'#070d1c',mid:'#14213b',horizon:'#3a3f55',sunGlow:'#6a7290',cloudLit:'#3d4560',cloudShade:'#121828',coverage:.45,sunDisc:.15},
+ sunOffset:[160,260,-120],sunColor:'#9fb3db',sunIntensity:.32,
+ hemiSky:'#5b6d99',hemiGround:'#3a342e',hemiIntensity:.95,
+ fog:{color:'#1d2438',near:170,far:700},
+ sea:{deep:'#0b1018',shore:'#1d2128',sunColor:'#ffcf8a'},
+ grade:{...GRADE_DEFAULTS,exposure:1.15,tint:[.97,.98,1.06],lift:[.02,.024,.045],saturation:.92,contrast:1.04,bloomStrength:.55,bloomThreshold:.85,vignette:.32},
+ wetness:.25,rain:0,night:1,
+};
+export const LOOKS=Object.freeze({midday,golden,whitenight,overcast,rain,night});
+export const LOOK_ORDER=Object.freeze(['midday','golden','whitenight','night','overcast','rain']);
 
 // Rain: one draw call of short line segments falling through a box that wraps around the camera.
 const RAIN_COUNT=2600,RAIN_BOX=new THREE.Vector3(44,26,44);
@@ -115,7 +127,7 @@ function materialise(p){
   fog:{color:color(p.fog.color),near:p.fog.near,far:p.fog.far},
   sea:{deep:color(p.sea.deep),shore:color(p.sea.shore),sunColor:color(p.sea.sunColor)},
   grade:{...p.grade,tint:[...p.grade.tint],lift:[...p.grade.lift],hazeColor:[...p.grade.hazeColor]},
-  wetness:p.wetness,rain:p.rain,
+  wetness:p.wetness,rain:p.rain,night:p.night||0,
  };
 }
 // Blend every field of `a` toward `b` in place (colours in linear light, offsets as vectors).
@@ -151,7 +163,7 @@ export function createLook({scene,sky,hemi,sun,post,surfaces=[],getSea=()=>null,
   if(scene){if(scene.fog){scene.fog.color.copy(c.fog.color);scene.fog.near=c.fog.near;scene.fog.far=c.fog.far;}if(scene.background?.isColor)scene.background.copy(c.fog.color);}
   const sea=getSea();if(sea?.material?.uniforms){const u=sea.material.uniforms;u.uDeep.value.copy(c.sea.deep);u.uShore.value.copy(c.sea.shore);u.uSunColor.value.copy(c.sea.sunColor);}
   if(post){post.setGrade(c.grade);post.setGrade({wetness:c.wetness,wetSky:[c.fog.color.r*.9,c.fog.color.g*.9,c.fog.color.b*.9]});}
-  WEATHER_UNIFORMS.wetness.value=c.wetness;WEATHER_UNIFORMS.rain.value=c.rain;
+  WEATHER_UNIFORMS.wetness.value=c.wetness;WEATHER_UNIFORMS.rain.value=c.rain;WEATHER_UNIFORMS.night.value=c.night;
   rainLines.visible=c.rain>.01;
   for(const [m,base] of baseColors){m.roughness=1-c.wetness*.72;m.color.copy(base).multiplyScalar(1-c.wetness*.3);}
  }

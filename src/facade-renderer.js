@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import {litWindows} from './night-windows.js';
 import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';
 import {storeyBands,storeyStyle} from './facade-data.js';
 
@@ -140,5 +141,5 @@ export function createFacade(faces,spec){
 
 // Materials for the two batches; the shell itself keeps the building's own material.
 export function facadeMaterials(){
- return {glass:new THREE.MeshStandardMaterial({vertexColors:true,roughness:.3,metalness:.1}),relief:new THREE.MeshStandardMaterial({vertexColors:true,roughness:.78})};
+ return {glass:litWindows(new THREE.MeshStandardMaterial({vertexColors:true,roughness:.3,metalness:.1})),relief:new THREE.MeshStandardMaterial({vertexColors:true,roughness:.78})};
 }

@@ -80,7 +80,7 @@ function grid(items,size){const g=new Map();for(const it of items){const k=`${Ma
  return {near(x,z,r){const out=[];for(let i=Math.floor((x-r)/size);i<=Math.floor((x+r)/size);i++)for(let j=Math.floor((z-r)/size);j<=Math.floor((z+r)/size);j++)for(const it of g.get(`${i},${j}`)||[])if(Math.hypot(it.x-x,it.z-z)<=r)out.push(it);return out;}};}
 export const TEMPORARY=/roadworks|temporary|detour/;
 export function qualityFilter(items,all=items,{minImages=2,minYear=2014,recaptureYears=3,evidence=5,radius=8,temporaryYears=1,genericImages=3}={}){
- const newest=Math.max(0,...all.map(f=>f.last)),index=grid(all,radius),kept=[],dropped={fewImages:0,old:0,stale:0,temporary:0};
+ const newest=all.reduce((m,f)=>f.last>m?f.last:m,0),index=grid(all,radius),kept=[],dropped={fewImages:0,old:0,stale:0,temporary:0};
  for(const it of items){
   if(it.images!==null&&it.images<minImages){dropped.fewImages++;continue;}
   if(it.last&&new Date(it.last).getUTCFullYear()<minYear){dropped.old++;continue;}

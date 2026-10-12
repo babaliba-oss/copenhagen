@@ -10,7 +10,7 @@ import {SpatialIndex,RADIUS,pointInPolygon,insidePlayable,setPlayableRadius} fro
 import {loadExtensionIndex,loadExtension,applyExtensions,mapViewFor,activateExtension,createExtensionStreamer} from './extensions.js';
 import {setTramLivery} from './tram-model.js';
 import {setBusLivery} from './bus-renderer.js';
-import {selectCity,useCity,pickStart,startUrl,dataUrl,registerCities} from './cities.js';
+import {selectCity,useCity,pickStart,startUrl,dataUrl,registerCities,CITIES} from './cities.js';
 import {createStartPicker,pickerStep} from './start-picker.js';
 import {createAdaptiveResolution} from './adaptive-quality.js';
 import {makeCar,driveStep,simulationSteps,PLAYER_MAX_SPEED,displayedSpeedKmh} from './physics.js';
@@ -66,6 +66,7 @@ import {createRouteCrossingSigns} from './route-crossing-signs.js';
 import {createEtelarantaGantry} from './etelaranta-gantry.js';
 import {createMarketLife,marketGullColony,createInstancedPeople} from './market-life.js';
 import {createCopenhagenGame} from './copenhagen/game.js';
+import {createCarriage} from './copenhagen/carriage.js';
 import {createBirds,shoreSamples,inWater} from './birds.js';
 import {createSenateStreetProps} from './senate-street-props.js';
 import {createUniversityLife} from './university-life.js';
@@ -92,6 +93,7 @@ import {gameIsStopped,onGameStop,reportGameError} from './game-resilience.js';
 import {createSky} from './sky.js';
 import {createPostPipeline} from './post.js';
 import {createLook,WEATHER_UNIFORMS} from './weather.js';
+import {facadeGrain} from './facade-grain.js';
 import {createStreetFurniture,combineKnockables} from './street-furniture.js';
 import {breakableSigns} from './breakable-signs.js';
 import {createParkedMicromobility} from './parked-micromobility.js';
@@ -101,7 +103,7 @@ import {createMappedFurniture} from './mapped-furniture.js';
 import {createPlace} from './place-scene.js';
 import {createSpeciesTrees} from './tree-species.js';
 import {createTreeTrunks} from './tree-trunks.js';
-import {PlayerTravel,TRAVEL_MODES} from './player-travel.js';
+import {PlayerTravel,TRAVEL_MODES,STARTER_VISUALS} from './player-travel.js';
 import {createPlayerTravelRenderer,travelCameraPose} from './player-travel-renderer.js';
 import {createTravelUI} from './player-travel-ui.js';
 import {createMobileControls} from './mobile-controls.js';
@@ -119,7 +121,7 @@ let waterfrontLandmarks,palaceLife,cityHallFlag,sea,marketScene,marketLife,unive
 let marketShop=null,marketShopRenderer=null; // buying at market stalls on foot (market-shop.js)
 const gullEncounter=new GullEncounter();
 let safeBirdFlight=null;
-let cph=null,detailPeople=[],travel=null,peopleInteraction=null,staticCars=[],trafficCars=[],cameraTransition=null;
+let cph=null,carriage=null,detailPeople=[],travel=null,peopleInteraction=null,staticCars=[],trafficCars=[],cameraTransition=null;
 
 const $=id=>document.getElementById(id);
 const keys=new Set();
@@ -216,7 +218,7 @@ surfaceMaterial.onBeforeCompile=shader=>{
  }else diffuseColor.rgb*=1.0+grain*0.04;
  `).replace('#include <roughnessmap_fragment>','#include <roughnessmap_fragment>\n roughnessFactor*=1.0-wetRough*0.6;');
 };
-const buildingMaterial=new THREE.MeshStandardMaterial({vertexColors:true,roughness:.88});
+const buildingMaterial=facadeGrain(new THREE.MeshStandardMaterial({vertexColors:true,roughness:.88}));
 look=createLook({scene,sky,hemi,sun,post,surfaces:[surfaceMaterial],getSea:()=>sea,initial:'golden'}); // golden evening is the default look; T cycles the others
 $('look-label').textContent=look.label;look.onChange((name,label)=>{$('look-label').textContent=label;});$('look-btn').addEventListener('click',()=>{look.cycle();toast(look.label);$('world').focus();});
 window.helsinkiLook={set:(name,opts)=>look.set(name,opts),cycle:()=>look.cycle(),get name(){return look.name;},post};
@@ -494,7 +496,12 @@ function mapPolice(ctx,project,scale){
  ctx.canvas.dataset.policeMarkers=String(state.units.length);
  ctx.canvas.setAttribute('aria-label',`City map${state.level?` — ${state.units.length} police units, ${state.status.toLowerCase()}`:''}`);
 }
-function drawMinimap(){if(!car)return;const canvas=$('minimap'),ctx=canvas.getContext('2d');const span=police?.level?420:1250,s=mapCache.width/mapView.size;const cx=mapCache.width/2+(car.x-mapView.cx)*s,cz=mapCache.height/2+(car.z-mapView.cz)*s;const sw=span*s,sh=sw*canvas.height/canvas.width;ctx.fillStyle='#b3ced0';ctx.fillRect(0,0,canvas.width,canvas.height);ctx.drawImage(mapCache,cx-sw/2,cz-sh/2,sw,sh,0,0,canvas.width,canvas.height);mapPolice(ctx,p=>[canvas.width/2+(p.x-car.x)*canvas.width/span,canvas.height/2+(p.z-car.z)*canvas.width/span],canvas.width/span);mapCar(ctx,canvas.width/2,canvas.height/2,car.heading,1.25);ctx.fillStyle='#34483d';ctx.font='18px sans-serif';ctx.fillText('N',canvas.width-26,25);}
+function drawMinimap(){if(!car)return;const canvas=$('minimap'),ctx=canvas.getContext('2d');const span=police?.level?420:1250,s=mapCache.width/mapView.size;const cx=mapCache.width/2+(car.x-mapView.cx)*s,cz=mapCache.height/2+(car.z-mapView.cz)*s;const sw=span*s,sh=sw*canvas.height/canvas.width;ctx.fillStyle='#b3ced0';ctx.fillRect(0,0,canvas.width,canvas.height);ctx.drawImage(mapCache,cx-sw/2,cz-sh/2,sw,sh,0,0,canvas.width,canvas.height);mapPolice(ctx,p=>[canvas.width/2+(p.x-car.x)*canvas.width/span,canvas.height/2+(p.z-car.z)*canvas.width/span],canvas.width/span);if(cph){const P=p=>[canvas.width/2+(p[0]-car.x)*canvas.width/span,canvas.height/2+(p[1]-car.z)*canvas.width/span],r=cph.route?.();ctx.save();
+  if(r?.length>1){ctx.strokeStyle='#7b3fe4';ctx.lineWidth=5;ctx.lineJoin=ctx.lineCap='round';ctx.beginPath();r.forEach((p,i)=>{const [x,y]=P(Array.isArray(p)?p:[p.x,p.z]);i?ctx.lineTo(x,y):ctx.moveTo(x,y);});ctx.stroke();}
+  for(const t of cph.minimapTargets()){let [x,y]=P(t.p);const m=12,cx=canvas.width/2,cy=canvas.height/2,dx=x-cx,dy=y-cy,k=Math.min(1,(cx-m)/Math.max(1e-6,Math.abs(dx)),(cy-m)/Math.max(1e-6,Math.abs(dy)));x=cx+dx*k;y=cy+dy*k;
+   ctx.fillStyle=t.color;ctx.strokeStyle='#fff';ctx.lineWidth=2.5;ctx.beginPath();ctx.arc(x,y,k<1?6:8,0,Math.PI*2);ctx.fill();ctx.stroke();}
+  ctx.restore();}
+ mapCar(ctx,canvas.width/2,canvas.height/2,car.heading,1.25);ctx.fillStyle='#34483d';ctx.font='18px sans-serif';ctx.fillText('N',canvas.width-26,25);}
 function drawCityMap(){const canvas=$('city-map'),ctx=canvas.getContext('2d');const side=canvas.height;ctx.fillStyle='#b3ced0';ctx.fillRect(0,0,canvas.width,canvas.height);const offset=(canvas.width-side)/2;ctx.drawImage(mapCache,offset,0,side,side);const s=side/mapView.size,mx=x=>canvas.width/2+(x-mapView.cx)*s,mz=z=>canvas.height/2+(z-mapView.cz)*s;for(const [i,l] of data.landmarks.entries()){const x=mx(l.x),z=mz(l.z);ctx.fillStyle='#f8f5eb';ctx.strokeStyle='#758670';ctx.lineWidth=1.5;ctx.beginPath();ctx.arc(x,z,11,0,Math.PI*2);ctx.fill();ctx.stroke();ctx.fillStyle='#34483d';ctx.font='600 11px sans-serif';ctx.textAlign='center';ctx.fillText(String(i+1),x,z+4);}mapPolice(ctx,p=>[mx(p.x),mz(p.z)],s);mapCar(ctx,mx(car.x),mz(car.z),car.heading,1.35);}
 // Tram sections and bus bodies: cars never drive or spawn into them (mobility.js).
 const transitBodies=()=>[...(tramSim?.bodies||[]),...(buses?.bodies||[]),...(travel?.parkedBodies()||[])];
@@ -608,7 +615,8 @@ window.addEventListener('keydown',e=>{
  if(!started){if(!ready)return;if(e.code==='Enter'){e.preventDefault();start();return;}if(!['KeyW','KeyA','KeyS','KeyD','ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.code))return;}
  if(e.code==='Escape'){if(marketShop?.close()){refreshMarketUI();return;}if(peopleInteraction?.close())return;if(!mapOpen)setPaused(!paused);return;}
  if(mapOpen)return;
- if(cph&&started&&cph.key(e.code)){e.preventDefault();return;} // Copenhagen: J journal, K treasure map, lore cards
+ if(cph&&started&&cph.key(e.code)){e.preventDefault();return;}
+ if(e.code==='KeyY'&&started&&city?.id?.startsWith('copenhagen')){const to=city.id==='copenhagen'?'copenhagen-1760':'copenhagen';if(CITIES[to]){try{sessionStorage.setItem('era-jump',JSON.stringify({to,x:car.x,z:car.z,heading:car.heading}));}catch{}const u=new URL(location.href);u.searchParams.set('city',to);u.searchParams.delete('start');toast(to==='copenhagen'?'Back to today…':'Travelling to 1760…');setTimeout(()=>{location.href=u.href;},250);e.preventDefault();return;}} // Copenhagen: J journal, K treasure map, lore cards
  if(e.code==='KeyF'||e.code==='Enter'&&started){e.preventDefault();if(!paused)interactTravel();return;}
  if(e.code==='KeyG'){e.preventDefault();talkToPerson();return;}
  if(e.code==='KeyE'&&!paused&&canTalk()&&(marketShop?.intent()||gullEncounter.snapshot().phase==='chase'&&marketShop?.hand?.item.encounter==='gulls')){e.preventDefault();marketAction();return;} // otherwise E keeps looking right
@@ -715,7 +723,7 @@ function frame(now){
   }
   knockables?.update();streetLife.update(dt,car);tramRenderer.update(car);cyclistRenderer.update(car);npcScooterRenderer.update(car,dt);policeRenderer.update(dt);roadblock?.update(dt,car);
   if(police.message){toast(police.message);police.message=null;}
-  if(cph&&car)cph.update(dt,car,travel.mode,{running:started});
+  if(cph&&car)cph.update(dt,car,travel.mode,{running:started});if(carriage&&car)carriage.userData.update(car.speed||0,dt);
  }else if(ready&&police?.busted){policeRenderer.update(dt);roadblock?.update(dt,car);if(finale.cinematicStep(dt,roadblock?.playing)){$('busted-overlay').classList.toggle('live',!!roadblock?.active);$('busted-overlay').hidden=false;$('busted-continue').focus();}} // arrest cinematic: strobes keep flashing, then the end screen
  if(car){
    speedometer.update(car,dt,{mode:travel.mode});
@@ -797,7 +805,7 @@ requestAnimationFrame(frame);
 async function boot(){
  try{
    try{registerCities((await json('/cities/index.json')).cities);}catch{} // community-built cities
-   city=useCity(selectCity(location.search));updateWorldhoodBrand(city);setPlayableRadius(city.radius||2000);
+   city=useCity(selectCity(location.search));if(city.id==='copenhagen')STARTER_VISUALS.bike={kind:'ladcykel',color:'#26302b'};if(city.era===1760)STARTER_VISUALS.none=['bike','scooter'];updateWorldhoodBrand(city);setPlayableRadius(city.radius||2000);
    const helsinki=city.scenery==='helsinki';
    if(!helsinki)finale.zone=null; // station tram scheduling belongs to Helsinki; pursuit rules are shared
    if(!helsinki&&city.projection?.startsWith('+proj'))useProjection(city.projection,city.origin);
@@ -819,7 +827,8 @@ async function boot(){
    if(helsinki)data.landmarks.push({...HARBOUR_START});
    for(const e of extensions)data.landmarks.push(...(e.starts||[]));
    areaLabel=areaCaption(helsinki?[...HELSINKI_AREAS,...extensions.flatMap(e=>e.starts||[])]:data.landmarks,city.name);
-   const requestedStart=new URLSearchParams(location.search).get('start'),firstStart=pickStart(data.landmarks,requestedStart)||pickStart(data.landmarks,city.defaultStart)||(helsinki?HARBOUR_START:data.landmarks[0]);
+   let eraJump=null;try{eraJump=JSON.parse(sessionStorage.getItem('era-jump')||'null');sessionStorage.removeItem('era-jump');}catch{} // Y in Copenhagen: same spot, other century
+   const requestedStart=new URLSearchParams(location.search).get('start'),firstStart=(eraJump?.to===city.id&&Number.isFinite(eraJump.x)?{name:city.era===1760?'1760':'Today',x:eraJump.x,z:eraJump.z,heading:eraJump.heading}:null)||pickStart(data.landmarks,requestedStart)||pickStart(data.landmarks,city.defaultStart)||(helsinki?HARBOUR_START:data.landmarks[0]);
    treeTrunks=createTreeTrunks({lanes:mobilityData.roads.edges});
    const regionStages=new Map(),transitQueue=[],addTransit=e=>{if(!tramSim||!buses)transitQueue.push(e);else installTransit(e.transitLines,{trams:tramSim,tramRenderer,buses:buses.simulation});};
    extensionStreamer=createExtensionStreamer({entries:extensions,load:e=>loadExtension(e,json,unpack),onError:handleTileError,install:async e=>{
@@ -900,7 +909,8 @@ async function boot(){
     marketLife=life();universityLife=life();terminalLife=life();detailPeople=[];
     // Copenhagen's game layer (src/copenhagen): jobs, GPS line, sagas and the characters who give them.
     // The characters are spread across the city, so the crowd's single-centre culling is overridden.
-    if(city.id==='copenhagen'){cph?.dispose?.();cph=createCopenhagenGame({scene,city,mobilityData,cityData:data,toast});const npc=createInstancedPeople(cph.people,{name:'Copenhagen characters',center:{x:0,z:0}});
+    if(city.era===1760&&!carriage){const starter=carGroup.children[0];if(starter){starter.traverse(m=>{if(m.isMesh)m.visible=false;});carriage=createCarriage();starter.add(carriage);}} // 1760: the player's car becomes a coach and horses
+    if(city.id.startsWith('copenhagen')){cph?.dispose?.();cph=createCopenhagenGame({scene,city,mobilityData,cityData:data,toast});const npc=createInstancedPeople(cph.people,{name:'Copenhagen characters',center:{x:0,z:0}});
      npc.update=(u=>(dt,player)=>{u(dt,player);npc.group.visible=true;})(npc.update);cityModel.add(npc.group);marketLife={...life(),...npc,group:npc.group};detailPeople=npc.people;}
     harbour={group:new THREE.Group(),obstacles:[],knockables:null};knockables=combineKnockables([breakableSigns]); // traffic-signal posts bend when hit, in every city
     finale.zone=null; // station tram scheduling is Helsinki-specific
@@ -926,12 +936,12 @@ async function boot(){
    setStart(firstStart);history.replaceState(null,'',startUrl(location,city,firstStart));
    progress(58,'Preparing the driving map');await new Promise(r=>setTimeout(r,30));drawMapBase();
    progress(68,'Loading buildings and textures');focus.set(car.x,0,car.z);await Promise.all([ensureCityModel(),updateTiles()]);
-   progress(88,'Loading traffic and pedestrians');mobility=helsinki?new Mobility(correctHarbourLanes(mobilityData),world,{stationCars:16,corridorCars:HARBOUR_CORRIDOR_CARS,corridor:harbourCorridor(world.roads)}):new Mobility(mobilityData,world);mobility.reset(car);angryDrivers=createAngryDrivers({vehicleOf:a=>streetLife?.traffic?.vehicleOf(a)});scene.add(angryDrivers.group);mobility.onCrash=a=>angryDrivers.trigger(a,mobility.time);streetLife=createStreetLife(scene,mobility);streetLife.update(0,car);world.objects.add(breakableSigns.bodies);
+   progress(88,'Loading traffic and pedestrians');mobility=helsinki?new Mobility(correctHarbourLanes(mobilityData),world,{stationCars:16,corridorCars:HARBOUR_CORRIDOR_CARS,corridor:harbourCorridor(world.roads)}):new Mobility(mobilityData,world,city.era===1760?{cars:0,people:150}:undefined);mobility.reset(car);angryDrivers=createAngryDrivers({vehicleOf:a=>streetLife?.traffic?.vehicleOf(a)});scene.add(angryDrivers.group);mobility.onCrash=a=>angryDrivers.trigger(a,mobility.time);streetLife=createStreetLife(scene,mobility);streetLife.update(0,car);world.objects.add(breakableSigns.bodies);
    trafficCars=mobility.cars.map(actor=>{const visual=streetLife.traffic.vehicleOf(actor);return {id:`traffic-${actor.id}`,label:visual?.type==='taxi'?'Taxi':'Car',actor,visual:{type:visual?.type||'sedan',paint:visual?.paint.getStyle()},claim(){if(actor.playerTaken||actor.edge===null||Math.abs(actor.speed)>1.2)return false;actor.playerTaken=true;actor.edge=null;actor.speed=0;return true;},release(){delete actor.playerTaken;}};});
    police=new PoliceSimulation(mobility.roads,world);policeRenderer=createPoliceRenderer(scene,police);police.onIncident=(...incident)=>finale.incident(...incident);roadblock=createRoadblock(scene,{world,police,carModel:carGroup,playerLook:travelRenderer.look,isVisible:trafficInView,obstacles:()=>[...mobility.cars.filter(c=>c.edge),...(tramSim?.bodies||[]),...(buses?.bodies||[]),...travel.parkedBodies(),...police.obstacles],onWarning:message=>toast(message,{important:true})});
    tramSim=new TramSimulation(tramData,world);tramSim.reset(car);tramRenderer=createTramRenderer(scene,tramSim);tramRenderer.update(car);
    cyclists=new Cyclists(data);cyclistRenderer=createCyclistRenderer(scene,cyclists);cyclistRenderer.update(car);
-   npcScooters=new ScooterRiders(mobility.walks,world);npcScooters.reset(car);npcScooterRenderer=createScooterRiderRenderer(scene,npcScooters);npcScooterRenderer.update(car);
+   npcScooters=new ScooterRiders(mobility.walks,world,city.era===1760?{count:0}:undefined);npcScooters.reset(car);npcScooterRenderer=createScooterRiderRenderer(scene,npcScooters);npcScooterRenderer.update(car);
    birds=createBirds(data,{colonies:birdColonies});cityModel.add(birds.group);
    safeBirdFlight=createBirdFlightClearance({buildings:world.cameraBuildings,stalls:market.stalls||[],water:world.water});
    marketShop=new MarketShop({stalls:market.stalls||[]});if(marketShop.stalls.length)marketShopRenderer=createMarketShopRenderer(cityModel,marketShop.stalls); // only where the city has market stalls

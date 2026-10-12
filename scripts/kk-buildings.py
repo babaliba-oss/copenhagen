@@ -17,7 +17,10 @@ import numpy as np
 from pyproj import Transformer
 from ezdxf.addons import iterdxf
 
-ZIP, CITY = sys.argv[1], (sys.argv[2] if len(sys.argv) > 2 else 'copenhagen')
+ZIP, CITY = sys.argv[1], (sys.argv[2] if len(sys.argv) > 2 and not sys.argv[2].startswith('--') else 'copenhagen')
+# --era 1760: only faces on a footprint of the (period-filtered) OSM build are kept, heights are brought down to
+# 18th-century eaves, and walls and roofs take period colours (limewash ochre, ox-blood, grey; red tile roofs).
+ERA = int(sys.argv[sys.argv.index('--era') + 1]) if '--era' in sys.argv else None
 reg = next(c for c in json.load(open('public/cities/index.json'))['cities'] if c['id'] == CITY)
 OUT = os.path.join('public', reg['dataRoot'].lstrip('/'))
 EXTENT = round(json.load(open(f'cities/{CITY}/city.json'))['radiusMetres'] * 1.25)
@@ -106,6 +109,10 @@ group = np.where(own > 0, own, len(osm) + comp)  # unmatched faces keep their me
 bids, bidx = np.unique(group, return_inverse=True)
 print(len(bids), 'buildings', int((own > 0).mean() * 100), '% of faces matched to an OSM footprint', flush=True)
 
+WALLS_1760 = ['#d9b26f', '#e8d39a', '#8e3b2e', '#bdb6a6', '#ece4d0', '#d99c7f', '#a8ae96', '#a5503a', '#c99a5b', '#e3d5b8', '#b46e4f']
+ROOFS_1760 = ['#9c4a30', '#8a3f2a', '#a85a3a', '#93442d', '#4d4f52']
+MODERN = re.compile(r'rådhus|glyptotek|tivoli|hovedbanegård|politigård|nationalmuseet|det kongelige bibliotek|operaen|skuespilhus', re.I)
+LANDMARK = re.compile(r'kirke|kirken|tårn|børsen|slot|christiansborg|kastellet|amalienborg|church|tower|palace', re.I)
 WALLS = ['#e8d9b0', '#f0e2c4', '#e5c27a', '#d9a45b', '#c8664a', '#b5523b', '#efe9dc', '#d8d2c4', '#9c4f3a', '#e9c9a1', '#cfd8c4', '#e2b8a4', '#f2efe6', '#bfb7a6']
 ROOFS = ['#8a3e2c', '#7a3626', '#9a4a32', '#4b4f55', '#3f4348', '#5a5f66', '#6f8f7a']
 def pick(pal, s, salt):
@@ -128,6 +135,7 @@ for b in range(len(bids)):
     base = ys.min(); h = ys.max() - base
     if h < 2 or len(fi) < 4: continue
     gid = int(bids[b]); ob = osm[gid] if gid < len(osm) else None
+    if ERA and (not ob or ob.get('name') == 'Volden' or MODERN.search(ob.get('name') or '')): continue
     bid = 'kk-' + (ob['id'] if ob else f'{int(round(mx))}-{int(round(mz))}')
     bbox = [round(float(xs.min()), 2), round(float(zs.min()), 2), round(float(xs.max()), 2), round(float(zs.max()), 2)]
     if (bbox[2] - bbox[0]) * (bbox[3] - bbox[1]) > 60000: continue
@@ -137,6 +145,10 @@ for b in range(len(bids)):
     t = tiles.setdefault(key, {'arr': [], 'parts': []})
     sel = fi
     P = L[sel].copy(); P[:, :, 1] = P[:, :, 1] - base + .12
+    name = (ob or {}).get('name', '')
+    if ERA:
+        cap = 7 if re.search(r'frederiks kirke|marmorkirken', name, re.I) else (None if LANDMARK.search(name) else 16)
+        if cap and h > cap: P[:, :, 1] *= cap / h; h = cap
     # UVs in metres (walls: along the wall / up; roofs: plan), only used if a texture is added later
     uv = np.zeros(P.shape[:2] + (2,))
     d = P[:, 1] - P[:, 0]; ln = np.hypot(d[:, 0], d[:, 2]) + 1e-9
@@ -148,24 +160,42 @@ for b in range(len(bids)):
     start = sum(len(x) for x in t['arr']) // 5
     t['arr'].append(V.ravel())
     t['parts'].append({'id': bid, 'bbox': bbox, 'height': round(float(h), 2), 'texture': None,
-                       'color': hexrgb(pick(WALLS, bid, 'w')), 'roofColor': hexrgb(pick(ROOFS, bid, 'r') if h < 40 else '#6f8f7a'),
+                       'color': hexrgb(pick(WALLS_1760 if ERA else WALLS, bid, 'w')), 'roofColor': hexrgb(pick(ROOFS_1760 if ERA else ROOFS, bid, 'r') if h < (24 if ERA else 40) else '#6f8f7a'),
                        'start': start, 'count': len(V), 'address': (ob or {}).get('address', ''), 'name': (ob or {}).get('name', '')})
     count += 1
 print(count, 'buildings kept in the city square', flush=True)
 
 # --- keep OSM buildings the 2013 model does not have ---
-old = json.load(open(os.path.join(OUT, 'buildings3d-index.json')))
+# city-build's own OpenStreetMap buildings are set aside the first time (data/raw/cities/<id>/buildings3d-osm/), so reruns start from them.
+import shutil
+OSMD = os.path.join('data/raw/cities', CITY, 'buildings3d-osm')
+cur = json.load(open(os.path.join(OUT, 'buildings3d-index.json')))
+if not str(cur.get('source', '')).startswith('København'):
+    shutil.rmtree(OSMD, ignore_errors=True); shutil.copytree(os.path.join(OUT, 'buildings3d'), OSMD)
+    json.dump(cur, open(os.path.join(OSMD, 'index.json'), 'w'))
+if not os.path.exists(OSMD):  # older builds: only the previous output is left; keep what it kept
+    OSMD = os.path.join(OUT, 'buildings3d'); json.dump(cur, open('/tmp/kk-prev-index.json', 'w'))
+    old = cur
+    import io
+    _cache = {os.path.basename(t['file']): open(os.path.join(OSMD, os.path.basename(t['file'])), 'rb').read() for t in cur['tiles']}
+else:
+    old = json.load(open(os.path.join(OSMD, 'index.json'))); _cache = None
 kept = 0
 for ot in old['tiles']:
-    arr = np.frombuffer(gzip.decompress(open(os.path.join(OUT, ot['file']), 'rb').read()), dtype=np.float32)
+    raw = _cache[os.path.basename(ot['file'])] if _cache else open(os.path.join(OSMD, os.path.basename(ot['file'])), 'rb').read()
+    arr = np.frombuffer(gzip.decompress(raw), dtype=np.float32)
     for p in ot['parts']:
         b = p['bbox']; gx, gz = int(((b[0] + b[2]) / 2) // 4), int(((b[1] + b[3]) / 2) // 4)
-        if any((gx + i, gz + j) in occ for i in (-1, 0, 1) for j in (-1, 0, 1)): continue
+        if ERA and MODERN.search(p.get('name') or ''): continue
+        if not (ERA and p.get('name') == 'Volden') and any((gx + i, gz + j) in occ for i in (-1, 0, 1) for j in (-1, 0, 1)): continue
         mx, mz = (b[0] + b[2]) / 2, (b[1] + b[3]) / 2
         t = tiles.setdefault((int(mx // TILE), int(mz // TILE)), {'arr': [], 'parts': []})
         V = arr[p['start'] * 5:(p['start'] + p['count']) * 5]
         start = sum(len(x) for x in t['arr']) // 5
-        t['arr'].append(V); t['parts'].append({**p, 'start': start}); kept += 1
+        q = {**p, 'start': start}
+        if ERA and p.get('name') == 'Volden': q.update(color=hexrgb('#6f8a4a'), roofColor=hexrgb('#7d9a52'), noFacade=True)
+        elif ERA: q.update(color=hexrgb(pick(WALLS_1760, p['id'], 'w')), roofColor=hexrgb(pick(ROOFS_1760, p['id'], 'r')))
+        t['arr'].append(V); t['parts'].append(q); kept += 1
 print(kept, 'OpenStreetMap buildings kept where the model has none', flush=True)
 
 # --- write ---

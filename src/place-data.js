@@ -32,7 +32,7 @@ export function matchPaving(rules,{layer,street='',type='',material=''},ring){
 // the scientific genus first, e.g. "TILIA X VULGARIS (PUISTOLEHMUS)".
 const FAMILIES=[[/^TILIA/,'lime'],[/^ACER/,'maple'],[/^BETULA/,'birch'],[/^PINUS/,'pine'],[/^PICEA/,'spruce'],[/^ABIES/,'fir'],[/^LARIX/,'larch'],
  [/^QUERCUS/,'oak'],[/^ULMUS/,'elm'],[/^FRAXINUS/,'ash'],[/^SORBUS/,'rowan'],[/^ALNUS/,'alder'],[/^(PRUNUS|MALUS|PYRUS|CRATAEGUS)/,'blossom'],
- [/PYLVÄSHAAPA|FASTIGIATA|ERECTA/,'columnar'],[/^POPULUS/,'poplar'],[/^SALIX/,'willow'],[/^AESCULUS/,'chestnut'],[/^(THUJA|JUNIPERUS|TAXUS)/,'spruce']];
+ [/PYLVÄSHAAPA|FASTIGIATA|ERECTA/,'columnar'],[/^POPULUS/,'poplar'],[/^SALIX/,'willow'],[/^AESCULUS/,'chestnut'],[/^PLATANUS/,'maple'],[/^(ROBINIA|GLEDITSIA|AILANTHUS|SOPHORA|STYPHNOLOBIUM)/,'ash'],[/^(CARPINUS|CORYLUS|ZELKOVA)/,'lime'],[/^(AMELANCHIER|MAGNOLIA|CERCIDIPHYLLUM)/,'blossom'],[/^(METASEQUOIA|TAXODIUM)/,'larch'],[/^GINKGO/,'columnar'],[/^(THUJA|JUNIPERUS|TAXUS)/,'spruce']];
 export function speciesFamily(species='',conifer=false){
  const s=String(species).toUpperCase().trim();
  for(const [re,f] of FAMILIES)if(re.test(s)&&!(f==='poplar'&&/PYLVÄS/.test(s)))return f;

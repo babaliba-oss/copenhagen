@@ -270,7 +270,7 @@ const seen=new Set(),candidates=points.elements.filter(e=>e.tags?.name&&(e.lat||
  .filter(c=>Math.hypot(...c.p)<R-60).sort((a,b)=>b.score-a.score||Math.hypot(...a.p)-Math.hypot(...b.p));
 const drivable=city.roads.filter(r=>!/muu/.test(r.kind)),manual=(def.starts||[]).map(s=>({name:s.name,p:local(...s.at),score:99}));
 for(const c of [...manual,...candidates]){
- if(city.landmarks.length>=8)break;if(seen.has(c.name))continue;
+ if(city.landmarks.length>=(def.maxStarts||8))break;if(seen.has(c.name))continue;
  try{const p=nearestRoadPoint(c.p[0],c.p[1],drivable,buildingIndex);
   // Face along the nearest car edge.
   let best=null;for(const e of mobility.roads.edges)for(let i=1;i<e.points.length;i++){const a=e.points[i-1],b=e.points[i],dx=b[0]-a[0],dz=b[1]-a[1],l=dx*dx+dz*dz;if(!l)continue;const t=Math.max(0,Math.min(1,((p.x-a[0])*dx+(p.z-a[1])*dz)/l)),d=Math.hypot(a[0]+dx*t-p.x,a[1]+dz*t-p.z);if(!best||d<best.d)best={d,dx,dz};}
@@ -331,7 +331,7 @@ const extensionCatalog=path.join(OUT,'extensions/index.json');
 if(!fs.existsSync(extensionCatalog))fs.writeFileSync(extensionCatalog,JSON.stringify({schemaVersion:1,extensions:[]}));
 const counts={official:officialCount,buildings:registry,roads:city.roads.length,pavement:city.pavement.length,parks:city.parks.length,water:city.water.length,trees:city.trees.length,roadEdges:mobility.roads.edges.length,walkEdges:mobility.walks.edges.length,signals:signals.length,starts:city.landmarks.length,tramRoutes:tramPaths.length,tramLines:[...new Set(tramPaths.map(p=>p.line))].join(' '),busRoutes:busPaths.length,busCorridors:usableBuses.length,stops:transitStops.length};
 const regFile='public/cities/index.json',registryFile=fs.existsSync(regFile)?JSON.parse(fs.readFileSync(regFile)):{schemaVersion:1,cities:[]};
-registryFile.cities=[...registryFile.cities.filter(c=>c.id!==id),{id,name:def.name,country:def.country,dataRoot:URL_DIR,origin:def.origin,radius:R,projection,defaultStart:city.landmarks[0].name,status:def.status,maintainers:def.maintainers,liveries:def.liveries||undefined,
+registryFile.cities=[...registryFile.cities.filter(c=>c.id!==id),{id,name:def.name,country:def.country,dataRoot:URL_DIR,origin:def.origin,radius:R,projection,defaultStart:city.landmarks[0].name,status:def.status,maintainers:def.maintainers,liveries:def.liveries||undefined,era:def.era||undefined,
  attribution:'Map data © OpenStreetMap contributors, ODbL 1.0 (openstreetmap.org/copyright).'+(def.official?` ${def.official.attribution}.`:'')+' Building heights from OSM tags or estimated by building type.',fetchedAt:city.fetchedAt,counts}];
 fs.writeFileSync(regFile,JSON.stringify(registryFile,null,1));
 (await import('./facades.mjs')).shipFacades(id); // façades described from street-level photos, if any (cities/<id>/facades.json)
@@ -343,4 +343,4 @@ console.log(JSON.stringify({city:def.name,counts,starts:city.landmarks.map(l=>`$
 
 // ---------- Street furniture from Mapillary detections (optional: runs when MAPILLARY_TOKEN is set) ----------
 // Lamps, signals, signs, bins and boxes at their photographed positions; see scripts/mapillary-features.mjs.
-if((await import('./env.mjs')).env('MAPILLARY_TOKEN'))await (await import('./mapillary-features.mjs')).buildFurniture(id,{refresh});
+if(!def.era&&(await import('./env.mjs')).env('MAPILLARY_TOKEN'))await (await import('./mapillary-features.mjs')).buildFurniture(id,{refresh});

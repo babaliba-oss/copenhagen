@@ -6,14 +6,14 @@
 import * as THREE from 'three';
 import proj4 from 'proj4';
 import {groundAt} from '../terrain.js';
-import {JOBS,SAGAS,CHARACTERS} from './data.js';
+import {JOBS,JOBS_1760,SAGAS,CHARACTERS} from './data.js';
 import {connectCharacters} from './characters.js';
 import './copenhagen.css';
 
 const SAVE_KEY='cph-game-v1';
 const clamp=(v,a,b)=>v<a?a:v>b?b:v;
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-const fmtKr=n=>Math.round(n).toLocaleString('da-DK');
+const fmtKr=n=>Math.round(n).toLocaleString('da-DK');let UNIT='kr'; // 1760: skilling (96 to the rigsdaler)
 const dist=(a,b)=>Math.hypot(a[0]-b[0],a[1]-b[1]);
 
 // ---------- routing (A* over the city's walk or road graph) ----------
@@ -67,16 +67,17 @@ export function createCopenhagenGame({scene,city,mobilityData,cityData,toast}){
  const proj=proj4('EPSG:4326',city.projection);
  const ll=([lat,lon])=>{const [x,y]=proj.forward([lon,lat]);return [x,-y];};
  const walk=makeGraph(mobilityData.walks,true),road=makeGraph(mobilityData.roads,false);
- const jobs=JOBS.map(j=>({...j,A:ll(j.a),B:ll(j.b),aName:j.a[2],bName:j.b[2]}));
- const sagas=SAGAS.filter(s=>s.era!=='h').map(s=>({...s,steps:s.steps.map(st=>({...st,p:ll(st.at)}))}));
+ const ERA=city.era===1760?'h':'m';UNIT=ERA==='h'?'sk.':'kr';const inEra=e=>(e||'m')===ERA||e==='b',cast=CHARACTERS.filter(c=>inEra(c.era));
+ const jobs=(ERA==='h'?JOBS_1760:JOBS).map(j=>({...j,A:ll(j.a),B:ll(j.b),aName:j.a[2],bName:j.b[2]}));
+ const sagas=SAGAS.filter(s=>inEra(s.era)).map(s=>({...s,steps:s.steps.map(st=>({...st,p:ll(st.at)}))}));
  const byId=Object.fromEntries(sagas.map(s=>[s.id,s]));
- const people=CHARACTERS.map(c=>{const [x,z]=ll(c.at);return {id:`cph-${c.id}`,script:c.id,x,z,heading:0,pose:'chat',walking:false,talkable:true,...(c.look.height?{height:c.look.height}:{})};});
+ const people=cast.map(c=>{const [x,z]=ll(c.at);return {id:`cph-${c.id}`,script:c.id,x,z,heading:0,pose:'chat',walking:false,talkable:true,...(c.look.height?{height:c.look.height}:{})};});
 
  // ---- save ----
  let save={money:0,job:0,done:{},lore:[],active:null};
- try{save={...save,...JSON.parse(localStorage.getItem(SAVE_KEY)||'{}')};}catch{}
+ const KEY=SAVE_KEY+(ERA==='h'?'-1760':'');try{save={...save,...JSON.parse(localStorage.getItem(KEY)||'{}')};}catch{}
  if(save.active&&(!byId[save.active.id]||byId[save.active.id].limit))save.active=null; // timed sagas restart after a reload
- const persist=()=>{try{localStorage.setItem(SAVE_KEY,JSON.stringify(save));}catch{}};
+ const persist=()=>{try{localStorage.setItem(KEY,JSON.stringify(save));}catch{}};
 
  // ---- HUD ----
  const hud=document.createElement('div');hud.id='cph-hud';hud.innerHTML=`<div class="cph-money" id="cph-money"></div><div class="cph-card" id="cph-job"></div><div class="cph-card cph-saga" id="cph-saga" hidden></div>`;
@@ -100,13 +101,14 @@ export function createCopenhagenGame({scene,city,mobilityData,cityData,toast}){
  function nextLore(){const it=loreQ.shift();if(!it){loreOpen=false;lore.hidden=true;return;}const [q,[t,txt]]=it;loreOpen=true;$('cph-lore-kick').textContent=q.title;$('cph-lore-title').textContent=t;$('cph-lore-text').textContent=txt;lore.hidden=false;}
  $('cph-lore-go').onclick=()=>nextLore();
  function startSaga(id){const q=byId[id];save.active={id,done:[],t:q.limit||0,shown:-1};persist();routeFor=null;toast(`${q.title}: saga started. Follow the red beam.`);}
- function endSaga(win){const q=byId[save.active.id];if(win){save.done[q.id]=1;save.money+=q.pay;toast(`Saga complete: ${q.title}. +${fmtKr(q.pay)} kr`,{important:true});}else toast(`Saga failed: ${q.title}. Talk to ${giverName(q)} to try again.`,{important:true});save.active=null;persist();routeFor=null;}
+ function endSaga(win){const q=byId[save.active.id];if(win){save.done[q.id]=1;save.money+=q.pay;toast(`Saga complete: ${q.title}. +${fmtKr(q.pay)} ${UNIT}`,{important:true});}else toast(`Saga failed: ${q.title}. Talk to ${giverName(q)} to try again.`,{important:true});save.active=null;persist();routeFor=null;}
  const api={
-  money:()=>fmtKr(save.money)+' kr',
+  era:ERA,
+  money:()=>fmtKr(save.money)+' '+UNIT,
   spend:n=>{if(save.money<n)return false;save.money-=n;persist();return true;},
   sagaChoice:id=>{const q=byId[id];if(!q||save.done[id]||save.active?.id===id)return [];return [{id:`saga:${id}`,label:`Saga: ${q.title}`}];},
   sagaIntro:id=>{const q=byId[id];if(save.active&&save.active.id!==id)return {response:`Finish what you started first. ${byId[save.active.id].title} is still waiting.`,choices:[{id:'bye',label:'Right'}],expression:'friendly'};
-   return {response:q.intro,choices:[{id:`accept:${id}`,label:`Accept · ${fmtKr(q.pay)} kr${q.limit?` · ${Math.round(q.limit/60)} min`:''}`},{id:'bye',label:'Not now'}],expression:'friendly'};},
+   return {response:q.intro,choices:[{id:`accept:${id}`,label:`Accept · ${fmtKr(q.pay)} ${UNIT}${q.limit?` · ${Math.round(q.limit/60)} min`:''}`},{id:'bye',label:'Not now'}],expression:'friendly'};},
   sagaAccept:id=>{startSaga(id);return {response:byId[id].go,choices:[{id:'bye',label:'On my way'}],expression:'friendly'};},
  };
  connectCharacters(api);
@@ -135,7 +137,7 @@ export function createCopenhagenGame({scene,city,mobilityData,cityData,toast}){
  // ---- journal (J) ----
  function renderJournal(){
   const rows=sagas.map(q=>{const done=!!save.done[q.id],act=save.active?.id===q.id;const cards=q.steps.map((s,k)=>[s,k]).filter(([s,k])=>s.card&&save.lore.includes(q.id+':'+k));
-   return `<article class="cph-jq${done?' done':''}${act?' act':''}"><div class="cph-jh"><span>${q.limit?'Timed · ':''}${fmtKr(q.pay)} kr</span></div><h3>${esc(q.title)}</h3><p class="cph-js">${done?'Complete':act?`In progress · ${save.active.done.length}/${q.steps.length}`:`Ask ${esc(giverName(q))}`}</p>${cards.map(([s])=>`<details><summary>${esc(s.card[0])}</summary><p>${esc(s.card[1])}</p></details>`).join('')}${!done&&!act?`<button data-way="${q.giver}">Show me the way</button>`:''}${act?`<button data-abandon="1">Abandon</button>`:''}</article>`;}).join('');
+   return `<article class="cph-jq${done?' done':''}${act?' act':''}"><div class="cph-jh"><span>${q.limit?'Timed · ':''}${fmtKr(q.pay)} ${UNIT}</span></div><h3>${esc(q.title)}</h3><p class="cph-js">${done?'Complete':act?`In progress · ${save.active.done.length}/${q.steps.length}`:`Ask ${esc(giverName(q))}`}</p>${cards.map(([s])=>`<details><summary>${esc(s.card[0])}</summary><p>${esc(s.card[1])}</p></details>`).join('')}${!done&&!act?`<button data-way="${q.giver}">Show me the way</button>`:''}${act?`<button data-abandon="1">Abandon</button>`:''}</article>`;}).join('');
   journal.innerHTML=`<div class="cph-jcard" role="dialog"><div class="cph-jtop"><div><p class="cph-kick">Stories from Danish history and folklore</p><h2>Sagas</h2></div><button id="cph-jclose">Close <kbd>J</kbd></button></div><div class="cph-jlist">${rows}</div></div>`;
   $('cph-jclose').onclick=()=>toggleJournal(false);
   journal.querySelectorAll('[data-way]').forEach(b=>b.onclick=()=>{const c=people.find(p=>p.script===b.dataset.way);if(c){wayTo=[c.x,c.z];routeFor=null;toggleJournal(false);toast(`Route set to ${CHARACTERS.find(x=>x.id===c.script).name}`);}});
@@ -153,7 +155,7 @@ export function createCopenhagenGame({scene,city,mobilityData,cityData,toast}){
  function rebuild(){const t=target();routeFor=t.p;const G=mode==='car'?road:walk;const a=G.nearest(player.x,player.z),b=G.nearest(t.p[0],t.p[1]);const pts=G.route(a,b);line.set(pts?[[player.x,player.z],...pts,t.p]:null);}
 
  function updateHud(){
-  $('cph-money').textContent=fmtKr(save.money)+' kr';
+  $('cph-money').textContent=fmtKr(save.money)+' '+UNIT;
   const j=job(),t=state==='a'?j.A:j.B,d=line.points?line.remaining():dist(t,[player.x,player.z]);
   $('cph-job').innerHTML=`<p class="cph-kick">Job ${save.job%jobs.length+1}/${jobs.length}</p><h3>${esc(j.t)}</h3><p>${esc(j.d)}</p><p class="cph-go">${state==='a'?'Pick up at':'Deliver to'} <b>${esc(state==='a'?j.aName:j.bName)}</b> · ${d>1000?(d/1000).toFixed(1)+' km':Math.round(d/10)*10+' m'}${state==='b'?` · <span class="${timer<15?'cph-low':''}">${Math.max(0,timer).toFixed(0)} s</span>`:''}</p>`;
   const sg=$('cph-saga');if(!save.active){sg.hidden=true;return;}sg.hidden=false;
@@ -171,7 +173,7 @@ export function createCopenhagenGame({scene,city,mobilityData,cityData,toast}){
   const t=state==='a'?j.A:j.B;
   if(running&&dist(here,t)<9){
    if(state==='a'){state='b';const len=(walk.route(walk.nearest(...j.A),walk.nearest(...j.B))||[]).reduce((s,p,i,a)=>i?s+dist(p,a[i-1]):0,0)||dist(j.A,j.B)*1.4;timer=Math.round(len/6+35);toast(`Picked up. Deliver to ${j.bName} in ${timer} s.`);routeFor=null;}
-   else{const pay=Math.round(j.pay+timer*4);save.money+=pay;save.job++;state='a';persist();toast(`Delivered! +${fmtKr(pay)} kr`,{important:true});routeFor=null;}
+   else{const pay=Math.round(j.pay+timer*4);save.money+=pay;save.job++;state='a';persist();toast(`Delivered! +${fmtKr(pay)} ${UNIT}`,{important:true});routeFor=null;}
   }
   mkA.visible=state==='a';mkB.visible=state==='b';mkA.position.set(j.A[0],groundAt(...j.A),j.A[1]);mkB.position.set(j.B[0],groundAt(...j.B),j.B[1]);
   const pulse=1+Math.sin(performance.now()/300)*.08;mkA.children[1].scale.setScalar(pulse);mkB.children[1].scale.setScalar(pulse);

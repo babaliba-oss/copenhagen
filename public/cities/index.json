@@ -93,63 +93,112 @@
    "country": "Denmark",
    "dataRoot": "/cities/copenhagen",
    "origin": [
-    12.585,
-    55.679
+    12.576,
+    55.68
    ],
-   "radius": 1400,
-   "projection": "+proj=tmerc +lat_0=55.679 +lon_0=12.585 +k=1 +x_0=0 +y_0=0 +ellps=GRS80 +units=m +no_defs",
+   "radius": 2200,
+   "projection": "+proj=tmerc +lat_0=55.68 +lon_0=12.576 +k=1 +x_0=0 +y_0=0 +ellps=GRS80 +units=m +no_defs",
    "defaultStart": "Nyhavn",
    "status": "draft",
    "maintainers": [
     "Daniel Sfita"
    ],
-   "attribution": "Map data © OpenStreetMap contributors, ODbL 1.0 (openstreetmap.org/copyright). Street furniture positions from Mapillary map features (mapillary.com), under Mapillary Terms of Use (mapillary.com/terms). Building heights from OSM tags or estimated by building type. Elevation: Mapterhorn terrain tiles (mapterhorn.com); see mapterhorn.com/attribution for the sources and licences of your area. Buildings: København 3D bymodel © Københavns Kommune 2013, CC BY 4.0.",
+   "attribution": "Map data © OpenStreetMap contributors, ODbL 1.0 (openstreetmap.org/copyright). Street furniture positions from Mapillary map features (mapillary.com), under Mapillary Terms of Use (mapillary.com/terms). Building heights from OSM tags or estimated by building type. Elevation: Mapterhorn terrain tiles (mapterhorn.com); see mapterhorn.com/attribution for the sources and licences of your area. Buildings: København 3D bymodel © Københavns Kommune 2013, CC BY 4.0. Street trees, street lights, bike racks and bollards: City of Copenhagen open data (CC BY 4.0).",
    "fetchedAt": "2026-10-12",
    "counts": {
     "official": {},
-    "buildings": 7159,
-    "roads": 3120,
-    "pavement": 4851,
-    "parks": 893,
-    "water": 108,
-    "trees": 7491,
-    "roadEdges": 11801,
-    "walkEdges": 33294,
+    "buildings": 18152,
+    "roads": 7813,
+    "pavement": 10491,
+    "parks": 2883,
+    "water": 210,
+    "trees": 15572,
+    "roadEdges": 46570,
+    "walkEdges": 104470,
+    "signals": 1161,
+    "starts": 8,
+    "tramRoutes": 16,
+    "tramLines": "B Bx C E F H A",
+    "busRoutes": 110,
+    "busCorridors": 431,
+    "stops": 837,
+    "furniture": {
+     "placed": 50152,
+     "barrier": 321,
+     "bench": 2202,
+     "bike-rack": 557,
+     "bin": 3412,
+     "cone": 42,
+     "crossing-light": 1569,
+     "hydrant": 317,
+     "junction-box": 1425,
+     "lamp": 13537,
+     "parking-meter": 203,
+     "pole": 6017,
+     "sign": 17633,
+     "traffic-light": 2917
+    }
+   },
+   "terrain": {
+    "file": "terrain.pack",
+    "cell": 3,
+    "base": 6,
+    "min": -16.4,
+    "max": 14.5,
+    "bridges": 460,
+    "gradeSpikes": 0,
+    "source": "Elevation: Mapterhorn terrain tiles (mapterhorn.com); see mapterhorn.com/attribution for the sources and licences of your area."
+   },
+   "estimatedFacades": true,
+   "furniture": "furniture.json"
+  },
+  {
+   "id": "copenhagen-1760",
+   "name": "Copenhagen 1760",
+   "country": "Denmark",
+   "dataRoot": "/cities/copenhagen-1760",
+   "origin": [
+    12.576,
+    55.68
+   ],
+   "radius": 2200,
+   "projection": "+proj=tmerc +lat_0=55.68 +lon_0=12.576 +k=1 +x_0=0 +y_0=0 +ellps=GRS80 +units=m +no_defs",
+   "defaultStart": "Nyhavn",
+   "status": "draft",
+   "maintainers": [
+    "Daniel Sfita"
+   ],
+   "era": 1760,
+   "attribution": "Map data © OpenStreetMap contributors, ODbL 1.0 (openstreetmap.org/copyright). Building heights from OSM tags or estimated by building type. Elevation: Mapterhorn terrain tiles (mapterhorn.com); see mapterhorn.com/attribution for the sources and licences of your area.",
+   "fetchedAt": "2026-10-12",
+   "counts": {
+    "official": {},
+    "buildings": 3534,
+    "roads": 1437,
+    "pavement": 1622,
+    "parks": 1909,
+    "water": 210,
+    "trees": 3931,
+    "roadEdges": 3272,
+    "walkEdges": 9160,
     "signals": 0,
     "starts": 8,
     "tramRoutes": 0,
     "tramLines": "",
     "busRoutes": 0,
     "busCorridors": 0,
-    "stops": 0,
-    "furniture": {
-     "placed": 25111,
-     "barrier": 270,
-     "bench": 1109,
-     "bike-rack": 261,
-     "bin": 1592,
-     "cone": 24,
-     "crossing-light": 1215,
-     "hydrant": 110,
-     "junction-box": 683,
-     "lamp": 6433,
-     "parking-meter": 86,
-     "pole": 3126,
-     "sign": 8015,
-     "traffic-light": 2187
-    }
+    "stops": 0
    },
    "terrain": {
     "file": "terrain.pack",
     "cell": 3,
-    "base": 3,
-    "min": -1.6,
+    "base": 6,
+    "min": -16.4,
     "max": 14.5,
-    "bridges": 171,
+    "bridges": 50,
     "gradeSpikes": 0,
     "source": "Elevation: Mapterhorn terrain tiles (mapterhorn.com); see mapterhorn.com/attribution for the sources and licences of your area."
-   },
-   "furniture": "furniture.json"
+   }
   }
  ]
 }

@@ -4,6 +4,7 @@ import {createBreakableSigns} from './breakable-signs.js';
 import {createKnockables} from './knockables.js';
 import {signalGreen} from './mobility.js';
 import {groundAt} from './terrain.js';
+import {WEATHER_UNIFORMS} from './weather.js';
 import {signFace,drawSignFace,PLATE_SIZE} from './sign-faces.js';
 
 // Street furniture placed from a city's furniture.json (built by scripts/mapillary-features.mjs from
@@ -21,8 +22,10 @@ export const POSTS={
  sign:{height:3,radius:.04,strength:1},
  pole:{height:8.5,radius:.14,strength:3.2},
  'parking-meter':{height:1.55,radius:.1,strength:1.3},
+ 'mast-lamp':{height:5.6,radius:.075,strength:2.2}, // Copenhagen conical graphite mast with a top lantern (register: 5–6 m)
+ 'park-lamp':{height:3.2,radius:.06,strength:1.4}, // short park lantern with stacked shades
 };
-export const SOLIDS={'junction-box':[.85,.42,1.3],bench:[1.8,.6,.85],'bike-rack':[2.4,.55,.8],hydrant:[.36,.36,.8],shelter:[3.6,1.5,2.5]}; // width, depth, height
+export const SOLIDS={bollard:[.22,.22,.95],'junction-box':[.85,.42,1.3],bench:[1.8,.6,.85],'bike-rack':[2.4,.55,.8],hydrant:[.36,.36,.8],shelter:[3.6,1.5,2.5]}; // width, depth, height
 // A stable id per object: Mapillary feature id, else its source and place in the file.
 const itemId=(it,i)=>`mapped-${it.k}-${it.mly?.[0]??`${it.src||'item'}-${i}`}`;
 export const KNOCKABLE={bin:{radius:.26},barrier:{radius:.35},cone:{radius:.2}};
@@ -51,8 +54,21 @@ function postParts(kind){
  if(kind==='traffic-light')return [cyl(.065,.085,3.4,1.7,'#566166',6),box(.27,.8,.23,0,3.1,.05,DARK)];
  if(kind==='crossing-light')return [cyl(.06,.075,2.85,1.42,'#566166',6),box(.25,.56,.2,0,2.5,.05,DARK)];
  if(kind==='pole')return [cyl(.11,.14,8.5,4.25,WOOD),box(1.4,.08,.08,0,7.9,0,WOOD)];
+ if(kind==='mast-lamp')return [cyl(.04,.075,5.4,2.7,'#3b3f42',8),cyl(.05,.05,.12,5.42,'#2c3033',8),cyl(.12,.24,.34,5.62,'#2c3033',10),cyl(.2,.2,.04,5.44,'#fff3d6',10)];
+ if(kind==='park-lamp')return [cyl(.045,.06,2.8,1.4,'#3b3f42',8),cyl(.08,.22,.12,2.9,'#e9e6dc',12),cyl(.1,.28,.12,3.02,'#e9e6dc',12),cyl(.04,.12,.1,3.14,'#e9e6dc',12),cyl(.16,.16,.03,2.86,'#fff3d6',10)];
  if(kind==='parking-meter')return [cyl(.04,.045,1.1,.55,'#4a5255'),box(.24,.38,.2,0,1.3,0,'#2b5d8f')];
  return [];
+}
+// One wire lamp: wire points (pairs for LineSegments) rising from the shade to anchors a and b metres either
+// side, plus pole positions where no wall was in reach. The shade itself is instanced.
+const WIRE_LOW=7.1;
+function wireLines(it,out,poles){
+ const yaw=it.yaw||0,gy=groundAt(it.x,it.z),c=Math.cos(yaw),s=Math.sin(yaw);
+ for(const [len,dir,pole] of [[it.a||7,1,it.pa],[it.b||7,-1,it.pb]]){
+  const top=pole?8.2:8.9,steps=4;let px=it.x,pz=it.z,py=gy+WIRE_LOW+.55;
+  for(let k=1;k<=steps;k++){const t=k/steps,d=dir*len*t,x=it.x+s*d,z=it.z+c*d,y=gy+WIRE_LOW+.55+(top-WIRE_LOW-.55)*Math.pow(t,1.6);out.push(px,py,pz,x,y,z);px=x;py=y;pz=z;}
+  if(pole)poles.push([it.x+s*dir*len,it.z+c*dir*len]);
+ }
 }
 const LENSES={'traffic-light':[[3.35,'red'],[3.1,'amber'],[2.85,'green']],'crossing-light':[[2.62,'red'],[2.38,'green']]};
 const LENS_ON={red:'#ff392b',amber:'#ffb43a',green:'#47ec9b'},LENS_OFF={red:'#382927',amber:'#3a3322',green:'#233a32'};
@@ -103,7 +119,21 @@ export function createMappedFurniture(layer,{player=()=>null,mobility=()=>null,c
    const rear=plateGeometry(size,back);rear.rotateY(Math.PI);rear.translate(0,p.y,.035);place(rear,it.x,it.z,p.yaw,chunk,i,chunk.plates);}
   if(LENSES[it.k])lights.push({x:it.x,z:it.z,yaw,kind:it.k,post:chunk.signs.bodies[i],edge:undefined});
  });
+ // Wire-hung lamps: the Copenhagen street light, a dark shade on a steel wire strung between facades
+ // (register span to the nearest wall on each side; a slim pole where no wall is in reach).
+ const wireLamps=items.filter(it=>it.k==='wire-lamp'),wirePoles=[];
+ if(wireLamps.length){
+  for(const it of wireLamps){const chunk=chunkOf(it.x,it.z);wireLines(it,chunk.wires??=[],wirePoles);}
+  const shade=mergeGeometries([cyl(.012,.012,.5,WIRE_LOW+.3,'#24282a',4),cyl(.06,.06,.1,WIRE_LOW+.5,'#2c3033',8),cyl(.09,.42,.24,WIRE_LOW+.32,'#2c3033',12),cyl(.3,.3,.03,WIRE_LOW+.19,'#fff3d6',12)]);
+  const sm=new THREE.InstancedMesh(shade,painted,wireLamps.length);sm.name='Wire lamp shades';
+  wireLamps.forEach((it,i)=>sm.setMatrixAt(i,m4.compose(v.set(it.x,groundAt(it.x,it.z),it.z),q.setFromAxisAngle(UP,it.yaw||0),one)));sm.computeBoundingSphere();group.add(sm);
+  if(wirePoles.length){const pm=new THREE.InstancedMesh(mergeGeometries([cyl(.06,.09,8.2,4.1,'#3b3f42',7)]),painted,wirePoles.length);pm.name='Wire poles';pm.castShadow=true;
+   wirePoles.forEach(([x,z],i)=>pm.setMatrixAt(i,m4.compose(v.set(x,groundAt(x,z),z),q.identity(),one)));pm.computeBoundingSphere();group.add(pm);
+   wirePoles.forEach(([x,z],i)=>obstacles.push({id:`wire-pole-${i}`,name:'pole',rings:[[[x-.1,z-.1],[x+.1,z-.1],[x+.1,z+.1],[x-.1,z+.1]]],bbox:[x-.1,z-.1,x+.1,z+.1]}));}
+ }
+ const wireMaterial=new THREE.LineBasicMaterial({color:'#1f2325'});
  for(const chunk of chunks.values()){
+  if(chunk.wires?.length){const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(chunk.wires,3));const m=new THREE.LineSegments(g,wireMaterial);m.name='Lamp wires';chunk.group.add(m);chunk.wires=null;}
   if(chunk.painted.length){const m=chunk.signs.mesh(mergeGeometries(chunk.painted),painted);m.name='Mapped furniture posts';chunk.group.add(m);}
   if(chunk.plates.length){const m=chunk.signs.mesh(mergeGeometries(chunk.plates),plates,{castShadow:false});m.name='Mapped sign plates';chunk.group.add(m);}
   [...chunk.painted,...chunk.plates].forEach(g=>g.dispose());chunk.painted=chunk.plates=null;
@@ -152,7 +182,7 @@ export function createMappedFurniture(layer,{player=()=>null,mobility=()=>null,c
   const k=createKnockables(list.map((it,i)=>({id:itemId(it,i),x:it.x,z:it.z,yaw:it.yaw||0})),[{geometry:g,material:painted}],KNOCKABLE[kind]);
   k.group.name=`Mapped ${kind}s`;group.add(k.group);knock.push(k);
  }
- const solidParts={'junction-box':([w,d,h])=>[box(w,h,d,0,h/2,0,'#8a9086'),box(w+.04,.05,d+.04,0,h+.02,0,'#6d736a')],
+ const solidParts={bollard:([w,,h])=>[cyl(w*.45,w*.5,h,h/2,'#2f3436',8),cyl(w*.5,w*.5,.08,h*.82,'#c9a64a',8),cyl(w*.38,w*.45,.06,h+.03,'#2f3436',8)],'junction-box':([w,d,h])=>[box(w,h,d,0,h/2,0,'#8a9086'),box(w+.04,.05,d+.04,0,h+.02,0,'#6d736a')],
   bench:([w,d,h])=>[box(w,.06,.42,0,.45,.05,'#7a5a3e'),box(w,.4,.05,0,.75,-.18,'#7a5a3e'),box(.06,.45,.45,-w/2+.12,.22,0,'#2d3133'),box(.06,.45,.45,w/2-.12,.22,0,'#2d3133')],
   'bike-rack':([w,d,h])=>Array.from({length:5},(_,i)=>box(.04,h,d,-w/2+.2+i*(w-.4)/4,h/2,0,'#8e979a')),
   hydrant:([w,,h])=>[cyl(w*.4,w*.45,h,h/2,'#b8322a',8),cyl(w*.5,w*.5,.08,h,'#b8322a',8)],
@@ -169,8 +199,30 @@ export function createMappedFurniture(layer,{player=()=>null,mobility=()=>null,c
   mesh.computeBoundingSphere();group.add(mesh);
  }
 
+ // Lamp light after dark (weather.js night look): a bright head that blooms and a warm pool on the ground.
+ const HEAD={lamp:[0,8.2,1.5],'mast-lamp':[0,5.42,0],'park-lamp':[0,2.85,0],'wire-lamp':[0,7.28,0]};
+ const heads=items.filter(it=>HEAD[it.k]).map(it=>{const [hx,hy,hz]=HEAD[it.k],yaw=it.yaw||0,x=it.x+Math.sin(yaw)*hz,z=it.z+Math.cos(yaw)*hz;return {x,z,y:groundAt(it.x,it.z)+hy,k:it.k};});
+ let glow=null,pools=null;
+ if(heads.length){
+  const glowMat=new THREE.MeshBasicMaterial({color:'#ffd9a3',toneMapped:false,fog:false});
+  glow=new THREE.InstancedMesh(new THREE.SphereGeometry(.2,8,6),glowMat,heads.length);glow.name='Lamp heads lit';glow.frustumCulled=false;glow.visible=false;
+  const c=document.createElement('canvas');c.width=c.height=64;const g=c.getContext('2d'),grad=g.createRadialGradient(32,32,0,32,32,32);
+  grad.addColorStop(0,'rgba(255,255,255,1)');grad.addColorStop(.25,'rgba(255,255,255,.6)');grad.addColorStop(.6,'rgba(255,255,255,.18)');grad.addColorStop(1,'rgba(255,255,255,0)');g.fillStyle=grad;g.fillRect(0,0,64,64);
+  const poolMat=new THREE.MeshBasicMaterial({color:'#ffc98a',fog:true,alphaMap:new THREE.CanvasTexture(c),transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,polygonOffset:true,polygonOffsetFactor:-4,opacity:0});
+  pools=new THREE.InstancedMesh(new THREE.PlaneGeometry(1,1).rotateX(-Math.PI/2),poolMat,heads.length);pools.name='Lamp light pools';pools.frustumCulled=false;pools.visible=false;pools.renderOrder=2;
+  const R={lamp:12,'mast-lamp':9,'park-lamp':5.5,'wire-lamp':10},sc=new THREE.Vector3();
+  heads.forEach((h,i)=>{glow.setMatrixAt(i,m4.compose(v.set(h.x,h.y,h.z),q.identity(),h.k==='park-lamp'?sc.set(.8,.8,.8):one));
+   const r=R[h.k];pools.setMatrixAt(i,m4.compose(v.set(h.x,groundAt(h.x,h.z)+.32,h.z),q.identity(),sc.set(r,1,r)));});
+  group.add(glow,pools);
+ }
+ let litShown=-1;
+ function updateLights(){
+  const n=WEATHER_UNIFORMS.night.value;if(!glow||Math.abs(n-litShown)<.01)return;litShown=n;
+  glow.visible=pools.visible=n>.03;glow.material.color.setRGB(2.6*n+.2,2.0*n+.17,1.25*n+.12);pools.material.opacity=.2*n;
+ }
  // Distance culling for post chunks; lenses follow the player.
  function update(){
+  updateLights();
   const p=player();if(!p)return;
   for(const c of chunks.values())c.group.visible=Math.hypot(c.centre[0]-p.x,c.centre[1]-p.z)<VIEW_RANGE+CHUNK*.71;
   updateLenses(p);
@@ -182,5 +234,5 @@ export function createMappedFurniture(layer,{player=()=>null,mobility=()=>null,c
   resetAll(){for(const k of knock)k.resetAll();}, // posts reset with every other breakable sign set
   snapshot(){const s=knock.map(k=>k.snapshot()),posts=[...chunks.values()].map(c=>c.signs.snapshot()),sum=(l,k)=>l.reduce((n,x)=>n+x[k],0);
    return {count:sum(s,'count'),knocked:sum(s,'knocked'),hits:sum(s,'hits'),posts:{count:sum(posts,'count'),knocked:sum(posts,'knocked'),bent:sum(posts,'bent'),broken:sum(posts,'broken')}};}};
- return {group,obstacles,knockables,update,lights,chunks};
+ return {group,obstacles,knockables,update,lights,chunks,wireLamps};
 }
