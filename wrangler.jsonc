@@ -1,0 +1,6 @@
+// Cloudflare Workers static-assets deploy for this fork (Workers Builds: build `npm ci && npm run build`, deploy `npx wrangler deploy`).
+{
+  "name": "copenhagen",
+  "compatibility_date": "2026-10-01",
+  "assets": { "directory": "./dist" }
+}
