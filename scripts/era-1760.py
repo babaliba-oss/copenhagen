@@ -104,6 +104,20 @@ for e in areas:
 ext = cfg['radiusMetres'] * 1.25 * 1.45
 field = Polygon([(-ext, -ext), (ext, -ext), (ext, ext), (-ext, ext)]).difference(ZONE.buffer(10))
 for i, g in enumerate(ring_geo(field)): out.append({'type': 'way', 'id': -(50000 + i), 'tags': {'landuse': 'meadow', 'name': 'Fælled'}, 'geometry': g})
+# the town's open ground (yards, squares, the strip between street and house) is cobbled
+greens = []
+for e in out:
+    t = e.get('tags', {})
+    if (t.get('leisure') in ('park', 'garden') or t.get('landuse') in ('grass', 'cemetery', 'forest') or t.get('natural') == 'water') and e.get('geometry') and len(e['geometry']) > 3:
+        try: greens.append(Polygon([fwd(g['lon'], g['lat']) for g in e['geometry']]).buffer(0))
+        except Exception: pass
+    if t.get('natural') == 'water' and e.get('members'):
+        for m in e['members']:
+            if m.get('role') == 'outer' and m.get('geometry') and len(m['geometry']) > 3:
+                try: greens.append(Polygon([fwd(g['lon'], g['lat']) for g in m['geometry']]).buffer(0))
+                except Exception: pass
+paved = unary_union([OLD_TOWN, CHRISTIANSHAVN]).difference(unary_union(greens).buffer(1) if greens else Polygon()).difference(rampart.buffer(4)).difference(moat.buffer(2))
+for i, g in enumerate(ring_geo(paved)): out.append({'type': 'way', 'id': -(53000 + i), 'tags': {'highway': 'pedestrian', 'area': 'yes', 'surface': 'sett', 'name': 'Brosten'}, 'geometry': g})
 for i, g in enumerate(ring_geo(moat)): out.append({'type': 'way', 'id': -(51000 + i), 'tags': {'natural': 'water', 'name': 'Voldgrav'}, 'geometry': g})
 for j, (poly, h) in enumerate(terraces):
     for i, g in enumerate(ring_geo(poly)):
@@ -122,6 +136,7 @@ for e in hw:
     inside = sum(ZP.contains(Point(fwd(p['lon'], p['lat']))) for p in pts) / len(pts)
     if inside >= .5 or t.get('name') in COUNTRY_ROADS:
         t = {k2: v for k2, v in t.items() if not k2.startswith(('cycleway', 'bus', 'psv', 'maxspeed', 'lanes'))}
+        t['surface'] = 'sett' if inside >= .5 else 'gravel'  # cobbled town, gravel country roads
         ways.append({**e, 'tags': t})
 used = {n for w in ways for n in w['nodes']}
 json.dump({'elements': ways + [n for i, n in nodes.items() if i in used]}, open(f'{DST}/highways.json', 'w')); print('highways', len(ways))

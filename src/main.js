@@ -71,6 +71,8 @@ import {createParkedCars} from './copenhagen/parked-cars.js';
 import {createRails} from './copenhagen/rails.js';
 import {createBoats} from './copenhagen/boats.js';
 import {createLandmarks} from './copenhagen/landmarks.js';
+import {CityCyclists} from './copenhagen/city-cyclists.js';
+import {createTrains} from './copenhagen/trains.js';
 import {PERIOD as PERSON_PERIOD} from './person-model.js';
 import {WATER_LEVEL as CPH_WATER} from './quay.js';
 import {createBirds,shoreSamples,inWater} from './birds.js';
@@ -127,7 +129,7 @@ let waterfrontLandmarks,palaceLife,cityHallFlag,sea,marketScene,marketLife,unive
 let marketShop=null,marketShopRenderer=null; // buying at market stalls on foot (market-shop.js)
 const gullEncounter=new GullEncounter();
 let safeBirdFlight=null;
-let cph=null,carriage=null,parkedCars=null,boats=null,landmarks=null,detailPeople=[],travel=null,peopleInteraction=null,staticCars=[],trafficCars=[],cameraTransition=null;
+let cph=null,carriage=null,parkedCars=null,boats=null,landmarks=null,trains=null,detailPeople=[],travel=null,peopleInteraction=null,staticCars=[],trafficCars=[],cameraTransition=null;
 
 const $=id=>document.getElementById(id);
 const keys=new Set();
@@ -741,7 +743,7 @@ function frame(now){
   }
   knockables?.update();streetLife.update(dt,car);tramRenderer.update(car);cyclistRenderer.update(car);npcScooterRenderer.update(car,dt);policeRenderer.update(dt);roadblock?.update(dt,car);
   if(police.message){toast(police.message);police.message=null;}
-  if(cph&&car)cph.update(dt,car,travel.mode,{running:started});if(carriage&&car)carriage.userData.update(car.speed||0,dt);parkedCars?.update(car);boats?.update(dt,car);landmarks?.update(dt);
+  if(cph&&car)cph.update(dt,car,travel.mode,{running:started});if(carriage&&car)carriage.userData.update(car.speed||0,dt);parkedCars?.update(car);boats?.update(dt,car);landmarks?.update(dt);trains?.update(dt);
  }else if(ready&&police?.busted){policeRenderer.update(dt);roadblock?.update(dt,car);if(finale.cinematicStep(dt,roadblock?.playing)){$('busted-overlay').classList.toggle('live',!!roadblock?.active);$('busted-overlay').hidden=false;$('busted-continue').focus();}} // arrest cinematic: strobes keep flashing, then the end screen
  if(car){
    speedometer.update(car,dt,{mode:travel.mode});
@@ -950,7 +952,7 @@ async function boot(){
    // Detected street furniture: solid boxes join the obstacles; posts, bins and barriers can be knocked down.
    {const an=anchorData&&await anchorData;if(an){const ed=eraData&&await eraData;landmarks=createLandmarks({era:city.era,anchors:an,mills:ed?.mills||[]});cityModel.add(landmarks.group);}}
    {const bd=boatData&&await boatData;if(bd){boats=createBoats(bd,{waterY:CPH_WATER+(sea?.group?.position?.y||0),era:city.era});cityModel.add(boats.group);}}
-   {const rd=railData&&await railData;if(rd)cityModel.add(createRails(rd).group);}
+   {const rd=railData&&await railData;if(rd){cityModel.add(createRails(rd).group);trains=createTrains(rd);cityModel.add(trains.group);}}
    {const pd=parkedData&&await parkedData;if(pd){parkedCars=createParkedCars(pd);cityModel.add(parkedCars.group);streetObstacles.push(...parkedCars.obstacles);}}
    const mapped=furnitureData&&await furnitureData;let mappedFurniture=null;
    if(mapped?.items)for(const pl of places)mapped.items=mapped.items.filter(i=>!(pl.dropFurniture||[]).some(([x,z,r])=>Math.hypot(i.x-x,i.z-z)<r)); // replaced by the place's own lamps and masts
@@ -970,7 +972,7 @@ async function boot(){
    trafficCars=mobility.cars.map(actor=>{const visual=streetLife.traffic.vehicleOf(actor);return {id:`traffic-${actor.id}`,label:visual?.type==='taxi'?'Taxi':'Car',actor,visual:{type:visual?.type||'sedan',paint:visual?.paint.getStyle()},claim(){if(actor.playerTaken||actor.edge===null||Math.abs(actor.speed)>1.2)return false;actor.playerTaken=true;actor.edge=null;actor.speed=0;return true;},release(){delete actor.playerTaken;}};});
    police=new PoliceSimulation(mobility.roads,world);police.relaxed=city.id.startsWith('copenhagen');policeRenderer=createPoliceRenderer(scene,police);police.onIncident=(...incident)=>finale.incident(...incident);roadblock=createRoadblock(scene,{world,police,carModel:carGroup,playerLook:travelRenderer.look,isVisible:trafficInView,obstacles:()=>[...mobility.cars.filter(c=>c.edge),...(tramSim?.bodies||[]),...(buses?.bodies||[]),...travel.parkedBodies(),...police.obstacles],onWarning:message=>toast(message,{important:true})});
    tramSim=new TramSimulation(tramData,world);tramSim.reset(car);tramRenderer=createTramRenderer(scene,tramSim);tramRenderer.update(car);
-   cyclists=new Cyclists(data);cyclistRenderer=createCyclistRenderer(scene,cyclists);cyclistRenderer.update(car);
+   cyclists=city.id==='copenhagen'?new CityCyclists(mobility.roads,world,42):new Cyclists(data);cyclistRenderer=createCyclistRenderer(scene,cyclists);cyclistRenderer.update(car);
    npcScooters=new ScooterRiders(mobility.walks,world,city.id.startsWith('copenhagen')?{count:0}:undefined);npcScooters.reset(car);npcScooterRenderer=createScooterRiderRenderer(scene,npcScooters);npcScooterRenderer.update(car);
    birds=createBirds(data,{colonies:birdColonies});cityModel.add(birds.group);
    safeBirdFlight=createBirdFlightClearance({buildings:world.cameraBuildings,stalls:market.stalls||[],water:world.water});
