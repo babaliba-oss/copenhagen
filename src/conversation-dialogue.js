@@ -1,6 +1,7 @@
 // Authored, fictional characters. Place names and bearings come only from the
 // active city's supplied map; sellers describe the game's existing stall menu.
 import {STALL_KINDS,formatEuro} from './market-shop.js';
+import {isAuthored,authoredCharacter,authoredBegin,authoredNext} from './copenhagen/characters.js';
 
 const hash=value=>{let n=2166136261;for(const c of String(value??''))n=Math.imul(n^c.charCodeAt(0),16777619)>>>0;return n;};
 const NAMES=['Robin','Ari','Alex','Sam','Kai','Mika','Noor','Jules','Sasha','Charlie','Elli','Lee'];
@@ -11,6 +12,7 @@ const PROFILES=[
  {id:'social',description:'Happy to stop for a chat',about:'Honestly? A walk and a conversation like this. I usually leave without much of a plan and see who I run into.',notice:'Slow down for a moment. I like watching the city carry on around me instead of always hurrying through it.',favourite:'A place I can return to and notice something new. Sometimes it is the same corner, just a different sort of day.'},
 ];
 export function characterFor(person){
+ if(isAuthored(person))return authoredCharacter(person); // a city's named characters (src/copenhagen/characters.js)
  const n=hash(person?.id??person?.stall??`${person?.x}:${person?.z}`),profile=PROFILES[n%PROFILES.length];
  const menu=menuFor(person);
  return {name:NAMES[Math.floor(n/7)%NAMES.length],profile,label:menu?menu.name:'Passerby',description:menu?'Market seller':profile.description,voiceSeed:n};
@@ -49,6 +51,7 @@ const DETAILS={
 const itemDetail=item=>Object.hasOwn(DETAILS,item.id)?DETAILS[item.id]:`${item.note}.`;
 
 export function beginDialogue(person,memory,context={}){
+ if(isAuthored(person))return authoredBegin(person,memory,context);
  const c=characterFor(person),menu=menuFor(person);memory.visits=(memory.visits||0)+1;memory.topics??=[];
  if(menu){
   const remembered=memory.item&&menu.items.find(it=>it.id===memory.item);
@@ -60,6 +63,7 @@ export function beginDialogue(person,memory,context={}){
 }
 
 export function nextDialogue(id,person,memory,context={}){
+ if(isAuthored(person))return authoredNext(id,person,memory,context);
  const c=characterFor(person),menu=menuFor(person),repeat=memory.topics.includes(id);
  if(!repeat)memory.topics.push(id);
  if(menu){

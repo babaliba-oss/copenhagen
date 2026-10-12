@@ -64,7 +64,8 @@ import './police-alert.css';
 import {cutLowerYard} from './port-yard.js';
 import {createRouteCrossingSigns} from './route-crossing-signs.js';
 import {createEtelarantaGantry} from './etelaranta-gantry.js';
-import {createMarketLife,marketGullColony} from './market-life.js';
+import {createMarketLife,marketGullColony,createInstancedPeople} from './market-life.js';
+import {createCopenhagenGame} from './copenhagen/game.js';
 import {createBirds,shoreSamples,inWater} from './birds.js';
 import {createSenateStreetProps} from './senate-street-props.js';
 import {createUniversityLife} from './university-life.js';
@@ -118,7 +119,7 @@ let waterfrontLandmarks,palaceLife,cityHallFlag,sea,marketScene,marketLife,unive
 let marketShop=null,marketShopRenderer=null; // buying at market stalls on foot (market-shop.js)
 const gullEncounter=new GullEncounter();
 let safeBirdFlight=null;
-let detailPeople=[],travel=null,peopleInteraction=null,staticCars=[],trafficCars=[],cameraTransition=null;
+let cph=null,detailPeople=[],travel=null,peopleInteraction=null,staticCars=[],trafficCars=[],cameraTransition=null;
 
 const $=id=>document.getElementById(id);
 const keys=new Set();
@@ -607,6 +608,7 @@ window.addEventListener('keydown',e=>{
  if(!started){if(!ready)return;if(e.code==='Enter'){e.preventDefault();start();return;}if(!['KeyW','KeyA','KeyS','KeyD','ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.code))return;}
  if(e.code==='Escape'){if(marketShop?.close()){refreshMarketUI();return;}if(peopleInteraction?.close())return;if(!mapOpen)setPaused(!paused);return;}
  if(mapOpen)return;
+ if(cph&&started&&cph.key(e.code)){e.preventDefault();return;} // Copenhagen: J journal, K treasure map, lore cards
  if(e.code==='KeyF'||e.code==='Enter'&&started){e.preventDefault();if(!paused)interactTravel();return;}
  if(e.code==='KeyG'){e.preventDefault();talkToPerson();return;}
  if(e.code==='KeyE'&&!paused&&canTalk()&&(marketShop?.intent()||gullEncounter.snapshot().phase==='chase'&&marketShop?.hand?.item.encounter==='gulls')){e.preventDefault();marketAction();return;} // otherwise E keeps looking right
@@ -713,6 +715,7 @@ function frame(now){
   }
   knockables?.update();streetLife.update(dt,car);tramRenderer.update(car);cyclistRenderer.update(car);npcScooterRenderer.update(car,dt);policeRenderer.update(dt);roadblock?.update(dt,car);
   if(police.message){toast(police.message);police.message=null;}
+  if(cph&&car)cph.update(dt,car,travel.mode,{running:started});
  }else if(ready&&police?.busted){policeRenderer.update(dt);roadblock?.update(dt,car);if(finale.cinematicStep(dt,roadblock?.playing)){$('busted-overlay').classList.toggle('live',!!roadblock?.active);$('busted-overlay').hidden=false;$('busted-continue').focus();}} // arrest cinematic: strobes keep flashing, then the end screen
  if(car){
    speedometer.update(car,dt,{mode:travel.mode});
@@ -895,6 +898,10 @@ async function boot(){
     const empty=()=>({group:new THREE.Group(),userData:{},obstacles:[]});
     const life=()=>({group:new THREE.Group(),people:[],update(){},reset(){},snapshot:()=>({})});
     marketLife=life();universityLife=life();terminalLife=life();detailPeople=[];
+    // Copenhagen's game layer (src/copenhagen): jobs, GPS line, sagas and the characters who give them.
+    // The characters are spread across the city, so the crowd's single-centre culling is overridden.
+    if(city.id==='copenhagen'){cph?.dispose?.();cph=createCopenhagenGame({scene,city,mobilityData,cityData:data,toast});const npc=createInstancedPeople(cph.people,{name:'Copenhagen characters',center:{x:0,z:0}});
+     npc.update=(u=>(dt,player)=>{u(dt,player);npc.group.visible=true;})(npc.update);cityModel.add(npc.group);marketLife={...life(),...npc,group:npc.group};detailPeople=npc.people;}
     harbour={group:new THREE.Group(),obstacles:[],knockables:null};knockables=combineKnockables([breakableSigns]); // traffic-signal posts bend when hit, in every city
     finale.zone=null; // station tram scheduling is Helsinki-specific
     const streetObstacles=[];for(const pl of places){const p=createPlace(pl,{textureUrl:dataUrl});cityModel.add(settleObject(p.group));streetObstacles.push(...p.obstacles);}

@@ -1,0 +1,44 @@
+/* Copenhagen game layer: same paper/ink language as the rest of the HUD (Spectral headings, Manrope text). */
+#cph-hud{position:fixed;top:96px;left:38px;z-index:30;display:grid;gap:10px;width:min(340px,calc(100vw - 76px));pointer-events:none;font-family:Manrope,sans-serif;color:#30312e}
+body:not(.driving) #cph-hud,body.busted #cph-hud,body.clean-capture #cph-hud{visibility:hidden}
+.cph-money{justify-self:start;padding:6px 12px;border-radius:999px;background:rgba(248,245,238,.94);box-shadow:0 4px 18px rgba(30,30,28,.14);font-family:Spectral,Georgia,serif;font-weight:600;font-size:20px;font-variant-numeric:tabular-nums}
+.cph-card{padding:12px 15px;border-radius:14px;background:rgba(248,245,238,.94);box-shadow:0 6px 24px rgba(30,30,28,.16)}
+.cph-card h3{margin:2px 0 4px;font-family:Spectral,Georgia,serif;font-weight:600;font-size:21px;line-height:1.1;letter-spacing:-.01em}
+.cph-card p{margin:0;font-size:12.5px;line-height:1.45;color:#5d5b55}
+.cph-card .cph-go{margin-top:6px;color:#30312e}
+.cph-card .cph-go b{color:#b36a12}
+.cph-kick{margin:0;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#8a867c}
+.cph-kick kbd,#cph-hud kbd{font:600 10px Manrope,sans-serif;border:1px solid rgba(48,49,46,.25);border-bottom-width:2px;border-radius:4px;padding:0 4px;background:#fff}
+.cph-saga{border-left:4px solid #c8202a}
+.cph-saga h3{color:#9e1b2c}
+.cph-saga ol{margin:4px 0 0;padding-left:18px;font-size:12.5px;color:#8a867c;display:grid;gap:2px}
+.cph-saga li.d{text-decoration:line-through;opacity:.6}
+.cph-saga li.c{color:#30312e;font-weight:600}
+.cph-saga li span{color:#b36a12;font-weight:500}
+.cph-timer{font-family:Spectral,Georgia,serif;font-size:22px!important;color:#2f7d6c!important;margin-top:4px!important}
+.cph-low{color:#c8202a!important}
+#cph-lore,#cph-journal,#cph-tmap{position:fixed;inset:0;z-index:40;display:grid;place-items:center;padding:16px;background:rgba(30,30,28,.45);font-family:Manrope,sans-serif}
+#cph-lore[hidden],#cph-journal[hidden],#cph-tmap[hidden]{display:none}
+.cph-lore-card{width:min(560px,100%);padding:24px 26px 20px;border-radius:16px;background:#f3ead6;color:#2a2118;box-shadow:0 22px 70px rgba(0,0,0,.4);border-top:6px solid #c8202a;display:grid;gap:10px}
+.cph-lore-card .cph-kick{color:#9e1b2c}
+.cph-lore-card h2{margin:0;font-family:Spectral,Georgia,serif;font-weight:700;font-size:clamp(26px,5vw,36px);line-height:1}
+.cph-lore-card p{margin:0;font-size:15px;line-height:1.65}
+.cph-lore-card button,.cph-jcard button,.cph-tmap-wrap button{justify-self:end;cursor:pointer;border:0;border-radius:999px;padding:8px 16px;background:#30312e;color:#f8f5ee;font:600 12px Manrope,sans-serif}
+.cph-lore-card kbd{color:#f8f5ee;margin-left:6px;font-size:10px}
+.cph-jcard{width:min(760px,100%);max-height:calc(100vh - 32px);overflow:auto;padding:20px;border-radius:16px;background:#f8f5ee;color:#30312e;display:grid;gap:14px}
+.cph-jtop{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+.cph-jcard h2{margin:2px 0 0;font-family:Spectral,Georgia,serif;font-size:34px}
+.cph-jlist{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:10px}
+.cph-jq{border:1px solid rgba(48,49,46,.15);border-left:4px solid #c8202a;border-radius:12px;padding:12px 14px;display:grid;gap:6px;background:#fff}
+.cph-jq.done{border-left-color:#2f7d6c;opacity:.85}
+.cph-jq.act{background:#fff6f2}
+.cph-jq h3{margin:0;font-family:Spectral,Georgia,serif;font-size:21px}
+.cph-jh{font-size:11px;color:#b36a12}
+.cph-js{margin:0;font-size:12px;color:#747168}
+.cph-jq details{font-size:13px;line-height:1.55;border-top:1px solid rgba(48,49,46,.12);padding-top:6px}
+.cph-jq summary{cursor:pointer}
+.cph-jq button{justify-self:start;background:#fff;color:#30312e;border:1px solid rgba(48,49,46,.25)}
+.cph-tmap-wrap{display:grid;gap:10px;justify-items:center;color:#f8f5ee;font-size:13px}
+.cph-tmap-wrap canvas{width:min(520px,calc(100vw - 32px),calc(100vh - 120px));height:auto;border-radius:6px;transform:rotate(1.2deg);box-shadow:0 18px 50px rgba(0,0,0,.5)}
+.cph-tmap-wrap p{margin:0}
+@media (max-width:760px){#cph-hud{top:12px;left:12px;width:min(280px,calc(100vw - 24px))}.cph-card p:not(.cph-go):not(.cph-kick){display:none}.cph-saga ol{display:none}}
