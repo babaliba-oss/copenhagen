@@ -24,6 +24,7 @@ export const POSTS={
  'parking-meter':{height:1.55,radius:.1,strength:1.3},
  'mast-lamp':{height:5.6,radius:.075,strength:2.2}, // Copenhagen conical graphite mast with a top lantern (register: 5–6 m)
  'park-lamp':{height:3.2,radius:.06,strength:1.4}, // short park lantern with stacked shades
+ lantern:{height:3.1,radius:.07,strength:1.2}, // 1760 oil lantern on a wooden post
 };
 export const SOLIDS={bollard:[.22,.22,.95],'junction-box':[.85,.42,1.3],bench:[1.8,.6,.85],'bike-rack':[2.4,.55,.8],hydrant:[.36,.36,.8],shelter:[3.6,1.5,2.5]}; // width, depth, height
 // A stable id per object: Mapillary feature id, else its source and place in the file.
@@ -56,6 +57,7 @@ function postParts(kind){
  if(kind==='pole')return [cyl(.11,.14,8.5,4.25,WOOD),box(1.4,.08,.08,0,7.9,0,WOOD)];
  if(kind==='mast-lamp')return [cyl(.04,.075,5.4,2.7,'#3b3f42',8),cyl(.05,.05,.12,5.42,'#2c3033',8),cyl(.12,.24,.34,5.62,'#2c3033',10),cyl(.2,.2,.04,5.44,'#fff3d6',10)];
  if(kind==='park-lamp')return [cyl(.045,.06,2.8,1.4,'#3b3f42',8),cyl(.08,.22,.12,2.9,'#e9e6dc',12),cyl(.1,.28,.12,3.02,'#e9e6dc',12),cyl(.04,.12,.1,3.14,'#e9e6dc',12),cyl(.16,.16,.03,2.86,'#fff3d6',10)];
+ if(kind==='lantern')return [cyl(.06,.08,2.6,1.3,'#3b2e22',6),box(.08,.08,.5,0,2.5,.22,'#2a221a'),box(.32,.42,.32,0,2.62,.42,'#1d1a17'),box(.26,.32,.26,0,2.62,.42,'#f6dca0'),cyl(.02,.22,.16,0,2.91,.42,'#1d1a17',4)];
  if(kind==='parking-meter')return [cyl(.04,.045,1.1,.55,'#4a5255'),box(.24,.38,.2,0,1.3,0,'#2b5d8f')];
  return [];
 }
@@ -200,7 +202,7 @@ export function createMappedFurniture(layer,{player=()=>null,mobility=()=>null,c
  }
 
  // Lamp light after dark (weather.js night look): a bright head that blooms and a warm pool on the ground.
- const HEAD={lamp:[0,8.2,1.5],'mast-lamp':[0,5.42,0],'park-lamp':[0,2.85,0],'wire-lamp':[0,7.28,0]};
+ const HEAD={lantern:[0,2.62,.42],lamp:[0,8.2,1.5],'mast-lamp':[0,5.42,0],'park-lamp':[0,2.85,0],'wire-lamp':[0,7.28,0]};
  const heads=items.filter(it=>HEAD[it.k]).map(it=>{const [hx,hy,hz]=HEAD[it.k],yaw=it.yaw||0,x=it.x+Math.sin(yaw)*hz,z=it.z+Math.cos(yaw)*hz;return {x,z,y:groundAt(it.x,it.z)+hy,k:it.k};});
  let glow=null,pools=null;
  if(heads.length){
@@ -210,7 +212,7 @@ export function createMappedFurniture(layer,{player=()=>null,mobility=()=>null,c
   grad.addColorStop(0,'rgba(255,255,255,1)');grad.addColorStop(.25,'rgba(255,255,255,.6)');grad.addColorStop(.6,'rgba(255,255,255,.18)');grad.addColorStop(1,'rgba(255,255,255,0)');g.fillStyle=grad;g.fillRect(0,0,64,64);
   const poolMat=new THREE.MeshBasicMaterial({color:'#ffc98a',fog:true,alphaMap:new THREE.CanvasTexture(c),transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,polygonOffset:true,polygonOffsetFactor:-4,opacity:0});
   pools=new THREE.InstancedMesh(new THREE.PlaneGeometry(1,1).rotateX(-Math.PI/2),poolMat,heads.length);pools.name='Lamp light pools';pools.frustumCulled=false;pools.visible=false;pools.renderOrder=2;
-  const R={lamp:12,'mast-lamp':9,'park-lamp':5.5,'wire-lamp':10},sc=new THREE.Vector3();
+  const R={lantern:6,lamp:12,'mast-lamp':9,'park-lamp':5.5,'wire-lamp':10},sc=new THREE.Vector3();
   heads.forEach((h,i)=>{glow.setMatrixAt(i,m4.compose(v.set(h.x,h.y,h.z),q.identity(),h.k==='park-lamp'?sc.set(.8,.8,.8):one));
    const r=R[h.k];pools.setMatrixAt(i,m4.compose(v.set(h.x,groundAt(h.x,h.z)+.32,h.z),q.identity(),sc.set(r,1,r)));});
   group.add(glow,pools);

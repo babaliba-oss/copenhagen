@@ -200,7 +200,8 @@
     "gradeSpikes": 0,
     "source": "Elevation: Mapterhorn terrain tiles (mapterhorn.com); see mapterhorn.com/attribution for the sources and licences of your area."
    },
-   "estimatedFacades": true
+   "estimatedFacades": true,
+   "furniture": "furniture.json"
   }
  ]
 }
