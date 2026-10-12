@@ -138,7 +138,7 @@ for b in range(len(bids)):
     if ERA and (not ob or ob.get('name') == 'Volden' or MODERN.search(ob.get('name') or '')): continue
     bid = 'kk-' + (ob['id'] if ob else f'{int(round(mx))}-{int(round(mz))}')
     bbox = [round(float(xs.min()), 2), round(float(zs.min()), 2), round(float(xs.max()), 2), round(float(zs.max()), 2)]
-    if (bbox[2] - bbox[0]) * (bbox[3] - bbox[1]) > 60000: continue
+    if (bbox[2] - bbox[0]) * (bbox[3] - bbox[1]) > 160000: continue
     for gx in range(int(bbox[0] // 4), int(bbox[2] // 4) + 1):
         for gz in range(int(bbox[1] // 4), int(bbox[3] // 4) + 1): occ.add((gx, gz))
     key = (int(mx // TILE), int(mz // TILE))

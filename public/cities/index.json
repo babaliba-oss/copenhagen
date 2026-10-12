@@ -169,20 +169,20 @@
     "Daniel Sfita"
    ],
    "era": 1760,
-   "attribution": "Map data © OpenStreetMap contributors, ODbL 1.0 (openstreetmap.org/copyright). Building heights from OSM tags or estimated by building type. Elevation: Mapterhorn terrain tiles (mapterhorn.com); see mapterhorn.com/attribution for the sources and licences of your area.",
+   "attribution": "Map data © OpenStreetMap contributors, ODbL 1.0 (openstreetmap.org/copyright). Building heights from OSM tags or estimated by building type. Elevation: Mapterhorn terrain tiles (mapterhorn.com); see mapterhorn.com/attribution for the sources and licences of your area. Buildings: København 3D bymodel © Københavns Kommune 2013, CC BY 4.0.",
    "fetchedAt": "2026-10-12",
    "counts": {
     "official": {},
-    "buildings": 3534,
-    "roads": 1437,
-    "pavement": 1622,
-    "parks": 1909,
+    "buildings": 3517,
+    "roads": 1410,
+    "pavement": 1564,
+    "parks": 1908,
     "water": 210,
-    "trees": 3931,
-    "roadEdges": 3272,
-    "walkEdges": 9160,
+    "trees": 3792,
+    "roadEdges": 3208,
+    "walkEdges": 8878,
     "signals": 0,
-    "starts": 8,
+    "starts": 16,
     "tramRoutes": 0,
     "tramLines": "",
     "busRoutes": 0,
@@ -198,7 +198,8 @@
     "bridges": 50,
     "gradeSpikes": 0,
     "source": "Elevation: Mapterhorn terrain tiles (mapterhorn.com); see mapterhorn.com/attribution for the sources and licences of your area."
-   }
+   },
+   "estimatedFacades": true
   }
  ]
 }

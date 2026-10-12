@@ -68,7 +68,24 @@ export function personLook(seed=0,overrides={}){
  look.stoop=look.age==='senior'?.08+tone*.08:0;
  // Keep facial variation after the established appearance draws.
  look.eyeSpacing=.94+r()*.12;look.mouthWidth=.91+r()*.18;look.browTilt=(r()-.5)*.0025;
+ if(PERIOD.year===1760)dress1760(look,r);
  return Object.assign(look,overrides);
+}
+// Copenhagen 1760 (set by main.js for the era city): long coats and breeches for men, long skirts and
+// aprons for women, wool and linen colours, no phones, backpacks or strollers.
+export const PERIOD={year:null};
+const PERIOD_1760={coats:['#1f2c4a','#5a2a22','#3b2f25','#4a3b2a','#2f3a2a','#7a2a20','#2a2a2e','#6b5a3a','#8a6b3a','#3a4a5a'],
+ skirts:['#5a2a22','#2f3a52','#6b5a3a','#3b2f25','#7a6a4a','#8a3a2a','#2a3a2a'],linen:['#e9e3d4','#ddd3bd','#cfc4ab'],stockings:['#e6e0d0','#3a3530','#d8d0bf'],hats:['#1d1b19','#2a2622','#3b2f25','#e9e3d4']};
+function dress1760(look,r){
+ const fem=look.figure>0;
+ look.shirt=fem?pick(r,PERIOD_1760.linen):pick(r,PERIOD_1760.coats);
+ look.trousers=fem?pick(r,PERIOD_1760.skirts):pick(r,PERIOD_1760.coats);
+ look.skirt=fem;look.coat=fem?.95+r()*.05:.75+r()*.2;look.outer='coat';
+ look.shoes=r()<.7?'#1b1714':'#3a2a20';look.tights=pick(r,PERIOD_1760.stockings);
+ look.hat=pick(r,PERIOD_1760.hats);look.hairStyle=fem?(r()<.6?'bun':'beanie'):(r()<.55?'cap':'short');
+ if(!fem&&look.hairStyle==='short'&&r()<.5)look.hair=pick(r,PALETTE.greys); // powdered wigs
+ look.scarf=fem&&r()<.4?pick(r,PERIOD_1760.linen):null;look.phoneWalk=false;look.bagType=r()<.12?'shoulder':null;look.bagColor='#6b4a32';
+ look.accessory=look.accessory==='dog'?'dog':null;
 }
 const smooth=(a,b,v)=>{const t=Math.min(1,Math.max(0,(v-a)/(b-a)));return t*t*(3-2*t);};
 

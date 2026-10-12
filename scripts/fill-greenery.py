@@ -39,7 +39,8 @@ for p in city['parks']:
     bb = p['bbox']
     if (bb[2] - bb[0]) * (bb[3] - bb[1]) < 300: continue
     pm = mask([p])
-    step = 7.5 if wood else 11.0
+    area = (bb[2] - bb[0]) * (bb[3] - bb[1]); huge = area > 120000 and not wood
+    step = 7.5 if wood else (30.0 if huge else 11.0)
     x = bb[0] + rnd.random() * step
     while x < bb[2]:
         z = bb[1] + rnd.random() * step
@@ -47,7 +48,7 @@ for p in city['parks']:
             px, pz = x + (rnd.random() - .5) * step * .8, z + (rnd.random() - .5) * step * .8
             i, j = int((pz + EXT) / G), int((px + EXT) / G)
             dense = noise(px, pz, 55) * .7 + noise(px, pz, 17) * .3
-            if 0 <= i < N and 0 <= j < N and pm[i, j] and not blocked[i, j] and not occ[i, j] and (wood or dense > .48):
+            if 0 <= i < N and 0 <= j < N and pm[i, j] and not blocked[i, j] and not occ[i, j] and (wood or dense > (.66 if huge else .48)):
                 sp = rnd.choice(SPECIES['wood' if wood else 'park'])
                 city['trees'].append({'p': [round(px, 2), round(pz, 2)], 'species': sp, 'size': '30 - 50 cm', 'height': round(9 + rnd.random() * 11, 1), 'fill': 1})
                 occ[max(0, i - 3):i + 4, max(0, j - 3):j + 4] = True; added += 1

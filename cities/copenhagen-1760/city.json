@@ -28,13 +28,6 @@
    ]
   },
   {
-   "name": "Rådhuspladsen",
-   "at": [
-    12.5695,
-    55.6759
-   ]
-  },
-  {
    "name": "Amalienborg",
    "at": [
     12.593,
@@ -88,7 +81,7 @@
   "geocoder": "manual",
   "displayName": "København, Denmark"
  },
+ "maxStarts": 16,
  "era": 1760,
- "note": "Copenhagen around 1760: built by scripts/era-1760.py from the 2026 city.",
- "maxStarts": 16
+ "note": "Copenhagen around 1760: built by scripts/era-1760.py from the 2026 city."
 }

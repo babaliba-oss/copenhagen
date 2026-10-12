@@ -147,5 +147,10 @@ c2['starts'] = [s for s in cfg['starts'] if ZP.contains(Point(fwd(*s['at'])))] +
 c2['note'] = 'Copenhagen around 1760: built by scripts/era-1760.py from the 2026 city.'
 os.makedirs('cities/copenhagen-1760', exist_ok=True)
 json.dump(c2, open('cities/copenhagen-1760/city.json', 'w'), indent=1, ensure_ascii=False)
+mills = []
+for b in bastions:
+    c = b.centroid; mills.append([round(c.x, 1), round(-c.y, 1)])
+os.makedirs('public/cities/copenhagen-1760', exist_ok=True)
+json.dump({'mills': mills}, open('public/cities/copenhagen-1760/era.json', 'w'))
 json.dump({'zone': mapping(ZONE), 'rampart': mapping(rampart), 'moat': mapping(moat), 'wall': WALL}, open(f'{DST}/era.json', 'w'))
 print('starts', [s['name'] for s in c2['starts']])

@@ -70,6 +70,8 @@ import {createCarriage} from './copenhagen/carriage.js';
 import {createParkedCars} from './copenhagen/parked-cars.js';
 import {createRails} from './copenhagen/rails.js';
 import {createBoats} from './copenhagen/boats.js';
+import {createLandmarks} from './copenhagen/landmarks.js';
+import {PERIOD as PERSON_PERIOD} from './person-model.js';
 import {WATER_LEVEL as CPH_WATER} from './quay.js';
 import {createBirds,shoreSamples,inWater} from './birds.js';
 import {createSenateStreetProps} from './senate-street-props.js';
@@ -125,7 +127,7 @@ let waterfrontLandmarks,palaceLife,cityHallFlag,sea,marketScene,marketLife,unive
 let marketShop=null,marketShopRenderer=null; // buying at market stalls on foot (market-shop.js)
 const gullEncounter=new GullEncounter();
 let safeBirdFlight=null;
-let cph=null,carriage=null,parkedCars=null,boats=null,detailPeople=[],travel=null,peopleInteraction=null,staticCars=[],trafficCars=[],cameraTransition=null;
+let cph=null,carriage=null,parkedCars=null,boats=null,landmarks=null,detailPeople=[],travel=null,peopleInteraction=null,staticCars=[],trafficCars=[],cameraTransition=null;
 
 const $=id=>document.getElementById(id);
 const keys=new Set();
@@ -739,7 +741,7 @@ function frame(now){
   }
   knockables?.update();streetLife.update(dt,car);tramRenderer.update(car);cyclistRenderer.update(car);npcScooterRenderer.update(car,dt);policeRenderer.update(dt);roadblock?.update(dt,car);
   if(police.message){toast(police.message);police.message=null;}
-  if(cph&&car)cph.update(dt,car,travel.mode,{running:started});if(carriage&&car)carriage.userData.update(car.speed||0,dt);parkedCars?.update(car);boats?.update(dt,car);
+  if(cph&&car)cph.update(dt,car,travel.mode,{running:started});if(carriage&&car)carriage.userData.update(car.speed||0,dt);parkedCars?.update(car);boats?.update(dt,car);landmarks?.update(dt);
  }else if(ready&&police?.busted){policeRenderer.update(dt);roadblock?.update(dt,car);if(finale.cinematicStep(dt,roadblock?.playing)){$('busted-overlay').classList.toggle('live',!!roadblock?.active);$('busted-overlay').hidden=false;$('busted-continue').focus();}} // arrest cinematic: strobes keep flashing, then the end screen
  if(car){
    speedometer.update(car,dt,{mode:travel.mode});
@@ -825,7 +827,7 @@ requestAnimationFrame(frame);
 async function boot(){
  try{
    try{registerCities((await json('/cities/index.json')).cities);}catch{} // community-built cities
-   city=useCity(selectCity(location.search));if(city.id==='copenhagen')STARTER_VISUALS.bike={kind:'ladcykel',color:'#26302b'};if(city.era===1760)STARTER_VISUALS.none=['bike','scooter'];updateWorldhoodBrand(city);setPlayableRadius(city.radius||2000);
+   city=useCity(selectCity(location.search));if(city.id==='copenhagen')STARTER_VISUALS.bike={kind:'ladcykel',color:'#26302b'};if(city.era===1760){STARTER_VISUALS.none=['bike','scooter'];PERSON_PERIOD.year=1760;}updateWorldhoodBrand(city);setPlayableRadius(city.radius||2000);
    const helsinki=city.scenery==='helsinki';
    if(!helsinki)finale.zone=null; // station tram scheduling belongs to Helsinki; pursuit rules are shared
    if(!helsinki&&city.projection?.startsWith('+proj'))useProjection(city.projection,city.origin);
@@ -833,6 +835,7 @@ async function boot(){
    progress(8,`Loading ${city.name}`);
    const d=unpack(dataUrl('city.pack')).then(bytes=>JSON.parse(new TextDecoder().decode(bytes)));
    const terrainData=city.terrain?.file?unpack(dataUrl(city.terrain.file)).then(decodeTerrain).catch(e=>{console.warn('Terrain unavailable; the city stays flat:',e);return null;}):null; // ground elevation (src/terrain.js)
+   const anchorData=city.id.startsWith('copenhagen')?json(dataUrl('anchors.json')).catch(()=>null):null,eraData=city.era===1760?json(dataUrl('era.json')).catch(()=>null):null;
    const boatData=city.id.startsWith('copenhagen')?json(dataUrl('boats.json')).catch(()=>null):null;
    const railData=city.id==='copenhagen'?json(dataUrl('rails.json')).catch(()=>null):null;
    const parkedData=city.id==='copenhagen'?json(dataUrl('parked.json')).catch(()=>null):null; // kerbside parked cars (scripts/parked-cars.py)
@@ -945,6 +948,7 @@ async function boot(){
    const {streetObstacles,ads,crossingSigns,routeCrossingSigns,roadworks,senateProps,furniture,micromobility,market,kaivokatuDetails}=helsinki?await buildHelsinkiScenery():genericScenery();
    staticCars=[...(furniture.enterableCars||[]),...(harbour.enterableCars||[]),...(stationStreetLife?.enterableCars||[])];
    // Detected street furniture: solid boxes join the obstacles; posts, bins and barriers can be knocked down.
+   {const an=anchorData&&await anchorData;if(an){const ed=eraData&&await eraData;landmarks=createLandmarks({era:city.era,anchors:an,mills:ed?.mills||[]});cityModel.add(landmarks.group);}}
    {const bd=boatData&&await boatData;if(bd){boats=createBoats(bd,{waterY:CPH_WATER+(sea?.group?.position?.y||0),era:city.era});cityModel.add(boats.group);}}
    {const rd=railData&&await railData;if(rd)cityModel.add(createRails(rd).group);}
    {const pd=parkedData&&await parkedData;if(pd){parkedCars=createParkedCars(pd);cityModel.add(parkedCars.group);streetObstacles.push(...parkedCars.obstacles);}}
