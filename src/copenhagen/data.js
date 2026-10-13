@@ -10,6 +10,7 @@ export const JOBS = [
   { t: 'Flag cake', d: 'Birthday cake with little Dannebrog flags. Do not tip it.', a: [55.68590, 12.57640, 'Rosenborg'], b: [55.67280, 12.59380, 'Vor Frelsers Kirke'], pay: 430 },
   { t: 'Rød pølse, express', d: 'A tourist at Nyhavn is hungry and a bit disappointed by the prices.', a: [55.67595, 12.56870, 'Rådhuspladsen'], b: [55.67985, 12.59000, 'Nyhavn'], pay: 360 },
   { t: 'Library returns', d: 'Three overdue books for the Black Diamond. The fine is already embarrassing.', a: [55.68136, 12.57580, 'Rundetårn'], b: [55.67340, 12.58210, 'Den Sorte Diamant'], pay: 340 },
+  { t: 'Ice lollies for the lifeguards', d: 'A cool box for the lifeguards at Havnebadet. They melt, so take Langebro.', a: [55.67340, 12.58210, 'Den Sorte Diamant'], b: [55.66510, 12.57360, 'Havnebadet Islands Brygge'], pay: 410 },
   { t: 'Flowers for Strøget', d: 'A bucket of tulips for a shop on Amagertorv. Mind the pedestrians.', a: [55.67910, 12.56750, 'Ørstedsparken'], b: [55.67870, 12.57920, 'Amagertorv'], pay: 300 },
 ];
 
