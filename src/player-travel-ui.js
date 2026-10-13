@@ -12,7 +12,7 @@ export function createTravelUI({interact,toggleRun,focusWorld=()=>{},doc=documen
   if(previous!==travel.mode){if(started&&!seen.has(travel.mode)){hintUntil=now()+4000;seen.add(travel.mode);}previous=travel.mode;}
   const nearest=travel.mode==='walk'?travel.nearest():null,stopped=Math.abs(travel.actor.speed)<.35,showHint=now()<hintUntil;
   action.dataset.ride=nearest?.id||'';
-  action.textContent=travel.mode==='walk'?nearest?`${coarse?'':'Enter · '}${nearest.mode==='car'?'Enter car':`Ride ${nearest.label.toLowerCase()}`}`:'':`${coarse?'':'F · '}${travel.mode==='car'?'Get out':'Get off'}`;
+  action.textContent=travel.mode==='walk'?nearest?`${coarse?'':'Enter · '}${nearest.mode==='car'?(doc.body.classList.contains('era-1760')?'Board the coach':'Enter car'):`Ride ${nearest.label.toLowerCase()}`}`:'':`${coarse?'':'F · '}${travel.mode==='car'?(doc.body.classList.contains('era-1760')?'Step down':'Get out'):'Get off'}`;
   action.hidden=travel.mode==='walk'?!nearest:!stopped||(!coarse&&!showHint);action.disabled=false;
   run.hidden=!coarse||travel.mode!=='walk';run.textContent=travel.sprint?'Running':'Run';run.setAttribute('aria-pressed',String(!!travel.sprint));
   hint.textContent=coarse?'':travel.mode==='walk'?'WASD · Shift to run':travel.mode==='car'?'F to get out when stopped':'W / ↑ to ride · Space to brake · F to get off';hint.hidden=!showHint||coarse;
