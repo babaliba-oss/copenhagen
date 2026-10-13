@@ -5,7 +5,7 @@ generic or period palettes: a cream Rundetårn). Both eras.  python3 scripts/lan
 import json, re
 BRICK, DARKBRICK, SAND, PLASTER, GREY = '#8e4a38', '#7a3d2f', '#cdbb94', '#e6dcc4', '#b9b4aa'
 COPPER, SLATE, TILE = '#5f8f7a', '#4a4f52', '#8a3b2a'
-L = [(r'rundetårn|trinitatis', BRICK, COPPER), (r'vor frelsers', DARKBRICK, '#2a2725'), (r'børsen', BRICK, COPPER),
+L = [(r'rundetårn|trinitatis', BRICK, COPPER), (r'vor frelsers', BRICK, '#55585a'), (r'børsen', BRICK, COPPER),
      (r'rosenborg', BRICK, COPPER), (r'holmens kirke', BRICK, COPPER), (r'petri', BRICK, COPPER), (r'helligånds', BRICK, COPPER),
      (r'nikolaj', BRICK, COPPER), (r'christians kirke', PLASTER, COPPER), (r'garnisons', '#e2cfa0', COPPER),
      (r'christiansborg slotskirke', PLASTER, COPPER), (r'christiansborg', GREY, COPPER), (r'marmorkirken|frederiks kirke', '#ddd6c8', COPPER),
