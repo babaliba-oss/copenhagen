@@ -192,7 +192,7 @@ export function createMappedFurniture(layer,{player=()=>null,mobility=()=>null,c
  }
  const solidParts={bollard:([w,,h])=>[cyl(w*.45,w*.5,h,h/2,'#2f3436',8),cyl(w*.5,w*.5,.08,h*.82,'#c9a64a',8),cyl(w*.38,w*.45,.06,h+.03,'#2f3436',8)],'junction-box':([w,d,h])=>[box(w,h,d,0,h/2,0,'#8a9086'),box(w+.04,.05,d+.04,0,h+.02,0,'#6d736a')],
   bench:([w,d,h])=>[box(w,.06,.42,0,.45,.05,'#7a5a3e'),box(w,.4,.05,0,.75,-.18,'#7a5a3e'),box(.06,.45,.45,-w/2+.12,.22,0,'#2d3133'),box(.06,.45,.45,w/2-.12,.22,0,'#2d3133')],
-  'bike-rack':([w,d,h])=>[box(w,.03,.03,0,.07,-.12,'#7f888b'),box(w,.03,.03,0,.07,.12,'#7f888b'),box(w,.03,.03,0,.34,0,'#7f888b'),...[-.9,-.3,.3,.9].map(x=>box(.03,.3,.26,x,.2,0,'#7f888b'))], // Copenhagen ground rack: low wheel-slot rail (it reads as a fence when tall and empty)
+  'bike-rack':([w,d,h])=>[box(w,.025,.025,0,.07,-.12,'#4c5356'),box(w,.025,.025,0,.07,.12,'#4c5356'),box(w-.3,.022,.022,0,.33,0,'#4c5356'),...[-.9,-.3,.3,.9].map(x=>box(.025,.3,.26,x,.2,0,'#4c5356'))], // Copenhagen ground rack: low wheel-slot rail (it reads as a fence when tall and empty)
   hydrant:([w,,h])=>[cyl(w*.4,w*.45,h,h/2,'#b8322a',8),cyl(w*.5,w*.5,.08,h,'#b8322a',8)],
   // Stop shelter, open towards the road (+Z): steel frame, roof, back and side glass, a bench and an advert panel at one end.
   shelter:([w,d,h])=>[...[-w/2+.05,w/2-.05].flatMap(x=>[box(.08,h,.08,x,h/2,-d/2+.06,'#3e4a4f'),box(.08,h,.08,x,h/2,d/2-.12,'#3e4a4f')]),box(w+.2,.12,d+.25,0,h+.06,0,'#4a565b'),

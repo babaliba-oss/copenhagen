@@ -250,7 +250,7 @@ $('look-label').textContent=look.label;look.onChange((name,label)=>{$('look-labe
 window.helsinkiLook={set:(name,opts)=>look.set(name,opts),cycle:()=>look.cycle(),get name(){return look.name;},post};
 cutLowerYard(ground.material);cutLowerYard(surfaceMaterial);
 const loadedTiles=new Map(),loadingTiles=new Map();
-const uploads=createFrameQueue({maxJobs:8,budgetMs:4}),detailScheduler=createDetailScheduler(2),treeChunks=[],leafGeometries=[],shadowCuller=createStaticShadowCuller(cityModel);
+const uploads=createFrameQueue({maxJobs:5,budgetMs:3}),detailScheduler=createDetailScheduler(2),treeChunks=[],leafGeometries=[],shadowCuller=createStaticShadowCuller(cityModel);
 const photoTiles=new Map(),photoPromises=new Map();
 const tmp=new THREE.Object3D();
 const treeFocus={value:new THREE.Vector2(1e5,1e5)};
@@ -363,6 +363,17 @@ function createFallbackBuildings(buildings=data.buildings){
  }
  if(geoms.length){const mesh=new THREE.Mesh(mergeGeometries(geoms),new THREE.MeshStandardMaterial({color:'#c5c4b8',roughness:1}));mesh.castShadow=true;mesh.receiveShadow=true;cityModel.add(mesh);geoms.forEach(g=>g.dispose());}
 }
+// Building materials: keep one already-compiled material of each shader variant alive. Disposing the last
+// one released its program, and the next tile of that kind recompiled it on the spot (a long frame, worst on
+// Macs where shader compiles are slow).
+const pinnedMaterials=new Map();
+function disposeMaterial(m){
+ if(!m)return;if(Array.isArray(m)){m.forEach(disposeMaterial);return;}
+ const key=m.type+'|'+(m.customProgramCacheKey?.()||'')+'|'+!!m.vertexColors+'|'+!!m.map+'|'+m.side+'|'+!!m.transparent;
+ if(pinnedMaterials.get(key)===m)return;
+ if(!pinnedMaterials.has(key)&&renderer.properties.get(m)?.currentProgram){pinnedMaterials.set(key,m);return;}
+ m.dispose();
+}
 function loadRoof(t,at=focus){
  if(ready&&tileDistance(t,at)>650||loadedTiles.has(t.file))return Promise.resolve();
  if(loadingTiles.has(t.file))return loadingTiles.get(t.file);
@@ -387,7 +398,7 @@ async function buildRoof(t,at){
   uploads.push(()=>{if(loadedTiles.get(t.file)===group)cityModel.add(group);});
  }catch(error){
   if(loadedTiles.get(t.file)===group)loadedTiles.delete(t.file);
-  cityModel.remove(group);group.children.forEach(m=>{m.geometry.dispose();m.material.dispose();});textures.forEach(t=>t.dispose());images?.forEach(({bitmap})=>bitmap.close());
+  cityModel.remove(group);group.children.forEach(m=>{m.geometry.dispose();disposeMaterial(m.material);});textures.forEach(t=>t.dispose());images?.forEach(({bitmap})=>bitmap.close());
   throw new Error(`Building tile ${t.file}: ${error.message||error}`);
  }
 }
@@ -402,7 +413,7 @@ async function detailTile(group){
  const shells=new Map(group.children.filter(m=>m.userData.source).map(m=>[m.userData.id,m]));
  for(const b of buildings)uploads.push(()=>{
   if(loadedTiles.get(t.file)!==group)return;
-  const shell=shells.get(b.part.id);if(shell){group.remove(shell);shell.geometry.dispose();shell.material.dispose();}
+  const shell=shells.get(b.part.id);if(shell){group.remove(shell);shell.geometry.dispose();disposeMaterial(shell.material);}
   const meshes=materialiseBuilding(b,textures);for(const m of meshes){freezeMesh(m);applyMeshLod(m,group.userData.level,focus);}group.add(...meshes);group.userData.windows+=b.windows;
  },()=>dist(b)); // nearest building first, across every tile in the queue
 }
@@ -491,7 +502,7 @@ async function runTilePass(){
  await pool(near,4,loadRoof);
  for(const t of roofIndex.tiles){const m=loadedTiles.get(t.file);if(!m)continue;
   const d=tileDistance(t);
-  if(d>1000){detailScheduler.cancel(t.file);cityModel.remove(m);m.children.forEach(c=>{c.geometry.dispose();c.material.dispose();});m.userData.textures.forEach(x=>{x.image?.close?.();x.dispose();});loadedTiles.delete(t.file);continue;}
+  if(d>1000){detailScheduler.cancel(t.file);cityModel.remove(m);m.children.forEach(c=>{c.geometry.dispose();disposeMaterial(c.material);});m.userData.textures.forEach(x=>{x.image?.close?.();x.dispose();});loadedTiles.delete(t.file);continue;}
   const level=applyTileLod(m,tileLevel(m.userData.level,d),focus);
   // Only near-level tiles are worth the worker's time, nearest first.
   if(level==='near'&&m.userData.pending)detailScheduler.request(t.file,priority(t),()=>detailTile(m),handleTileError);

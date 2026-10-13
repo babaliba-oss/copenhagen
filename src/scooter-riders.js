@@ -153,12 +153,13 @@ export class ScooterRiders{
   return false;
  }
  reset(player){
+  if(!this.actors.length)return; // no riders (Copenhagen): no route discovery either
   this.pool(player);
   for(const actor of this.actors)if(!actor.playerTaken&&!actor.knockdown)actor.edge=null;
   for(const actor of this.actors)if(!actor.playerTaken&&!actor.knockdown)this.spawn(actor,player);
  }
  step(dt,player,{people=[],vehicles=[],impacts=null}={}){
-  dt=clamp(dt,0,.1);this.time+=dt;
+  dt=clamp(dt,0,.1);this.time+=dt;if(!this.actors.length)return;
   if(!this.anchor)this.pool(player);
   else if(this.pending||this.dirty||(this.time-this.refreshed>2&&Math.hypot(player.x-this.anchor.x,player.z-this.anchor.z)>140))this.refreshPool(player);
   for(const actor of this.actors){

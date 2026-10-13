@@ -69,7 +69,7 @@ export class Mobility {
  // streamed region. Only derived junction and route lookup data is refreshed.
  appendRegion(data){
   const offset=this.signals.length,roads=this.roads.edges.length,walks=this.walks.edges.length;
-  this.signals.push(...data.signals);mergeGraph(this.roads,data.roads,offset);mergeGraph(this.walks,data.walks,offset);
+  this.signals.push(...data.signals);mergeGraph(this.roads,data.roads,offset);mergeGraph(this.walks,data.walks,offset);this.roads._grid=this.walks._grid=null;
   for(const e of this.roads.edges)if(e.mappedSignal!==undefined)e.signal=e.mappedSignal;
   this.signalControl=annotateJunctions(this.roads,this.signals);annotateCrossings(this.walks,this.signalControl);this.signalAxes=this.signalControl.axes;
   this.stationEdges=this.roads.edges.filter(e=>e.points.some(([x,z])=>inStationTrafficArea({x,z})));
@@ -133,6 +133,14 @@ export class Mobility {
   for(let i=1,n=Math.max(1,Math.ceil(distance/.25));i<=n;i++)if(!this.walkable(a.x+(p.x-a.x)*i/n,a.z+(p.z-a.z)*i/n,edge))return false;
   return true;
  }
+ // Edges whose midpoint lies near the player, from a 100 m grid built once per graph (spawning used to scan
+ // every edge in the city per agent: a long frame whenever many respawned at once).
+ edgesNear(graph,player,r){
+  const C=100;if(!graph._grid){const g=new Map();for(const e of graph.edges){const p=e.points[Math.floor(e.points.length/2)],k=Math.floor(p[0]/C)+','+Math.floor(p[1]/C);let l=g.get(k);if(!l)g.set(k,l=[]);l.push(e);}graph._grid=g;}
+  if(!player)return graph.edges;const out=[],x0=Math.floor((player.x-r)/C),x1=Math.floor((player.x+r)/C),z0=Math.floor((player.z-r)/C),z1=Math.floor((player.z+r)/C);
+  for(let i=x0;i<=x1;i++)for(let j=z0;j<=z1;j++){const l=graph._grid.get(i+','+j);if(l)for(const e of l)out.push(e);}
+  return out;
+ }
  nearCorridor(player){return this.corridorEdges.some(e=>{const p=e.points[Math.floor(e.points.length/2)];return Math.hypot(p[0]-player.x,p[1]-player.z)<420;});}
  spawn(a,player){
   if(a.playerTaken){a.edge=null;a.speed=0;return;}
@@ -141,7 +149,7 @@ export class Mobility {
   if(a.corridorOnly&&!this.nearCorridor(player)){a.edge=null;a.speed=0;return;}
   const graph=a.walking?this.walks:this.roads;
   // Prefer nearby routes; edge midpoint avoids choosing a remote end of a long road.
-  const nearby=(a.stationOnly?this.stationEdges:a.corridorOnly?this.corridorEdges:graph.edges).filter(e=>{const p=e.points[Math.floor(e.points.length/2)],d=Math.hypot(p[0]-player.x,p[1]-player.z);return (!a.walking||!e.crossing)&&d<(a.walking?200:a.corridorOnly?520:320)&&e.length>(a.walking?3:10)&&!(!a.walking&&(this.obstructed?.has(e)||this.trap(e,2)));});
+  const nearby=(a.stationOnly?this.stationEdges:a.corridorOnly?this.corridorEdges:this.edgesNear(graph,player,a.walking?200:320)).filter(e=>{const p=e.points[Math.floor(e.points.length/2)],d=Math.hypot(p[0]-player.x,p[1]-player.z);return (!a.walking||!e.crossing)&&d<(a.walking?200:a.corridorOnly?520:320)&&e.length>(a.walking?3:10)&&!(!a.walking&&(this.obstructed?.has(e)||this.trap(e,2)));});
   for(let trial=0;trial<80&&nearby.length;trial++){
    a.edge=nearby[Math.floor(this.random()*nearby.length)];a.s=this.random()*a.edge.length;a.plan=[];a.prevDir=undefined;
    const p=this.position(a);
