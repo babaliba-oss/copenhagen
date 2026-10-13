@@ -53,9 +53,14 @@ export function createStreetLife(scene,mobility){
  // dropped across crossings; geometry and shader live in street-furniture.js (createGraniteKerbs).
  for(const pavement of pavements)for(const ring of pavement.rings)for(let i=1;i<ring.length;i++){
   const a=ring[i-1],b=ring[i],dx=b[0]-a[0],dz=b[1]-a[1],length=Math.hypot(dx,dz);if(length<.4||length>30)continue;
-  const x=(a[0]+b[0])/2,z=(a[1]+b[1])/2,nx=-dz/length*.38,nz=dx/length*.38;
-  if(!mobility.world.roads.at(x+nx,z+nz)===!mobility.world.roads.at(x-nx,z-nz))continue; // road on exactly one side: not along crossing strips that lie on the carriageway
-  kerbs.push(...kerbSegments(a,b,crossingData.chains));
+  // Road on exactly one side, tested every ~1.5 m (a midpoint test let pavement edges that cut across a
+  // carriageway lay a kerb right over the road); each qualifying run becomes kerbstones.
+  const nx=-dz/length*.38,nz=dx/length*.38,n=Math.max(1,Math.round(length/1.5)),roads=mobility.world.roads;let run=-1;
+  for(let k=0;k<=n;k++){
+   let ok=false;if(k<n){const x=a[0]+dx*(k+.5)/n,z=a[1]+dz*(k+.5)/n;ok=!roads.at(x+nx,z+nz)!==!roads.at(x-nx,z-nz);}
+   if(ok&&run<0)run=k;
+   else if(!ok&&run>=0){const p=t=>[a[0]+dx*t/n,a[1]+dz*t/n];if(k-run>=1)kerbs.push(...kerbSegments(p(run),p(k),crossingData.chains));run=-1;}
+  }
  }
  const kerbGroup=kerbs.length?settleObject(createGraniteKerbs(kerbs)):null;if(kerbGroup){group.add(kerbGroup);kerbGroups.push(kerbGroup);}
  const signalPosts=createBreakableSigns('Traffic signal posts');
