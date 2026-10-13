@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';
 import {waterAt} from '../terrain.js';
+import {inHarbourBath} from './harbour-bath.js';
 
 // Boats (scripts/boats.py → boats.json): moored sailboats, motor boats and wooden boats along the quays,
 // three-masted ships in 1760, and canal tour boats that go round the inner harbour. Procedural,
@@ -52,7 +53,7 @@ export function createBoats(data,{waterY=-1.2,era=null}={}){
  // The sea surface is drawn at the terrain's water level (sea.js drapes it 10 cm under waterAt); a fixed level
  // left boats metres above the water. Each boat sits on the water under it.
  const level=(x,z)=>{const w=waterAt(x,z);return (w==null?waterY:w-.1);};
- const boats=data?.boats||[],mat=new THREE.MeshStandardMaterial({vertexColors:true,roughness:.6,metalness:.05});
+ const boats=(data?.boats||[]).filter(b=>era===1760||!inHarbourBath(b[0],b[1])),mat=new THREE.MeshStandardMaterial({vertexColors:true,roughness:.6,metalness:.05});
  // Chunked by 300 m and kind: chunks frustum-cull, hide past 1 km, and only those near the player bob.
  const chunks=new Map(),geos={};
  for(const bt of boats){if(!BUILD[bt[3]])continue;const k=`${Math.floor(bt[0]/300)},${Math.floor(bt[1]/300)}`;if(!chunks.has(k))chunks.set(k,{list:{},x:0,z:0,n:0});const c=chunks.get(k);(c.list[bt[3]]??=[]).push(bt);c.x+=bt[0];c.z+=bt[1];c.n++;}

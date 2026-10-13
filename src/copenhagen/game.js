@@ -143,7 +143,8 @@ export function createCopenhagenGame({scene,city,mobilityData,cityData,toast,sou
    ['marmorkirken','Marmorkirken',55.6849,12.5893,'The dome they finished 145 years late.'],['christiansborg','Christiansborg',55.6761,12.5800,'Parliament, court and royal halls in one palace.'],
    ['borsen','Børsen',55.6758,12.5833,'Four dragons twist their tails into the spire.'],['vorfrelsers','Vor Frelsers Kirke',55.6727,12.5940,'400 steps, the last ones outside.'],
    ['tivoli','Tivoli',55.6737,12.5681,'The garden that inspired a certain theme park.'],['operaen','Operaen',55.6818,12.6008,'The opera house across the harbour.'],
-   ['raadhuset','Rådhuset',55.6757,12.5700,'The city hall and its clock tower.'],['gefion','Gefion Fountain',55.6870,12.5990,'The goddess ploughing Zealand out of Sweden.']];
+   ['raadhuset','Rådhuset',55.6757,12.5700,'The city hall and its clock tower.'],['gefion','Gefion Fountain',55.6870,12.5990,'The goddess ploughing Zealand out of Sweden.'],
+   ['havnebadet','Havnebadet',55.6648,12.5727,'A swim in the harbour, right in the middle of the city.']];
  const postcards=POSTCARD_DEFS.map(([id,title,lat,lon,text])=>({id,title,text,p:ll([lat,lon])}));
  save.cards??={};
  let cardHint=null;
