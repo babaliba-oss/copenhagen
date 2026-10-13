@@ -28,7 +28,7 @@ test('the complete terminal destination board and outer supports stop a car',()=
 test('harbour parked fleet keeps claimable actor identity and removes exactly the taken vehicle',()=>{
  const source=harbour.enterableCars[0],fleet=harbour.group.getObjectByName('Instanced traffic fleet'),batch=fleet.children.find(m=>m.userData.type===source.visual.type&&!m.userData.lod),before=batch.count;
  assert.ok(harbour.enterableCars.length>=200);assert.ok(harbour.obstacles.includes(source.obstacle));assert.match(source.visual.paint,/^#[a-f0-9]{6}$/i);
- try{assert.equal(source.claim(),true);assert.equal(source.actor.edge,null);assert.equal(source.obstacle.disabled,true);assert.equal(batch.count,before-1);}
+ try{assert.equal(source.claim(),true);assert.equal(source.actor.edge,null);assert.equal(source.obstacle.disabled,true);assert.equal(batch.count,before-batch.userData.parts.length);}
  finally{source.release();}
  assert.ok(source.actor.edge);assert.equal(source.obstacle.disabled,false);assert.equal(batch.count,before);
 });

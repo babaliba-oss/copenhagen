@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {FAMILIES,FAMILY,treeTemplate,treeInstance,crownProfile,createSpeciesTrees,treeLevel} from '../src/tree-species.js';
+// The EZ-Tree library requests its bark and leaf images when imported; give it an inert document in Node.
+globalThis.document??={createElementNS:()=>({style:{},addEventListener(){},removeEventListener(){}})};
+const {FAMILIES,FAMILY,treeTemplate,treeInstance,crownProfile,createSpeciesTrees,treeLevel}=await import('../src/tree-species.js');
 
 test('every species family builds finite templates within the triangle budget per level', () => {
  const budget={near:2400,mid:450,far:200};

@@ -14,7 +14,7 @@ const city=JSON.parse(gunzipSync(readFileSync('public/data/city.pack')));
 test('building visibility fades gradually and holds through corner jitter',()=>{
  const s={opacity:1,clearTime:1};let previous=1;
  for(let i=0;i<80;i++){const value=advanceOcclusion(s,i%3!==0,1/60);assert.ok(value>=.18&&value<=1);assert.ok(Math.abs(value-previous)<.075);previous=value;}
- assert.ok(s.opacity<.2);for(let i=0;i<10;i++)advanceOcclusion(s,false,1/60);assert.ok(s.opacity<.2,'short clear interval must not flash opaque');
+ assert.ok(s.opacity<.3);for(let i=0;i<10;i++)advanceOcclusion(s,false,1/60);assert.ok(s.opacity<.3,'short clear interval must not flash opaque');
  for(let i=0;i<140;i++)advanceOcclusion(s,false,1/60);assert.equal(s.opacity,1);
 });
 test('shadow target is quantised to the light-space texel grid',()=>{

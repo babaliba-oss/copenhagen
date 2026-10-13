@@ -205,7 +205,7 @@ export function createModelledBuilding(array,part,pixels,texture=null,includeHer
   plain=same(plain);glass=same(glass);if(r.relief)r.relief=same([r.relief])[0];if(r.glass)r.glass=same([r.glass])[0];
   const relief=r.relief?mergeGeometries([r.relief,...plain]):(plain.length?mergeGeometries(plain):null);if(r.relief)r.relief.dispose();plain.forEach(g=>g.dispose());plain=[];
   const glassAll=r.glass?mergeGeometries([r.glass,...glass]):(glass.length?mergeGeometries(glass):null);if(r.glass)r.glass.dispose();glass.forEach(g=>g.dispose());glass=[];
-  if(r.signs){const sm=new THREE.MeshStandardMaterial({roughness:.6});sm.userData.signs=true;mesh(r.signs,sm);meshes.at(-1).userData.role='facade-detail';}
+  if(r.signs){const sm=new THREE.MeshStandardMaterial({roughness:.6});sm.userData.signs=true;mesh(r.signs,sm);meshes.at(-1).userData.role='signs';}
   // Glass and relief in one mesh (one draw call per building); aGlass marks the glazing for its roughness and night glow.
   const flag=(g,v)=>{if(g)g.setAttribute('aGlass',new THREE.BufferAttribute(new Float32Array(g.attributes.position.count).fill(v),1));return g;};
   const parts=[flag(glassAll,1),flag(relief,0)].filter(Boolean);m.glass.dispose();m.relief.dispose();
@@ -213,8 +213,8 @@ export function createModelledBuilding(array,part,pixels,texture=null,includeHer
   // camera fade, shadows and LOD; the loader adds the wall grain and the window glow to its material.
   const shellIdx=!texture?meshes.findIndex(m=>m.userData.shell&&m.userData.role==='facade'&&!m.material.map):-1;
   if(shellIdx>=0&&parts.length){const sh=meshes[shellIdx];const sg=same([sh.geometry])[0];flag(sg,0);parts.push(sg);meshes.splice(shellIdx,1);sh.material.dispose();}
-  if(parts.length){const g=parts.length>1?mergeGeometries(parts):parts[0];parts.forEach(x=>x!==g&&x.dispose());g.computeBoundingSphere();const mat=new THREE.MeshStandardMaterial({vertexColors:true,roughness:.78,side:shellIdx>=0?THREE.DoubleSide:THREE.FrontSide});mat.userData.facadeCombined=true;mesh(g,mat);const u=meshes.at(-1).userData;u.provisional=true;
-   if(shellIdx>=0){u.shell=true;u.role='facade';}else u.role='facade-detail';}
+  if(parts.length){const g=parts.length>1?mergeGeometries(parts):parts[0];parts.forEach(x=>x!==g&&x.dispose());g.computeBoundingSphere();const mat=new THREE.MeshStandardMaterial({vertexColors:true,roughness:.78,side:shellIdx>=0?THREE.DoubleSide:THREE.FrontSide});mat.userData.facadeCombined=true;mesh(g,mat);const u=meshes.at(-1).userData;
+   if(shellIdx>=0){u.shell=true;u.role='facade';u.provisional=false;}else{u.role='facade-detail';u.provisional=true;}} // a shell is always drawn near; window-only batches stay out to the tile edge
  }
  if(plain.length){mesh(mergeGeometries(plain),new THREE.MeshStandardMaterial({vertexColors:true,roughness:.72,metalness:.12}));plain.forEach(g=>g.dispose());}
  if(glass.length){mesh(mergeGeometries(glass),new THREE.MeshStandardMaterial({vertexColors:true,roughness:.19,metalness:.55}));glass.forEach(g=>g.dispose());}

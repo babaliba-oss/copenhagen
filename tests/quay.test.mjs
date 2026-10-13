@@ -72,7 +72,7 @@ test('ground plane is cut where the sea is, keeping islands',()=>{
 
 test('createSea wires water, quays and shade into at most three meshes',()=>{
  const sea=createSea([basin,neighbour],land);
- assert.ok(sea.group.children.length<=3);assert.ok(sea.group.getObjectByName('Granite quay walls'));
+ assert.ok(sea.group.children.filter(m=>m.name!=='Granite quay walls').length<=3,'water and shade in at most three meshes (quays are split into culling cells)');assert.ok(sea.group.getObjectByName('Granite quay walls'));
  assert.ok(sea.group.userData.quayEdges>0);assert.ok(sea.groundGeometry.attributes.position.count>0);
  const shade=sea.group.getObjectByName('Quay shade on water');assert.ok(shade.material.transparent&&!shade.material.depthWrite);
 });

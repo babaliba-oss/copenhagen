@@ -119,8 +119,19 @@ export function createBreakableSigns(name='Breakable signs',{register=true}={}){
   s.target=Math.min(MAX_BEND,Math.max(s.target,s.theta+speed*dt/.6));car.speed*=Math.exp(-dt*(speed<SIGN_BEND_SPEED?1.2:.3)*s.strength);
  }
 
+ // Thousands of posts stand still almost all the time: each frame only steps the posts near the car (an 8 m
+ // grid) and the ones still moving, waiting to respawn or touching the car.
+ let grid=null,gridSize=-1;const active=new Set(),near=[];
+ const cellKey=(x,z)=>Math.floor(x/8)*100003+Math.floor(z/8);
+ function nearCar(car){
+  if(gridSize!==posts.length){grid=new Map();for(const s of posts){const k=cellKey(s.x,s.z);if(!grid.has(k))grid.set(k,[]);grid.get(k).push(s);}gridSize=posts.length;}
+  near.length=0;const cx=Math.floor(car.x/8),cz=Math.floor(car.z/8);
+  for(let i=-1;i<=1;i++)for(let j=-1;j<=1;j++){const c=grid.get((cx+i)*100003+cz+j);if(c)for(const s of c)near.push(s);}
+  return near;
+ }
  function step(dt,car,world){
-  for(const s of posts){
+  if(car)for(const s of nearCar(car))active.add(s);
+  for(const s of active){
    if(car&&s.state!=='flying'&&s.state!=='down'&&s.theta<1.05&&Math.abs(car.speed)>.15&&Math.abs(car.x-s.x)<6&&Math.abs(car.z-s.z)<6){
     const contact=carContact(car,s.x,s.z,s.radius);if(contact)hit(s,car,contact,dt);s.touching=!!contact;
    }else s.touching=false;
@@ -130,6 +141,7 @@ export function createBreakableSigns(name='Breakable signs',{register=true}={}){
     if(Math.abs(s.rate)<.01&&Math.abs(s.target-s.theta)<.004&&!s.touching)s.settled=true;
    }else if(s.state==='flying')fly(s,dt,world);
    if(s.knocked&&s.settled&&car&&(s.restTime+=dt)>RESPAWN_AFTER&&Math.hypot(car.x-s.x,car.z-s.z)>RESPAWN_CLEAR)reset(s);
+   if(!s.knocked&&!s.touching&&s.settled&&s.state!=='flying'&&!(car&&Math.abs(car.x-s.x)<8&&Math.abs(car.z-s.z)<8))active.delete(s);
   }
  }
  function fly(s,dt,world){

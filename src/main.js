@@ -512,7 +512,7 @@ async function runTilePass(){
  await pool(near,4,loadRoof);
  for(const t of roofIndex.tiles){const m=loadedTiles.get(t.file);if(!m)continue;
   const d=tileDistance(t);
-  if(d>1000){detailScheduler.cancel(t.file);cityModel.remove(m);m.children.forEach(c=>{c.geometry.dispose();disposeMaterial(c.material);c.customDepthMaterial?.dispose();});m.userData.mask?.texture.dispose();m.userData.textures.forEach(x=>{x.image?.close?.();x.dispose();});loadedTiles.delete(t.file);continue;}
+  if(d>1000){detailScheduler.cancel(t.file);cityModel.remove(m);m.children.forEach(c=>{c.geometry.dispose();disposeMaterial(c.material);c.customDepthMaterial?.dispose();});m.userData.textures.forEach(x=>{x.image?.close?.();x.dispose();});loadedTiles.delete(t.file);continue;}
   const level=applyTileLod(m,tileLevel(m.userData.level,d),focus);
   // Only near-level tiles are worth the worker's time, nearest first.
   if(level==='near'&&m.userData.pending)detailScheduler.request(t.file,priority(t),()=>detailTile(m),handleTileError);

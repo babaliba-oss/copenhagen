@@ -24,7 +24,7 @@ test('sea sits below street level, preserves boundaries and island holes with up
  assert.ok(Math.abs(area-96)<1e-5);
  for(let i=0;i<p.count;i++)assert.ok(Math.abs(p.getY(i)-WATER_LEVEL)<1e-6);
  assert.equal(sea.group.userData.surfaceHeight,WATER_LEVEL);
- assert.ok(sea.group.children.length<=3,'water stays within three draw calls');
+ assert.ok(sea.group.children.filter(m=>m.name!=='Granite quay walls').length<=3,'water stays within three draw calls (plus quay culling cells)');
 });
 
 test('sea animates only a shader uniform, without changing mesh or uploading vertices',()=>{
@@ -40,7 +40,7 @@ test('water shader: Fresnel sky reflection, multi-scale ripples, sun glint and f
  for(const u of ['uRipples','uSeaTime','uDeep','uSkyHorizon','uSkyZenith','uSunDir','uSunColor','fogColor','fogNear','fogFar'])assert.ok(u in m.uniforms,u);
  const f=m.fragmentShader;
  assert.match(f,/fresnel=.*pow\(1\.-NdV,5\.\)/);
- assert.match(f,/mix\(uDeep,sky\*[\d.]+,fresnel\)/);
+ assert.match(f,/mix\(uDeep[^,]*,sky\*[\d.]+,fresnel(\*uReflect)?\)/);
  assert.equal((f.match(/texture2D\(uRipples/g)||[]).length,3,'three ripple scales');
  assert.match(f,/dot\(R,uSunDir\)/);
  assert.match(f,/#include <fog_fragment>/);assert.match(f,/#include <tonemapping_fragment>/);

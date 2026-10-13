@@ -25,21 +25,22 @@ export function mergedShellRanges(parts){
  return ranges;
 }
 
-// Near tiles show the same merged shells until the worker's detailed buildings land: a per-tile mask texture
+// Near tiles show the same merged shells until the worker's detailed buildings land: a per-tile mask
 // (one texel per part) hides each part as its detailed building arrives, and dithers it while the chase
 // camera fades it. One draw per atlas instead of one per waiting building (500+ draws at Nyhavn).
 export function createShellMask(count){
- const W=256,H=Math.max(1,Math.ceil(count/W)),data=new Uint8Array(W*H).fill(255),texture=new THREE.DataTexture(data,W,H,THREE.RedFormat,THREE.UnsignedByteType);
- texture.needsUpdate=true;let shown=count;
- return {texture,data,get shown(){return shown;},
-  set(i,v){const b=Math.round(Math.max(0,Math.min(1,v))*255);if(data[i]===b)return;if(data[i]>0&&b===0)shown--;else if(data[i]===0&&b>0)shown++;data[i]=b;texture.needsUpdate=true;},
-  get(i){return data[i]/255;}};
+ // One float per part in a vec4[64] uniform (a tile holds at most 255 parts): no texture uploads, and the
+ // uniform only re-sends when a value changes.
+ const data=new Float32Array(256).fill(1);let shown=count;
+ return {data,get shown(){return shown;},
+  set(i,v){v=Math.max(0,Math.min(1,v));if(i>255||data[i]===v)return;if(data[i]>0&&v===0)shown--;else if(data[i]===0&&v>0)shown++;data[i]=v;},
+  get(i){return data[i];}};
 }
-const MASK_VERTEX='\nvMask=uMaskOn>.5?texelFetch(uMask,ivec2(int(aBid)%256,int(aBid)/256),0).r:1.;if(vMask<.002)gl_Position=vec4(0.,0.,2.,1.);';
+const MASK_VERTEX='\nvMask=1.;if(uMaskOn>.5&&aBid<255.5){int b=int(aBid+.5);vMask=uMask[b>>2][b&3];}if(vMask<.002)gl_Position=vec4(0.,0.,2.,1.);';
 function maskShader(material,uniforms,{fragment=true}={}){
  const prev=material.onBeforeCompile,prevKey=material.customProgramCacheKey;
  material.onBeforeCompile=(shader,renderer)=>{prev?.call(material,shader,renderer);Object.assign(shader.uniforms,uniforms);
-  shader.vertexShader=shader.vertexShader.replace('#include <common>','#include <common>\nattribute float aBid;uniform sampler2D uMask;uniform float uMaskOn;varying float vMask;').replace('#include <project_vertex>','#include <project_vertex>'+MASK_VERTEX);
+  shader.vertexShader=shader.vertexShader.replace('#include <common>','#include <common>\nattribute float aBid;uniform vec4 uMask[64];uniform float uMaskOn;varying float vMask;').replace('#include <project_vertex>','#include <project_vertex>'+MASK_VERTEX);
   shader.fragmentShader=shader.fragmentShader.replace('#include <common>','#include <common>\nvarying float vMask;').replace('#include <clipping_planes_fragment>','#include <clipping_planes_fragment>\n'+(fragment?'if(vMask<.996&&fract(52.9829189*fract(dot(floor(gl_FragCoord.xy),vec2(.06711056,.00583715))))>vMask)discard;':'if(vMask<.5)discard;'));};
  material.customProgramCacheKey=()=>(prevKey?prevKey.call(material):'')+'|shell-mask';
  return material;
@@ -54,7 +55,7 @@ export function createMergedShells(array,parts,textures,mask=null){
   const material=texture?new THREE.MeshStandardMaterial({map:texture,roughness:.86,side:THREE.DoubleSide}):facadeGrain(new THREE.MeshStandardMaterial({vertexColors:true,roughness:.86,side:THREE.DoubleSide}),{windows:true});
   const mesh=new THREE.Mesh(geometry,material);mesh.castShadow=false;mesh.receiveShadow=true;
   if(mask){const bid=new Float32Array(r.end-r.start);for(const p of parts)if(p.start>=r.start&&p.start<r.end)bid.fill(index.get(p),p.start-r.start,p.start-r.start+p.count);geometry.setAttribute('aBid',new THREE.BufferAttribute(bid,1));
-   const uniforms={uMask:{value:mask.texture},uMaskOn:{value:0}};maskShader(material,uniforms);mesh.customDepthMaterial=maskShader(new THREE.MeshDepthMaterial({depthPacking:THREE.RGBADepthPacking}),uniforms,{fragment:false});mesh.userData.maskOn=uniforms.uMaskOn;mesh.userData.mask=mask;}
+   const uniforms={uMask:{value:mask.data},uMaskOn:{value:0}};maskShader(material,uniforms);mesh.customDepthMaterial=maskShader(new THREE.MeshDepthMaterial({depthPacking:THREE.RGBADepthPacking}),uniforms,{fragment:false});mesh.userData.maskOn=uniforms.uMaskOn;mesh.userData.mask=mask;}
   geometry.computeBoundingBox();
   // An empty box keeps the chase-camera occlusion fade from ever grabbing a whole tile; tileBox is for distance.
   Object.assign(mesh.userData,{lod:true,occlusion:{opacity:1,clearTime:1},box:new THREE.Box3(),tileBox:geometry.boundingBox.clone(),triangles:(r.end-r.start)/3});

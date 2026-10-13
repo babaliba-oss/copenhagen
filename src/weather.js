@@ -68,10 +68,10 @@ const rain={
 // Kept readable on purpose: the hemisphere stays high enough that streets and facades are never black.
 const night={
  label:'Night',
- sky:{zenith:'#070d1c',mid:'#14213b',horizon:'#3a3f55',sunGlow:'#6a7290',cloudLit:'#3d4560',cloudShade:'#121828',coverage:.45,sunDisc:.15},
+ sky:{zenith:'#070d1c',mid:'#14213b',horizon:'#2a3048',sunGlow:'#6a7290',cloudLit:'#3d4560',cloudShade:'#121828',coverage:.45,sunDisc:.15},
  sunOffset:[160,260,-120],sunColor:'#9fb3db',sunIntensity:.32,
  hemiSky:'#5b6d99',hemiGround:'#3a342e',hemiIntensity:.95,
- fog:{color:'#1d2438',near:170,far:700},
+ fog:{color:'#2a3048',near:170,far:700},
  sea:{deep:'#0b1018',shore:'#1d2128',sunColor:'#ffcf8a'},
  grade:{...GRADE_DEFAULTS,exposure:1.15,tint:[.97,.98,1.06],lift:[.02,.024,.045],saturation:.92,contrast:1.04,bloomStrength:.55,bloomThreshold:.85,vignette:.32},
  wetness:.25,rain:0,night:1,

@@ -8,7 +8,7 @@ import {GRADE_DEFAULTS} from '../src/post.js';
 const hex=/^#[0-9a-f]{6}$/i;
 
 test('every look is complete, with valid colours and a sun above the horizon',()=>{
- assert.deepEqual(LOOK_ORDER,['midday','golden','whitenight','overcast','rain']);
+ assert.deepEqual(LOOK_ORDER,['midday','golden','whitenight','night','overcast','rain']);
  for(const name of LOOK_ORDER){
   const l=LOOKS[name];assert.ok(l,name);assert.ok(l.label);
   for(const k of ['zenith','mid','horizon','sunGlow','cloudLit','cloudShade'])assert.match(l.sky[k],hex,`${name}.sky.${k}`);
@@ -50,7 +50,7 @@ test('look blends toward the target and drives sky, lights, fog and weather unif
  assert.ok(dir.distanceTo(new THREE.Vector3(...LOOKS.golden.sunOffset).normalize())<1e-6,'light follows the preset sun');
  assert.ok(sky.uniforms.uSunDir.value.distanceTo(dir)<1e-6,'sky dome sun follows the light');
  assert.equal(look.cycle().name,'whitenight');
- let changed=null;look.onChange((n,label)=>{changed=[n,label];});look.cycle();assert.deepEqual(changed,['overcast','Overcast']);
+ let changed=null;look.onChange((n,label)=>{changed=[n,label];});look.cycle();assert.deepEqual(changed,['night','Night']);
  assert.throws(()=>look.set('snow'));
  look.dispose();assert.ok(!scene.children.includes(look.rain));
 });

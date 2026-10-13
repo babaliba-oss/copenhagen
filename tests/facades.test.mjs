@@ -62,20 +62,23 @@ test('groups and height fixes attach to building parts and survive tile reloads'
 test('described buildings get coloured walls, real window bays, shop glazing and roof colour',()=>{
  const p=part();attachFacades({tiles:[{parts:[p]}]},SPEC);
  const array=extrude(RING,16),result=createModelledBuilding(array,p,null,null);
- const detail=result.meshes.filter(m=>m.userData.role==='facade-detail');
- assert.equal(detail.length,2,'one glass batch, one relief batch');
+ // Untextured: shell, glass and relief are one combined mesh (one draw call per building).
+ const detail=result.meshes.filter(m=>m.userData.role==='facade');
+ assert.equal(detail.length,1,'one combined facade mesh');assert.equal(result.meshes.filter(m=>m.userData.role==='facade-detail').length,0);
+ assert.ok(result.meshes.find(m=>m.userData.role==='facade').geometry.attributes.aGlass.array.some(v=>v===1),'glass flagged in the facade mesh');
  assert.ok(result.meshes.every(m=>m.userData.role==='facade-detail'||!m.userData.provisional),'no provisional placeholder bays');
  // 4 upper storeys × bays on two 24 m and two 10 m walls, plus shop bays at street level.
  const upper=4*(2*bays(0,24,2.5).length+2*bays(0,10,2.5).length);
  assert.ok(result.windows>=upper&&result.windows<=upper+40,`windows ${result.windows}`);
  const wall=new THREE.Color('#c86432'),facade=result.meshes.find(m=>m.userData.role==='facade').geometry.attributes.color;
- assert.ok(Math.abs(facade.getX(0)-wall.r)<1e-6&&Math.abs(facade.getZ(0)-wall.b)<1e-6,'wall colour applied');
- const roofColour=result.meshes.find(m=>m.userData.role==='roof').geometry.attributes.color,roof=new THREE.Color('#203040');
- assert.ok(Math.abs(roofColour.getZ(0)-roof.b)<1e-6,'roof colour applied');
+ const hasColour=(c,arr=facade.array)=>{for(let i=0;i<arr.length;i+=3)if(Math.abs(arr[i]-c.r)<1e-6&&Math.abs(arr[i+1]-c.g)<1e-6&&Math.abs(arr[i+2]-c.b)<1e-6)return true;return false;};
+ assert.ok(hasColour(wall),'wall colour applied');
+ const roof=new THREE.Color('#203040'),cols=facade.array;let roofed=false;for(let i=0;i<cols.length;i+=3)if(Math.abs(cols[i]-roof.r)<1e-6&&Math.abs(cols[i+1]-roof.g)<1e-6&&Math.abs(cols[i+2]-roof.b)<1e-6){roofed=true;break;}
+ assert.ok(roofed,'roof colour applied (roof is part of the combined shell)');
  for(const m of detail){const pos=m.geometry.attributes.position.array;assert.ok(pos.every(Number.isFinite));m.geometry.computeBoundingBox();const b=m.geometry.boundingBox;
   assert.ok(b.min.y>=-.01&&b.max.y<=16.6&&b.min.x>-2.5&&b.max.x<26.5,'details stay on the building');
   assert.ok(b.min.x<-.01&&b.max.x>24.01&&b.min.z<-.01&&b.max.z>10.01,'details sit on the outside of the walls');}
- const tris=detail.reduce((n,m)=>n+m.geometry.attributes.position.count/3,0);assert.ok(tris<result.windows*40,`cheap: ${tris} triangles`);
+ const tris=detail.reduce((n,m)=>n+m.geometry.attributes.position.count/3,0);assert.ok(tris<result.windows*70,`cheap: ${tris} triangles (shell, deep surrounds, sills and hoods included)`);
 });
 
 test('missing data keeps the provisional look; glass and ribbon styles render',()=>{

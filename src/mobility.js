@@ -136,10 +136,10 @@ export class Mobility {
  // Edges whose midpoint lies near the player, from a 100 m grid built once per graph (spawning used to scan
  // every edge in the city per agent: a long frame whenever many respawned at once).
  edgesNear(graph,player,r){
-  const C=100;if(!graph._grid){const g=new Map();for(const e of graph.edges){const p=e.points[Math.floor(e.points.length/2)],k=Math.floor(p[0]/C)+','+Math.floor(p[1]/C);let l=g.get(k);if(!l)g.set(k,l=[]);l.push(e);}graph._grid=g;}
+  const C=100;if(!graph._grid){const g=new Map();graph.edges.forEach((e,i)=>{e._gi=i;const p=e.points[Math.floor(e.points.length/2)],k=Math.floor(p[0]/C)+','+Math.floor(p[1]/C);let l=g.get(k);if(!l)g.set(k,l=[]);l.push(e);});graph._grid=g;}
   if(!player)return graph.edges;const out=[],x0=Math.floor((player.x-r)/C),x1=Math.floor((player.x+r)/C),z0=Math.floor((player.z-r)/C),z1=Math.floor((player.z+r)/C);
   for(let i=x0;i<=x1;i++)for(let j=z0;j<=z1;j++){const l=graph._grid.get(i+','+j);if(l)for(const e of l)out.push(e);}
-  return out;
+  return out.sort((a,b)=>a._gi-b._gi); // graph order, so seeded spawns pick the same edges as a full scan
  }
  nearCorridor(player){return this.corridorEdges.some(e=>{const p=e.points[Math.floor(e.points.length/2)];return Math.hypot(p[0]-player.x,p[1]-player.z)<420;});}
  spawn(a,player){

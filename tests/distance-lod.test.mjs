@@ -34,8 +34,8 @@ test('traffic batches keep full detail near the player, boxes beyond and nothing
  const near=r.group.children.filter(m=>!m.userData.lod),low=r.group.children.filter(m=>m.userData.lod==='far');
  assert.equal(low.length,2);assert.ok(low.every(m=>!m.castShadow&&m.geometry.type==='BoxGeometry'));
  r.update(0,{x:0,z:0});
- assert.ok(near.every(m=>m.count===2),'two cars within 150 m keep every part');assert.ok(low.every(m=>m.count===1),'one car is a box pair');
- r.update(0,null);assert.ok(near.every(m=>m.count===4),'no viewer: everything detailed');
+ assert.ok(near.every(m=>m.count===2*m.userData.parts.length),'two cars within 150 m keep every part');assert.ok(low.every(m=>m.count===1),'one car is a box pair');
+ r.update(0,null);assert.ok(near.every(m=>m.count===4*m.userData.parts.length),'no viewer: everything detailed');
  r.update(0,{x:5000,z:0});assert.ok(near.every(m=>m.count===0)&&low.every(m=>m.count===0));
 });
 
