@@ -149,7 +149,7 @@ for f in json.load(open(f'{SRC}/furniture_p.json'))['features']:
 
 def near(grid, it, r):
     return any(math.hypot(o['x'] - it['x'], o['z'] - it['z']) < r for o in grid.near(it['x'], it['z'], 1))
-kept = [it for it in items if not ((it['k'] == 'lamp' and near(lamps, it, 12)) or (it['k'] == 'bike-rack' and near(racks, it, 8)))]
+kept = [it for it in items if it['k'] not in ('barrier', 'cone') and not ((it['k'] == 'lamp' and near(lamps, it, 12)) or (it['k'] == 'bike-rack' and near(racks, it, 8)))]
 furn['items'] = kept + kk
 furn['note'] = (furn.get('note') or '') + ' Lamps, bike racks and bollards from the City of Copenhagen registers (CC BY 4.0) replace nearby photo detections.'
 furn['licence'] = (furn.get('licence') or '') + '; City of Copenhagen open data CC BY 4.0'
