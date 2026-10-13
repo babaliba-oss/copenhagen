@@ -80,3 +80,18 @@ body.era-1760 .battery-row,body.era-1760 #battery-gauge{visibility:hidden}
 #big-map .bm-hint{margin:0;font:500 12px Manrope,sans-serif;color:#77786f;text-align:center}
 #big-map kbd{font:700 10px Manrope,sans-serif;padding:1px 5px;border-radius:4px;background:#fff;box-shadow:0 0 0 1px #0002}
 @media (max-width:640px){#big-map{padding:10px;gap:6px}#big-map .bm-legend{display:none}#big-map h2{font-size:20px}}
+
+/* Rank under the money */
+.cph-money b{font-weight:600}
+.cph-money{display:flex;flex-wrap:wrap;align-items:baseline;gap:0 8px}
+.cph-rank{flex-basis:100%;font:700 10px/1.4 Manrope,sans-serif;letter-spacing:.08em;text-transform:uppercase;color:#7a6a4a}
+.cph-rank i{display:block;height:3px;margin-top:2px;border-radius:2px;background:linear-gradient(90deg,#c8902a var(--p),#0001 var(--p))}
+/* GTA-style banner for big moments */
+#cph-banner{position:fixed;left:0;right:0;top:40%;z-index:70;text-align:center;pointer-events:none;animation:cph-ban 3.4s ease both}
+#cph-banner.cph-banner-rank{animation-duration:4.6s}
+#cph-banner h2{margin:0;font:800 clamp(34px,6vw,72px)/1 'Spectral',Georgia,serif;letter-spacing:.02em;text-transform:uppercase;color:#f3c64b;-webkit-text-stroke:1.5px #1b1a16;paint-order:stroke fill;text-shadow:0 4px 0 #1b1a16,0 10px 30px rgba(0,0,0,.45)}
+#cph-banner p{margin:10px auto 0;display:inline-block;padding:6px 14px;border-radius:8px;background:rgba(20,22,24,.72);color:#f6f1e4;font:600 clamp(13px,1.6vw,18px)/1.3 Manrope,sans-serif}
+#cph-banner.cph-banner-fail h2{color:#e2483a}
+#cph-banner.cph-banner-pick h2{color:#f6f1e4;font-size:clamp(26px,4vw,48px)}
+#cph-banner.cph-banner-rank h2{color:#7fd6c2}
+@keyframes cph-ban{0%{opacity:0;transform:scale(1.25)}8%{opacity:1;transform:scale(1)}85%{opacity:1}100%{opacity:0}}

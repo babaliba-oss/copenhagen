@@ -88,6 +88,18 @@ export function createCopenhagenGame({scene,city,mobilityData,cityData,toast}){
  document.body.append(hud,lore,journal,tmap);
  const $=id=>document.getElementById(id);
 
+ // ---- big moments: GTA-style banner with a short chime ----
+ const ban=document.createElement('div');ban.id='cph-banner';ban.hidden=true;document.body.append(ban);let banT=0;
+ let ac=null;
+ function chime(kind){try{ac??=new (window.AudioContext||window.webkitAudioContext)();const t0=ac.currentTime,notes=kind==='fail'?[392,330,262]:kind==='rank'?[523,659,784,1047]:[523,659,784];
+  notes.forEach((f,i)=>{const o=ac.createOscillator(),g=ac.createGain();o.type='triangle';o.frequency.value=f;g.gain.setValueAtTime(0,t0+i*.11);g.gain.linearRampToValueAtTime(.09,t0+i*.11+.02);g.gain.exponentialRampToValueAtTime(.001,t0+i*.11+.5);o.connect(g).connect(ac.destination);o.start(t0+i*.11);o.stop(t0+i*.11+.55);});}catch{}}
+ function banner(title,sub='',kind='pass'){ban.className='cph-banner-'+kind;ban.innerHTML=`<h2>${esc(title)}</h2>${sub?`<p>${sub}</p>`:''}`;ban.hidden=false;ban.style.animation='none';void ban.offsetWidth;ban.style.animation='';clearTimeout(banT);banT=setTimeout(()=>{ban.hidden=true;},kind==='rank'?4600:3400);chime(kind);}
+ // ---- courier ranks: deliveries move you up; every rank pays 10% more ----
+ const RANKS=ERA==='h'?[['Errand boy',0],['Runner',2],['Messenger',5],['Trusted courier',9],['Merchant’s man',14],['Court messenger',20],['Legend of the town',30]]
+  :[['Newcomer',0],['Bike courier',2],['Cargo rider',5],['Street regular',9],['Harbour hand',14],['City fixer',20],['Copenhagen legend',30]];
+ const rankOf=n=>{let r=0;RANKS.forEach(([,at],i)=>{if(n>=at)r=i;});return r;};
+ const payBonus=()=>1+.1*rankOf(save.delivered||0);
+
  // ---- world markers ----
  // ---- hidden nisser: 22 small house-nisse figures tucked away around the city (GTA hidden packages) ----
  const NISSE_SPOTS=[[55.6797,12.5935],[55.6855,12.5805],[55.6857,12.5772],[55.6871,12.5731],[55.6918,12.5945],[55.6925,12.5988],[55.6866,12.5985],[55.6840,12.5926],[55.6851,12.5893],[55.6765,12.5785],[55.6776,12.5786],[55.6813,12.5760],[55.6837,12.5700],[55.6810,12.5665],[55.6760,12.5690],[55.6738,12.5985],[55.6728,12.5947],[55.6705,12.5760],[55.6880,12.5640],[55.6735,12.5820],[55.6818,12.6000],[55.6770,12.5885]];
@@ -108,8 +120,8 @@ export function createCopenhagenGame({scene,city,mobilityData,cityData,toast}){
  function showLore(q,card){loreQ.push([q,card]);if(!loreOpen)nextLore();}
  function nextLore(){const it=loreQ.shift();if(!it){loreOpen=false;lore.hidden=true;return;}const [q,[t,txt]]=it;loreOpen=true;$('cph-lore-kick').textContent=q.title;$('cph-lore-title').textContent=t;$('cph-lore-text').textContent=txt;lore.hidden=false;}
  $('cph-lore-go').onclick=()=>nextLore();
- function startSaga(id){const q=byId[id];save.active={id,done:[],t:q.limit||0,shown:-1};persist();routeFor=null;toast(`${q.title}: saga started. Follow the red beam.`);}
- function endSaga(win){const q=byId[save.active.id];if(win){save.done[q.id]=1;save.money+=q.pay;toast(`Saga complete: ${q.title}. +${fmtKr(q.pay)} ${UNIT}`,{important:true});}else toast(`Saga failed: ${q.title}. Talk to ${giverName(q)} to try again.`,{important:true});save.active=null;persist();routeFor=null;}
+ function startSaga(id){const q=byId[id];save.active={id,done:[],t:q.limit||0,shown:-1};persist();routeFor=null;banner('Saga started',`${esc(q.title)} · follow the red beam`,'pick');}
+ function endSaga(win){const q=byId[save.active.id];if(win){save.done[q.id]=1;save.money+=q.pay;banner('Saga complete',`${esc(q.title)} · +${fmtKr(q.pay)} ${UNIT}`,'rank');}else banner('Saga failed',`${esc(q.title)} · talk to ${esc(giverName(q))} to try again`,'fail');save.active=null;persist();routeFor=null;}
  const api={
   era:ERA,
   money:()=>fmtKr(save.money)+' '+UNIT,
@@ -164,7 +176,8 @@ export function createCopenhagenGame({scene,city,mobilityData,cityData,toast}){
 
  let hudClock=1;const setHtml=(el,h)=>{if(el&&el.__h!==h){el.__h=h;el.innerHTML=h;}};
  function updateHud(){
-  $('cph-money').textContent=fmtKr(save.money)+' '+UNIT+(save.nisser?.length?` · nisser ${save.nisser.length}/${nisser.length}`:'');
+  {const n=save.delivered||0,r=rankOf(n),next=RANKS[r+1],from=RANKS[r][1],pct=next?Math.round((n-from)/(next[1]-from)*100):100;
+   setHtml($('cph-money'),`<b>${fmtKr(save.money)} ${UNIT}</b>${save.nisser?.length?` · nisser ${save.nisser.length}/${nisser.length}`:''}<span class="cph-rank">${esc(RANKS[r][0])}${save.streak>1?` · streak ×${save.streak}`:''}<i style="--p:${pct}%"></i></span>`);}
   const j=job(),t=state==='a'?j.A:j.B,d=line.points?line.remaining():dist(t,[player.x,player.z]);
   setHtml($('cph-job'),`<p class="cph-kick">Job ${save.job%jobs.length+1}/${jobs.length}</p><h3>${esc(j.t)}</h3><p>${esc(j.d)}</p><p class="cph-go">${state==='a'?'Pick up at':'Deliver to'} <b>${esc(state==='a'?j.aName:j.bName)}</b> · ${d>1000?(d/1000).toFixed(1)+' km':Math.round(d/10)*10+' m'}${state==='b'?` · <span class="${timer<15?'cph-low':''}">${Math.max(0,timer).toFixed(0)} s</span>`:''}</p>`);
   const sg=$('cph-saga');if(!save.active){sg.hidden=true;return;}sg.hidden=false;
@@ -195,18 +208,22 @@ export function createCopenhagenGame({scene,city,mobilityData,cityData,toast}){
   player=actor;started=running;if(!actor)return;
   if(running&&!paperShown)setTimeout(showPaper,1500);if(running)paperShown=true;
   {save.nisser??=[];const {m,q,v,one,zero}=NT,now=performance.now()/1000;
-   for(const n of nisser){const got=save.nisser.includes(n.i);if(!got&&running&&Math.hypot(n.p[0]-actor.x,n.p[1]-actor.z)<2.6){save.nisser.push(n.i);save.money+=ERA==='h'?24:150;persist();toast(`Nisse found! ${save.nisser.length}/${nisser.length} · +${ERA==='h'?24:150} ${UNIT}`,{important:true});}
+   for(const n of nisser){const got=save.nisser.includes(n.i);if(!got&&running&&Math.hypot(n.p[0]-actor.x,n.p[1]-actor.z)<2.6){save.nisser.push(n.i);save.money+=ERA==='h'?24:150;persist();banner('Nisse found!',`${save.nisser.length} of ${nisser.length} · +${ERA==='h'?24:150} ${UNIT}`,'pass');}
     nisseMesh.setMatrixAt(n.i,m.compose(v.set(n.p[0],groundAt(n.p[0],n.p[1])+.05+Math.abs(Math.sin(now*2+n.i))*.12,n.p[1]),q.setFromAxisAngle(THREE.Object3D.DEFAULT_UP,now*.8+n.i),save.nisser.includes(n.i)?zero:one));}
    nisseMesh.instanceMatrix.needsUpdate=true;}
   if(travelMode!==mode){mode=travelMode;routeFor=null;}
   const here=[actor.x,actor.z];
   // job
   const j=job();
-  if(state==='b'&&running){timer-=dt;if(timer<=0){toast(`Too slow: ${j.t} failed.`);save.job++;state='a';persist();routeFor=null;}}
+  if(state==='b'&&running){timer-=dt;if(timer<=0){banner('Job failed',`Too slow: ${esc(j.t)}. Streak lost.`,'fail');save.streak=0;save.job++;state='a';persist();routeFor=null;}}
   const t=state==='a'?j.A:j.B;
   if(running&&dist(here,t)<9){
-   if(state==='a'){state='b';const len=(walk.route(walk.nearest(...j.A),walk.nearest(...j.B))||[]).reduce((s,p,i,a)=>i?s+dist(p,a[i-1]):0,0)||dist(j.A,j.B)*1.4;timer=Math.round(len/6+35);toast(`Picked up. Deliver to ${j.bName} in ${timer} s.`);routeFor=null;}
-   else{const pay=Math.round(j.pay+timer*4);save.money+=pay;save.job++;state='a';persist();toast(`Delivered! +${fmtKr(pay)} ${UNIT}`,{important:true});routeFor=null;}
+   if(state==='a'){state='b';const len=(walk.route(walk.nearest(...j.A),walk.nearest(...j.B))||[]).reduce((s,p,i,a)=>i?s+dist(p,a[i-1]):0,0)||dist(j.A,j.B)*1.4;timer=Math.round(len/6+35);banner('Picked up',`Deliver to <b>${esc(j.bName)}</b> in ${timer} s`,'pick');routeFor=null;}
+   else{const before=rankOf(save.delivered||0);save.delivered=(save.delivered||0)+1;save.streak=(save.streak||0)+1;
+    const base=j.pay+timer*4,streakBonus=save.streak>=3?Math.round(base*.25):0,pay=Math.round(base*payBonus())+streakBonus;save.money+=pay;save.job++;state='a';persist();routeFor=null;
+    const after=rankOf(save.delivered);
+    if(after>before)banner(`Promoted: ${RANKS[after][0]}`,`+${fmtKr(pay)} ${UNIT} · jobs now pay +${after*10}%${RANKS[after+1]?` · next: ${esc(RANKS[after+1][0])} at ${RANKS[after+1][1]} deliveries`:''}`,'rank');
+    else banner('Delivered!',`+${fmtKr(pay)} ${UNIT}${streakBonus?` · streak ×${save.streak} bonus +${fmtKr(streakBonus)}`:''}${timer>20?' · fast':''}`,'pass');}
   }
   mkA.visible=state==='a';mkB.visible=state==='b';mkA.position.set(j.A[0],groundAt(...j.A),j.A[1]);mkB.position.set(j.B[0],groundAt(...j.B),j.B[1]);
   const pulse=1+Math.sin(performance.now()/300)*.08;mkA.children[1].scale.setScalar(pulse);mkB.children[1].scale.setScalar(pulse);
