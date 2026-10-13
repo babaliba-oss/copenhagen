@@ -35,8 +35,9 @@ function makeGraph(g,undirected){
 }
 
 // ---------- the line on the street (eaten from behind as you ride it) ----------
-function createRouteLine(scene){
- const u={uProg:{value:0}},mat=new THREE.MeshBasicMaterial({color:0xb46bff,transparent:true,opacity:.62,depthWrite:false,fog:false});
+// 1760: a warm lantern-gold trail instead of the modern sat-nav purple.
+function createRouteLine(scene,{historic=false}={}){
+ const u={uProg:{value:0}},mat=new THREE.MeshBasicMaterial({color:historic?0xf0c060:0xb46bff,transparent:true,opacity:historic?.5:.62,depthWrite:false,fog:false});
  mat.onBeforeCompile=sh=>{sh.uniforms.uProg=u.uProg;
   sh.vertexShader=sh.vertexShader.replace('void main() {','attribute float rd; varying float vRd;\nvoid main() { vRd = rd;');
   sh.fragmentShader=sh.fragmentShader.replace('void main() {','uniform float uProg; varying float vRd;\nvoid main() { if (vRd < uProg) discard;').replace('vec4 diffuseColor = vec4( diffuse, opacity );','vec4 diffuseColor = vec4( diffuse, opacity * clamp((vRd - uProg) / 6.0, 0.0, 1.0) );');};
@@ -109,7 +110,7 @@ export function createCopenhagenGame({scene,city,mobilityData,cityData,toast,sou
  const nisseMesh=new THREE.InstancedMesh(nisseGeo,new THREE.MeshStandardMaterial({vertexColors:true,roughness:.6,emissive:'#3a1210'}),nisser.length);nisseMesh.castShadow=true;nisseMesh.frustumCulled=false;nisseMesh.name='Hidden nisser';scene.add(nisseMesh);
  const NT={m:new THREE.Matrix4(),q:new THREE.Quaternion(),v:new THREE.Vector3(),one:new THREE.Vector3(1,1,1),zero:new THREE.Vector3()};
  const mkA=beam(scene,0xf2b134),mkB=beam(scene,0x46c2b0),mkQ=[0,1,2,3,4].map(()=>beam(scene,0xe0313e,100));
- const line=createRouteLine(scene);
+ const line=createRouteLine(scene,{historic:ERA==='h'});
  let state='a',timer=0,routeFor=null,routeT=0,player=null,mode='car',started=false;
  const job=()=>jobs[save.job%jobs.length];
 
