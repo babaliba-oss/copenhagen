@@ -13,11 +13,26 @@ function wheel(r,x,z,hex='#3a2a1c'){
  for(let i=0;i<10;i++)parts.push(paint(new THREE.CylinderGeometry(.014,.014,r*2-.04,4).rotateX(i*Math.PI/10).translate(x,r,z),hex));
  return parts;
 }
+// A horse from rounded parts (capsule body, chest and rump, tapered neck, long head with muzzle and ears,
+// mane, tail, collar). Legs are separate so they can swing (see createCarriage).
+const sph=(r,x,y,z,hex,sx=1,sy=1,sz=1)=>paint(new THREE.SphereGeometry(r,12,9).scale(sx,sy,sz).translate(x,y,z),hex);
+const cap=(r,l,x,y,z,hex,rx=0,sx=1)=>paint(new THREE.CapsuleGeometry(r,l,5,10).rotateX(rx).scale(sx,1,1).translate(x,y,z),hex);
 function horse(x,z,coat){
- const body=[box(.5,.62,1.55,x,1.32,z,coat),box(.34,.62,.38,x,1.72,z-.88,coat,-.75),box(.24,.26,.55,x,1.98,z-1.18,coat,-.35),box(.06,.1,.08,x-.08,2.2,z-1.02,coat),box(.06,.1,.08,x+.08,2.2,z-1.02,coat),
-  box(.08,.5,.5,x,1.85,z-.75,'#1e1712',-.75),cyl(.05,.11,.7,x,1.25,z+.85,'#1e1712',6,0,.5), // mane, tail
-  box(.54,.1,.4,x,1.68,z-.05,'#2b1d14'),box(.56,.06,1.2,x,1.34,z,'#2b1d14')]; // harness
- return {body,legs:[[x-.16,z-.55],[x+.16,z-.55],[x-.16,z+.55],[x+.16,z+.55]]};
+ const dark='#1e1712',muzzle='#2a221c';
+ const body=[cap(.31,.95,x,1.33,z,coat,Math.PI/2,.88),sph(.34,x,1.37,z-.6,coat,.85,1,.95),sph(.35,x,1.39,z+.58,coat,.9,.95,1),
+  paint(new THREE.CylinderGeometry(.15,.25,.9,10).rotateX(-.62).translate(x,1.8,z-.93),coat),
+  cap(.12,.42,x,2.0,z-1.33,coat,-1.15),sph(.11,x,1.86,z-1.55,muzzle,.9,.85,1.1),
+  paint(new THREE.ConeGeometry(.045,.14,5).translate(x-.06,2.27,z-1.2),coat),paint(new THREE.ConeGeometry(.045,.14,5).translate(x+.06,2.27,z-1.2),coat),
+  box(.05,.6,.1,x,1.95,z-.88,dark,-.62), // mane
+  paint(new THREE.CylinderGeometry(.04,.11,.8,6).rotateX(.3).translate(x,1.12,z+1.02),dark), // tail
+  paint(new THREE.TorusGeometry(.25,.055,6,14).rotateX(-.95).translate(x,1.64,z-.76),'#2b1d14'), // collar
+  box(.56,.06,.5,x,1.68,z-.05,'#2b1d14'),box(.6,.05,.08,x,1.3,z-.05,'#2b1d14')]; // pad and girth
+ return {body,legs:[[x-.15,z-.58],[x+.15,z-.58],[x-.15,z+.6],[x+.15,z+.6]]};
+}
+// One leg: forearm, cannon, fetlock and a dark hoof, hanging from a pivot 1.05 m up.
+function legGeometry(coat){
+ return mergeGeometries([paint(new THREE.CylinderGeometry(.075,.055,.52,8).translate(0,-.26,0),coat),paint(new THREE.CylinderGeometry(.045,.042,.42,7).translate(0,-.73,0),coat),
+  sph(.055,0,-.95,0,coat),paint(new THREE.CylinderGeometry(.055,.065,.09,8).translate(0,-1.005,0),'#1b1714')]);
 }
 
 export function createCarriage(){
@@ -40,8 +55,8 @@ export function createCarriage(){
  parts.push(box(.42,.55,.3,0,1.85,-.98,'#3a2c45'),box(.26,.26,.24,0,2.27,-.98,'#d9b49a'),box(.36,.12,.36,0,2.44,-.98,'#141414'),box(.42,.04,.42,0,2.38,-.98,'#141414'));
  const mesh=new THREE.Mesh(mergeGeometries(parts),mat);parts.forEach(g=>g.dispose());mesh.castShadow=true;group.add(mesh);
  // Legs: one pivot per leg at the shoulder/hip so they can swing.
- const legGeo=paint(new THREE.CylinderGeometry(.055,.045,1.02,6).translate(0,-.51,0),'#3b2618'),legs=[];
- for(const [x,c] of [[-.62,'#4b2f1d'],[.62,'#26201b']])for(const [lx,lz] of horse(x,-3.25,c).legs){const pivot=new THREE.Group();pivot.position.set(lx,1.05,lz);const m=new THREE.Mesh(legGeo,mat);m.castShadow=true;pivot.add(m);group.add(pivot);legs.push(pivot);}
+ const legs=[];
+ for(const [x,c] of [[-.62,'#5b3a24'],[.62,'#2e2520']]){const legGeo=legGeometry(c);for(const [lx,lz] of horse(x,-3.25,c).legs){const pivot=new THREE.Group();pivot.position.set(lx,1.05,lz);const m=new THREE.Mesh(legGeo,mat);m.castShadow=true;pivot.add(m);group.add(pivot);legs.push(pivot);}}
  let phase=0;
  group.userData.update=(speed,dt)=>{const v=Math.min(Math.abs(speed),14);phase+=dt*v*1.4;const amp=Math.min(.55,v*.08);
   legs.forEach((p,i)=>{p.rotation.x=Math.sin(phase+(i%2?Math.PI:0)+(i>3?.6:0))*amp;});};
