@@ -20,7 +20,7 @@ export function createBigMap({base,view,landmarks,player,targets,route,onTravel,
   // the cached base map covers v.size metres centred on (v.cx, v.cz)
   const [x0,y0]=toScreen(v.cx-v.size/2,v.cz-v.size/2);ctx.imageSmoothingQuality='high';ctx.drawImage(img,x0,y0,v.size*s,v.size*s);
   const dpr=Math.min(2,devicePixelRatio||1);
-  const r=route();if(r?.length>1){ctx.strokeStyle='#7b3fe4';ctx.lineWidth=5*dpr;ctx.lineJoin=ctx.lineCap='round';ctx.beginPath();r.forEach((p,i)=>{const [x,y]=toScreen(...(Array.isArray(p)?p:[p.x,p.z]));i?ctx.lineTo(x,y):ctx.moveTo(x,y);});ctx.stroke();}
+  const r=route();if(r?.length>1){ctx.strokeStyle=document.body.classList.contains('era-1760')?'#c08a2a':'#7b3fe4';ctx.lineWidth=5*dpr;ctx.lineJoin=ctx.lineCap='round';ctx.beginPath();r.forEach((p,i)=>{const [x,y]=toScreen(...(Array.isArray(p)?p:[p.x,p.z]));i?ctx.lineTo(x,y):ctx.moveTo(x,y);});ctx.stroke();}
   ctx.textAlign='center';
   const taken=[];
   for(const l of [...landmarks()].sort((a,b)=>(a===hover)-(b===hover))){const [x,y]=toScreen(l.x,l.z),h=hover===l;
