@@ -169,6 +169,9 @@ export function createModelledBuilding(array,part,pixels,texture=null,includeHer
  let plain=[...tint(trim,part.ratu===324?'#927e60':'#d6d1c4'),...tint(ridges,'#606869'),...tint(chimneys,'#8b4b3c')];
  let glass=tint(glazing,'#263e4d');
  if(described){const r=createFacade(analysis.faces,described),m=facadeMaterials();windows+=r.windows;
+  /* merge only matching layouts (position, normal, colour; non-indexed): BoxGeometry carries uvs the facade batches do not, and a mismatch made mergeGeometries return null, dropping all glass */
+  const same=list=>list.map(g0=>{let g=g0.index?g0.toNonIndexed():g0;for(const k of Object.keys(g.attributes))if(!['position','normal','color'].includes(k))g.deleteAttribute(k);if(!g.attributes.normal)g.computeVertexNormals();return g;});
+  plain=same(plain);glass=same(glass);if(r.relief)r.relief=same([r.relief])[0];if(r.glass)r.glass=same([r.glass])[0];
   const relief=r.relief?mergeGeometries([r.relief,...plain]):(plain.length?mergeGeometries(plain):null);if(r.relief)r.relief.dispose();plain.forEach(g=>g.dispose());plain=[];
   const glassAll=r.glass?mergeGeometries([r.glass,...glass]):(glass.length?mergeGeometries(glass):null);if(r.glass)r.glass.dispose();glass.forEach(g=>g.dispose());glass=[];
   for(const [g,mat] of [[glassAll,m.glass],[relief,m.relief]])if(g){g.computeBoundingSphere();mesh(g,mat);meshes.at(-1).userData.provisional=true;meshes.at(-1).userData.role='facade-detail';}else mat.dispose();

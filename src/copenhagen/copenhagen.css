@@ -61,3 +61,22 @@ body.era-1760 .battery-row,body.era-1760 #battery-gauge{visibility:hidden}
 .cph-paper-cols p{margin:0;font-size:13.5px;line-height:1.45}
 .cph-paper-card button{justify-self:end;cursor:pointer;border:0;border-radius:999px;padding:8px 16px;background:#22201c;color:#f4efe2;font:600 12px Manrope,sans-serif}
 .cph-paper-card kbd{margin-left:6px;font-size:10px}
+
+/* Whole-city map (M) */
+#big-map{width:min(1400px,96vw);height:min(940px,94vh);max-width:none;max-height:none;padding:16px 18px 10px;border:0;border-radius:18px;background:#f6f3ea;color:#25292b;display:none;flex-direction:column;gap:10px;box-shadow:0 30px 80px rgba(0,0,0,.35)}
+#big-map[open]{display:flex}
+#big-map::backdrop{background:rgba(18,24,28,.55);backdrop-filter:blur(3px)}
+#big-map .bm-top{display:flex;align-items:center;gap:18px;flex-wrap:wrap}
+#big-map .bm-top>div:first-child{flex:1;min-width:160px}
+#big-map .eyebrow{margin:0;font:700 10px/1.2 Manrope,sans-serif;letter-spacing:.14em;color:#8a8a80}
+#big-map h2{margin:2px 0 0;font:500 26px/1.1 'Source Serif 4',Georgia,serif}
+#big-map .bm-legend{display:flex;gap:14px;font:600 12px Manrope,sans-serif;color:#4a4f52;flex-wrap:wrap}
+#big-map .bm-legend i{display:inline-block;width:11px;height:11px;border-radius:50%;margin-right:6px;vertical-align:-1px;border:2px solid #fff;box-shadow:0 0 0 1px #0002}
+#big-map .bm-legend i.bm-you{background:#dc5b36;border-radius:2px;transform:rotate(45deg)}
+#big-map .bm-tools{display:flex;gap:6px;align-items:center}
+#big-map .bm-tools button{min-width:38px;height:38px;padding:0 12px;border-radius:10px;background:#fff;box-shadow:0 0 0 1px #0001,0 2px 6px #0001;font:700 15px Manrope,sans-serif}
+#big-map .bm-tools button:hover{background:#efe9dc}
+#big-map canvas{flex:1;min-height:0;width:100%;border-radius:12px;background:#b3ced0;cursor:grab;touch-action:none}
+#big-map .bm-hint{margin:0;font:500 12px Manrope,sans-serif;color:#77786f;text-align:center}
+#big-map kbd{font:700 10px Manrope,sans-serif;padding:1px 5px;border-radius:4px;background:#fff;box-shadow:0 0 0 1px #0002}
+@media (max-width:640px){#big-map{padding:10px;gap:6px}#big-map .bm-legend{display:none}#big-map h2{font-size:20px}}

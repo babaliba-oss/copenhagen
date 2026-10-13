@@ -95,7 +95,7 @@ function plateGeometry(size,rect){
  g.deleteAttribute('normal');g.computeVertexNormals();return g.toNonIndexed();
 }
 
-export function createMappedFurniture(layer,{player=()=>null,mobility=()=>null,canvas=globalThis.document}={}){
+export function createMappedFurniture(layer,{player=()=>null,mobility=()=>null,canvas=globalThis.document,poleAllowed=()=>true}={}){
  const group=new THREE.Group();group.name='Mapped street furniture';
  const items=layer?.items||[],obstacles=[],chunks=new Map(),lights=[];
  const painted=new THREE.MeshStandardMaterial({vertexColors:true,roughness:.6,metalness:.2});
@@ -134,6 +134,8 @@ export function createMappedFurniture(layer,{player=()=>null,mobility=()=>null,c
   for(const it of wireLamps){const chunk=chunkOf(it.x,it.z);wireLines(it,chunk.wires??=[],wirePoles);}
   const shade=mergeGeometries([cyl(.012,.012,.5,WIRE_LOW+.3,'#24282a',4),cyl(.06,.06,.1,WIRE_LOW+.5,'#2c3033',8),cyl(.09,.42,.24,WIRE_LOW+.32,'#2c3033',8),cyl(.3,.3,.03,WIRE_LOW+.19,'#fff3d6',8)]);
   chunkedInstances(wireLamps,shade,painted,'Wire lamp shades',it=>[it.x,it.z,it.yaw],{shadow:false});
+  // No pole in a traffic lane, and one pole where several wires end together (junction clusters).
+  {const kept=[];for(const p of wirePoles){if(!poleAllowed(p[0],p[1]))continue;if(kept.some(q=>Math.hypot(q[0]-p[0],q[1]-p[1])<3))continue;kept.push(p);}wirePoles.length=0;wirePoles.push(...kept);}
   if(wirePoles.length){chunkedInstances(wirePoles,mergeGeometries([cyl(.06,.09,8.2,4.1,'#3b3f42',7)]),painted,'Wire poles',p=>[p[0],p[1],0]);
    wirePoles.forEach(([x,z],i)=>obstacles.push({id:`wire-pole-${i}`,name:'pole',rings:[[[x-.1,z-.1],[x+.1,z-.1],[x+.1,z+.1],[x-.1,z+.1]]],bbox:[x-.1,z-.1,x+.1,z+.1]}));}
  }
