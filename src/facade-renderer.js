@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';
 import {storeyBands,storeyStyle} from './facade-data.js';
+import {signCell,SHOP_NAMES} from './shop-sign-layout.js';
 
 // Data-driven street fronts for buildings described in a city's facades.json (src/facade-data.js).
 // Works on the measured or extruded wall faces found by analyseBuilding(): every element sits in
@@ -114,6 +115,10 @@ function groundStorey(F,G,B,band,g,c){
  if(glassTop-base<1.2)return 0;
  for(const [a,b] of runs(F,band.y0+1.2,[F.s0,F.s1])){
   if(g.type!=='solid'&&fascia)slab(F,B,(a+b)/2,top-fascia/2-.15,.02,b-a,fascia,.14,c.band);
+  // A shop sign on the fascia: one per run, a name from the shared atlas.
+  if(g.type==='shops'&&fascia>.35&&b-a>2.6&&c.signs&&!F.signed&&c.signs.length<3&&F.s1-F.s0>8&&hash(F.d,a)<.75){F.signed=true;const k=Math.floor(hash(F.s0+a,F.d)*SHOP_NAMES.length),sw=Math.min(b-a-.5,2.4+hash(a,b)*1.4),sh=Math.min(fascia*.78,sw/4),[u0,v0,u1,v1]=signCell(k);
+   const pg=new THREE.PlaneGeometry(sw,sh),uv=pg.attributes.uv;for(let i=0;i<uv.count;i++)uv.setXY(i,u0+uv.getX(i)*(u1-u0),v0+uv.getY(i)*(v1-v0));
+   c.signs.push(F.place(pg,(a+b)/2,top-fascia/2-.15,.17));}
   if(g.canopy)slab(F,B,(a+b)/2,top-.12,.05,b-a,.28,2.2,c.canopy);
   if(g.type==='solid')continue;
   for(const s of bays(a,b,g.pitch,.4)){
@@ -133,8 +138,8 @@ export function createFacade(faces,spec){
  const c={glass:linear(spec.windows.glass),frame:linear(spec.windows.frame),trim:linear(spec.trim||spec.windows.frame),
   shop:linear('#7d7a70'),band:linear(spec.ground?.band||'#2e3134'),groundFrame:linear(spec.ground?.frame||'#2b2d2f'),
   awning:linear(spec.ground?.awning||'#2b2d2f'),canopy:linear(spec.ground?.canopy||'#2b2d2f'),door:linear(spec.door||'#3a2a20'),lower:spec.wallLower&&linear(spec.wallLower),cornice:linear(spec.cornice||spec.trim||spec.wall)};
- c.plinth=linear(spec.plinth||'#5d5a55');c.surround=linear(spec.surround||spec.cornice||spec.trim||spec.windows.frame);
- const G=new Batch(),B=new Batch();let windows=0;
+ c.plinth=linear(spec.plinth||'#5d5a55');c.rail=linear(spec.rail||'#3a3f42');c.surround=linear(spec.surround||spec.cornice||spec.trim||spec.windows.frame);
+ const G=new Batch(),B=new Batch();let windows=0;c.signs=[];
  for(const face of faces){
   const F=new FaceFrame(face),width=F.s1-F.s0,height=F.y1-F.y0;
   if(width<2.5||height<2.4||Math.abs(face.normal.y)>.12)continue;
@@ -150,6 +155,9 @@ export function createFacade(faces,spec){
      slab(F,B,s,band.y0+1.25,.03,1.3,2.5,.16,c.door);slab(F,B,s,band.y0+2.62,.03,1.5,.14,.2,c.cornice);}
     continue;}
    if(band.index===0&&spec.storeys>1){windows+=groundStorey(F,G,B,band,spec.ground,c);continue;}
+   // Balconies on newer blocks: a slab and a front rail on every other bay.
+   if(spec.balconies&&band.index>=1&&width>6)bays(F.s0,F.s1,spec.windows.pitch*2,1).forEach((s,i)=>{if(!F.rect(s-1.3,s+1.3,band.y0+.1,band.y0+1.2))return;
+    slab(F,B,s,band.y0+.05,0,2.6,.16,1.35,c.trim);slab(F,B,s,band.y0+.62,1.3,2.6,.95,.05,spec.balconyGlass?c.glass:c.rail);});
    windows+=upperStorey(F,G,B,band,{...storeyStyle(spec,band.index,spec.storeys),hood:band.index===1&&spec.material!=='glass'&&spec.windows.shape!=='ribbon'&&!spec.modern},c);
    // String course between storeys of masonry fronts.
    if(band.index===1&&spec.material!=='glass')for(const [a,b] of runs(F,band.y0+.1,[F.s0,F.s1]))slab(F,B,(a+b)/2,band.y0,.0,b-a,.22,.12,c.cornice);
@@ -162,7 +170,8 @@ export function createFacade(faces,spec){
   // Plinth: a darker stone base along the street.
   if(spec.material!=='glass'&&height>4)for(const [a,b] of runs(F,F.y0+.4,[F.s0,F.s1]))slab(F,B,(a+b)/2,F.y0+.35,0,b-a,.7,.08,c.plinth);
  }
- return {triangles:G.triangles+B.triangles,glass:G.finish(),relief:B.finish(),windows};
+ const signs=c.signs.length?mergeGeometries(c.signs.map(g=>g.index?g.toNonIndexed():g)):null;c.signs.forEach(g=>g.dispose());if(signs){signs.computeVertexNormals();signs.computeBoundingSphere();}
+ return {triangles:G.triangles+B.triangles,glass:G.finish(),relief:B.finish(),signs,windows};
 }
 
 // Materials for the two batches; the shell itself keeps the building's own material.

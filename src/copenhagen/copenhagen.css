@@ -95,3 +95,4 @@ body.era-1760 .battery-row,body.era-1760 #battery-gauge{visibility:hidden}
 #cph-banner.cph-banner-pick h2{color:#f6f1e4;font-size:clamp(26px,4vw,48px)}
 #cph-banner.cph-banner-rank h2{color:#7fd6c2}
 @keyframes cph-ban{0%{opacity:0;transform:scale(1.25)}8%{opacity:1;transform:scale(1)}85%{opacity:1}100%{opacity:0}}
+.cph-race-time{font:700 34px/1.1 'Spectral',Georgia,serif !important;font-variant-numeric:tabular-nums;margin:2px 0 !important;color:#7b2fbe}

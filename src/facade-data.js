@@ -124,7 +124,7 @@ export function estimatedFacade(p){
  const brick=p.color[0]>.5&&p.color[1]<.42&&p.color[2]<.36,lighter=p.color.map(v=>v+(1-v)*.45);
  return normaliseFacade({
   wall:hexOf(p.color),roof:hexOf(p.roofColor||[.3,.32,.34]),material:brick?'brick':'render',storeys,estimated:true,door:['#3a2a20','#1f3a2c','#2d3550','#5a2a22','#2b2b2b'][Math.floor(r(13)*5)],
-  groundStorey:storeys>1?3.3+r(1)*.7:undefined,cornice:hexOf(lighter),surround:brick?['#d8ccb4','#e6dfd0','#cbbfa6'][Math.floor(r(14)*3)]:hexOf(p.color.map(v=>v+(1-v)*.6)),plinth:['#5d5a55','#6b6660','#4f4d4a','#7a7068'][Math.floor(r(15)*4)],modern:!!p.modern,
+  groundStorey:storeys>1?3.3+r(1)*.7:undefined,cornice:hexOf(lighter),surround:brick?['#d8ccb4','#e6dfd0','#cbbfa6'][Math.floor(r(14)*3)]:hexOf(p.color.map(v=>v+(1-v)*.6)),plinth:['#5d5a55','#6b6660','#4f4d4a','#7a7068'][Math.floor(r(15)*4)],modern:!!p.modern,balconies:(!!p.modern||(p.year||0)>=1950)&&storeys>=4&&r(16)<.6,balconyGlass:r(17)<.4,
   windows:periodWindows(p,r,storeys),
   ground:storeys>=3&&r(7)<.68?{type:r(10)<.2?'glass':'shops',band:['#2e3134','#5a2a22','#1f3a2c','#2a3550','#3d2b1f'][Math.floor(r(8)*5)],...(r(11)<.35?{awning:['#7a2a20','#1f3a2c','#2d3550','#c8a24a','#e9e3d4'][Math.floor(r(12)*5)]}:{})}:{type:'solid'}
  },p.height);

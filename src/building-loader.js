@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import {litWindows} from './night-windows.js';
 import {facadeGrain} from './facade-grain.js';
+import {signMaterial} from './shop-signs.js';
 import {shellColourAttribute,shellHeightAttribute} from './shell-colors.js';
 let worker,id=0;const pending=new Map();
 // Cheap, measured textured shells are visible before the worker infers details.
@@ -23,7 +24,7 @@ export function materialiseBuilding(data,textures){
  const p=data.part,box=new THREE.Box3(new THREE.Vector3(p.bbox[0]-.5,0,p.bbox[1]-.5),new THREE.Vector3(p.bbox[2]+.5,p.height+.5,p.bbox[3]+.5)),occlusion={opacity:1,clearTime:1};
  return data.meshes.map(source=>{
   const geometry=new THREE.BufferGeometry();for(const [name,a] of Object.entries(source.attributes))geometry.setAttribute(name,new THREE.BufferAttribute(a.array,a.itemSize,a.normalized));if(source.index)geometry.setIndex(new THREE.BufferAttribute(source.index,1));geometry.computeBoundingSphere();
-  const {textured,...values}=source.material,material=new THREE.MeshStandardMaterial({...values,map:textured?textures.get(p.texture):null,forceSinglePass:true});
+  const {textured,signs,...values}=source.material,material=signs?signMaterial():new THREE.MeshStandardMaterial({...values,map:textured?textures.get(p.texture):null,forceSinglePass:true});if(signs){material.transparent=true;material.forceSinglePass=true;}
   if(source.shell&&!textured)facadeGrain(material);
   if((values.roughness===.19&&values.metalness===.55)||(values.roughness===.3&&values.metalness===.1&&values.vertexColors))litWindows(material); // window glazing (building-detail.js) lights up at night
   const mesh=new THREE.Mesh(geometry,material);mesh.castShadow=source.shell;mesh.receiveShadow=true;mesh.userData={box,occlusion,shell:source.shell,ratu:p.ratu,role:source.role||'detail',provisional:!!source.provisional};return mesh;

@@ -26,7 +26,7 @@ export const POSTS={
  'park-lamp':{height:3.2,radius:.06,strength:1.4}, // short park lantern with stacked shades
  lantern:{height:3.1,radius:.07,strength:1.2}, // 1760 oil lantern on a wooden post
 };
-export const SOLIDS={bollard:[.22,.22,.95],'junction-box':[.85,.42,1.3],bench:[1.8,.6,.85],'bike-rack':[2.4,.55,.8],hydrant:[.36,.36,.8],shelter:[3.6,1.5,2.5]}; // width, depth, height
+export const SOLIDS={bollard:[.22,.22,.95],'junction-box':[.85,.42,1.3],bench:[1.8,.6,.85],'bike-rack':[2.4,.55,.4],hydrant:[.36,.36,.8],shelter:[3.6,1.5,2.5]}; // width, depth, height
 // A stable id per object: Mapillary feature id, else its source and place in the file.
 const itemId=(it,i)=>`mapped-${it.k}-${it.mly?.[0]??`${it.src||'item'}-${i}`}`;
 export const KNOCKABLE={bin:{radius:.26},barrier:{radius:.35},cone:{radius:.2}};
@@ -192,7 +192,7 @@ export function createMappedFurniture(layer,{player=()=>null,mobility=()=>null,c
  }
  const solidParts={bollard:([w,,h])=>[cyl(w*.45,w*.5,h,h/2,'#2f3436',8),cyl(w*.5,w*.5,.08,h*.82,'#c9a64a',8),cyl(w*.38,w*.45,.06,h+.03,'#2f3436',8)],'junction-box':([w,d,h])=>[box(w,h,d,0,h/2,0,'#8a9086'),box(w+.04,.05,d+.04,0,h+.02,0,'#6d736a')],
   bench:([w,d,h])=>[box(w,.06,.42,0,.45,.05,'#7a5a3e'),box(w,.4,.05,0,.75,-.18,'#7a5a3e'),box(.06,.45,.45,-w/2+.12,.22,0,'#2d3133'),box(.06,.45,.45,w/2-.12,.22,0,'#2d3133')],
-  'bike-rack':([w,d,h])=>[box(w,.035,.035,0,.32,0,'#8e979a'),box(w,.035,.035,0,.62,0,'#8e979a'),...Array.from({length:6},(_,i)=>box(.03,.62,.03,-w/2+.1+i*(w-.2)/5,.31,0,'#8e979a'))], // low steel frame, not panels
+  'bike-rack':([w,d,h])=>[box(w,.03,.03,0,.07,-.12,'#7f888b'),box(w,.03,.03,0,.07,.12,'#7f888b'),box(w,.03,.03,0,.34,0,'#7f888b'),...[-.9,-.3,.3,.9].map(x=>box(.03,.3,.26,x,.2,0,'#7f888b'))], // Copenhagen ground rack: low wheel-slot rail (it reads as a fence when tall and empty)
   hydrant:([w,,h])=>[cyl(w*.4,w*.45,h,h/2,'#b8322a',8),cyl(w*.5,w*.5,.08,h,'#b8322a',8)],
   // Stop shelter, open towards the road (+Z): steel frame, roof, back and side glass, a bench and an advert panel at one end.
   shelter:([w,d,h])=>[...[-w/2+.05,w/2-.05].flatMap(x=>[box(.08,h,.08,x,h/2,-d/2+.06,'#3e4a4f'),box(.08,h,.08,x,h/2,d/2-.12,'#3e4a4f')]),box(w+.2,.12,d+.25,0,h+.06,0,'#4a565b'),
@@ -203,7 +203,7 @@ export function createMappedFurniture(layer,{player=()=>null,mobility=()=>null,c
   const bar=(a,b,c,r=.02)=>{const A=new THREE.Vector3(...a),B=new THREE.Vector3(...b),d=B.clone().sub(A),g=new THREE.CylinderGeometry(r,r,d.length(),4);g.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,1,0),d.normalize()));g.translate((A.x+B.x)/2,(A.y+B.y)/2,(A.z+B.z)/2);return paint(g,c);};
   const bikes=['#1d1f22','#2d4f7a','#7a2a20','#3f5d45','#c9c4b8'].map(c=>mergeGeometries([T(.33,0,-.55,'#1a1a1a'),T(.33,0,.55,'#1a1a1a'),bar([0,.36,.55],[0,.82,.22],c),bar([0,.36,.55],[0,.38,.05],c),bar([0,.82,.22],[0,.38,.05],c),bar([0,.38,.05],[0,.92,-.42],c),bar([0,.82,.22],[0,.92,-.42],c),bar([0,.92,-.42],[0,.36,-.55],c),bar([-.26,1.05,-.45],[.26,1.05,-.45],'#2a2a2a'),bar([0,.92,-.42],[0,1.05,-.45],'#555'),paint(new THREE.BoxGeometry(.12,.05,.26).translate(0,.92,.24),'#222')]));
   const lists=bikes.map(()=>[]);let n=0;
-  racks.forEach((it,i)=>{if((i*7919)%10<4)return;const c=Math.cos(it.yaw||0),sn=Math.sin(it.yaw||0);for(const off of [-.55,.55]){const k=(i*31+n++)%bikes.length;lists[k].push([it.x+c*off,it.z-sn*off,(it.yaw||0)+(off>0?Math.PI:0)+((i%3)-1)*.06]);}});
+  racks.forEach((it,i)=>{if((i*7919)%10<1)return;const c=Math.cos(it.yaw||0),sn=Math.sin(it.yaw||0);const slots=[-.9,-.3,.3,.9].filter((_,j)=>((i*13+j*7)%9)>2||j===1);for(const off of slots){const k=(i*31+n++)%bikes.length;lists[k].push([it.x+c*off,it.z-sn*off,(it.yaw||0)+(off>0?Math.PI:0)+((i%3)-1)*.06]);}});
   lists.forEach((l,k)=>{if(l.length)chunkedInstances(l,bikes[k],painted,'Parked bicycles',b=>b,{shadow:false});});
  }}
  for(const [kind,size] of Object.entries(SOLIDS)){

@@ -24,7 +24,7 @@ async function handle({id,array,parts,pixels}){
     const attributes={};for(const [name,a] of Object.entries(m.geometry.attributes)){attributes[name]={array:a.array,itemSize:a.itemSize,normalized:a.normalized};transfer.add(a.array.buffer);}
     const index=m.geometry.index?.array;if(index)transfer.add(index.buffer);
     const mat=m.material;
-    return {attributes,index,shell:!!m.userData.shell,role:m.userData.role,provisional:!!m.userData.provisional,material:{color:mat.color.getHex(),roughness:mat.roughness,metalness:mat.metalness,side:mat.side,vertexColors:mat.vertexColors,textured:!!mat.map}};
+    return {attributes,index,shell:!!m.userData.shell,role:m.userData.role,provisional:!!m.userData.provisional,material:{color:mat.color.getHex(),roughness:mat.roughness,metalness:mat.metalness,side:mat.side,vertexColors:mat.vertexColors,textured:!!mat.map,signs:!!mat.userData?.signs}};
    });
    buildings.push({part,meshes,windows:detail.windows});texture?.dispose();detail.meshes.forEach(m=>{m.geometry.dispose();m.material.dispose();});
   }

@@ -3,7 +3,7 @@
 export function createBigMap({base,view,landmarks,player,targets,route,onTravel,radius}){
  const dlg=document.createElement('dialog');dlg.id='big-map';
  dlg.innerHTML=`<div class="bm-top"><div><p class="eyebrow">THE CITY</p><h2 id="bm-title"></h2></div>
- <div class="bm-legend"><span><i class="bm-you"></i>You</span><span><i style="background:#f2b134"></i>Pick-up</span><span><i style="background:#46c2b0"></i>Drop-off</span><span><i style="background:#7b3fe4"></i>Route</span></div>
+ <div class="bm-legend"><span><i class="bm-you"></i>You</span><span><i style="background:#f2b134"></i>Pick-up</span><span><i style="background:#46c2b0"></i>Drop-off</span><span><i style="background:#9b5de5"></i>Race</span><span><i style="background:#7b3fe4;border-radius:2px"></i>Route</span></div>
  <div class="bm-tools"><button data-z="1.4" aria-label="Zoom in">+</button><button data-z="0.714" aria-label="Zoom out">−</button><button data-fit aria-label="Whole city">Whole city</button><button class="close-btn" aria-label="Close map">×</button></div></div>
  <canvas id="bm-canvas"></canvas><p class="bm-hint">Drag to move · scroll to zoom · click a place to travel there · <kbd>M</kbd> / <kbd>ESC</kbd> to close</p>`;
  document.body.appendChild(dlg);

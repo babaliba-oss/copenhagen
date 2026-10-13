@@ -397,11 +397,11 @@ async function detailTile(group){
  // Nearest buildings land first; each lands on its own (no walk over the whole tile).
  const dist=b=>{const q=b.part.bbox;return Math.hypot((q[0]+q[2])/2-focus.x,(q[1]+q[3])/2-focus.z);};
  const shells=new Map(group.children.filter(m=>m.userData.source).map(m=>[m.userData.id,m]));
- for(const b of buildings.sort((a,b)=>dist(a)-dist(b)))uploads.push(()=>{
+ for(const b of buildings)uploads.push(()=>{
   if(loadedTiles.get(t.file)!==group)return;
   const shell=shells.get(b.part.id);if(shell){group.remove(shell);shell.geometry.dispose();shell.material.dispose();}
   const meshes=materialiseBuilding(b,textures);for(const m of meshes){freezeMesh(m);applyMeshLod(m,group.userData.level,focus);}group.add(...meshes);group.userData.windows+=b.windows;
- });
+ },()=>dist(b)); // nearest building first, across every tile in the queue
 }
 async function loadPhoto(t){
  if(photoTiles.has(t.file))return;
@@ -525,7 +525,7 @@ function drawMinimap(){if(!car)return;const canvas=$('minimap'),ctx=canvas.getCo
   // Named places (the start points) as small labels, so you always know what is near.
   ctx.font='600 10px Manrope,sans-serif';ctx.textAlign='center';for(const l of data?.landmarks||[]){const [x,y]=P([l.x,l.z]);if(x<8||y<8||x>canvas.width-8||y>canvas.height-8)continue;ctx.fillStyle='#2b2d2f';ctx.beginPath();ctx.arc(x,y,2.6,0,Math.PI*2);ctx.fill();ctx.lineWidth=3;ctx.strokeStyle='rgba(248,245,238,.9)';ctx.strokeText(l.name,x,y-6);ctx.fillText(l.name,x,y-6);}
   if(r?.length>1){ctx.strokeStyle='#7b3fe4';ctx.lineWidth=5;ctx.lineJoin=ctx.lineCap='round';ctx.beginPath();r.forEach((p,i)=>{const [x,y]=P(Array.isArray(p)?p:[p.x,p.z]);i?ctx.lineTo(x,y):ctx.moveTo(x,y);});ctx.stroke();}
-  for(const t of cph.minimapTargets()){let [x,y]=P(t.p);const m=12,cx=canvas.width/2,cy=canvas.height/2,dx=x-cx,dy=y-cy,k=Math.min(1,(cx-m)/Math.max(1e-6,Math.abs(dx)),(cy-m)/Math.max(1e-6,Math.abs(dy)));x=cx+dx*k;y=cy+dy*k;
+  for(const t of cph.minimapTargets()){let [x,y]=P(t.p);const m=12,cx=canvas.width/2,cy=canvas.height/2,dx=x-cx,dy=y-cy,k=Math.min(1,(cx-m)/Math.max(1e-6,Math.abs(dx)),(cy-m)/Math.max(1e-6,Math.abs(dy)));if(t.small&&k<1)continue;x=cx+dx*k;y=cy+dy*k;
    ctx.fillStyle=t.color;ctx.strokeStyle='#fff';ctx.lineWidth=2.5;ctx.beginPath();ctx.arc(x,y,k<1?6:8,0,Math.PI*2);ctx.fill();ctx.stroke();}
   ctx.restore();}
  mapCar(ctx,canvas.width/2,canvas.height/2,car.heading,1.25);ctx.fillStyle='#34483d';ctx.font='18px sans-serif';ctx.fillText('N',canvas.width-26,25);}

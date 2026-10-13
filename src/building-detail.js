@@ -142,7 +142,7 @@ export function createModelledBuilding(array,part,pixels,texture=null,includeHer
    const g=new THREE.BoxGeometry(.75,1.5,1.1);g.rotateY(yaw);g.translate(x,y+.45,z);chimneys.push(g);const c=new THREE.BoxGeometry(.95,.14,1.3);c.rotateY(yaw);c.translate(x,y+1.25,z);chimneys.push(c);}
  }
  // Dormers: a row of small windowed dormers on each pitched roof plane of older houses (the Copenhagen roofline).
- const dormerWalls=[],dormerRoofs=[],dormerGlass=[];
+ const dormerWalls=[],dormerRoofs=[],dormerGlass=[],dormerFrames=[];
  if(!texture&&part.roofColor&&part.height>8&&part.height<32&&!part.modern&&!(part.year>1935)){
   const planes=new Map();
   for(const t of analysis.roof){if(t.n.y<.4||t.n.y>.9)continue;const hx=t.n.x,hz=t.n.z,hl=Math.hypot(hx,hz);if(hl<.2)continue;const v0=t.v[0],d=t.n.x*v0[0]+t.n.y*v0[1]+t.n.z*v0[2];
@@ -159,11 +159,11 @@ export function createModelledBuilding(array,part,pixels,texture=null,includeHer
    for(let k=1;k<=n&&count<14;k++){const s0=lo+step*k;
     // the roof point at (s0, yd): back along the horizontal normal to the plane
     const t0=pl.tris[0].v[0],d=pl.n.x*t0[0]+pl.n.y*t0[1]+pl.n.z*t0[2];const bx=s0*ax,bz=s0*az,u=(d-pl.n.y*yd-(pl.n.x*bx+pl.n.z*bz))/(pl.n.x*hx+pl.n.z*hz);
-    const px=bx+hx*u,pz=bz+hz*u,W=1.35,H=1.5,D=2.2,cx=px+hx*(.25-D/2),cz=pz+hz*(.25-D/2);
+    const px=bx+hx*u,pz=bz+hz*u,W=1.15,H=1.25,D=2,cx=px+hx*(.25-D/2),cz=pz+hz*(.25-D/2);
     const put=(g,list,y,ox=0,oz=0)=>{g.rotateY(yaw);g.translate(cx+hx*oz+ax*ox,y,cz+hz*oz+az*ox);list.push(g);};
     put(new THREE.BoxGeometry(W,H,D),dormerWalls,yd+H/2-.2);
     for(const sg of [-1,1]){const r=new THREE.BoxGeometry(W*.62,.08,D+.25);r.rotateZ(sg*-.62);r.translate(sg*W*.26,0,0);put(r,dormerRoofs,yd+H-.2+.2);}
-    put(new THREE.BoxGeometry(W*.62,H*.62,.06),dormerGlass,yd+H*.47-.2,0,D/2+.01);count++;}
+    put(new THREE.BoxGeometry(W*.7,H*.66,.04),dormerFrames,yd+H*.47-.2,0,D/2+.01);put(new THREE.BoxGeometry(W*.56,H*.54,.04),dormerGlass,yd+H*.47-.2,0,D/2+.03);count++;}
   }
  }
  const meshes=[];
@@ -197,7 +197,7 @@ export function createModelledBuilding(array,part,pixels,texture=null,includeHer
  // and the generated window glazing joins its glass (three draw calls per building instead of six).
  const tint=(list,hex)=>{const c=new THREE.Color(hex);return list.map(g0=>{const g=g0.index?g0.toNonIndexed():g0;if(g!==g0)g0.dispose();const n=g.attributes.position.count,a=new Float32Array(n*3);for(let i=0;i<n;i++)a.set([c.r,c.g,c.b],i*3);g.setAttribute('color',new THREE.BufferAttribute(a,3));if(g.attributes.uv)g.deleteAttribute('uv');return g;});};
  const hexArr=a=>'#'+a.map(v=>Math.round(Math.max(0,Math.min(1,v))*255).toString(16).padStart(2,'0')).join('');
- let plain=[...tint(trim,part.ratu===324?'#927e60':'#d6d1c4'),...tint(ridges,'#606869'),...tint(chimneys,'#8b4b3c'),...(dormerWalls.length?[...tint(dormerWalls,hexArr((part.color||[.85,.82,.75]).map(v=>v+(1-v)*.35))),...tint(dormerRoofs,hexArr((part.roofColor||[.3,.3,.3]).map(v=>v*.85)))]:[])];
+ let plain=[...tint(trim,part.ratu===324?'#927e60':'#d6d1c4'),...tint(ridges,'#606869'),...tint(chimneys,'#8b4b3c'),...(dormerWalls.length?[...tint(dormerWalls,hexArr((part.roofColor||[.3,.3,.3]).map(v=>v*1.08+.03))),...tint(dormerRoofs,hexArr((part.roofColor||[.3,.3,.3]).map(v=>v*.82))),...tint(dormerFrames,'#e9e5da')]:[])];
  let glass=[...tint(glazing,'#263e4d'),...tint(dormerGlass,'#22313a')];
  if(described){const r=createFacade(analysis.faces,described),m=facadeMaterials();windows+=r.windows;
   /* merge only matching layouts (position, normal, colour; non-indexed): BoxGeometry carries uvs the facade batches do not, and a mismatch made mergeGeometries return null, dropping all glass */
@@ -205,6 +205,7 @@ export function createModelledBuilding(array,part,pixels,texture=null,includeHer
   plain=same(plain);glass=same(glass);if(r.relief)r.relief=same([r.relief])[0];if(r.glass)r.glass=same([r.glass])[0];
   const relief=r.relief?mergeGeometries([r.relief,...plain]):(plain.length?mergeGeometries(plain):null);if(r.relief)r.relief.dispose();plain.forEach(g=>g.dispose());plain=[];
   const glassAll=r.glass?mergeGeometries([r.glass,...glass]):(glass.length?mergeGeometries(glass):null);if(r.glass)r.glass.dispose();glass.forEach(g=>g.dispose());glass=[];
+  if(r.signs){const sm=new THREE.MeshStandardMaterial({roughness:.6});sm.userData.signs=true;mesh(r.signs,sm);meshes.at(-1).userData.role='facade-detail';}
   for(const [g,mat] of [[glassAll,m.glass],[relief,m.relief]])if(g){g.computeBoundingSphere();mesh(g,mat);meshes.at(-1).userData.provisional=true;meshes.at(-1).userData.role='facade-detail';}else mat.dispose();
  }
  if(plain.length){mesh(mergeGeometries(plain),new THREE.MeshStandardMaterial({vertexColors:true,roughness:.72,metalness:.12}));plain.forEach(g=>g.dispose());}

@@ -113,6 +113,32 @@ export function createCopenhagenGame({scene,city,mobilityData,cityData,toast}){
  let state='a',timer=0,routeFor=null,routeT=0,player=null,mode='car',started=false;
  const job=()=>jobs[save.job%jobs.length];
 
+ // ---- checkpoint races: routes follow the road graph between named places; medals by time ----
+ const RACE_DEFS=ERA==='h'?[
+   {id:'coach-dash',title:'The Coachman’s Dash',via:['Kongens Nytorv','Christiansborg','Rådhuspladsen']},
+   {id:'harbour-run',title:'Harbour Run',via:['Nyhavn','Amalienborg','Kongens Nytorv']}]
+  :[{id:'harbour-sprint',title:'Harbour Sprint',via:['Kongens Nytorv','Christiansborg','Christianshavn']},
+   {id:'lakes-loop',title:'Lakes Loop',via:['Torvehallerne','Dronning Louises Bro','The Lakes','Rådhuspladsen']},
+   {id:'mermaid-run',title:'Tivoli to the Mermaid',via:['Tivoli','Rådhuspladsen','Kongens Nytorv','Amalienborg','Little Mermaid']},
+   {id:'brygge-blast',title:'Brygge Blast',via:['Islands Brygge','Christiansborg','Nyhavn']}];
+ const lms=cityData?.landmarks||[],lm=n=>lms.find(l=>l.name===n);
+ const races=RACE_DEFS.map(d=>{const pts=d.via.map(lm);if(pts.some(p=>!p))return null;
+  let path=[];for(let i=1;i<pts.length;i++){const leg=road.route(road.nearest(pts[i-1].x,pts[i-1].z),road.nearest(pts[i].x,pts[i].z));if(!leg)return null;path.push(...(path.length?leg.slice(1):leg));}
+  let len=0;const cps=[];let acc=0;for(let i=1;i<path.length;i++){const l=dist(path[i],path[i-1]);len+=l;acc+=l;if(acc>330&&len<9e9){cps.push(path[i]);acc=0;}}
+  if(cps.length&&dist(cps.at(-1),path.at(-1))<150)cps.pop();cps.push(path.at(-1));
+  const speed=ERA==='h'?7:11.5,gold=Math.round(len/speed+8);
+  return {...d,start:path[0],cps,len,par:[gold,Math.round(gold*1.25),Math.round(gold*1.6)],pay:Math.round((ERA==='h'?60:500)*len/1500)};}).filter(Boolean);
+ save.best??={};
+ let race=null; // {r, k (next checkpoint), t, countdown}
+ const mkStart=races.map(()=>beam(scene,0x9b5de5,60)),mkCp=beam(scene,0xff4fd8,90),mkCp2=beam(scene,0xff4fd8,40);
+ const fmtT=t=>`${Math.floor(t/60)}:${String(Math.floor(t%60)).padStart(2,'0')}.${Math.floor(t%1*10)}`;
+ function startRace(r){race={r,k:0,t:0,countdown:3.4};routeFor=null;banner(r.title,`${r.cps.length} checkpoints · ${(r.len/1000).toFixed(1)} km · gold ${fmtT(r.par[0])}`,'pick');}
+ function finishRace(){const r=race.r,t=race.t,medal=t<=r.par[0]?0:t<=r.par[1]?1:t<=r.par[2]?2:3;const names=['Gold','Silver','Bronze'];
+  const prev=save.best[r.id],best=prev==null||t<prev;if(best)save.best[r.id]=t;
+  if(medal<3){const pay=Math.round(r.pay*[1,.6,.35][medal]*payBonus());save.money+=pay;banner(`${names[medal]}!`,`${esc(r.title)} · ${fmtT(t)}${best?' · new best':''} · +${fmtKr(pay)} ${UNIT}`,medal===0?'rank':'pass');}
+  else banner('Too slow',`${esc(r.title)} · ${fmtT(t)} · bronze is ${fmtT(r.par[2])}`,'fail');
+  race=null;persist();routeFor=null;}
+
  // ---- sagas ----
  const frontier=()=>{const a=save.active;if(!a)return [];const q=byId[a.id],i=q.steps.findIndex((s,k)=>!a.done.includes(k));if(i<0)return [];if(!q.steps[i].any)return [i];const out=[];for(let k=i;k<q.steps.length&&q.steps[k].any;k++)if(!a.done.includes(k))out.push(k);return out;};
  const giverName=q=>CHARACTERS.find(c=>c.id===q.giver)?.name||q.giver;
@@ -168,6 +194,7 @@ export function createCopenhagenGame({scene,city,mobilityData,cityData,toast}){
 
  // ---- target for the GPS line: a walk to a character, the saga, or the job ----
  function target(){
+  if(race&&race.countdown<=0)return {p:race.r.cps[race.k],kind:'race'};
   if(wayTo)return {p:wayTo,kind:'way'};
   if(state!=='b'&&save.active){const q=byId[save.active.id],f=frontier().filter(k=>!q.steps[k].clue);if(f.length){let best=f[0];for(const k of f)if(dist(q.steps[k].p,[player.x,player.z])<dist(q.steps[best].p,[player.x,player.z]))best=k;return {p:q.steps[best].p,kind:'saga'};}}
   return {p:state==='a'?job().A:job().B,kind:'job'};
@@ -178,8 +205,11 @@ export function createCopenhagenGame({scene,city,mobilityData,cityData,toast}){
  function updateHud(){
   {const n=save.delivered||0,r=rankOf(n),next=RANKS[r+1],from=RANKS[r][1],pct=next?Math.round((n-from)/(next[1]-from)*100):100;
    setHtml($('cph-money'),`<b>${fmtKr(save.money)} ${UNIT}</b>${save.nisser?.length?` · nisser ${save.nisser.length}/${nisser.length}`:''}<span class="cph-rank">${esc(RANKS[r][0])}${save.streak>1?` · streak ×${save.streak}`:''}<i style="--p:${pct}%"></i></span>`);}
+  if(race){const r=race.r,b=save.best[r.id];setHtml($('cph-job'),`<p class="cph-kick">Race · checkpoint ${Math.min(race.k+1,r.cps.length)}/${r.cps.length} · <kbd>X</kbd> quit</p><h3>${esc(r.title)}</h3><p class="cph-race-time">${race.countdown>0?Math.ceil(race.countdown):fmtT(race.t)}</p><p>Gold ${fmtT(r.par[0])} · silver ${fmtT(r.par[1])} · bronze ${fmtT(r.par[2])}${b!=null?` · best ${fmtT(b)}`:''}</p>`);}
+  else{
   const j=job(),t=state==='a'?j.A:j.B,d=line.points?line.remaining():dist(t,[player.x,player.z]);
   setHtml($('cph-job'),`<p class="cph-kick">Job ${save.job%jobs.length+1}/${jobs.length}</p><h3>${esc(j.t)}</h3><p>${esc(j.d)}</p><p class="cph-go">${state==='a'?'Pick up at':'Deliver to'} <b>${esc(state==='a'?j.aName:j.bName)}</b> · ${d>1000?(d/1000).toFixed(1)+' km':Math.round(d/10)*10+' m'}${state==='b'?` · <span class="${timer<15?'cph-low':''}">${Math.max(0,timer).toFixed(0)} s</span>`:''}</p>`);
+  }
   const sg=$('cph-saga');if(!save.active){sg.hidden=true;return;}sg.hidden=false;
   const q=byId[save.active.id],f=frontier();
   setHtml(sg,`<p class="cph-kick">Saga · <kbd>J</kbd> journal${q.steps.some(s=>s.clue)?' · <kbd>K</kbd> map':''}</p><h3>${esc(q.title)}</h3><ol>${q.steps.map((s,k)=>{const dn=save.active.done.includes(k),c=f.includes(k),dd=dist(s.p,[player.x,player.z]);return `<li class="${dn?'d':c?'c':''}">${esc(s.name)}${c?` <span>${s.clue?warmth(dd):dd>1000?(dd/1000).toFixed(1)+' km':Math.round(dd/10)*10+' m'}</span>`:''}</li>`;}).join('')}</ol>${q.limit?`<p class="cph-timer ${save.active.t<30?'cph-low':''}">${Math.max(0,save.active.t).toFixed(0)} s</p>`:''}`);
@@ -213,8 +243,23 @@ export function createCopenhagenGame({scene,city,mobilityData,cityData,toast}){
    nisseMesh.instanceMatrix.needsUpdate=true;}
   if(travelMode!==mode){mode=travelMode;routeFor=null;}
   const here=[actor.x,actor.z];
+  // races
+  const now=performance.now();
+  races.forEach((r,i)=>{const m=mkStart[i];m.visible=!race&&state!=='b'&&running;m.position.set(r.start[0],groundAt(...r.start),r.start[1]);
+   const d=dist(here,r.start);if(d>30)r.armed=true;if(m.visible&&r.armed&&d<7){r.armed=false;startRace(r);}});
+  mkCp.visible=mkCp2.visible=false;
+  if(race&&running){
+   if(race.countdown>0){const before=Math.ceil(race.countdown);race.countdown-=dt;const after=Math.ceil(race.countdown);if(after!==before)banner(after>0?String(after):'Go!','',after>0?'pick':'pass');}
+   else{race.t+=dt;const r=race.r,cp=r.cps[race.k];
+    mkCp.visible=true;mkCp.position.set(cp[0],groundAt(...cp),cp[1]);mkCp.children[1].scale.setScalar(1.4+Math.sin(now/200)*.1);
+    const nx=r.cps[race.k+1];if(nx){mkCp2.visible=true;mkCp2.position.set(nx[0],groundAt(...nx),nx[1]);}
+    if(dist(here,cp)<14){race.k++;routeFor=null;if(race.k>=r.cps.length)finishRace();else chime('pick');}
+    else if(race&&race.t>r.par[2]*2)finishRace();}
+  }
   // job
   const j=job();
+  if(race){mkA.visible=mkB.visible=false;}
+  else{
   if(state==='b'&&running){timer-=dt;if(timer<=0){banner('Job failed',`Too slow: ${esc(j.t)}. Streak lost.`,'fail');save.streak=0;save.job++;state='a';persist();routeFor=null;}}
   const t=state==='a'?j.A:j.B;
   if(running&&dist(here,t)<9){
@@ -226,6 +271,7 @@ export function createCopenhagenGame({scene,city,mobilityData,cityData,toast}){
     else banner('Delivered!',`+${fmtKr(pay)} ${UNIT}${streakBonus?` · streak ×${save.streak} bonus +${fmtKr(streakBonus)}`:''}${timer>20?' · fast':''}`,'pass');}
   }
   mkA.visible=state==='a';mkB.visible=state==='b';mkA.position.set(j.A[0],groundAt(...j.A),j.A[1]);mkB.position.set(j.B[0],groundAt(...j.B),j.B[1]);
+  }
   const pulse=1+Math.sin(performance.now()/300)*.08;mkA.children[1].scale.setScalar(pulse);mkB.children[1].scale.setScalar(pulse);
   // saga
   for(const b of mkQ)b.visible=false;
@@ -241,6 +287,8 @@ export function createCopenhagenGame({scene,city,mobilityData,cityData,toast}){
      if(save.active.done.length>=q.steps.length)endSaga(true);persist();break;}
    }
   }
+  // Beams fade as you reach them: standing inside one tinted the whole screen.
+  for(const m of [mkA,mkB,mkCp,mkCp2,...mkQ,...mkStart])if(m.visible){const d=Math.hypot(m.position.x-here[0],m.position.z-here[1]),f=Math.min(1,Math.max(0,(d-12)/30));m.children[0].material.opacity=.18*f;m.children[0].visible=f>0;}
   if(wayTo&&dist(wayTo,here)<8){wayTo=null;routeFor=null;}
   // GPS line
   routeT-=dt;const tg=target();
@@ -253,10 +301,11 @@ export function createCopenhagenGame({scene,city,mobilityData,cityData,toast}){
   if(loreOpen){if(['Enter','Space','Escape','KeyG'].includes(code)){nextLore();return true;}return true;}
   if(tmapOpen){if(['KeyK','Escape','Enter'].includes(code))closeTreasure();return true;}
   if(journalOpen){if(code==='KeyJ'||code==='Escape')toggleJournal(false);return true;}
+  if(code==='KeyX'&&race){banner('Race abandoned',esc(race.r.title),'fail');race=null;routeFor=null;return true;}
   if(code==='KeyJ'){toggleJournal(true);return true;}
   if(code==='KeyK'){showTreasure();return true;}
   return false;
  }
  const blocking=()=>loreOpen||journalOpen||tmapOpen;
- return {update,key,blocking,people,api,minimapTargets:()=>{const out=[];const j=job();out.push({p:state==='a'?j.A:j.B,color:state==='a'?'#f2b134':'#46c2b0'});if(save.active){const q=byId[save.active.id];for(const k of frontier())if(!q.steps[k].clue)out.push({p:q.steps[k].p,color:'#e0313e'});}return out;},route:()=>line.ahead()};
+ return {debug:()=>({race:race&&{id:race.r.id,k:race.k,t:race.t,c:race.countdown},armed:races.map(r=>r.armed),state,started,player:player&&[player.x,player.z]}),update,key,blocking,people,api,minimapTargets:()=>{const out=[];if(race){out.push({p:race.r.cps[race.k],color:'#ff4fd8'});return out;}for(const r of races)if(state!=='b')out.push({p:r.start,color:'#9b5de5',small:true});const j=job();out.push({p:state==='a'?j.A:j.B,color:state==='a'?'#f2b134':'#46c2b0'});if(save.active){const q=byId[save.active.id];for(const k of frontier())if(!q.steps[k].clue)out.push({p:q.steps[k].p,color:'#e0313e'});}return out;},route:()=>line.ahead()};
 }
