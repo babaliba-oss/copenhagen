@@ -117,19 +117,19 @@ function periodWindows(p,r,storeys){
  if(y)return r(9)<.65?{shape:'ribbon',pitch:1.5,width:1.5,height:2.1,frame:'#2f3438',glass:'#24333d'}:{shape:'rect',pitch:2.4,width:1.6,height:2.0,frame:'#2f3438',glass:'#24333d'};
  return p.modern&&r(9)<.45?{shape:'ribbon',pitch:1.6,width:1.6,height:1.9,frame:'#4a4f52',glass:'#2a3b46'}:{shape:r(2)<.12&&storeys<6?'arch':'rect',pitch:[2.4,2.6,2.8,3.1][Math.floor(r(3)*4)],width:1.0+r(4)*.35,height:1.45+r(5)*.45,frame:r(6)<.8?'#ece8de':'#3b3f3c',glass:'#2c3a42'};
 }
-export function estimatedFacade(p){
+export function estimatedFacade(p,{era=null}={}){
  let seed=0;for(const ch of String(p.id))seed=(seed*31+ch.charCodeAt(0))>>>0;
  const r=k=>{const x=Math.sin(seed*.0001+k*12.9898)*43758.5453;return x-Math.floor(x);};
  const wallH=p.height*(p.height>14?.8:.86),storeys=Math.max(1,Math.min(18,Math.round((wallH-.4)/3.15)));
  const brick=p.color[0]>.5&&p.color[1]<.42&&p.color[2]<.36,lighter=p.color.map(v=>v+(1-v)*.45);
  return normaliseFacade({
   wall:hexOf(p.color),roof:hexOf(p.roofColor||[.3,.32,.34]),material:brick?'brick':'render',storeys,estimated:true,door:['#3a2a20','#1f3a2c','#2d3550','#5a2a22','#2b2b2b'][Math.floor(r(13)*5)],
-  groundStorey:storeys>1?3.3+r(1)*.7:undefined,cornice:hexOf(lighter),surround:brick?['#d8ccb4','#e6dfd0','#cbbfa6'][Math.floor(r(14)*3)]:hexOf(p.color.map(v=>v+(1-v)*.6)),plinth:['#5d5a55','#6b6660','#4f4d4a','#7a7068'][Math.floor(r(15)*4)],modern:!!p.modern,balconies:(!!p.modern||(p.year||0)>=1950)&&storeys>=4&&r(16)<.6,balconyGlass:r(17)<.4,
-  windows:periodWindows(p,r,storeys),
-  ground:storeys>=3&&r(7)<.68?{type:r(10)<.2?'glass':'shops',band:['#2e3134','#5a2a22','#1f3a2c','#2a3550','#3d2b1f'][Math.floor(r(8)*5)],...(r(11)<.35?{awning:['#7a2a20','#1f3a2c','#2d3550','#c8a24a','#e9e3d4'][Math.floor(r(12)*5)]}:{})}:{type:'solid'}
+  groundStorey:storeys>1?3.3+r(1)*.7:undefined,cornice:hexOf(lighter),surround:brick?['#d8ccb4','#e6dfd0','#cbbfa6'][Math.floor(r(14)*3)]:hexOf(p.color.map(v=>v+(1-v)*.6)),plinth:['#5d5a55','#6b6660','#4f4d4a','#7a7068'][Math.floor(r(15)*4)],modern:!!p.modern,balconies:era!==1760&&(!!p.modern||(p.year||0)>=1950)&&storeys>=4&&r(16)<.6,balconyGlass:r(17)<.4,
+  windows:era===1760?{shape:'rect',pitch:2.1+r(3)*.3,width:.9+r(4)*.12,height:1.45+r(5)*.2,frame:'#efe9dc',glass:'#27343c',shutters:r(18)<.45?['#2f4a3c','#5a2a22','#3a4a5a','#6b4a2a'][Math.floor(r(19)*4)]:null}:periodWindows(p,r,storeys),
+  ground:era===1760?{type:'solid'}:storeys>=3&&r(7)<.68?{type:r(10)<.2?'glass':'shops',band:['#2e3134','#5a2a22','#1f3a2c','#2a3550','#3d2b1f'][Math.floor(r(8)*5)],...(r(11)<.35?{awning:['#7a2a20','#1f3a2c','#2d3550','#c8a24a','#e9e3d4'][Math.floor(r(12)*5)]}:{})}:{type:'solid'}
  },p.height);
 }
-export function estimateFacades(index){
- let n=0;for(const t of index.tiles)for(const p of t.parts){if(p.texture||p.noFacade)continue;if(!p.roofColor)ensurePartColours(p);if(!p.facade&&p.height>=4&&p.height<=60){p.facade=estimatedFacade(p);n++;}}
+export function estimateFacades(index,{era=null}={}){
+ let n=0;for(const t of index.tiles)for(const p of t.parts){if(p.texture||p.noFacade)continue;if(!p.roofColor)ensurePartColours(p);if(!p.facade&&p.height>=4&&p.height<=60){p.facade=estimatedFacade(p,{era});n++;}}
  return n;
 }

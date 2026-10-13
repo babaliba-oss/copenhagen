@@ -87,6 +87,8 @@ function upperStorey(F,G,B,band,st,c){
    for(const dx of [-w/2+.04,w/2-.04])flat(F,B,s+dx,sideY,.045,.08,sideH,c.frame);
    if(!arch){flat(F,B,s,y+hh/2-.04,.045,w,.08,c.frame);flat(F,B,s,y-hh/2+.04,.045,w,.08,c.frame);}
    if(st.shape!=='ribbon'&&w>.7){flat(F,B,s,y,.05,.07,hh-.1,c.frame);if(!arch&&hh>1.2)flat(F,B,s,y+hh*.2,.05,w-.08,.07,c.frame);}
+   // Wooden shutters folded back beside the window (1760 houses).
+   if(c.shutter&&!arch)for(const dx of [-1,1])slab(F,B,s+dx*(w/2+.16+w*.25),y,0,w*.48,hh,.05,c.shutter);
    // Sill: projecting stone ledge; a hood moulding over the main-floor windows of older fronts.
    slab(F,B,s,y-hh/2-.1,0,w+.42,.1,.24,c.trim);
    if(st.hood&&!arch)slab(F,B,s,y+hh/2+.26,0,w+.5,.12,.22,c.cornice);
@@ -138,7 +140,7 @@ export function createFacade(faces,spec){
  const c={glass:linear(spec.windows.glass),frame:linear(spec.windows.frame),trim:linear(spec.trim||spec.windows.frame),
   shop:linear('#7d7a70'),band:linear(spec.ground?.band||'#2e3134'),groundFrame:linear(spec.ground?.frame||'#2b2d2f'),
   awning:linear(spec.ground?.awning||'#2b2d2f'),canopy:linear(spec.ground?.canopy||'#2b2d2f'),door:linear(spec.door||'#3a2a20'),lower:spec.wallLower&&linear(spec.wallLower),cornice:linear(spec.cornice||spec.trim||spec.wall)};
- c.plinth=linear(spec.plinth||'#5d5a55');c.rail=linear(spec.rail||'#3a3f42');c.surround=linear(spec.surround||spec.cornice||spec.trim||spec.windows.frame);
+ c.plinth=linear(spec.plinth||'#5d5a55');c.rail=linear(spec.rail||'#3a3f42');c.shutter=spec.windows.shutters?linear(spec.windows.shutters):null;c.surround=linear(spec.surround||spec.cornice||spec.trim||spec.windows.frame);
  const G=new Batch(),B=new Batch();let windows=0;c.signs=[];
  for(const face of faces){
   const F=new FaceFrame(face),width=F.s1-F.s0,height=F.y1-F.y0;

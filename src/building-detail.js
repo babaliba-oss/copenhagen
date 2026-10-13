@@ -109,7 +109,7 @@ export function createModelledBuilding(array,part,pixels,texture=null,includeHer
   if(corridor){f.windows=[];f.color=hexRGB(front?.wall||corridor.wall);}
   else if(described){f.windows=[];f.color=hexRGB(described.wall);}
   else if(clean)f.windows=[];
-  else if(!pixels&&!f.windows.length&&![23,1707,324].includes(part.ratu)){
+  else if(!pixels&&!f.windows.length&&!part.noFacade&&![23,1707,324].includes(part.ratu)){
    f.windows=provisionalWindows(f);if(f.windows.length){provisional=true;f.color=[.73,.72,.67];}
   }
   // Untextured meshes from a city's official model can carry their own wall and roof colours.

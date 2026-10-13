@@ -124,7 +124,10 @@ function buildingSite(r=17,h=13){
  for(let k=0;k<4;k++)p.push(bx(2.2,.9,1.2,r+3+(k%2)*2.4,.45+Math.floor(k/2)*.9,-10,STONE));
  return mergeGeometries(p);
 }
-export const HIDE_1760=['kk-osm-way-25451190']; // today's Vor Frue (1829) stands where the Gothic church was
+// Buildings that did not exist in 1760: today's Vor Frue (1829, the Gothic church is drawn instead), Jerusalemskirken
+// (1896), the English Church (1887), Sankt Pauls (1877), Kong Haakons Kirke (1958), Alexander Nevsky (1883),
+// Sankt Ansgar (1842) and Ny Christiansborg (modern).
+export const HIDE_1760=['kk-osm-way-25451190','kk-osm-way-134471983','kk-osm-way-36790389','kk-osm-way-26604470','kk-osm-way-89752515','kk-osm-way-55601707','kk-osm-way-133986381','kk-osm-relation-8833442'];
 export function createLandmarks({era=null,mills=[],anchors={}}={}){
  const group=new THREE.Group();group.name='Hand-built landmarks';
  const mat=new THREE.MeshStandardMaterial({vertexColors:true,roughness:.45,metalness:.35});
