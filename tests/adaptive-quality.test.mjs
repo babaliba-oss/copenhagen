@@ -32,3 +32,16 @@ test('capture lock holds a fixed scale through slow frames and unlock resumes ad
  let changed=false;for(let i=0;i<600;i++)changed=r.update(40,1/30)||changed;
  assert.ok(changed&&r.scale<1.5,'adapts again after unlock');
 });
+
+test('a sustained run of very slow frames (8 fps) still lowers the resolution',()=>{
+ const q=createAdaptiveResolution({max:1.5,min:.75});run(q,16.7,2);
+ run(q,125,6);assert.ok(q.scale<1.5,`scale ${q.scale}`);
+});
+import {createQualityGovernor} from '../src/quality-governor.js';
+test('quality governor drops extras one at a time only while the lowest resolution is still slow',()=>{
+ const done=[];const g=createQualityGovernor([()=>done.push('ao'),()=>done.push('bloom'),()=>done.push('msaa')]);
+ for(let i=0;i<600;i++)g.update(1/60,{atMin:false,smoothed:40});assert.deepEqual(done,[]);
+ for(let i=0;i<600;i++)g.update(1/60,{atMin:true,smoothed:12});assert.deepEqual(done,[]);
+ for(let i=0;i<300;i++)g.update(1/60,{atMin:true,smoothed:40});assert.deepEqual(done,['ao']);
+ for(let i=0;i<3000;i++)g.update(1/60,{atMin:true,smoothed:40});assert.deepEqual(done,['ao','bloom','msaa']);assert.equal(g.level,3);
+});

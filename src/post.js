@@ -173,6 +173,8 @@ export function createPostPipeline(renderer,{samples=4,ao=true,bloom=true}={}){
  const brightMaterial=material(BRIGHT_FRAGMENT,{uScene:{value:scene.texture},uTexel:{value:new THREE.Vector2()},uThreshold:{value:GRADE_DEFAULTS.bloomThreshold},uKnee:{value:.35}});
  const blurMaterial=material(BLUR_FRAGMENT,{uTex:{value:null},uDir:{value:new THREE.Vector2()}});
  const white=new THREE.DataTexture(new Uint8Array([255,255,255,255]),1,1);white.needsUpdate=true;
+ // AO off: full light (x=1) and no wet-sky mirror (y=0; a white texture would wash the whole frame with sky)
+ const noAO=new THREE.DataTexture(new Uint8Array([255,0,0,255]),1,1);noAO.needsUpdate=true;
  const black=new THREE.DataTexture(new Uint8Array([0,0,0,255]),1,1);black.needsUpdate=true;
  const compositeMaterial=material(COMPOSITE_FRAGMENT,{
   uScene:{value:scene.texture},uAO:{value:aoBlurred.texture},uBloom:{value:blurA.texture},
@@ -217,7 +219,7 @@ export function createPostPipeline(renderer,{samples=4,ao=true,bloom=true}={}){
    aoBlurMaterial.uniforms.uNear.value=camera.near;aoBlurMaterial.uniforms.uFar.value=camera.far;
    pass(aoRaw,aoMaterial);pass(aoBlurred,aoBlurMaterial);
    grade.uAO.value=aoBlurred.texture;
-  }else grade.uAO.value=white;
+  }else grade.uAO.value=noAO;
   if(options.bloom){
    pass(bright,brightMaterial);
    blurMaterial.uniforms.uTex.value=bright.texture;blurMaterial.uniforms.uDir.value.set(1/bright.width,0);pass(blurA,blurMaterial);
@@ -251,7 +253,7 @@ export function createPostPipeline(renderer,{samples=4,ao=true,bloom=true}={}){
   renderer.info.autoReset=previousAutoReset;
   for(const t of [scene,aoRaw,aoBlurred,bright,blurA])t.dispose();
   for(const m of [aoMaterial,aoBlurMaterial,brightMaterial,blurMaterial,compositeMaterial])m.dispose();
-  quad.dispose();white.dispose();black.dispose();
+  quad.dispose();white.dispose();black.dispose();noAO.dispose();
  }
  return {render,resize,setGrade,options,dispose,targets:{scene,aoRaw,aoBlurred,bright,blurA},materials:{aoMaterial,aoBlurMaterial,brightMaterial,blurMaterial,compositeMaterial}};
 }

@@ -189,7 +189,7 @@ export function createBreakableSigns(name='Breakable signs',{register=true}={}){
  }
  const system={group,bodies:posts,post,tag,add,attach,material,mesh,finish,step,update,
   resetAll(){posts.forEach(reset);update();},
-  snapshot:()=>({count:posts.length,knocked:posts.filter(s=>s.knocked).length,hits,bent:posts.filter(s=>s.state==='bent').length,broken:posts.filter(s=>s.state==='flying'||s.state==='down').length}),
+  snapshot:()=>{const live=[...active];return {count:posts.length,knocked:live.filter(s=>s.knocked).length,hits,bent:live.filter(s=>s.state==='bent').length,broken:live.filter(s=>s.state==='flying'||s.state==='down').length};}, // only stepped posts can be anything but upright
   dispose(){SYSTEMS.delete(system);}};
  if(register)SYSTEMS.add(system);
  return system;
