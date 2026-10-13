@@ -23,7 +23,7 @@ export function createBigMap({base,view,landmarks,player,targets,route,onTravel,
   const r=route();if(r?.length>1){ctx.strokeStyle='#7b3fe4';ctx.lineWidth=5*dpr;ctx.lineJoin=ctx.lineCap='round';ctx.beginPath();r.forEach((p,i)=>{const [x,y]=toScreen(...(Array.isArray(p)?p:[p.x,p.z]));i?ctx.lineTo(x,y):ctx.moveTo(x,y);});ctx.stroke();}
   ctx.textAlign='center';
   const taken=[];
-  for(const l of [...landmarks()].sort((a,b)=>(a===hover)-(b===hover)).reverse()){const [x,y]=toScreen(l.x,l.z),h=hover===l;
+  for(const l of [...landmarks()].sort((a,b)=>(a===hover)-(b===hover))){const [x,y]=toScreen(l.x,l.z),h=hover===l;
    ctx.font=`${h?700:600} ${(h?15:12.5)*dpr}px Manrope,sans-serif`;const tw=ctx.measureText(l.name).width,box=[x-tw/2-4,y-26*dpr,x+tw/2+4,y-4*dpr];
    const clash=taken.some(b=>box[0]<b[2]&&box[2]>b[0]&&box[1]<b[3]&&box[3]>b[1]);taken.push(box);
    ctx.fillStyle=h?'#d95e3b':'#2b2d2f';ctx.strokeStyle='#fff';ctx.lineWidth=2*dpr;ctx.beginPath();ctx.arc(x,y,(h?7:5)*dpr,0,Math.PI*2);ctx.fill();ctx.stroke();

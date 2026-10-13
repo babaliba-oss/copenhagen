@@ -21,7 +21,7 @@ function horse(x,z,coat){
  const dark='#1e1712',muzzle='#2a221c';
  const body=[cap(.31,.95,x,1.33,z,coat,Math.PI/2,.88),sph(.34,x,1.37,z-.6,coat,.85,1,.95),sph(.35,x,1.39,z+.58,coat,.9,.95,1),
   paint(new THREE.CylinderGeometry(.15,.25,.9,10).rotateX(-.62).translate(x,1.8,z-.93),coat),
-  cap(.12,.42,x,2.0,z-1.33,coat,-1.15),sph(.11,x,1.86,z-1.55,muzzle,.9,.85,1.1),
+  cap(.12,.42,x,2.0,z-1.33,coat,1.15),sph(.11,x,1.86,z-1.55,muzzle,.9,.85,1.1),
   paint(new THREE.ConeGeometry(.045,.14,5).translate(x-.06,2.27,z-1.2),coat),paint(new THREE.ConeGeometry(.045,.14,5).translate(x+.06,2.27,z-1.2),coat),
   box(.05,.6,.1,x,1.95,z-.88,dark,-.62), // mane
   paint(new THREE.CylinderGeometry(.04,.11,.8,6).rotateX(.3).translate(x,1.12,z+1.02),dark), // tail

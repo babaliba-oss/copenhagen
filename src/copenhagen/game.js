@@ -64,7 +64,7 @@ function beam(scene,color,h=80){
  g.add(col,ring);g.visible=false;scene.add(g);return g;
 }
 
-export function createCopenhagenGame({scene,city,mobilityData,cityData,toast}){
+export function createCopenhagenGame({scene,city,mobilityData,cityData,toast,soundOn=()=>true}){
  const proj=proj4('EPSG:4326',city.projection);
  const ll=([lat,lon])=>{const [x,y]=proj.forward([lon,lat]);return [x,-y];};
  const walk=makeGraph(mobilityData.walks,true),road=makeGraph(mobilityData.roads,false);
@@ -91,7 +91,7 @@ export function createCopenhagenGame({scene,city,mobilityData,cityData,toast}){
  // ---- big moments: GTA-style banner with a short chime ----
  const ban=document.createElement('div');ban.id='cph-banner';ban.hidden=true;document.body.append(ban);let banT=0;
  let ac=null;
- function chime(kind){try{ac??=new (window.AudioContext||window.webkitAudioContext)();const t0=ac.currentTime,notes=kind==='fail'?[392,330,262]:kind==='rank'?[523,659,784,1047]:[523,659,784];
+ function chime(kind){if(!soundOn())return;try{ac??=new (window.AudioContext||window.webkitAudioContext)();const t0=ac.currentTime,notes=kind==='fail'?[392,330,262]:kind==='rank'?[523,659,784,1047]:[523,659,784];
   notes.forEach((f,i)=>{const o=ac.createOscillator(),g=ac.createGain();o.type='triangle';o.frequency.value=f;g.gain.setValueAtTime(0,t0+i*.11);g.gain.linearRampToValueAtTime(.09,t0+i*.11+.02);g.gain.exponentialRampToValueAtTime(.001,t0+i*.11+.5);o.connect(g).connect(ac.destination);o.start(t0+i*.11);o.stop(t0+i*.11+.55);});}catch{}}
  function banner(title,sub='',kind='pass'){ban.className='cph-banner-'+kind;ban.innerHTML=`<h2>${esc(title)}</h2>${sub?`<p>${sub}</p>`:''}`;ban.hidden=false;ban.style.animation='none';void ban.offsetWidth;ban.style.animation='';clearTimeout(banT);banT=setTimeout(()=>{ban.hidden=true;},kind==='rank'?4600:3400);chime(kind);}
  // ---- courier ranks: deliveries move you up; every rank pays 10% more ----
@@ -138,7 +138,7 @@ export function createCopenhagenGame({scene,city,mobilityData,cityData,toast}){
   const prev=save.best[r.id],best=prev==null||t<prev;if(best)save.best[r.id]=t;
   if(medal<3){const pay=Math.round(r.pay*[1,.6,.35][medal]*payBonus());save.money+=pay;banner(`${names[medal]}!`,`${esc(r.title)} · ${fmtT(t)}${best?' · new best':''} · +${fmtKr(pay)} ${UNIT}`,medal===0?'rank':'pass');}
   else banner('Too slow',`${esc(r.title)} · ${fmtT(t)} · bronze is ${fmtT(r.par[2])}`,'fail');
-  race=null;persist();routeFor=null;}
+  race=null;races.forEach(r=>r.armed=false);persist();routeFor=null;}
 
  // ---- sagas ----
  const frontier=()=>{const a=save.active;if(!a)return [];const q=byId[a.id],i=q.steps.findIndex((s,k)=>!a.done.includes(k));if(i<0)return [];if(!q.steps[i].any)return [i];const out=[];for(let k=i;k<q.steps.length&&q.steps[k].any;k++)if(!a.done.includes(k))out.push(k);return out;};
@@ -302,7 +302,7 @@ export function createCopenhagenGame({scene,city,mobilityData,cityData,toast}){
   if(loreOpen){if(['Enter','Space','Escape','KeyG'].includes(code)){nextLore();return true;}return true;}
   if(tmapOpen){if(['KeyK','Escape','Enter'].includes(code))closeTreasure();return true;}
   if(journalOpen){if(code==='KeyJ'||code==='Escape')toggleJournal(false);return true;}
-  if(code==='KeyX'&&race){banner('Race abandoned',esc(race.r.title),'fail');race=null;routeFor=null;return true;}
+  if(code==='KeyX'&&race){banner('Race abandoned',esc(race.r.title),'fail');race=null;races.forEach(r=>r.armed=false);routeFor=null;return true;}
   if(code==='KeyJ'){toggleJournal(true);return true;}
   if(code==='KeyK'){showTreasure();return true;}
   return false;

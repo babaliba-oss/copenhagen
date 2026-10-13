@@ -24,7 +24,7 @@ const PROPS={
 const ANIMALS={
  goose:()=>mergeGeometries([paint(new THREE.SphereGeometry(.18,8,6).scale(1.4,1,1).translate(0,.25,0),'#efece4'),cyl(.04,.05,.28,.2,.42,0,'#efece4',6),box(.1,.05,.05,.27,.56,0,'#e08a2a')]),
  hen:()=>mergeGeometries([paint(new THREE.SphereGeometry(.14,8,6).scale(1.3,1,1).translate(0,.2,0),'#8a5a32'),paint(new THREE.SphereGeometry(.07,6,5).translate(.15,.34,0),'#8a5a32'),box(.04,.06,.02,.17,.42,0,'#c8202a')]),
- pig:()=>mergeGeometries([paint(new THREE.SphereGeometry(.35,10,8).scale(1.5,.9,.9).translate(0,.45,0),'#e2a99a'),paint(new THREE.SphereGeometry(.18,8,6).translate(.55,.5,0),'#e2a99a'),cyl(.08,.08,.08,.72,.5,0,'#c98a80',8).rotateZ(Math.PI/2)])};
+ pig:()=>mergeGeometries([paint(new THREE.SphereGeometry(.35,10,8).scale(1.5,.9,.9).translate(0,.45,0),'#e2a99a'),paint(new THREE.SphereGeometry(.18,8,6).translate(.55,.5,0),'#e2a99a'),paint(new THREE.CylinderGeometry(.08,.08,.08,8).rotateZ(Math.PI/2).translate(.72,.5,0),'#c98a80')])};
 const rnd=seed=>()=>{seed=(seed*16807)%2147483647;return (seed-1)/2147483646;};
 
 export function createPeriodLife({city,world,water=[],squares=[],gates=[]}){
@@ -73,7 +73,7 @@ export function createPeriodLife({city,world,water=[],squares=[],gates=[]}){
  for(const kind of Object.keys(ANIMALS)){const fl=animals.filter(a=>a.kind===kind);if(kind==='pig')for(const sq of squares.slice(0,6))fl.push({kind:'pig',x:sq.x+(r()-.5)*24,z:sq.z+(r()-.5)*24,n:1+Math.floor(r()*2)});
   const members=[];for(const f of fl)for(let i=0;i<f.n;i++){const x=f.x+(r()-.5)*4,z=f.z+(r()-.5)*4;if(free(x,z,.3))members.push({hx:x,hz:z,x,z,a:r()*6.28,ph:r()*10});}
   if(!members.length)continue;const im=new THREE.InstancedMesh(ANIMALS[kind](),mat,members.length);im.name=`1760 ${kind}`;im.castShadow=true;im.frustumCulled=false;group.add(im);flocks.push({im,members,kind});}
- let t=0,acc=0;
+ let t=0,acc=0;const EU=new THREE.Euler();
  function update(dt,player){
   t+=dt;acc+=dt;for(const b of batches)b.update(dt,player);
   if(acc<.05)return;acc=0;
@@ -82,9 +82,9 @@ export function createPeriodLife({city,world,water=[],squares=[],gates=[]}){
    f.members.forEach((m,i)=>{const near=!player||Math.hypot(m.x-player.x,m.z-player.z)<160;if(near){any=true;
      // wander: a slow circle around home, a peck now and then
      m.a+=(Math.sin(t*.3+m.ph)*.6)*.05;const nx=m.x+Math.cos(m.a)*sp*.05,nz=m.z+Math.sin(m.a)*sp*.05;
-     if(Math.hypot(nx-m.hx,nz-m.hz)>3.5||!free(nx,nz,.2))m.a+=Math.PI*.7;else{m.x=nx;m.z=nz;}}
+     if(Math.hypot(nx-m.hx,nz-m.hz)>3.5||world.buildings.at(nx,nz))m.a+=Math.PI*.7;else{m.x=nx;m.z=nz;}}
     const peck=f.kind==='pig'?0:Math.max(0,Math.sin(t*3+m.ph))*.35;
-    f.im.setMatrixAt(i,m4.compose(v.set(m.x,groundAt(m.x,m.z),m.z),q.setFromEuler(new THREE.Euler(0,-m.a,-peck)),one));});
+    f.im.setMatrixAt(i,m4.compose(v.set(m.x,groundAt(m.x,m.z),m.z),q.setFromEuler(EU.set(0,-m.a,-peck)),one));});
    f.im.visible=any;if(any)f.im.instanceMatrix.needsUpdate=true;}
  }
  const people=[...crowds.values()].reduce((n,l)=>n+l.length,0);

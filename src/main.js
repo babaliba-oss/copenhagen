@@ -686,6 +686,7 @@ for(const dialog of document.querySelectorAll('dialog')){
  });
 }
 window.addEventListener('keyup',e=>{if(e.code==='KeyB')soundscape?.horn(false);});
+window.addEventListener('blur',()=>soundscape?.horn(false));document.addEventListener('visibilitychange',()=>soundscape?.horn(false));
 window.addEventListener('keydown',e=>{
  const pick=startPicker&&pickerStep(e.code,{ready:ready&&!gameIsStopped(),started,blocked:mapOpen||!!police?.busted});
  if(pick){e.preventDefault();if(!e.repeat)startPicker.step(pick);return;} // before the start ←/→ choose the place; afterwards they steer
@@ -1006,7 +1007,7 @@ async function boot(){
     // Copenhagen's game layer (src/copenhagen): jobs, GPS line, sagas and the characters who give them.
     // The characters are spread across the city, so the crowd's single-centre culling is overridden.
     if(city.era===1760&&!carriage){const starter=carGroup.children[0];if(starter){starter.traverse(m=>{if(m.isMesh)m.visible=false;});carriage=createCarriage();carriage.position.z=1.2;starter.add(carriage);}} // 1760: the player's car becomes a coach and horses
-    if(city.id.startsWith('copenhagen')){cph?.dispose?.();cph=createCopenhagenGame({scene,city,mobilityData,cityData:data,toast});const npcCentre={x:0,z:0},npc=createInstancedPeople(cph.people,{name:'Copenhagen characters',center:npcCentre});
+    if(city.id.startsWith('copenhagen')){cph?.dispose?.();cph=createCopenhagenGame({scene,city,mobilityData,cityData:data,toast,soundOn:()=>sound});const npcCentre={x:0,z:0},npc=createInstancedPeople(cph.people,{name:'Copenhagen characters',center:npcCentre});
      npc.update=(u=>(dt,player)=>{if(player){npcCentre.x=player.x;npcCentre.z=player.z;}u(dt,player);npc.group.visible=true;})(npc.update);cityModel.add(npc.group);marketLife={...life(),...npc,group:npc.group};detailPeople=npc.people;}
     harbour={group:new THREE.Group(),obstacles:[],knockables:null};knockables=combineKnockables([breakableSigns]); // traffic-signal posts bend when hit, in every city
     finale.zone=null; // station tram scheduling is Helsinki-specific
