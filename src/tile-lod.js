@@ -29,6 +29,7 @@ export function mergedShellRanges(parts){
 // (one texel per part) hides each part as its detailed building arrives, and dithers it while the chase
 // camera fades it. One draw per atlas instead of one per waiting building (500+ draws at Nyhavn).
 export function createShellMask(count){
+ if(count>256)console.warn(`Tile with ${count} parts: only the first 256 can hand over to detail cleanly`);
  // One float per part in a vec4[64] uniform (a tile holds at most 255 parts): no texture uploads, and the
  // uniform only re-sends when a value changes.
  const data=new Float32Array(256).fill(1);let shown=count;

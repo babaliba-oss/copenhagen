@@ -11,15 +11,16 @@ const cyl=(r0,r1,h,x,y,z,hex,seg=6)=>paint(new THREE.CylinderGeometry(r0,r1,h,se
 // A hull: a box with the bow pinched to a point and the bottom narrowed. Length along Z, bow at -Z. The top
 // `band` metres take a second colour (the painted strake under the gunwale on Nyhavn's wooden ships).
 function hull(w,h,len,hex,deck='#c9b48a',sheer=.15,band=null,bandH=.32){
- const g=new THREE.BoxGeometry(w,h,len,2,3,12),p=g.attributes.position;
+ const g=new THREE.BoxGeometry(w,h,len,2,band?2:3,12),p=g.attributes.position,eps=1e-4;
  for(let i=0;i<p.count;i++){let x=p.getX(i),y=p.getY(i),z=p.getZ(i);const t=(z+len/2)/len; // 0 bow, 1 stern
   const bow=t<.4?Math.sin(t/.4*Math.PI/2):1,stern=t>.85?1-(t-.85)/.15*.3:1;x*=Math.max(.02,bow)*stern;
-  const keel=(y+h/2)/h;x*=.45+.55*keel;if(band&&y<h/2&&y>-h/2)y=h/2-bandH; // middle row at the strake line
-  y+=sheer*Math.pow(1-t,3)*(y>-h/2?1:0);p.setXYZ(i,x,y,z);}
+  const top=y>h/2-eps,bottom=y<-h/2+eps;if(band&&!top&&!bottom)y=h/2-bandH; // the one middle row sits at the strake line
+  const keel=(y+h/2)/h;x*=.45+.55*keel;
+  if(!bottom)y+=sheer*Math.pow(1-t,3);p.setXYZ(i,x,y,z);}
  g.computeVertexNormals();const n=paint(g.translate(0,h/2-.3,0),hex);
  if(band){const c=new THREE.Color(band),col=n.attributes.color,pos=n.attributes.position;
   // per triangle: any face whose lowest corner is at or above the strake line takes the band colour
-  for(let i=0;i<pos.count;i+=3){const lo=Math.min(pos.getY(i),pos.getY(i+1),pos.getY(i+2));if(lo>h-.3-bandH-.05-1e-3)for(let k=0;k<3;k++)col.setXYZ(i+k,c.r,c.g,c.b);}}
+  const nm=n.attributes.normal;for(let i=0;i<pos.count;i+=3){const lo=Math.min(pos.getY(i),pos.getY(i+1),pos.getY(i+2));if(lo>h-.3-bandH-.05-1e-3&&nm.getY(i)<.7)for(let k=0;k<3;k++)col.setXYZ(i+k,c.r,c.g,c.b);}}
  return [n,box(w*.84,.05,len*.62,0,h-.3,len*.16,deck)];
 }
 // A thin round spar between two points (masts, booms, stays, shrouds).

@@ -401,7 +401,7 @@ async function buildRoof(t,at){
   // Far level: one merged shell per atlas. Near level: per-part shells until the worker's details replace them.
   const mask=createShellMask(parts.length);group.add(...createMergedShells(a,parts,textures,mask));
   // Waiting parts keep their own chase-camera fade, written into the mask (see the occlusion pass).
-  const waiting=parts.map((p,i)=>({i,id:p.id,occlusion:{opacity:1,clearTime:1},box:new THREE.Box3(new THREE.Vector3(p.bbox[0]-.5,0,p.bbox[1]-.5),new THREE.Vector3(p.bbox[2]+.5,p.height+.5,p.bbox[3]+.5))}));
+  const waiting=parts.map((p,i)=>({i,id:p.id,start:p.start,occlusion:{opacity:1,clearTime:1},box:new THREE.Box3(new THREE.Vector3(p.bbox[0]-.5,0,p.bbox[1]-.5),new THREE.Vector3(p.bbox[2]+.5,p.height+.5,p.bbox[3]+.5))}));
   Object.assign(group.userData,{textures,windows:0,tile:t,mask,waiting,pending:{array:a,parts,images:new Map([...images].map(([f,i])=>[f,i.bytes]))}});
   freezeTileGroup(group);applyTileLod(group,tileLevel(null,tileDistance(t,at)),at);loadedTiles.set(t.file,group);
   // One atlas upload per frame, then the tile itself: twenty tiles landing after a teleport no longer upload in one frame.
@@ -421,14 +421,14 @@ async function detailTile(group){
  if(loadedTiles.get(t.file)!==group)return;
  // Nearest buildings land first; each lands on its own (no walk over the whole tile).
  const dist=b=>{const q=b.part.bbox;return Math.hypot((q[0]+q[2])/2-focus.x,(q[1]+q[3])/2-focus.z);};
- const shells=new Map(group.userData.waiting.map(w=>[w.id,w]));
+ const shells=new Map(group.userData.waiting.map(w=>[w.start,w])); // ids repeat within a tile; vertex starts do not
  for(const b of buildings)uploads.push(()=>{
   if(loadedTiles.get(t.file)!==group)return;
   const meshes=materialiseBuilding(b,textures);for(const m of meshes){freezeMesh(m);applyMeshLod(m,group.userData.level,focus);}
   // Shaders compile in the background first (parallel compile where the GPU offers it); a variant never seen
   // before no longer stalls a frame, the building just lands a moment later.
   const land=()=>{if(loadedTiles.get(t.file)!==group){for(const m of meshes){m.geometry.dispose();disposeMaterial(m.material);}return;}
-   const w=shells.get(b.part.id);if(w){group.userData.mask.set(w.i,0);w.landed=true;group.userData.waiting=group.userData.waiting.filter(x=>x!==w);}
+   const w=shells.get(b.part.start);if(w){group.userData.mask.set(w.i,0);w.landed=true;group.userData.waiting=group.userData.waiting.filter(x=>x!==w);}
    group.add(...meshes);group.userData.windows+=b.windows;
    if(!group.userData.mask.shown)for(const m of group.children)if(m.userData.lod)applyMeshLod(m,group.userData.level,focus);};
   const tmp=new THREE.Group();tmp.add(...meshes);
@@ -520,7 +520,7 @@ async function runTilePass(){
  await pool(near,4,loadRoof);
  for(const t of roofIndex.tiles){const m=loadedTiles.get(t.file);if(!m)continue;
   const d=tileDistance(t);
-  if(d>1000){detailScheduler.cancel(t.file);cityModel.remove(m);m.children.forEach(c=>{c.geometry.dispose();disposeMaterial(c.material);c.customDepthMaterial?.dispose();});m.userData.textures.forEach(x=>{x.image?.close?.();x.dispose();});loadedTiles.delete(t.file);continue;}
+  if(d>1000){detailScheduler.cancel(t.file);cityModel.remove(m);m.children.forEach(c=>{c.geometry.dispose();disposeMaterial(c.material);disposeMaterial(c.customDepthMaterial);});m.userData.textures.forEach(x=>{x.image?.close?.();x.dispose();});loadedTiles.delete(t.file);continue;}
   const level=applyTileLod(m,tileLevel(m.userData.level,d),focus);
   // Only near-level tiles are worth the worker's time, nearest first.
   if(level==='near'&&m.userData.pending)detailScheduler.request(t.file,priority(t),()=>detailTile(m),handleTileError);
