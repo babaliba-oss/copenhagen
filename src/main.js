@@ -74,7 +74,7 @@ import {createCarriage,createCarriageTraffic} from './copenhagen/carriage.js';
 import {createParkedCars} from './copenhagen/parked-cars.js';
 import {createRails} from './copenhagen/rails.js';
 import {createBoats} from './copenhagen/boats.js';
-import {createLandmarks} from './copenhagen/landmarks.js';
+import {createLandmarks,HIDE_1760} from './copenhagen/landmarks.js';
 import {CityCyclists} from './copenhagen/city-cyclists.js';
 import {createTrains} from './copenhagen/trains.js';
 import {createCafes} from './copenhagen/cafes.js';
@@ -874,7 +874,7 @@ requestAnimationFrame(frame);
 async function boot(){
  try{
    try{registerCities((await json('/cities/index.json')).cities);}catch{} // community-built cities
-   city=useCity(selectCity(location.search));if(city.scenery!=='helsinki')for(const m of [ground.material,surfaceMaterial]){m.defines={...m.defines,NO_PORT_YARD:''};m.needsUpdate=true;}if(city.id==='copenhagen'){ground.material.defines={...ground.material.defines,URBAN_GROUND:''};ground.material.needsUpdate=true;} /* unmapped ground in the city is paving, not grass: parks and lawns are mapped */ // Helsinki's lower port yard cut-out
+   city=useCity(selectCity(location.search));if(city.scenery!=='helsinki')for(const m of [ground.material,surfaceMaterial]){m.defines={...m.defines,NO_PORT_YARD:''};m.needsUpdate=true;}if(city.era===1760)for(const id of HIDE_1760)placeHidden.add(id);if(city.id==='copenhagen'){ground.material.defines={...ground.material.defines,URBAN_GROUND:''};ground.material.needsUpdate=true;} /* unmapped ground in the city is paving, not grass: parks and lawns are mapped */ // Helsinki's lower port yard cut-out
    if(city.id==='copenhagen')STARTER_VISUALS.bike={kind:'ladcykel',color:'#26302b'};if(city.era===1760){STARTER_VISUALS.none=['bike','scooter'];PERSON_PERIOD.year=1760;document.body.classList.add('era-1760');}updateWorldhoodBrand(city);setPlayableRadius(city.radius||2000);
    const helsinki=city.scenery==='helsinki';
    if(!helsinki)finale.zone=null; // station tram scheduling belongs to Helsinki; pursuit rules are shared

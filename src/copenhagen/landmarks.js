@@ -92,6 +92,39 @@ function tivoli(add,mat,spinners){
  }
  return T;
 }
+// ---- 1760 only: the churches and building site the city model cannot know ----
+const BRICK='#8e4a38',TILE='#6b3428',PITCH='#2f2c2a';
+const prism=(len,w,h,x,y,z,hex)=>{const sh=new THREE.Shape();sh.moveTo(-w/2,0);sh.lineTo(0,h);sh.lineTo(w/2,0);sh.closePath();const g=new THREE.ExtrudeGeometry(sh,{depth:len,bevelEnabled:false});g.translate(0,0,-len/2);g.rotateY(Math.PI/2);return paint(g.translate(x,y,z),hex);};
+const bx=(w,h,d,x,y,z,hex)=>paint(new THREE.BoxGeometry(w,h,d).translate(x,y,z),hex);
+// Gothic hall church with a west tower and a tall copper spire (Vor Frue before 1807). Local x = nave axis, tower at -x.
+function gothicChurch({len=64,width=27,eave=19,tower=13,towerH=50,spire=110}={}){
+ const p=[bx(len,eave,width,0,eave/2,0,BRICK),prism(len,width+1,15,0,eave,0,TILE),bx(16,eave-3,width*.62,len/2+8,(eave-3)/2,0,BRICK),prism(16,width*.62+1,11,len/2+8,eave-3,0,TILE)];
+ const tx=-len/2-tower/2+1;p.push(bx(tower,towerH,tower,tx,towerH/2,0,BRICK),bx(tower+.8,1.2,tower+.8,tx,towerH-.6,0,STONE));
+ p.push(paint(new THREE.ConeGeometry(tower*.48,spire-towerH,8).translate(tx,towerH+(spire-towerH)/2,0),COPPER));
+ for(const [dx,dz] of [[-1,-1],[1,-1],[-1,1],[1,1]])p.push(paint(new THREE.ConeGeometry(.9,7,6).translate(tx+dx*(tower/2-.6),towerH+3.5,dz*(tower/2-.6)),COPPER));
+ p.push(at(paint(new THREE.SphereGeometry(.7,10,8),GOLD),tx,spire+.4,0),bx(.12,3,.12,tx,spire+2.2,0,GOLD));
+ // tall pointed windows along the nave (dark recesses)
+ for(let k=-2;k<=2;k++)for(const sz of [-1,1])p.push(bx(3,9,.3,k*11,9,sz*(width/2+.1),'#2a2a2c'));
+ return mergeGeometries(p);
+}
+// A free-standing church tower with spire (Nikolaj before the fire of 1795).
+function spireTower({w=11,h=42,spire=92}={}){
+ return mergeGeometries([bx(w,h,w,0,h/2,0,BRICK),bx(w+.8,1,w+.8,0,h-.5,0,STONE),bx(w*.62,8,w*.62,0,h+4,0,COPPER),paint(new THREE.ConeGeometry(w*.36,spire-h-8,8).translate(0,h+8+(spire-h-8)/2,0),COPPER),at(paint(new THREE.SphereGeometry(.55,10,8),GOLD),0,spire+.3,0)]);
+}
+// Frederik's Church as a building site (begun 1749, stopped 1770): scaffold ring, treadwheel crane, stone stacks.
+function buildingSite(r=17,h=13){
+ const p=[];const wood='#7a5a3a';
+ for(let k=0;k<28;k++){const a=k/28*Math.PI*2;for(const rr of [r,r+1.6])p.push(bx(.18,h,.18,Math.cos(a)*rr,h/2,Math.sin(a)*rr,wood));}
+ for(const y of [3.5,7,10.5,h-.2])for(let k=0;k<28;k++){const a=(k+.5)/28*Math.PI*2,c=2*Math.PI*(r+.8)/28;const g=new THREE.BoxGeometry(c+.2,.12,1.8);g.rotateY(-a+Math.PI/2);p.push(paint(g.translate(Math.cos(a)*(r+.8),y,Math.sin(a)*(r+.8)),wood));}
+ // treadwheel crane outside the ring
+ const cx=r+9;p.push(paint(new THREE.TorusGeometry(3,.18,6,20).translate(cx,3.4,0),wood),paint(new THREE.TorusGeometry(3,.18,6,20).translate(cx,3.4,1.4),wood));
+ for(let k=0;k<8;k++){const a=k/8*Math.PI*2;p.push(paint(new THREE.BoxGeometry(.12,.12,1.4).translate(cx+Math.cos(a)*3,3.4+Math.sin(a)*3,.7),wood));}
+ p.push(bx(.4,9,.4,cx,4.5,.7,wood));const jib=new THREE.BoxGeometry(.35,.35,12);jib.rotateX(-.55);p.push(paint(jib.translate(cx-3,10,.7),wood));
+ for(let k=0;k<5;k++)p.push(bx(2.2,.9,1.2,-r-7+(k%3)*2.4,.45+Math.floor(k/3)*.9,8+(k%2)*.4,STONE));
+ for(let k=0;k<4;k++)p.push(bx(2.2,.9,1.2,r+3+(k%2)*2.4,.45+Math.floor(k/2)*.9,-10,STONE));
+ return mergeGeometries(p);
+}
+export const HIDE_1760=['kk-osm-way-25451190']; // today's Vor Frue (1829) stands where the Gothic church was
 export function createLandmarks({era=null,mills=[],anchors={}}={}){
  const group=new THREE.Group();group.name='Hand-built landmarks';
  const mat=new THREE.MeshStandardMaterial({vertexColors:true,roughness:.45,metalness:.35});
@@ -109,6 +142,11 @@ export function createLandmarks({era=null,mills=[],anchors={}}={}){
  }
  add(rider(3.2,era===1760?'#b8a46a':'#55715f'),603.9,16.7,{rot:.6}); // Christian V (1688; gilded lead until 1940s)
  for(const [x,z,h] of flagTops){const pole=add(mergeGeometries([paint(new THREE.CylinderGeometry(.08,.1,8,6).translate(0,4,0),'#e9e6dc')]),x,z,{y:groundAt(x,z)+h});const f=flag();f.position.set(x,groundAt(x,z)+h+7.2,z);group.add(f);flags.push(f);}
+ if(era===1760){
+  add(gothicChurch(),-205,66.3,{rot:.318}); // Vor Frue (old church, spire to ~110 m; lost in 1807)
+  add(spireTower(),336,158); // Sankt Nikolaj tower and spire (lost in 1795)
+  if(anchors.marmorkirken)add(buildingSite(),anchors.marmorkirken[0],anchors.marmorkirken[2]); // Frederik's Church, building site
+ }
  if(era===1760)for(const [x,z] of mills){add(windmill(),x,z,{y:groundAt(x,z)+7});const r=new THREE.Mesh(sails(),mat);r.position.set(x,groundAt(x,z)+14.6,z+2.3);group.add(r);rotors.push(r);}
  let t=0,acc=0;
  return {group,update(dt){t+=dt;acc+=dt;for(const r of rotors)r.rotation.z-=dt*.6;for(const sp of spinners){if(sp.axis==='z')sp.m.rotation.z+=dt*sp.rate;else sp.m.rotation.y+=dt*sp.rate;}if(acc>.05){acc=0;for(const f of flags)f.userData.wave?.(t);}}};
