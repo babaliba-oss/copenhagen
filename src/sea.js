@@ -165,7 +165,7 @@ export function createSea(water,land={},{helsinkiHarbour=true,groundExtent=0}={}
  if(geometry.attributes.position.count){
   // Split into 400 m cells so the quays behind the camera are frustum-culled (one city-wide mesh never is).
   const quayMaterial=new THREE.MeshStandardMaterial({vertexColors:true,roughness:.9,side:THREE.DoubleSide});
-  for(const g of splitByCell(drapeGeometry(geometry),400)){const quay=new THREE.Mesh(g,quayMaterial);quay.name='Granite quay walls';quay.receiveShadow=true;group.add(quay);}
+  for(const g of splitByCell(drapeGeometry(geometry,{maxEdge:10}),700)){const quay=new THREE.Mesh(g,quayMaterial);quay.name='Granite quay walls';quay.receiveShadow=true;group.add(quay);}
   const shade=new THREE.Mesh(drapeGeometry(skirt,{water:true,lift:-WATER_LEVEL-.1}),new THREE.MeshBasicMaterial({color:'#ffffff',vertexColors:true,transparent:true,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-1,polygonOffsetUnits:-2}));
   shade.name='Quay shade on water';shade.renderOrder=1;group.add(shade);
  }

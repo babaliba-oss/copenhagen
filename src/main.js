@@ -927,7 +927,7 @@ async function boot(){
    // ~0.375 px per metre, as before, whatever the map frame size.
    mapCache.width=mapCache.height=Math.min(4096,Math.round(mapView.size*.375));
    // Hilly cities: everything below samples the shared height field; the flat ground plane gives way to a terrain mesh.
-   if(setTerrain(await terrainData)){surfaceMaterial.defines={...surfaceMaterial.defines,TERRAIN:''};surfaceMaterial.needsUpdate=true;ground.visible=false;cityModel.add(createTerrainGround(ground.material));}
+   if(setTerrain(await terrainData)){surfaceMaterial.defines={...surfaceMaterial.defines,TERRAIN:''};surfaceMaterial.needsUpdate=true;ground.visible=false;cityModel.add(createTerrainGround(ground.material,city.id.startsWith('copenhagen')?{cell:20,chunk:40}:undefined));}
    if((landcoverData.polygons||landcoverData.runs||[]).length)cityModel.add(settleObject(createLandcover(landcoverData)));
    sea=createSea(data.water,data,{helsinkiHarbour:helsinki});cityModel.add(sea.group);ground.geometry.dispose();ground.geometry=sea.groundGeometry;
    // Helsinki's hand-built scenery (landmarks, harbour, street life, signs). Other cities get the generic engine only.

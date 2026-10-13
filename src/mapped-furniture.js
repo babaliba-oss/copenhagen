@@ -199,7 +199,7 @@ export function createMappedFurniture(layer,{player=()=>null,mobility=()=>null,c
    box(w-.1,h-.35,.03,0,h/2+.1,-d/2+.06,'#a9c4cb'),box(.03,h-.35,d*.55,-w/2+.05,h/2+.1,-d*.2,'#a9c4cb'),box(.05,1.75,d*.62,w/2-.05,1.15,-d*.18,'#d8d3c4'),box(1.5,.06,.38,-.3,.47,-d/2+.3,'#5c4a3a'),box(.06,.45,.3,-.95,.23,-d/2+.3,'#2d3133'),box(.06,.45,.3,.35,.23,-d/2+.3,'#2d3133')]};
  // Bicycles standing in the racks (Copenhagen racks are rarely empty): a low-poly bike, two per occupied rack.
  {const racks=items.filter(i=>i.k==='bike-rack');if(racks.length){
-  const T=(r,x,z,c)=>{const g=new THREE.TorusGeometry(r,.025,3,10);g.rotateY(Math.PI/2);g.translate(x,r,z);return paint(g,c);};
+  const T=(r,x,z,c)=>{const g=new THREE.TorusGeometry(r,.025,3,8);g.rotateY(Math.PI/2);g.translate(x,r,z);return paint(g,c);};
   const bar=(a,b,c,r=.02)=>{const A=new THREE.Vector3(...a),B=new THREE.Vector3(...b),d=B.clone().sub(A),g=new THREE.CylinderGeometry(r,r,d.length(),4);g.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,1,0),d.normalize()));g.translate((A.x+B.x)/2,(A.y+B.y)/2,(A.z+B.z)/2);return paint(g,c);};
   const bikes=['#1d1f22','#2d4f7a','#7a2a20','#3f5d45','#c9c4b8'].map(c=>mergeGeometries([T(.33,0,-.55,'#1a1a1a'),T(.33,0,.55,'#1a1a1a'),bar([0,.36,.55],[0,.82,.22],c),bar([0,.36,.55],[0,.38,.05],c),bar([0,.82,.22],[0,.38,.05],c),bar([0,.38,.05],[0,.92,-.42],c),bar([0,.82,.22],[0,.92,-.42],c),bar([0,.92,-.42],[0,.36,-.55],c),bar([-.26,1.05,-.45],[.26,1.05,-.45],'#2a2a2a'),bar([0,.92,-.42],[0,1.05,-.45],'#555'),paint(new THREE.BoxGeometry(.12,.05,.26).translate(0,.92,.24),'#222')]));
   const lists=bikes.map(()=>[]);let n=0;
@@ -243,7 +243,8 @@ export function createMappedFurniture(layer,{player=()=>null,mobility=()=>null,c
  // Distance culling for post chunks; lenses follow the player.
  function update(){
   const p=player();updateLights(p);if(!p)return;
-  for(const c of chunks.values())c.group.visible=Math.hypot(c.centre[0]-p.x,c.centre[1]-p.z)<VIEW_RANGE+CHUNK*.71;
+  for(const c of chunks.values()){const d=Math.hypot(c.centre[0]-p.x,c.centre[1]-p.z);c.group.visible=d<VIEW_RANGE+CHUNK*.71;
+   if(c.group.visible)for(const m of c.group.children)if(m.name==='Parked bicycles')m.visible=d<170+CHUNK*.71;} // small and many: bikes stop at a shorter range
   updateLenses(p);
  }
  const counts={};for(const it of items)counts[it.k]=(counts[it.k]||0)+1;

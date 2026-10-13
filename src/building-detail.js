@@ -206,7 +206,10 @@ export function createModelledBuilding(array,part,pixels,texture=null,includeHer
   const relief=r.relief?mergeGeometries([r.relief,...plain]):(plain.length?mergeGeometries(plain):null);if(r.relief)r.relief.dispose();plain.forEach(g=>g.dispose());plain=[];
   const glassAll=r.glass?mergeGeometries([r.glass,...glass]):(glass.length?mergeGeometries(glass):null);if(r.glass)r.glass.dispose();glass.forEach(g=>g.dispose());glass=[];
   if(r.signs){const sm=new THREE.MeshStandardMaterial({roughness:.6});sm.userData.signs=true;mesh(r.signs,sm);meshes.at(-1).userData.role='facade-detail';}
-  for(const [g,mat] of [[glassAll,m.glass],[relief,m.relief]])if(g){g.computeBoundingSphere();mesh(g,mat);meshes.at(-1).userData.provisional=true;meshes.at(-1).userData.role='facade-detail';}else mat.dispose();
+  // Glass and relief in one mesh (one draw call per building); aGlass marks the glazing for its roughness and night glow.
+  const flag=(g,v)=>{if(g)g.setAttribute('aGlass',new THREE.BufferAttribute(new Float32Array(g.attributes.position.count).fill(v),1));return g;};
+  const parts=[flag(glassAll,1),flag(relief,0)].filter(Boolean);m.glass.dispose();m.relief.dispose();
+  if(parts.length){const g=parts.length>1?mergeGeometries(parts):parts[0];parts.forEach(x=>x!==g&&x.dispose());g.computeBoundingSphere();const mat=new THREE.MeshStandardMaterial({vertexColors:true,roughness:.78});mat.userData.facadeCombined=true;mesh(g,mat);meshes.at(-1).userData.provisional=true;meshes.at(-1).userData.role='facade-detail';}
  }
  if(plain.length){mesh(mergeGeometries(plain),new THREE.MeshStandardMaterial({vertexColors:true,roughness:.72,metalness:.12}));plain.forEach(g=>g.dispose());}
  if(glass.length){mesh(mergeGeometries(glass),new THREE.MeshStandardMaterial({vertexColors:true,roughness:.19,metalness:.55}));glass.forEach(g=>g.dispose());}
