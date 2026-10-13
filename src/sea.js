@@ -121,6 +121,15 @@ const kauppatoriBollards=(x,z)=>x>12&&x<300&&z>265&&z<545;
 // Lowered Baltic water on the municipal sea polygons, granite quay walls on
 // every shore edge that borders land, and the ground plane cut under the sea.
 // Three draw calls: water, quay walls (merged), transparent wall shade.
+function splitByCell(source,cell){
+ const g=source.index?source.toNonIndexed():source,pos=g.attributes.position,names=Object.keys(g.attributes),buckets=new Map();
+ for(let t=0;t<pos.count;t+=3){const x=(pos.getX(t)+pos.getX(t+1)+pos.getX(t+2))/3,z=(pos.getZ(t)+pos.getZ(t+1)+pos.getZ(t+2))/3,k=`${Math.floor(x/cell)},${Math.floor(z/cell)}`;if(!buckets.has(k))buckets.set(k,[]);buckets.get(k).push(t);}
+ const out=[];for(const tris of buckets.values()){const ng=new THREE.BufferGeometry();
+  for(const n of names){const a=g.attributes[n],arr=new a.array.constructor(tris.length*3*a.itemSize);let o=0;for(const t of tris)for(let v=0;v<3;v++)for(let c=0;c<a.itemSize;c++)arr[o++]=a.array[(t+v)*a.itemSize+c];ng.setAttribute(n,new THREE.BufferAttribute(arr,a.itemSize,a.normalized));}
+  ng.computeBoundingSphere();out.push(ng);}
+ if(g!==source)g.dispose();
+ return out;
+}
 export function createSea(water,land={},{helsinkiHarbour=true,groundExtent=0}={}){
  const group=new THREE.Group();group.name='Helsinki harbour water and quays';
  const time={value:0},geometries=[];
@@ -154,8 +163,9 @@ export function createSea(water,land={},{helsinkiHarbour=true,groundExtent=0}={}
  const edges=extractQuayEdges(water,land);
  const {geometry,skirt}=buildQuayGeometry(edges,helsinkiHarbour?{skipBollards:kauppatoriBollards,pontoons:[{x:ALLAS.x,z:ALLAS.z,w:81.9,d:42.9,yaw:ALLAS.yaw,top:-.2}]}:{});
  if(geometry.attributes.position.count){
-  const quay=new THREE.Mesh(drapeGeometry(geometry),new THREE.MeshStandardMaterial({vertexColors:true,roughness:.9,side:THREE.DoubleSide}));
-  quay.name='Granite quay walls';quay.receiveShadow=true;group.add(quay);
+  // Split into 400 m cells so the quays behind the camera are frustum-culled (one city-wide mesh never is).
+  const quayMaterial=new THREE.MeshStandardMaterial({vertexColors:true,roughness:.9,side:THREE.DoubleSide});
+  for(const g of splitByCell(drapeGeometry(geometry),400)){const quay=new THREE.Mesh(g,quayMaterial);quay.name='Granite quay walls';quay.receiveShadow=true;group.add(quay);}
   const shade=new THREE.Mesh(drapeGeometry(skirt,{water:true,lift:-WATER_LEVEL-.1}),new THREE.MeshBasicMaterial({color:'#ffffff',vertexColors:true,transparent:true,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-1,polygonOffsetUnits:-2}));
   shade.name='Quay shade on water';shade.renderOrder=1;group.add(shade);
  }
