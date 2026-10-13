@@ -209,7 +209,12 @@ export function createModelledBuilding(array,part,pixels,texture=null,includeHer
   // Glass and relief in one mesh (one draw call per building); aGlass marks the glazing for its roughness and night glow.
   const flag=(g,v)=>{if(g)g.setAttribute('aGlass',new THREE.BufferAttribute(new Float32Array(g.attributes.position.count).fill(v),1));return g;};
   const parts=[flag(glassAll,1),flag(relief,0)].filter(Boolean);m.glass.dispose();m.relief.dispose();
-  if(parts.length){const g=parts.length>1?mergeGeometries(parts):parts[0];parts.forEach(x=>x!==g&&x.dispose());g.computeBoundingSphere();const mat=new THREE.MeshStandardMaterial({vertexColors:true,roughness:.78});mat.userData.facadeCombined=true;mesh(g,mat);meshes.at(-1).userData.provisional=true;meshes.at(-1).userData.role='facade-detail';}
+  // Untextured: the wall/roof shell joins the same mesh (one draw call per building). It stays a shell for the
+  // camera fade, shadows and LOD; the loader adds the wall grain and the window glow to its material.
+  const shellIdx=!texture?meshes.findIndex(m=>m.userData.shell&&m.userData.role==='facade'&&!m.material.map):-1;
+  if(shellIdx>=0&&parts.length){const sh=meshes[shellIdx];const sg=same([sh.geometry])[0];flag(sg,0);parts.push(sg);meshes.splice(shellIdx,1);sh.material.dispose();}
+  if(parts.length){const g=parts.length>1?mergeGeometries(parts):parts[0];parts.forEach(x=>x!==g&&x.dispose());g.computeBoundingSphere();const mat=new THREE.MeshStandardMaterial({vertexColors:true,roughness:.78,side:shellIdx>=0?THREE.DoubleSide:THREE.FrontSide});mat.userData.facadeCombined=true;mesh(g,mat);const u=meshes.at(-1).userData;u.provisional=true;
+   if(shellIdx>=0){u.shell=true;u.role='facade';}else u.role='facade-detail';}
  }
  if(plain.length){mesh(mergeGeometries(plain),new THREE.MeshStandardMaterial({vertexColors:true,roughness:.72,metalness:.12}));plain.forEach(g=>g.dispose());}
  if(glass.length){mesh(mergeGeometries(glass),new THREE.MeshStandardMaterial({vertexColors:true,roughness:.19,metalness:.55}));glass.forEach(g=>g.dispose());}
