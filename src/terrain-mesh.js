@@ -39,7 +39,15 @@ export function drapeGeometry(geometry,{maxEdge=4,lift=0,water=false,mark=false,
  const g=maxEdge?subdivideGeometry(geometry,maxEdge,{height:lines?null:surface}):geometry,p=g.attributes.position,added=mark?new Float32Array(p.count):null;
  for(let i=0;i<p.count;i++){const x=p.getX(i),z=p.getZ(i),h=surface(x,z)+lift;p.setY(i,p.getY(i)+h);if(added)added[i]=h;}
  if(added)g.setAttribute('terrainY',new THREE.BufferAttribute(added,1));
- p.needsUpdate=true;if(g.attributes.normal&&!lines)g.computeVertexNormals();g.computeBoundingSphere();g.computeBoundingBox();
+ p.needsUpdate=true;
+ if(g.attributes.normal&&!lines){
+  // Flat surfaces (roads, pavements, parks): smooth normals from the terrain slope, not per-triangle
+  // facets, which showed every 4 m triangle as a crease across open asphalt.
+  g.computeVertexNormals();const n=g.attributes.normal,e=1;
+  for(let i=0;i<p.count;i++){if(n.getY(i)<.8)continue;const x=p.getX(i),z=p.getZ(i),dx=(surface(x+e,z)-surface(x-e,z))/(2*e),dz=(surface(x,z+e)-surface(x,z-e))/(2*e),l=Math.hypot(dx,1,dz);n.setXYZ(i,-dx/l,1/l,-dz/l);}
+  n.needsUpdate=true;
+ }
+ g.computeBoundingSphere();g.computeBoundingBox();
  return g;
 }
 
