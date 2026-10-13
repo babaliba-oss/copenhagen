@@ -45,6 +45,7 @@ python3 scripts/anchors.py copenhagen-1760          # also restores era.json (wi
 python3 scripts/lanterns-1760.py
 python3 scripts/district-styles.py copenhagen-1760
 python3 scripts/market-1760.py
+python3 scripts/landmark-colours.py                       # both eras, after the building indexes
 ```
 
 `<kk data dir>` holds the City of Copenhagen registers (CC BY 4.0): `wires.gpkg`, `masts.gpkg`,
