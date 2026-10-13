@@ -165,7 +165,7 @@ export function createCopenhagenGame({scene,city,mobilityData,cityData,toast,sou
  function flash(){flashEl.classList.remove('on');void flashEl.offsetWidth;flashEl.classList.add('on');}
 
  let race=null; // {r, k (next checkpoint), t, countdown}
- const mkStart=races.map(()=>beam(scene,0x9b5de5,60)),mkCp=beam(scene,0xff4fd8,90),mkCp2=beam(scene,0xff4fd8,40);
+ const H=ERA==='h',mkStart=races.map(()=>beam(scene,H?0xb5462e:0x9b5de5,60)),mkCp=beam(scene,H?0xe0a040:0xff4fd8,90),mkCp2=beam(scene,H?0xe0a040:0xff4fd8,40); // 1760: sealing-wax red and lantern gold, not neon
  const fmtT=t=>`${Math.floor(t/60)}:${String(Math.floor(t%60)).padStart(2,'0')}.${Math.floor(t%1*10)}`;
  function startRace(r){race={r,k:0,t:0,countdown:3.4};routeFor=null;banner(r.title,`${r.cps.length} checkpoints · ${(r.len/1000).toFixed(1)} km · gold ${fmtT(r.par[0])}`,'pick');}
  function finishRace(){const r=race.r,t=race.t,medal=t<=r.par[0]?0:t<=r.par[1]?1:t<=r.par[2]?2:3;const names=['Gold','Silver','Bronze'];

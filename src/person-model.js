@@ -677,7 +677,7 @@ export function createPersonBatch(capacity,options={}){
   if(actor.knockdown)for(let m=0;m<list.length;m++)for(let i=start[m],e=Math.min(cursor[m],list[m].userData.capacity);i<e;i++)applyImpactPose(list[m],i,actor);
  }
  function end(){
-  for(let m=0;m<list.length;m++){const mesh=list[m];mesh.count=Math.min(cursor[m],mesh.userData.capacity);mesh.instanceMatrix.needsUpdate=true;mesh.instanceColor.needsUpdate=true;
+  for(let m=0;m<list.length;m++){const mesh=list[m];mesh.count=Math.min(cursor[m],mesh.userData.capacity);for(const [at,n] of [[mesh.instanceMatrix,16],[mesh.instanceColor,3]]){at.clearUpdateRanges();if(mesh.count){at.addUpdateRange(0,mesh.count*n);at.needsUpdate=true;}} // upload only the drawn instances
    // Upload only the instances drawn this frame, not the whole pool.
    mesh.instanceMatrix.clearUpdateRanges?.();mesh.instanceColor.clearUpdateRanges?.();
    if(mesh.count){mesh.instanceMatrix.addUpdateRange?.(0,mesh.count*16);mesh.instanceColor.addUpdateRange?.(0,mesh.count*3);}
