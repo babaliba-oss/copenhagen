@@ -74,6 +74,7 @@ import {createLandmarks} from './copenhagen/landmarks.js';
 import {CityCyclists} from './copenhagen/city-cyclists.js';
 import {createTrains} from './copenhagen/trains.js';
 import {createCafes} from './copenhagen/cafes.js';
+import {createStalls} from './copenhagen/stalls.js';
 import {PERIOD as PERSON_PERIOD} from './person-model.js';
 import {WATER_LEVEL as CPH_WATER} from './quay.js';
 import {createBirds,shoreSamples,inWater} from './birds.js';
@@ -853,6 +854,7 @@ async function boot(){
    const terrainData=city.terrain?.file?unpack(dataUrl(city.terrain.file)).then(decodeTerrain).catch(e=>{console.warn('Terrain unavailable; the city stays flat:',e);return null;}):null; // ground elevation (src/terrain.js)
    const anchorData=city.id.startsWith('copenhagen')?json(dataUrl('anchors.json')).catch(()=>null):null,eraData=city.era===1760?json(dataUrl('era.json')).catch(()=>null):null;
    const boatData=city.id.startsWith('copenhagen')?json(dataUrl('boats.json')).catch(()=>null):null;
+   const stallData=city.era===1760?json(dataUrl('stalls.json')).catch(()=>null):null;
    const cafeData=city.id==='copenhagen'?json(dataUrl('cafes.json')).catch(()=>null):null;
    const railData=city.id==='copenhagen'?json(dataUrl('rails.json')).catch(()=>null):null;
    const parkedData=city.id==='copenhagen'?json(dataUrl('parked.json')).catch(()=>null):null; // kerbside parked cars (scripts/parked-cars.py)
@@ -971,6 +973,8 @@ async function boot(){
     // Guests standing at the café tables, chatting (two at most tables).
     const guests=[];(cd.tables||[]).forEach(([x,z,yaw],i)=>{for(const k of i%3===2?[0]:[0,1]){const a=yaw+(k?2.3:-.8)+i*.7,gx=x+Math.sin(a)*.95,gz=z+Math.cos(a)*.95;guests.push({x:gx,z:gz,heading:Math.atan2(gx-x,gz-z),pose:'chat',walking:false,talkable:true});}});
     if(guests.length){const cx=guests.reduce((s,g)=>s+g.x,0)/guests.length,cz=guests.reduce((s,g)=>s+g.z,0)/guests.length;cafeGuests=createInstancedPeople(guests,{name:'Café guests',center:{x:cx,z:cz},seed:501});cityModel.add(cafeGuests.group);}}}
+   {const sd=stallData&&await stallData;if(sd){const st=createStalls(sd);cityModel.add(st.group);streetObstacles.push(...st.obstacles);
+    if(st.people.length){const cx=st.people.reduce((a,p)=>a+p.x,0)/st.people.length,cz=st.people.reduce((a,p)=>a+p.z,0)/st.people.length;cafeGuests=createInstancedPeople(st.people,{name:'Market people',center:{x:cx,z:cz},seed:1760});cityModel.add(cafeGuests.group);}}}
    {const rd=railData&&await railData;if(rd){cityModel.add(createRails(rd).group);trains=createTrains(rd);cityModel.add(trains.group);}}
    {const pd=parkedData&&await parkedData;if(pd){parkedCars=createParkedCars(pd);cityModel.add(parkedCars.group);streetObstacles.push(...parkedCars.obstacles);}}
    const mapped=furnitureData&&await furnitureData;let mappedFurniture=null;

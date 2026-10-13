@@ -41,6 +41,7 @@ python3 scripts/boats.py copenhagen-1760 --era
 python3 scripts/anchors.py copenhagen-1760          # also restores era.json (windmills)
 python3 scripts/lanterns-1760.py
 python3 scripts/district-styles.py copenhagen-1760
+python3 scripts/market-1760.py
 ```
 
 `<kk data dir>` holds the City of Copenhagen registers (CC BY 4.0): `wires.gpkg`, `masts.gpkg`,
