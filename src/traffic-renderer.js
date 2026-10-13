@@ -20,10 +20,12 @@ export function createTrafficRenderer(actors,{types=VEHICLE_TYPES,paintColors=nu
  const bodyMaterial=new THREE.MeshStandardMaterial({color:'#ffffff',roughness:.45,metalness:.25}),cabinMaterial=new THREE.MeshStandardMaterial({color:'#182328',roughness:.25,metalness:.5});
  const tmp=new THREE.Matrix4(),slope={y:0,pitch:0,roll:0};
  for(const family of families)if(family.entries.length){
-  family.batches=family.entries[0].parts.map((source,part)=>{
+  // Parts sharing geometry and material (the wheels, say) share one batch: instances = cars x parts.
+  const groups=new Map();family.entries[0].parts.forEach((source,part)=>{const g=source.geometry,key=(g.parameters?g.type+JSON.stringify(g.parameters):g.uuid)+'|'+source.material.name+'|'+source.material.color?.getHex();if(!groups.has(key))groups.set(key,[]);groups.get(key).push(part);});
+  family.batches=[...groups.values()].map(partIdx=>{const source=family.entries[0].parts[partIdx[0]];
    const material=registerEnvMaterial(source.material.clone());const colored=source.material.name==='paint';if(colored)material.color.set('#ffffff');
-   const mesh=new THREE.InstancedMesh(source.geometry,material,family.entries.length);mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);mesh.frustumCulled=false;mesh.castShadow=true;mesh.receiveShadow=true;mesh.count=0;
-   if(colored)family.entries.forEach((p,i)=>mesh.setColorAt(i,p.parts[part].material.color));mesh.userData={colored,type:family.type};group.add(mesh);return mesh;
+   const mesh=new THREE.InstancedMesh(source.geometry,material,family.entries.length*partIdx.length);mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);mesh.frustumCulled=false;mesh.castShadow=true;mesh.receiveShadow=true;mesh.count=0;
+   if(colored)family.entries.forEach((p,i)=>partIdx.forEach((part,k)=>mesh.setColorAt(i*partIdx.length+k,p.parts[part].material.color)));mesh.userData={colored,type:family.type,parts:partIdx};group.add(mesh);return mesh;
   });
   // Far level from the family's measured spec: a body box up to the belt line and a cabin box above it.
   const s=family.entries[0].model.userData.spec,paint=family.entries[0].parts.findIndex(p=>p.material.name==='paint');
@@ -38,8 +40,8 @@ export function createTrafficRenderer(actors,{types=VEHICLE_TYPES,paintColors=nu
    groundPose(a.x,a.z,a.heading,2.1,.85,slope);model.position.set(a.x,.12+slope.y,a.z);const delta=Math.atan2(Math.sin(a.heading-model.rotation.y),Math.cos(a.heading-model.rotation.y));model.rotation.set(slope.pitch,a.heading,slope.roll);
    if(d>lod.detail){model.updateMatrixWorld(true);for(const m of low){m.setMatrixAt(far,tmp.multiplyMatrices(model.matrixWorld,m.userData.offset));if(m.userData.paint>=0)m.setColorAt(far,parts[m.userData.paint].material.color);}far++;continue;}
    animateVehicle(model,a.speed,Math.max(-1,Math.min(1,delta*3)),dt,a.braking);model.updateMatrixWorld(true);
-   batches.forEach((m,j)=>{m.setMatrixAt(visible,parts[j].matrixWorld);if(m.userData.colored)m.setColorAt(visible,parts[j].material.color);});visible++;
-  }batches.forEach(m=>{m.count=visible;m.instanceMatrix.needsUpdate=true;if(m.instanceColor)m.instanceColor.needsUpdate=true;});
-  low.forEach(m=>{m.count=far;m.instanceMatrix.needsUpdate=true;if(m.instanceColor)m.instanceColor.needsUpdate=true;});}
+   for(const m of batches){const ps=m.userData.parts,n=ps.length;for(let k=0;k<n;k++){m.setMatrixAt(visible*n+k,parts[ps[k]].matrixWorld);if(m.userData.colored)m.setColorAt(visible*n+k,parts[ps[k]].material.color);}}visible++;
+  }batches.forEach(m=>{m.count=visible*m.userData.parts.length;m.visible=m.count>0;m.instanceMatrix.needsUpdate=true;if(m.instanceColor)m.instanceColor.needsUpdate=true;});
+  low.forEach(m=>{m.count=far;m.visible=far>0;m.instanceMatrix.needsUpdate=true;if(m.instanceColor)m.instanceColor.needsUpdate=true;});}
  }};
 }
