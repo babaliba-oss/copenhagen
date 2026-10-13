@@ -22,6 +22,8 @@ const wooden=()=>mergeGeometries([...hull(3.6,1.6,12.5,'#2a2420','#9b7a52',.4),b
 const ship=()=>mergeGeometries([...hull(7,3.6,30,'#3b2a1c','#a8875c',.9),box(7,.5,25,0,3.2,.8,'#c19a45'),box(6.8,2.2,4,0,4.3,12.5,'#4a3020'),
  ...[-9,0,8].flatMap((z,i)=>[cyl(.25,.32,[22,26,18][i],0,[11,13,9][i]+2,z,'#5b4630',8),box(9,4.5,.12,0,[11,14,9][i],z+.4,'#efe7d3'),box(7,3.5,.12,0,[16.5,20,13.5][i],z+.4,'#efe7d3')]),box(.2,.2,9,0,4,-17,'#5b4630'),box(.6,1.4,1.6,0,4.3,-15,'#c8202a')]);
 const tour=()=>mergeGeometries([...hull(4.6,1.2,17,'#1f3f63','#d9d6cc',.1),box(4.2,.12,13.5,0,1.9,.6,'#e9e7e0'),...[-5,-2.5,0,2.5,5].map(z=>box(4.25,.65,.06,0,1.55,z+.6,'#c9d6dd')),box(4.3,.06,14,0,1.25,.6,'#2b4a6e')]);
+// Havnebussen: a long low harbour bus, yellow hull, glazed cabin with a blue band, flat roof.
+const havnebus=()=>mergeGeometries([...hull(5.2,1.3,22,'#e2b33c','#5f6a70',.15),box(4.4,1.9,15,0,2.1,1.2,'#f2f0ea'),box(4.46,.9,14.4,0,2.35,1.2,'#25313a'),box(4.5,.22,15.2,0,1.32,1.2,'#1f4f8a'),box(4.6,.14,15.6,0,3.1,1.2,'#e9e7e0'),box(1.6,.9,2.2,0,3.6,4.8,'#f2f0ea')]);
 const BUILD={sail,motor,wooden,ship,tour};
 
 export function createBoats(data,{waterY=-1.2,era=null}={}){
@@ -38,6 +40,12 @@ export function createBoats(data,{waterY=-1.2,era=null}={}){
  if(era!==1760)for(const r of data?.routes||[]){const pts=[...r,r[0]];let len=0;const cum=[0];for(let i=1;i<pts.length;i++){len+=Math.hypot(pts[i][0]-pts[i-1][0],pts[i][1]-pts[i-1][1]);cum.push(len);}
   for(let k=0;k<2;k++)movers.push({pts,cum,len,s:len*k/2});}
  let tourMesh=null;if(movers.length){tourMesh=new THREE.InstancedMesh(tour(),mat,movers.length);tourMesh.castShadow=true;tourMesh.frustumCulled=false;tourMesh.userData.shadowLod=true;tourMesh.name='Canal tour boats';group.add(tourMesh);}
+ // Harbour buses: along the ferry path end to end and back, 15 s at each stop.
+ const ferries=[];
+ if(era!==1760)for(const f of data?.ferries||[]){const pts=f.path,cum=[0];for(let i=1;i<pts.length;i++)cum.push(cum[i-1]+Math.hypot(pts[i][0]-pts[i-1][0],pts[i][1]-pts[i-1][1]));
+  const stops=f.stops.map(i=>cum[i]);for(let k=0;k<2;k++)ferries.push({pts,cum,stops,s:k?cum.at(-1)*.55:0,dir:k?-1:1,wait:0,yaw:0});}
+ let ferryMesh=null;if(ferries.length){ferryMesh=new THREE.InstancedMesh(havnebus(),mat,ferries.length);ferryMesh.castShadow=true;ferryMesh.frustumCulled=false;ferryMesh.name='Harbour buses';group.add(ferryMesh);}
+ const ferryAt=(f,s)=>{let k=1;while(k<f.cum.length-1&&f.cum[k]<s)k++;const a=f.pts[k-1],b=f.pts[k],u=(s-f.cum[k-1])/Math.max(.01,f.cum[k]-f.cum[k-1]);return [a[0]+(b[0]-a[0])*u,a[1]+(b[1]-a[1])*u,Math.atan2(-(b[0]-a[0]),-(b[1]-a[1]))];};
  let t=0;
  function placeMesh(im,list){for(let i=0;i<list.length;i++){const b=list[i],x=b[0],z=b[1],sc=b[4],ph=x*.13+z*.07;e.set(Math.sin(t*.9+ph)*.025,b[2],Math.sin(t*.7+ph)*.035);m4.compose(v.set(x,waterY-.35+Math.sin(t*1.1+ph)*.06,z),q.setFromEuler(e),s.set(sc,sc,sc));im.setMatrixAt(i,m4);}im.instanceMatrix.needsUpdate=true;}
  function place(player){for(const c of chunks.values()){const d=player?Math.hypot(c.x-player.x,c.z-player.z):0;const vis=d<650;for(const en of c.meshes){en.im.visible=vis;en.im.castShadow=d<350;if(vis&&d<400)placeMesh(en.im,en.list);}}}
@@ -47,6 +55,12 @@ export function createBoats(data,{waterY=-1.2,era=null}={}){
   t+=dt;acc+=dt;
   if(tourMesh){movers.forEach((m,i)=>{m.s=(m.s+dt*3.2)%m.len;let k=1;while(k<m.cum.length-1&&m.cum[k]<m.s)k++;const a=m.pts[k-1],b=m.pts[k],f=(m.s-m.cum[k-1])/Math.max(.01,m.cum[k]-m.cum[k-1]);
    const x=a[0]+(b[0]-a[0])*f,z=a[1]+(b[1]-a[1])*f,yaw=Math.atan2(-(b[0]-a[0]),-(b[1]-a[1]));e.set(0,yaw,Math.sin(t+i)*.02);m4.compose(v.set(x,waterY+.05,z),q.setFromEuler(e),s.set(1,1,1));tourMesh.setMatrixAt(i,m4);});tourMesh.instanceMatrix.needsUpdate=true;}
+  if(ferryMesh){ferries.forEach((f,i)=>{
+    if(f.wait>0)f.wait-=dt;else{const before=f.s,L=f.cum.at(-1);f.s=Math.max(0,Math.min(L,f.s+f.dir*dt*5.5));
+     const hit=f.stops.find(x=>(before-x)*(f.s-x)<0||Math.abs(f.s-x)<.01&&Math.abs(before-x)>.01);if(hit!=null){f.s=hit;f.wait=15;}
+     if(f.s<=0||f.s>=L){f.dir*=-1;f.wait=Math.max(f.wait,20);}}
+    const [x,z,yaw0]=ferryAt(f,f.s),yaw=yaw0+(f.dir<0?Math.PI:0);let dy=yaw-f.yaw;dy=Math.atan2(Math.sin(dy),Math.cos(dy));f.yaw+=dy*Math.min(1,dt*1.5);
+    e.set(Math.sin(t*.8+i)*.012,f.yaw,Math.sin(t*.6+i)*.02);m4.compose(v.set(x,waterY-.2,z),q.setFromEuler(e),s.set(1,1,1));ferryMesh.setMatrixAt(i,m4);});ferryMesh.instanceMatrix.needsUpdate=true;}
   if(acc>.12){acc=0;place(player);} // bobbing at ~8 Hz is plenty
  }};
 }

@@ -115,8 +115,9 @@ export function createCopenhagenGame({scene,city,mobilityData,cityData,toast}){
 
  // ---- checkpoint races: routes follow the road graph between named places; medals by time ----
  const RACE_DEFS=ERA==='h'?[
-   {id:'coach-dash',title:'The Coachman’s Dash',via:['Kongens Nytorv','Christiansborg','Rådhuspladsen']},
-   {id:'harbour-run',title:'Harbour Run',via:['Nyhavn','Amalienborg','Kongens Nytorv']}]
+   {id:'coach-dash',title:'The Coachman’s Dash',via:['Kongens Nytorv','Højbro Plads','Gammeltorv','Vesterport']},
+   {id:'harbour-run',title:'Harbour Run',via:['Nyhavn','Amalienborg','Kongens Nytorv']},
+   {id:'rampart-ride',title:'Rampart Ride',via:['Nørreport','Kultorvet','Rundetårn','Christiansborg']}]
   :[{id:'harbour-sprint',title:'Harbour Sprint',via:['Kongens Nytorv','Christiansborg','Christianshavn']},
    {id:'lakes-loop',title:'Lakes Loop',via:['Torvehallerne','Dronning Louises Bro','The Lakes','Rådhuspladsen']},
    {id:'mermaid-run',title:'Tivoli to the Mermaid',via:['Tivoli','Rådhuspladsen','Kongens Nytorv','Amalienborg','Little Mermaid']},
