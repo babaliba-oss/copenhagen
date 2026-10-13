@@ -563,6 +563,12 @@ function interactTravel(id=null){
 }
 const nearbyPeople=()=>[...(mobility?.people||[]),...detailPeople,...(marketShopRenderer?.vendors||[])];
 const canTalk=()=>ready&&started&&!paused&&!mapOpen&&!captureMode&&!police?.busted&&travel?.mode==='walk';
+// Postcard snapshot: render this frame, then shrink the canvas into a 320 px JPEG for the album.
+function snapPhoto(){
+ if(post)post.render(scene,camera);else renderer.render(scene,camera);
+ const src=renderer.domElement,w=320,h=Math.round(320*src.height/src.width),c=document.createElement('canvas');c.width=w;c.height=h;
+ c.getContext('2d').drawImage(src,0,0,w,h);return c.toDataURL('image/jpeg',.72);
+}
 function talkToPerson(){
  if(!canTalk()||gullEncounter.snapshot().phase==='chase')return false;
  const result=peopleInteraction.interact(car,nearbyPeople(),{enabled:true});
@@ -706,6 +712,7 @@ window.addEventListener('keydown',e=>{
  if(e.code==='KeyE'&&!paused&&canTalk()&&(marketShop?.intent()||gullEncounter.snapshot().phase==='chase'&&marketShop?.hand?.item.encounter==='gulls')){e.preventDefault();marketAction();return;} // otherwise E keeps looking right
  if(marketShop?.open&&/^(Digit|Numpad)[1-9]$/.test(e.code)){e.preventDefault();const item=marketShop.menu()[Number(e.code.at(-1))-1];if(item)buyAtStall(item.id);return;}
  if(e.code==='KeyB'){soundscape?.horn(true);return;}
+ if(e.code==='KeyN'&&cph?.photo){e.preventDefault();const d=camera.getWorldDirection(new THREE.Vector3());cph.photo({dir:[d.x,d.z],snap:snapPhoto});return;}
  if(e.code==='KeyM'){showDialog('map-dialog');return;}
  if(e.code==='KeyR'){reset();return;}
  if(e.code==='KeyC'){cycleCamera();return;}

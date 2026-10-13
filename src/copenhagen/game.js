@@ -81,7 +81,7 @@ export function createCopenhagenGame({scene,city,mobilityData,cityData,toast,sou
  const persist=()=>{try{localStorage.setItem(KEY,JSON.stringify(save));}catch{}};
 
  // ---- HUD ----
- const hud=document.createElement('div');hud.id='cph-hud';hud.innerHTML=`<div class="cph-money" id="cph-money"></div><div class="cph-card" id="cph-job"></div><div class="cph-card cph-saga" id="cph-saga" hidden></div>`;
+ const hud=document.createElement('div');hud.id='cph-hud';hud.innerHTML=`<div class="cph-money" id="cph-money"></div><div class="cph-card-hint" id="cph-card-hint" hidden></div><div class="cph-card" id="cph-job"></div><div class="cph-card cph-saga" id="cph-saga" hidden></div>`;
  const lore=document.createElement('div');lore.id='cph-lore';lore.hidden=true;lore.innerHTML=`<div class="cph-lore-card" role="dialog"><div class="cph-kick" id="cph-lore-kick"></div><h2 id="cph-lore-title"></h2><p id="cph-lore-text"></p><button id="cph-lore-go">Continue <kbd>Enter</kbd></button></div>`;
  const journal=document.createElement('div');journal.id='cph-journal';journal.hidden=true;
  const tmap=document.createElement('div');tmap.id='cph-tmap';tmap.hidden=true;tmap.innerHTML=`<div class="cph-tmap-wrap"><div id="cph-tmap-canvas"></div><p>No GPS for this one. The saga card tells you if you’re getting warmer.</p><button id="cph-tmap-close">Put the map away <kbd>K</kbd></button></div>`;
@@ -130,6 +130,38 @@ export function createCopenhagenGame({scene,city,mobilityData,cityData,toast,sou
   const speed=ERA==='h'?7:11.5,gold=Math.round(len/speed+8);
   return {...d,start:path[0],cps,len,par:[gold,Math.round(gold*1.25),Math.round(gold*1.6)],pay:Math.round((ERA==='h'?60:500)*len/1500)};}).filter(Boolean);
  save.best??={};
+ // ---- postcards: photograph the famous views (N); each subject pays once and goes into the album (J) ----
+ const POSTCARD_DEFS=ERA==='h'?[
+   ['borsen','Børsen',55.6758,12.5833,'The exchange and its dragon spire, a century old already.'],['christiansborg','Christiansborg',55.6761,12.5800,'The new palace, finished only fifteen years ago.'],
+   ['rundetaarn','Rundetårn',55.6813,12.5757,'Christian IV’s round tower: a coach can drive up its ramp.'],['vorfrelsers','Vor Frelsers Kirke',55.6727,12.5940,'The spiral spire, finished in 1752.'],
+   ['amalienborg','Amalienborg',55.6840,12.5930,'Four noble palaces, still smelling of fresh mortar.'],['vorfrue','Vor Frue Kirke',55.6796,12.5729,'The cathedral and its tall copper spire.'],
+   ['nikolaj','Sankt Nikolaj',55.6785,12.5810,'The spire sailors steer by.'],['frederiks','Frederik’s Church',55.6849,12.5893,'A marble church that may never be finished.'],
+   ['christian5','Christian V',55.6797,12.5856,'The gilded king on Kongens Nytorv.'],['holmens','Holmens Kirke',55.6762,12.5823,'The navy’s church by the canal.']]
+  :[['nyhavn','Nyhavn',55.6799,12.5911,'The painted houses on the canal.'],['mermaid','The Little Mermaid',55.6929,12.5993,'Smaller than you expected. Everyone says so.'],
+   ['rundetaarn','Rundetårn',55.6813,12.5757,'The round tower with a ramp instead of stairs.'],['amalienborg','Amalienborg',55.6840,12.5930,'The royal square; the guard changes at noon.'],
+   ['marmorkirken','Marmorkirken',55.6849,12.5893,'The dome they finished 145 years late.'],['christiansborg','Christiansborg',55.6761,12.5800,'Parliament, court and royal halls in one palace.'],
+   ['borsen','Børsen',55.6758,12.5833,'Four dragons twist their tails into the spire.'],['vorfrelsers','Vor Frelsers Kirke',55.6727,12.5940,'400 steps, the last ones outside.'],
+   ['tivoli','Tivoli',55.6737,12.5681,'The garden that inspired a certain theme park.'],['operaen','Operaen',55.6818,12.6008,'The opera house across the harbour.'],
+   ['raadhuset','Rådhuset',55.6757,12.5700,'The city hall and its clock tower.'],['gefion','Gefion Fountain',55.6870,12.5990,'The goddess ploughing Zealand out of Sweden.']];
+ const postcards=POSTCARD_DEFS.map(([id,title,lat,lon,text])=>({id,title,text,p:ll([lat,lon])}));
+ save.cards??={};
+ let cardHint=null;
+ // Called by main.js on N: dir = camera forward (x,z); snap() returns a small JPEG data URL of the view.
+ function photo({dir,snap}){
+  if(!player)return false;let best=null,bd=Infinity;
+  for(const c of postcards){const dx=c.p[0]-player.x,dz=c.p[1]-player.z,d=Math.hypot(dx,dz);if(d<20||d>280)continue;
+   const cos=(dx*dir[0]+dz*dir[1])/(d*Math.hypot(dir[0],dir[1])||1);if(cos<Math.cos(38*Math.PI/180))continue; /* in frame: about the camera's horizontal half-view */if(d<bd){bd=d;best=c;}}
+  flash();
+  if(!best){banner('Nice photo','No postcard view here · face a landmark nearby','pick');return true;}
+  if(save.cards[best.id]){banner(best.title,'Already in your album','pick');return true;}
+  let img=null;try{img=snap();}catch{}
+  save.cards[best.id]={img,t:Date.now()};const pay=ERA==='h'?18:150;save.money+=pay;persist();
+  const n=Object.keys(save.cards).length;banner(`Postcard: ${best.title}`,`${esc(best.text)} · +${fmtKr(pay)} ${UNIT} · ${n}/${postcards.length} in your album`,n===postcards.length?'rank':'pass');
+  return true;
+ }
+ const flashEl=document.createElement('div');flashEl.id='cph-flash';document.body.append(flashEl);
+ function flash(){flashEl.classList.remove('on');void flashEl.offsetWidth;flashEl.classList.add('on');}
+
  let race=null; // {r, k (next checkpoint), t, countdown}
  const mkStart=races.map(()=>beam(scene,0x9b5de5,60)),mkCp=beam(scene,0xff4fd8,90),mkCp2=beam(scene,0xff4fd8,40);
  const fmtT=t=>`${Math.floor(t/60)}:${String(Math.floor(t%60)).padStart(2,'0')}.${Math.floor(t%1*10)}`;
@@ -185,7 +217,8 @@ export function createCopenhagenGame({scene,city,mobilityData,cityData,toast,sou
  function renderJournal(){
   const rows=sagas.map(q=>{const done=!!save.done[q.id],act=save.active?.id===q.id;const cards=q.steps.map((s,k)=>[s,k]).filter(([s,k])=>s.card&&save.lore.includes(q.id+':'+k));
    return `<article class="cph-jq${done?' done':''}${act?' act':''}"><div class="cph-jh"><span>${q.limit?'Timed · ':''}${fmtKr(q.pay)} ${UNIT}</span></div><h3>${esc(q.title)}</h3><p class="cph-js">${done?'Complete':act?`In progress · ${save.active.done.length}/${q.steps.length}`:`Ask ${esc(giverName(q))}`}</p>${cards.map(([s])=>`<details><summary>${esc(s.card[0])}</summary><p>${esc(s.card[1])}</p></details>`).join('')}${!done&&!act?`<button data-way="${q.giver}">Show me the way</button>`:''}${act?`<button data-abandon="1">Abandon</button>`:''}</article>`;}).join('');
-  journal.innerHTML=`<div class="cph-jcard" role="dialog"><div class="cph-jtop"><div><p class="cph-kick">Stories from Danish history and folklore</p><h2>Sagas</h2></div><button id="cph-jclose">Close <kbd>J</kbd></button></div><div class="cph-jlist">${rows}</div></div>`;
+  const album=postcards.map(c=>{const got=save.cards[c.id];return `<figure class="cph-pc${got?'':' empty'}">${got?.img?`<img src="${got.img}" alt="">`:`<div class="cph-pc-blank">?</div>`}<figcaption>${esc(c.title)}</figcaption></figure>`;}).join('');
+  journal.innerHTML=`<div class="cph-jcard" role="dialog"><div class="cph-jtop"><div><p class="cph-kick">Stories from Danish history and folklore</p><h2>Sagas</h2></div><button id="cph-jclose">Close <kbd>J</kbd></button></div><div class="cph-jlist">${rows}</div><h2 class="cph-album-h">Postcards · ${Object.keys(save.cards).length}/${postcards.length}</h2><p class="cph-js">Find a landmark, face it and press N.</p><div class="cph-album">${album}</div></div>`;
   $('cph-jclose').onclick=()=>toggleJournal(false);
   journal.querySelectorAll('[data-way]').forEach(b=>b.onclick=()=>{const c=people.find(p=>p.script===b.dataset.way);if(c){wayTo=[c.x,c.z];routeFor=null;toggleJournal(false);toast(`Route set to ${CHARACTERS.find(x=>x.id===c.script).name}`);}});
   journal.querySelectorAll('[data-abandon]').forEach(b=>b.onclick=()=>{save.active=null;persist();routeFor=null;renderJournal();});
@@ -211,6 +244,8 @@ export function createCopenhagenGame({scene,city,mobilityData,cityData,toast,sou
   const j=job(),t=state==='a'?j.A:j.B,d=line.points?line.remaining():dist(t,[player.x,player.z]);
   setHtml($('cph-job'),`<p class="cph-kick">Job ${save.job%jobs.length+1}/${jobs.length}</p><h3>${esc(j.t)}</h3><p>${esc(j.d)}</p><p class="cph-go">${state==='a'?'Pick up at':'Deliver to'} <b>${esc(state==='a'?j.aName:j.bName)}</b> · ${d>1000?(d/1000).toFixed(1)+' km':Math.round(d/10)*10+' m'}${state==='b'?` · <span class="${timer<15?'cph-low':''}">${Math.max(0,timer).toFixed(0)} s</span>`:''}</p>`);
   }
+  {let near=null,nd=Infinity;for(const c of postcards){if(save.cards[c.id])continue;const d=dist(c.p,[player.x,player.z]);if(d<200&&d<nd){nd=d;near=c;}}
+   const h=$('cph-card-hint');if(h){h.hidden=!near;if(near)setHtml(h,`Postcard view nearby: <b>${esc(near.title)}</b> · face it and press <kbd>N</kbd>`);}}
   const sg=$('cph-saga');if(!save.active){sg.hidden=true;return;}sg.hidden=false;
   const q=byId[save.active.id],f=frontier();
   setHtml(sg,`<p class="cph-kick">Saga · <kbd>J</kbd> journal${q.steps.some(s=>s.clue)?' · <kbd>K</kbd> map':''}</p><h3>${esc(q.title)}</h3><ol>${q.steps.map((s,k)=>{const dn=save.active.done.includes(k),c=f.includes(k),dd=dist(s.p,[player.x,player.z]);return `<li class="${dn?'d':c?'c':''}">${esc(s.name)}${c?` <span>${s.clue?warmth(dd):dd>1000?(dd/1000).toFixed(1)+' km':Math.round(dd/10)*10+' m'}</span>`:''}</li>`;}).join('')}</ol>${q.limit?`<p class="cph-timer ${save.active.t<30?'cph-low':''}">${Math.max(0,save.active.t).toFixed(0)} s</p>`:''}`);
@@ -308,5 +343,5 @@ export function createCopenhagenGame({scene,city,mobilityData,cityData,toast,sou
   return false;
  }
  const blocking=()=>loreOpen||journalOpen||tmapOpen;
- return {debug:()=>({race:race&&{id:race.r.id,k:race.k,t:race.t,c:race.countdown},armed:races.map(r=>r.armed),state,started,player:player&&[player.x,player.z]}),update,key,blocking,people,api,minimapTargets:()=>{const out=[];if(race){out.push({p:race.r.cps[race.k],color:'#ff4fd8'});return out;}for(const r of races)if(state!=='b')out.push({p:r.start,color:'#9b5de5',small:true});const j=job();out.push({p:state==='a'?j.A:j.B,color:state==='a'?'#f2b134':'#46c2b0'});if(save.active){const q=byId[save.active.id];for(const k of frontier())if(!q.steps[k].clue)out.push({p:q.steps[k].p,color:'#e0313e'});}return out;},route:()=>line.ahead()};
+ return {photo,debug:()=>({race:race&&{id:race.r.id,k:race.k,t:race.t,c:race.countdown},armed:races.map(r=>r.armed),state,started,player:player&&[player.x,player.z]}),update,key,blocking,people,api,minimapTargets:()=>{const out=[];if(race){out.push({p:race.r.cps[race.k],color:'#ff4fd8'});return out;}for(const r of races)if(state!=='b')out.push({p:r.start,color:'#9b5de5',small:true});const j=job();out.push({p:state==='a'?j.A:j.B,color:state==='a'?'#f2b134':'#46c2b0'});if(save.active){const q=byId[save.active.id];for(const k of frontier())if(!q.steps[k].clue)out.push({p:q.steps[k].p,color:'#e0313e'});}return out;},route:()=>line.ahead()};
 }

@@ -96,3 +96,18 @@ body.era-1760 .battery-row,body.era-1760 #battery-gauge{visibility:hidden}
 #cph-banner.cph-banner-rank h2{color:#7fd6c2}
 @keyframes cph-ban{0%{opacity:0;transform:scale(1.25)}8%{opacity:1;transform:scale(1)}85%{opacity:1}100%{opacity:0}}
 .cph-race-time{font:700 34px/1.1 'Spectral',Georgia,serif !important;font-variant-numeric:tabular-nums;margin:2px 0 !important;color:#7b2fbe}
+
+/* Postcards */
+.cph-card-hint{justify-self:start;padding:5px 10px;border-radius:8px;background:rgba(20,22,24,.72);color:#f6f1e4;font:600 12px Manrope,sans-serif}
+.cph-card-hint kbd{font:700 10px Manrope,sans-serif;padding:1px 5px;border-radius:4px;background:#f6f1e4;color:#222}
+#cph-flash{position:fixed;inset:0;background:#fff;opacity:0;pointer-events:none;z-index:75}
+#cph-flash.on{animation:cph-flash .5s ease-out}
+@keyframes cph-flash{0%{opacity:.85}100%{opacity:0}}
+.cph-album-h{margin:18px 0 2px;font:500 22px/1.2 'Spectral',Georgia,serif}
+.cph-album{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-top:8px}
+.cph-pc{margin:0;padding:6px 6px 4px;background:#fffdf7;border-radius:6px;box-shadow:0 2px 8px rgba(0,0,0,.15);transform:rotate(-.6deg)}
+.cph-pc:nth-child(2n){transform:rotate(.7deg)}
+.cph-pc img,.cph-pc-blank{display:block;width:100%;aspect-ratio:16/10;object-fit:cover;border-radius:3px}
+.cph-pc-blank{display:grid;place-items:center;background:#e9e4d6;color:#b7ad94;font:700 28px Spectral,serif}
+.cph-pc figcaption{font:600 11px Manrope,sans-serif;margin-top:4px;color:#3a3a36;text-align:center}
+.cph-pc.empty{opacity:.6}
