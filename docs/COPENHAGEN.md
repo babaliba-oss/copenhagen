@@ -18,8 +18,9 @@ node scripts/mapillary-features.mjs copenhagen                       # needs MAP
 rm -rf data/raw/cities/copenhagen/kk-street-backup
 python3 scripts/kk-street.py <kk data dir> copenhagen                # lamps, wires, trees, racks, bollards
 python3 scripts/add-starts.py copenhagen
+python3 scripts/prune-mobility.py copenhagen        # keep the main road/footpath network (no one stuck on islands)
 python3 scripts/fill-greenery.py copenhagen
-python3 scripts/parked-cars.py copenhagen
+python3 scripts/parked-cars.py copenhagen                    # after the buildings: tested against the drawn 3D roofs
 python3 scripts/boats.py copenhagen
 python3 scripts/rails.py Copenhagen.osm.pbf copenhagen
 python3 scripts/cafes.py copenhagen
@@ -36,6 +37,7 @@ python3 scripts/era-1760.py <kk data dir>/save.json
 node scripts/city-build.mjs copenhagen-1760
 python3 scripts/kk-buildings.py bymodel3dkobenhavnbygningerdxf.zip copenhagen-1760 --era 1760
 python3 scripts/add-starts.py copenhagen-1760
+python3 scripts/prune-mobility.py copenhagen-1760
 python3 scripts/fill-greenery.py copenhagen-1760
 python3 scripts/boats.py copenhagen-1760 --era
 python3 scripts/anchors.py copenhagen-1760          # also restores era.json (windmills)
@@ -50,6 +52,7 @@ python3 scripts/market-1760.py
 Notes:
 - Vite caches the list of public files at start-up: restart the dev server after a rebuild.
 - File names must not contain commas (Cloudflare's asset server redirect-loops on them).
+- Data requests carry `?v=<build id>` (src/cache-bust.js), so a deploy never mixes with cached city files.
 
 ## Game layer (src/copenhagen)
 

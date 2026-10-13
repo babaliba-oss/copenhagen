@@ -66,6 +66,7 @@ export function createInstancedPeople(records,options={}){
   if(!group.visible)return;
   for(const p of options.externalMotion?[]:people){
    if(p.knockdown){p.speed=0;continue;}
+   if(p.seated){p.speed=0;continue;} // café guests stay in their chairs
    // Crowd reactions (crowd-reaction.js): standing to watch, or running from a crash.
    if(p.heldFor>0){p.heldFor-=step;p.speed=0;continue;}
    if(p.scared&&(p.scared.left-=step)<=0)p.scared=null;

@@ -2,10 +2,10 @@
 /assets/*
   Cache-Control: public, max-age=31536000, immutable
 
-# City data changes only when a city is rebuilt: cache for a day.
+# Data URLs carry ?v=<build id> (src/cache-bust.js), so each deploy gets fresh files; still revalidate.
 /data/*
-  Cache-Control: public, max-age=86400
+  Cache-Control: public, max-age=3600, must-revalidate
 /cities/*
-  Cache-Control: public, max-age=86400
+  Cache-Control: public, max-age=3600, must-revalidate
 /models/*
   Cache-Control: public, max-age=86400

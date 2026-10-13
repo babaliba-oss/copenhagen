@@ -243,7 +243,7 @@ export function posePerson(actor,look,gait,out,time=0){
  const weights=poseWeights(actor,gait),phoneLook=Math.max(weights.phone,look.phoneWalk&&!actor.pose?1:0);
  // Browsing only reaches out when (nearly) standing; chat gestures fade in the same way.
  const browseW=weights.browse*(1-smooth(.35,.6,w)),chatW=weights.chat*(1-smooth(.1,.4,w));
- const stoop=cycle?0:(look.stoop||0)+(actor.lean||0),lean=cycle?.62:scooter?.25:.035*w+.2*r+.03*phoneLook+(1-w)*.01*Math.sin(clock*1.1)+stoop,twist=cycle?0:-.11*w*(1-.4*r)*Math.sin(phase);
+ const stoop=cycle?0:(look.stoop||0)+(actor.lean||0),lean=cycle?(actor.bike.lean??.62):scooter?.25:.035*w+.2*r+.03*phoneLook+(1-w)*.01*Math.sin(clock*1.1)+stoop,twist=cycle?0:-.11*w*(1-.4*r)*Math.sin(phase);
  const yy=Math.cos(lean),yz=-Math.sin(lean);let xx=Math.cos(twist),xy=0,xz=Math.sin(twist);
  const d=xy*yy+xz*yz;xy-=d*yy;xz-=d*yz;const xl=Math.hypot(xx,xy,xz);xx/=xl;xy/=xl;xz/=xl;
  const zx=xy*yz-xz*yy,zy=xz*0-xx*yz,zz=xx*yy-xy*0;
@@ -251,7 +251,7 @@ export function posePerson(actor,look,gait,out,time=0){
  const bx=out[JOINT.pelvis],by=py-.026*H,bz=out[JOINT.pelvis+2];set(out,JOINT.base,bx,by,bz);
  const up=(j,ox,oy,oz)=>set(out,j,bx+xx*ox+zx*oz,by+xy*ox+yy*oy+zy*oz,bz+xz*ox+yz*oy+zz*oz);
  up(JOINT.neck,0,P.torso*H*.97,.008*H);
- const hp=lean*.45-stoop*.75-(cycle?.13:0)+.33*phoneLook+.03*Math.sin(clock*.9)+(actor.headPitch||0),hy=Math.cos(hp),hz=-Math.sin(hp);
+ const hp=lean*.45-stoop*.75-(cycle&&!actor.bike.seated?.13:0)+.33*phoneLook+.03*Math.sin(clock*.9)+(actor.headPitch||0),hy=Math.cos(hp),hz=-Math.sin(hp);
  set(out,JOINT.headY,0,hy,hz);
  set(out,JOINT.head,out[JOINT.neck],out[JOINT.neck+1]+hy*.09*H,out[JOINT.neck+2]+hz*.09*H-.01*H);
  // Arms: swing opposite to the same-side leg; more swing and a bent elbow when running.

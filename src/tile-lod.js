@@ -43,16 +43,18 @@ export function createMergedShells(array,parts,textures){
 export function applyTileLod(group,level,focus,bands=LOD){
  group.userData.level=level;group.visible=level!=='hidden';
  if(!group.visible)return level;
- for(const mesh of group.children){
-  const u=mesh.userData;
-  if(u.lod){mesh.visible=level==='far';continue;}
-  const d=u.box.distanceToPoint(focus);
-  if(u.source){mesh.visible=level==='near';mesh.castShadow=mesh.visible&&d<bands.shadow;continue;}
-  const hero=!!u.shell&&u.role==='detail';
-  mesh.visible=level==='near'?!!(u.shell||u.provisional||d<bands.detail):hero;
-  mesh.castShadow=!!u.shell&&level==='near'&&mesh.visible&&d<bands.shadow;
- }
+ for(const mesh of group.children)applyMeshLod(mesh,level,focus,bands);
  return level;
+}
+// One mesh at its tile's level (newly landed detail does not need the whole tile walked again).
+export function applyMeshLod(mesh,level,focus,bands=LOD){
+ const u=mesh.userData;
+ if(u.lod){mesh.visible=level==='far';return;}
+ const d=u.box.distanceToPoint(focus);
+ if(u.source){mesh.visible=level==='near';mesh.castShadow=mesh.visible&&d<bands.shadow;return;}
+ const hero=!!u.shell&&u.role==='detail';
+ mesh.visible=level==='near'?!!(u.shell||u.provisional||d<bands.detail):hero;
+ mesh.castShadow=!!u.shell&&level==='near'&&mesh.visible&&d<bands.shadow;
 }
 
 // Buildings never move: skip them in the renderer's per-frame matrix walk. New children must call

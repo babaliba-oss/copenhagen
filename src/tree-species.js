@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import {groundAt} from './terrain.js';
 import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';
 import {speciesFamily} from './place-data.js';
+import {createEzTrees,ezKind} from './ez-trees.js';
 
 // Species-shaped trees for cities with a tree register (any city whose trees carry a species name).
 // Each family's silhouette, colours and proportions were read from current photos of Tampere's
@@ -135,11 +136,14 @@ export function treeInstance(t,i=0){
 // per-tree visibility by distance and per-tree frustum culling. Returns {group, update(focus), stats}.
 export const SPECIES_LOD={near:140,mid:460,far:850};
 export function treeLevel(d,b=SPECIES_LOD){return d<b.near?'near':d<b.mid?'mid':d<b.far?'far':null;}
-export function createSpeciesTrees(trees){
+export function createSpeciesTrees(trees,{detailed=false}={}){
  const group=new THREE.Group();group.name='Species trees';
  const material=new THREE.MeshStandardMaterial({vertexColors:true,roughness:.95,metalness:0,emissive:'#3a4a28',emissiveIntensity:.45});
  const items=trees.map((t,i)=>({t,inst:treeInstance(t,i)})),used=new Set(items.map(o=>`${o.inst.family}|${o.inst.variant}`));
  const meshes={},ids={},triangles={};const m=new THREE.Object3D(),tint=new THREE.Color();
+ // Near trees: the detailed EZ-Tree crowns (as in Helsinki) where the family has one; the procedural near shape otherwise.
+ const ez=detailed?createEzTrees(items.map(({t,inst})=>{const F=FAMILY[inst.family]||FAMILY.broadleaf;return {x:t.p[0],z:t.p[1],y:groundAt(t.p[0],t.p[1]),kind:ezKind(inst.family),width:inst.width*F.width*1.05,height:inst.height,yaw:inst.yaw,tint:inst.tint};})):null;
+ if(ez)group.add(ez.group);
  for(const level of LEVELS){
   const geos=new Map([...used].map(k=>{const [f,v]=k.split('|');return [k,treeTemplate(f,level,+v+1)];}));
   const verts=[...geos.values()].reduce((n,g)=>n+g.attributes.position.count,0);
@@ -154,7 +158,8 @@ export function createSpeciesTrees(trees){
  const update=focus=>{
   if(last&&Math.hypot(focus.x-last.x,focus.z-last.z)<8)return;last={x:focus.x,z:focus.z};
   items.forEach(({t},i)=>{const l=treeLevel(Math.hypot(t.p[0]-focus.x,t.p[1]-focus.z));if(l===shown[i])return;
-   if(shown[i])meshes[shown[i]].setVisibleAt(ids[shown[i]][i],false);if(l)meshes[l].setVisibleAt(ids[l][i],true);shown[i]=l;});
+   const vis=(lv,on)=>{if(lv==='near'&&ez?.has(i))ez.show(i,on);else meshes[lv].setVisibleAt(ids[lv][i],on);};
+   if(shown[i])vis(shown[i],false);if(l)vis(l,true);shown[i]=l;});
  };
  const families={};for(const {inst} of items)families[inst.family]=(families[inst.family]||0)+1;
  group.userData={count:trees.length,families,templates:used.size*LEVELS.length,drawCalls:LEVELS.length,trianglesIfAllNear:triangles.near,trianglesIfAllMid:triangles.mid,trianglesIfAllFar:triangles.far,

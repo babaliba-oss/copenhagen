@@ -10,7 +10,7 @@ import {storeyBands,storeyStyle} from './facade-data.js';
 
 const linear=hex=>new THREE.Color(hex); // hex is sRGB; three converts it to the linear working space
 export const hexRGB=hex=>[1,3,5].map(i=>parseInt(hex.slice(i,i+2),16)/255);
-const SKY=linear('#b9cbd8'),WARM=linear('#e9cf9c');
+const SKY=linear('#9fb4c4'),WARM=linear('#d9b47a');
 const hash=(a,b)=>{const x=Math.sin(a*12.9898+b*78.233)*43758.5453;return x-Math.floor(x);};
 
 class Batch{
@@ -44,7 +44,7 @@ export class FaceFrame{
 // a few panes with warm light or a pale blind behind them.
 function glassTone(base,s,y,h){
  const r=hash(s,y),tint=r<.12?WARM:r<.2?linear('#d8d2c4'):null;
- return (c,worldY)=>{const v=Math.min(1,Math.max(0,(worldY-y)/h+.5));c.lerp(SKY,.3+.35*v);if(tint)c.lerp(tint,.45*(1-v));};
+ return (c,worldY)=>{const v=Math.min(1,Math.max(0,(worldY-y)/h+.5));c.lerp(SKY,.06+.26*v*v);if(tint)c.lerp(tint,.4*(1-v));};
 }
 function pane(F,G,s,y,w,h,glass,arch=false){
  let g;
@@ -71,15 +71,30 @@ function upperStorey(F,G,B,band,st,c){
    slab(F,B,(a+b)/2,y-wh/2-.06,.02,w,.12,.12,c.frame);n+=Math.max(1,Math.round(w/st.pitch));}
   return n;
  }
+ const deep=st.surround!==false&&st.shape!=='square';
  for(const s of bays(...span,st.pitch)){
   const arch=st.shape==='arch',w=st.shape==='square'?Math.min(ww,wh):ww,hh=st.shape==='square'?w:wh;
-  if(!F.rect(s-w/2-.15,s+w/2+.15,y-hh/2-.2,y+hh/2+.15))continue;
+  if(!F.rect(s-w/2-.2,s+w/2+.2,y-hh/2-.25,y+hh/2+.2))continue;
   pane(F,G,s,y,w,hh,c.glass,arch);
-  // A flat frame just proud of the wall and a projecting sill: cheap, and enough to catch the light.
-  for(const dx of [-w/2,w/2])flat(F,B,s+dx,y-(arch?w/4:0),.06,.1,hh-(arch?w/2:0),c.frame);
-  if(!arch)flat(F,B,s,y+hh/2,.06,w+.1,.1,c.frame);
-  if(w>1.1&&!arch)flat(F,B,s,y,.06,.06,hh,c.frame);
-  flat(F,B,s,y-hh/2-.05,.2,w+.3,.1,c.trim);B.add(F.place(new THREE.PlaneGeometry(w+.3,.18).rotateX(-Math.PI/2),s,y-hh/2,.11),c.trim); // sill: front and top
+  const sideH=hh-(arch?w/2:0),sideY=y-(arch?w/4:0);
+  if(deep){
+   // A real reveal: the surround stands 16 cm proud of the wall, so the glass sits back in a recess that
+   // catches light and shadow; plus the sash frame and the Danish cross bar (post and transom).
+   for(const dx of [-1,1])slab(F,B,s+dx*(w/2+.07),sideY,0,.14,sideH+.14,.16,c.surround);
+   if(!arch)slab(F,B,s,y+hh/2+.07,0,w+.28,.14,.16,c.surround);
+   else for(let k=0;k<5;k++){const a=Math.PI*(k+.5)/5,r=w/2+.07;B.add(F.place(new THREE.BoxGeometry(.14,w*.34,.16).rotateZ(a),s+Math.cos(a)*r,y+hh/2-w/2+Math.sin(a)*r,.08),c.surround);}
+   for(const dx of [-w/2+.04,w/2-.04])flat(F,B,s+dx,sideY,.045,.08,sideH,c.frame);
+   if(!arch){flat(F,B,s,y+hh/2-.04,.045,w,.08,c.frame);flat(F,B,s,y-hh/2+.04,.045,w,.08,c.frame);}
+   if(st.shape!=='ribbon'&&w>.7){slab(F,B,s,y,.035,.07,hh-.1,.04,c.frame);if(!arch&&hh>1.2)slab(F,B,s,y+hh*.2,.035,w-.08,.07,.04,c.frame);}
+   // Sill: projecting stone ledge; a hood moulding over the main-floor windows of older fronts.
+   slab(F,B,s,y-hh/2-.1,0,w+.42,.1,.24,c.trim);
+   if(st.hood&&!arch)slab(F,B,s,y+hh/2+.26,0,w+.5,.12,.22,c.cornice);
+  }else{
+   for(const dx of [-w/2,w/2])flat(F,B,s+dx,sideY,.06,.1,sideH,c.frame);
+   if(!arch)flat(F,B,s,y+hh/2,.06,w+.1,.1,c.frame);
+   if(w>1.1&&!arch)flat(F,B,s,y,.06,.06,hh,c.frame);
+   flat(F,B,s,y-hh/2-.05,.2,w+.3,.1,c.trim);B.add(F.place(new THREE.PlaneGeometry(w+.3,.18).rotateX(-Math.PI/2),s,y-hh/2,.11),c.trim);
+  }
   n++;
  }
  return n;
@@ -118,6 +133,7 @@ export function createFacade(faces,spec){
  const c={glass:linear(spec.windows.glass),frame:linear(spec.windows.frame),trim:linear(spec.trim||spec.windows.frame),
   shop:linear('#7d7a70'),band:linear(spec.ground?.band||'#2e3134'),groundFrame:linear(spec.ground?.frame||'#2b2d2f'),
   awning:linear(spec.ground?.awning||'#2b2d2f'),canopy:linear(spec.ground?.canopy||'#2b2d2f'),door:linear(spec.door||'#3a2a20'),lower:spec.wallLower&&linear(spec.wallLower),cornice:linear(spec.cornice||spec.trim||spec.wall)};
+ c.plinth=linear(spec.plinth||'#5d5a55');c.surround=linear(spec.surround||spec.cornice||spec.trim||spec.windows.frame);
  const G=new Batch(),B=new Batch();let windows=0;
  for(const face of faces){
   const F=new FaceFrame(face),width=F.s1-F.s0,height=F.y1-F.y0;
@@ -134,13 +150,17 @@ export function createFacade(faces,spec){
      slab(F,B,s,band.y0+1.25,.03,1.3,2.5,.16,c.door);slab(F,B,s,band.y0+2.62,.03,1.5,.14,.2,c.cornice);}
     continue;}
    if(band.index===0&&spec.storeys>1){windows+=groundStorey(F,G,B,band,spec.ground,c);continue;}
-   windows+=upperStorey(F,G,B,band,storeyStyle(spec,band.index,spec.storeys),c);
+   windows+=upperStorey(F,G,B,band,{...storeyStyle(spec,band.index,spec.storeys),hood:band.index===1&&spec.material!=='glass'&&spec.windows.shape!=='ribbon'&&!spec.modern},c);
    // String course between storeys of masonry fronts.
    if(band.index===1&&spec.material!=='glass')for(const [a,b] of runs(F,band.y0+.1,[F.s0,F.s1]))slab(F,B,(a+b)/2,band.y0,.0,b-a,.22,.12,c.cornice);
   }
   if(spec.storeys===1&&spec.ground?.type==='glass')windows+=groundStorey(F,G,B,{y0:F.y0,y1:F.y1-.3},spec.ground,c);
-  // Cornice along the top edge.
-  if(spec.cornice||spec.material!=='glass')for(const [a,b] of runs(F,F.y1-.4,[F.s0,F.s1]))slab(F,B,(a+b)/2,F.y1-.22,.0,b-a+.1,.44,spec.cornice?.42:.18,c.cornice);
+  // Cornice along the top edge: frieze, a projecting crown and a shadow line under it.
+  if(spec.cornice||spec.material!=='glass')for(const [a,b] of runs(F,F.y1-.4,[F.s0,F.s1])){
+   slab(F,B,(a+b)/2,F.y1-.22,.0,b-a+.1,.44,spec.cornice?.42:.18,c.cornice);
+   if(spec.material!=='glass'&&height>6){slab(F,B,(a+b)/2,F.y1-.62,0,b-a,.36,.1,c.cornice);slab(F,B,(a+b)/2,F.y1-.03,.0,b-a+.2,.08,spec.cornice?.58:.3,c.cornice);}}
+  // Plinth: a darker stone base along the street.
+  if(spec.material!=='glass'&&height>4)for(const [a,b] of runs(F,F.y0+.4,[F.s0,F.s1]))slab(F,B,(a+b)/2,F.y0+.35,0,b-a,.7,.08,c.plinth);
  }
  return {triangles:G.triangles+B.triangles,glass:G.finish(),relief:B.finish(),windows};
 }

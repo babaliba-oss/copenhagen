@@ -20,6 +20,20 @@ def mask(polys):
     return np.array(im, dtype=bool)
 road = mask([r for r in city['roads'] if 'island' not in str(r.get('kind', ''))])
 bld = mask(city['buildings'])
+# The drawn buildings come from the municipal 3D model, not OSM footprints: add every roof triangle of the rendered tiles.
+import os
+idx = json.load(open(f'{OUT}/buildings3d-index.json'))
+im = Image.new('1', (N, N), 0); dr = ImageDraw.Draw(im); tris = 0
+for t in idx['tiles']:
+    a = np.frombuffer(gzip.decompress(open(f"{OUT}/{t['file']}", 'rb').read()), dtype=np.float32).reshape(-1, 3, 5)
+    p0, p1, p2 = a[:, 0, :3], a[:, 1, :3], a[:, 2, :3]
+    n = np.cross(p1 - p0, p2 - p0); keep = np.abs(n[:, 1]) > .3 * (np.linalg.norm(n, axis=1) + 1e-9)
+    for tri in a[keep]:
+        dr.polygon([((v[0] + EXT) / G, (v[2] + EXT) / G) for v in tri], fill=1); tris += 1
+bld |= np.array(im, dtype=bool)
+from scipy.ndimage import binary_dilation
+bld = binary_dilation(bld, iterations=2)  # 1 m clearance from walls
+print('roof triangles', tris)
 def at(m, x, z):
     i, j = int((z + EXT) / G), int((x + EXT) / G)
     return 0 <= i < N and 0 <= j < N and m[i, j]
@@ -45,7 +59,9 @@ for e in mob['roads']['edges']:
             for sgn in (1, -1):
                 px, pz = x + rx * off * sgn, z + rz * off * sgn
                 qx, qz = x + rx * (off + .8) * sgn, z + rz * (off + .8) * sgn
-                if at(road, px, pz) and at(road, qx, qz) and not at(bld, qx + rx * 1.2 * sgn, qz + rz * 1.2 * sgn):
+                cx, cz = x + rx * (off + .35) * sgn, z + rz * (off + .35) * sgn  # car centre
+                corners = [(cx + ux * f * 2.4 + rx * g * 1.0, cz + uz * f * 2.4 + rz * g * 1.0) for f in (-1, 0, 1) for g in (-1, 1)]
+                if at(road, px, pz) and at(road, qx, qz) and all(at(road, *c) and not at(bld, *c) for c in corners) and not at(bld, qx + rx * 1.2 * sgn, qz + rz * 1.2 * sgn):
                     key = (round(px / 3), round(pz / 3))
                     if key in taken: break
                     taken.add(key)

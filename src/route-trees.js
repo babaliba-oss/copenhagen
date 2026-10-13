@@ -9,7 +9,7 @@ export {detailedTreeArea,detailedTreeCell} from './street-trees.js';
 // Kinds 3 and 4 are lean street trees (~3.8k triangles, because sixty stand in view at Lasipalatsi):
 // 3 the boulevard lime (Tilia) — straight trunk, ascending limbs under a dense ovoid crown; 4 the
 // corridor's maples and elms with a broader rounded crown. Both use the fullest leaf card (oak).
-function template(kind,seed,far=false){
+export function template(kind,seed,far=false){
  const tree=new Tree();tree.loadPreset(kind===2?'Pine Medium':kind===1?'Aspen Medium':'Oak Medium');
  const o=tree.options;o.seed=seed;
  if(kind>=3){
