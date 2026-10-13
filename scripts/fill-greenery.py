@@ -10,7 +10,7 @@ from PIL import Image, ImageDraw
 
 cid = sys.argv[1]; path = f'public/cities/{cid}/city.pack'
 city = json.loads(gzip.decompress(open(path, 'rb').read()))
-city['trees'] = [t for t in city['trees'] if not t.get('fill')]
+city['trees'] = [t for t in city['trees'] if not t.get('fill')]  # fill 1: parks, fill 2: open ground
 EXT = city['extent'] + 100; G = 1.0; N = int(2 * EXT / G)
 def mask(polys, grow=0):
     im = Image.new('1', (N, N), 0); d = ImageDraw.Draw(im)
@@ -54,5 +54,26 @@ for p in city['parks']:
                 occ[max(0, i - 3):i + 4, max(0, j - 3):j + 4] = True; added += 1
             z += step
         x += step
+# Second pass: large open ground that is not a mapped park (yards, forecourts, waterfront lots) gets sparse
+# tree groups, kept 7 m from buildings and roads, so the city has no bare fields.
+from scipy import ndimage
+parks_m = mask(city['parks'])
+far = ~(mask(city['buildings'], 7) | mask(city['roads'], 5) | mask(city['water'], 4) | mask(city.get('pavement', []), 2))
+open_ = far & ~parks_m
+yy, xx = np.mgrid[0:N, 0:N]; inside = ((xx * G - EXT) ** 2 + (yy * G - EXT) ** 2) < (city.get('radius', 2200)) ** 2
+open_ &= inside
+lab, nlab = ndimage.label(open_)
+sizes = ndimage.sum(open_, lab, range(1, nlab + 1))
+big = np.isin(lab, [i + 1 for i, a in enumerate(sizes) if a * G * G > 1800])
+added2 = 0; step = 16.0
+for x in np.arange(-EXT, EXT, step):
+    for z in np.arange(-EXT, EXT, step):
+        px, pz = x + rnd.random() * step * .7, z + rnd.random() * step * .7
+        i, j = int((pz + EXT) / G), int((px + EXT) / G)
+        if not (0 <= i < N and 0 <= j < N) or not big[i, j] or occ[i, j]: continue
+        if noise(px, pz, 40) < .5: continue
+        city['trees'].append({'p': [round(px, 2), round(pz, 2)], 'species': rnd.choice(['Tilia', 'Acer', 'Platanus', 'Betula', 'Quercus']), 'size': '30 - 50 cm', 'height': round(8 + rnd.random() * 8, 1), 'fill': 2})
+        occ[max(0, i - 4):i + 5, max(0, j - 4):j + 5] = True; added2 += 1
+print('open-ground trees', added2)
 open(path, 'wb').write(gzip.compress(json.dumps(city, separators=(',', ':')).encode(), 9))
 print('fill trees', added, 'total', len(city['trees']))
