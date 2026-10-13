@@ -108,6 +108,12 @@ export function createMappedFurniture(layer,{player=()=>null,mobility=()=>null,c
   return chunks.get(key);};
  const place=(geometry,x,z,yaw,chunk,i,list)=>{geometry.applyMatrix4(m4.compose(v.set(x,groundAt(x,z),z),q.setFromAxisAngle(UP,yaw),one));chunk.signs.tag(geometry,i);list.push(geometry);};
 
+ // Instanced items split into the post chunks, so they are hidden with them beyond view range.
+ function chunkedInstances(list,geometry,material,name,pose,{shadow=true}={}){
+  const by=new Map();for(const it of list){const [x,z]=pose(it);const c=chunkOf(x,z);if(!by.has(c))by.set(c,[]);by.get(c).push(it);}
+  for(const [c,its] of by){const mesh=new THREE.InstancedMesh(geometry,material,its.length);mesh.name=name;mesh.castShadow=shadow;mesh.receiveShadow=true;
+   its.forEach((it,i)=>{const [x,z,yaw]=pose(it);mesh.setMatrixAt(i,m4.compose(v.set(x,groundAt(x,z),z),q.setFromAxisAngle(UP,yaw||0),one));});mesh.computeBoundingSphere();c.group.add(mesh);}
+ }
  // Breakable posts.
  items.forEach((it,index)=>{const spec=POSTS[it.k];if(!spec)return;
   const chunk=chunkOf(it.x,it.z),yaw=it.yaw||0;let height=spec.height;
@@ -126,11 +132,9 @@ export function createMappedFurniture(layer,{player=()=>null,mobility=()=>null,c
  const wireLamps=items.filter(it=>it.k==='wire-lamp'),wirePoles=[];
  if(wireLamps.length){
   for(const it of wireLamps){const chunk=chunkOf(it.x,it.z);wireLines(it,chunk.wires??=[],wirePoles);}
-  const shade=mergeGeometries([cyl(.012,.012,.5,WIRE_LOW+.3,'#24282a',4),cyl(.06,.06,.1,WIRE_LOW+.5,'#2c3033',8),cyl(.09,.42,.24,WIRE_LOW+.32,'#2c3033',12),cyl(.3,.3,.03,WIRE_LOW+.19,'#fff3d6',12)]);
-  const sm=new THREE.InstancedMesh(shade,painted,wireLamps.length);sm.name='Wire lamp shades';
-  wireLamps.forEach((it,i)=>sm.setMatrixAt(i,m4.compose(v.set(it.x,groundAt(it.x,it.z),it.z),q.setFromAxisAngle(UP,it.yaw||0),one)));sm.computeBoundingSphere();group.add(sm);
-  if(wirePoles.length){const pm=new THREE.InstancedMesh(mergeGeometries([cyl(.06,.09,8.2,4.1,'#3b3f42',7)]),painted,wirePoles.length);pm.name='Wire poles';pm.castShadow=true;
-   wirePoles.forEach(([x,z],i)=>pm.setMatrixAt(i,m4.compose(v.set(x,groundAt(x,z),z),q.identity(),one)));pm.computeBoundingSphere();group.add(pm);
+  const shade=mergeGeometries([cyl(.012,.012,.5,WIRE_LOW+.3,'#24282a',4),cyl(.06,.06,.1,WIRE_LOW+.5,'#2c3033',8),cyl(.09,.42,.24,WIRE_LOW+.32,'#2c3033',8),cyl(.3,.3,.03,WIRE_LOW+.19,'#fff3d6',8)]);
+  chunkedInstances(wireLamps,shade,painted,'Wire lamp shades',it=>[it.x,it.z,it.yaw],{shadow:false});
+  if(wirePoles.length){chunkedInstances(wirePoles,mergeGeometries([cyl(.06,.09,8.2,4.1,'#3b3f42',7)]),painted,'Wire poles',p=>[p[0],p[1],0]);
    wirePoles.forEach(([x,z],i)=>obstacles.push({id:`wire-pole-${i}`,name:'pole',rings:[[[x-.1,z-.1],[x+.1,z-.1],[x+.1,z+.1],[x-.1,z+.1]]],bbox:[x-.1,z-.1,x+.1,z+.1]}));}
  }
  const wireMaterial=new THREE.LineBasicMaterial({color:'#1f2325'});
@@ -194,11 +198,10 @@ export function createMappedFurniture(layer,{player=()=>null,mobility=()=>null,c
  for(const [kind,size] of Object.entries(SOLIDS)){
   const list=items.filter(i=>i.k===kind);if(!list.length)continue;
   const g=mergeGeometries(solidParts[kind](size));g.computeVertexNormals();
-  const mesh=new THREE.InstancedMesh(g,painted,list.length);mesh.name=`Mapped ${kind}`;mesh.castShadow=mesh.receiveShadow=true;
-  list.forEach((it,i)=>{const yaw=it.yaw||0;mesh.setMatrixAt(i,m4.compose(v.set(it.x,groundAt(it.x,it.z),it.z),q.setFromAxisAngle(UP,yaw),one));
+  chunkedInstances(list,g,painted,`Mapped ${kind}`,it=>[it.x,it.z,it.yaw]);
+  list.forEach((it,i)=>{const yaw=it.yaw||0;
    const [w,d]=size,c=Math.cos(yaw),s=Math.sin(yaw),ring=[[-w/2,-d/2],[w/2,-d/2],[w/2,d/2],[-w/2,d/2]].map(([a,b])=>[it.x+a*c+b*s,it.z-a*s+b*c]);
    obstacles.push({id:itemId(it,i),name:kind,rings:[ring],bbox:[Math.min(...ring.map(p=>p[0])),Math.min(...ring.map(p=>p[1])),Math.max(...ring.map(p=>p[0])),Math.max(...ring.map(p=>p[1]))]});});
-  mesh.computeBoundingSphere();group.add(mesh);
  }
 
  // Lamp light after dark (weather.js night look): a bright head that blooms and a warm pool on the ground.
