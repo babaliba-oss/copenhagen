@@ -22,6 +22,7 @@ python3 scripts/prune-mobility.py copenhagen        # keep the main road/footpat
 python3 scripts/fill-greenery.py copenhagen
 python3 scripts/parked-cars.py copenhagen                    # after the buildings: tested against the drawn 3D roofs
 python3 scripts/boats.py copenhagen
+python3 scripts/havnebus.py copenhagen                   # harbour bus route (after boats.py)
 python3 scripts/rails.py Copenhagen.osm.pbf copenhagen
 python3 scripts/cafes.py copenhagen
 python3 scripts/anchors.py copenhagen
