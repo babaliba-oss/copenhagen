@@ -62,7 +62,7 @@ export function createInstancedPeople(records,options={}){
  const clear=(x,z,p)=>safe(x,z)&&!people.some(q=>q!==p&&Math.hypot(q.x-x,q.z-z)<.69)&&!scooters.some(q=>Math.hypot(q.x-x,q.z-z)<1.2);
  function update(dt,player){
   const step=clamp(dt||0,0,.08);time+=step;viewer=player||null;
-  group.visible=!player||Math.hypot(player.x-center.x,player.z-center.z)<650;
+  group.visible=!player||Math.hypot(player.x-center.x,player.z-center.z)<(options.range??650);
   if(!group.visible)return;
   for(const p of options.externalMotion?[]:people){
    if(p.knockdown){p.speed=0;continue;}

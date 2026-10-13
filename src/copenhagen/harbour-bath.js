@@ -31,13 +31,13 @@ export function createHarbourBath({createPeople}={}){
  box(-12,(B0+B1)/2,deck-.25,2.4,B1-B0,.25,WOOD2);box(10,(B0+B1)/2,deck-.25,2,B1-B0,.25,WOOD2); // children's pool, lane divider
  for(const a of [-22,6,24]){const q=groundAt(...W(a,-1));box(a,1,Math.min(q,deck)-.1,3.4,4.2,.22,WOOD2);}
  // a sunbathing terrace along the quay side
- box(0,B0-1.5+T,deck-.25,40,3,.25,WOOD);
+ box(0,B0-1.5,deck-.25,40,3,.25,WOOD);
  // pool edges: a blue line on the inner deck edges
  box(0,B0+T+.05,deck,A1-A0-2*T,.1,.03,BLUE);box(0,B1-T-.05,deck,A1-A0-2*T,.1,.03,BLUE);
  // white railing on the outer edges (posts every 2 m, top and mid rails)
  const rail=(a0,b0,a1,b1)=>{const len=Math.hypot(a1-a0,b1-b0),ca=(a1-a0)/len,cb=(b1-b0)/len;for(let s=0;s<=len;s+=2){box(a0+ca*s,b0+cb*s,deck,.07,.07,1.05,WHITE);}
   const g=(y,t)=>{const geo=new THREE.BoxGeometry(t,t,len);geo.rotateY(Math.atan2(u[0]*ca+n[0]*cb,u[1]*ca+n[1]*cb));const [x,z]=W((a0+a1)/2,(b0+b1)/2);geo.translate(x,y,z);parts.push(paint(geo,WHITE));};g(deck+1.05,.08);g(deck+.55,.05);};
- rail(A0,B1,A1,B1);rail(A0,B0+2,A0,B1);rail(A1,B0+2,A1,B1);
+ rail(A0,B1,da-2,B1);rail(da+2,B1,A1,B1); // open where the boards reach outrail(A0,B0+2,A0,B1);rail(A1,B0+2,A1,B1);
  // diving tower at the outer corner: three platforms (1, 3 and 5 m) on white legs, blue boards
  const da=A1-8,db=B1-1.6;
  for(const [dx,dy] of [[-1.2,0],[1.2,0],[-1.2,-1.6],[1.2,-1.6]])box(da+dx,db+dy,deck,.22,.22,5.2,WHITE);
@@ -60,7 +60,7 @@ export function createHarbourBath({createPeople}={}){
  const people=[];const at=(a,b,extra={})=>{const [x,z]=W(a,b);people.push({x,z,heading:yaw+(r()-.5)*3,pose:r()<.5?'chat':'browse',groundY:deck-groundAt(x,z)+.02,talkable:false,...extra});};
  for(let i=0;i<10;i++)at(-20+r()*40,B0+T/2+(r()-.5)*1.6);
  for(let i=0;i<8;i++)at(A0+T/2+(r()-.5),B0+T+r()*(B1-B0-2*T));
- for(let i=0;i<4;i++)at(da-1.8+(r()-.5)*.6,db-1-i*.9,{pose:'browse',heading:yaw});
+ for(let i=0;i<4;i++)at(da-2.4-i*.9,B1-T/2+(r()-.5)*.6,{pose:'browse',heading:yaw}); // queueing for the tower along the outer deck
  const crowd=people.length&&createPeople?createPeople(people,{name:'Harbour bath bathers',center:{x:mid[0],z:mid[1]},seed:4242}):null;if(crowd)group.add(crowd.group);
  const obstacles=[]; // the bath is on the water: the car cannot reach it, walkers come by the gangways
  return {group,crowd,obstacles,center:{x:mid[0]+n[0]*16,z:mid[1]+n[1]*16},update(dt,player){crowd?.update(dt,player);}};

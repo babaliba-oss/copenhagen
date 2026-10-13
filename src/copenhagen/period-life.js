@@ -100,14 +100,16 @@ export function createSquareCrowds({world,water=[],places=[],seed=2026}){
  const group=new THREE.Group();group.name='Square crowds';const r=rnd(seed),batches=[];
  const wet=(x,z)=>water.some(w=>{const b=w.bbox;return (!b||x>=b[0]&&x<=b[2]&&z>=b[1]&&z<=b[3])&&pointInPolygon(x,z,w.rings);});
  const free=(x,z)=>!world.buildings.at(x,z)&&!world.roads.at(x,z)&&!wet(x,z)&&!world.buildings.at(x+.6,z)&&!world.buildings.at(x-.6,z)&&!world.buildings.at(x,z+.6)&&!world.buildings.at(x,z-.6);
- let total=0;
- for(const sq of places){const list=[];
+ const list=[];
+ for(const sq of places){
   const groups=10+Math.floor(r()*8);
   for(let g=0;g<groups;g++){const a=r()*6.28,d=4+Math.sqrt(r())*40,cx=sq.x+Math.cos(a)*d,cz=sq.z+Math.sin(a)*d;
    if(r()<.35){if(free(cx,cz))list.push({x:cx,z:cz,heading:r()*6.28,pose:'browse',walking:false});continue;} // someone alone, looking at the sights
    const n=2+Math.floor(r()*3);for(let i=0;i<n;i++){const b=i/n*6.28+r()*.4,px=cx+Math.cos(b)*.75,pz=cz+Math.sin(b)*.75;if(free(px,pz))list.push({x:px,z:pz,heading:Math.atan2(px-cx,pz-cz),pose:r()<.7?'chat':'browse',walking:false});}}
-  if(!list.length)continue;total+=list.length;
-  const b=createInstancedPeople(list,{name:`Crowd at ${sq.name||'square'}`,center:{x:sq.x,z:sq.z},seed:seed+batches.length*131});group.add(b.group);batches.push(b);}
- group.userData={people:total,batches:batches.length};
+  }
+ // one batch for all of them (about nine draws): the batch picks each person's detail by distance and its
+ // meshes are frustum-culled, so one batch beats one per place
+ if(list.length){const b=createInstancedPeople(list,{name:'Crowds at the squares',center:{x:0,z:0},seed,range:Infinity});group.add(b.group);batches.push(b);}
+ group.userData={people:list.length,batches:batches.length};
  return {group,update(dt,player){for(const b of batches)b.update(dt,player);}};
 }
