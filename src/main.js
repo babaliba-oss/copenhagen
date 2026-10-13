@@ -413,8 +413,14 @@ async function detailTile(group){
  const shells=new Map(group.children.filter(m=>m.userData.source).map(m=>[m.userData.id,m]));
  for(const b of buildings)uploads.push(()=>{
   if(loadedTiles.get(t.file)!==group)return;
-  const shell=shells.get(b.part.id);if(shell){group.remove(shell);shell.geometry.dispose();disposeMaterial(shell.material);}
-  const meshes=materialiseBuilding(b,textures);for(const m of meshes){freezeMesh(m);applyMeshLod(m,group.userData.level,focus);}group.add(...meshes);group.userData.windows+=b.windows;
+  const meshes=materialiseBuilding(b,textures);for(const m of meshes){freezeMesh(m);applyMeshLod(m,group.userData.level,focus);}
+  // Shaders compile in the background first (parallel compile where the GPU offers it); a variant never seen
+  // before no longer stalls a frame, the building just lands a moment later.
+  const land=()=>{if(loadedTiles.get(t.file)!==group){for(const m of meshes){m.geometry.dispose();disposeMaterial(m.material);}return;}
+   const shell=shells.get(b.part.id);if(shell){group.remove(shell);shell.geometry.dispose();disposeMaterial(shell.material);}
+   group.add(...meshes);group.userData.windows+=b.windows;};
+  const tmp=new THREE.Group();tmp.add(...meshes);
+  renderer.compileAsync(tmp,camera,scene).then(()=>{tmp.remove(...meshes);land();},()=>{tmp.remove(...meshes);land();});
  },()=>dist(b)); // nearest building first, across every tile in the queue
 }
 async function loadPhoto(t){
