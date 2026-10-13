@@ -8,20 +8,39 @@ import {waterAt} from '../terrain.js';
 const paint=(g,hex)=>{const n=g.index?g.toNonIndexed():g;if(n!==g)g.dispose();for(const k of Object.keys(n.attributes))if(k!=='position'&&k!=='normal')n.deleteAttribute(k);const c=new THREE.Color(hex),a=new Float32Array(n.attributes.position.count*3);for(let i=0;i<a.length;i+=3)a.set([c.r,c.g,c.b],i);n.setAttribute('color',new THREE.BufferAttribute(a,3));return n;};
 const box=(w,h,d,x,y,z,hex)=>paint(new THREE.BoxGeometry(w,h,d).translate(x,y,z),hex);
 const cyl=(r0,r1,h,x,y,z,hex,seg=6)=>paint(new THREE.CylinderGeometry(r0,r1,h,seg).translate(x,y,z),hex);
-// A hull: a box with the bow pinched to a point and the bottom narrowed. Length along Z, bow at -Z.
-function hull(w,h,len,hex,deck='#c9b48a',sheer=.15){
- const g=new THREE.BoxGeometry(w,h,len,2,2,10),p=g.attributes.position;
+// A hull: a box with the bow pinched to a point and the bottom narrowed. Length along Z, bow at -Z. The top
+// `band` metres take a second colour (the painted strake under the gunwale on Nyhavn's wooden ships).
+function hull(w,h,len,hex,deck='#c9b48a',sheer=.15,band=null,bandH=.32){
+ const g=new THREE.BoxGeometry(w,h,len,2,3,12),p=g.attributes.position;
  for(let i=0;i<p.count;i++){let x=p.getX(i),y=p.getY(i),z=p.getZ(i);const t=(z+len/2)/len; // 0 bow, 1 stern
   const bow=t<.4?Math.sin(t/.4*Math.PI/2):1,stern=t>.85?1-(t-.85)/.15*.3:1;x*=Math.max(.02,bow)*stern;
-  const keel=(y+h/2)/h;x*=.45+.55*keel;y+=sheer*Math.pow(1-t,3)*(y>0?1:0);p.setXYZ(i,x,y,z);}
- g.computeVertexNormals();return [paint(g.translate(0,h/2-.3,0),hex),box(w*.84,.05,len*.62,0,h-.3,len*.16,deck)];
+  const keel=(y+h/2)/h;x*=.45+.55*keel;if(band&&y<h/2&&y>-h/2)y=h/2-bandH; // middle row at the strake line
+  y+=sheer*Math.pow(1-t,3)*(y>-h/2?1:0);p.setXYZ(i,x,y,z);}
+ g.computeVertexNormals();const n=paint(g.translate(0,h/2-.3,0),hex);
+ if(band){const c=new THREE.Color(band),col=n.attributes.color,pos=n.attributes.position;
+  // per triangle: any face whose lowest corner is at or above the strake line takes the band colour
+  for(let i=0;i<pos.count;i+=3){const lo=Math.min(pos.getY(i),pos.getY(i+1),pos.getY(i+2));if(lo>h-.3-bandH-.05-1e-3)for(let k=0;k<3;k++)col.setXYZ(i+k,c.r,c.g,c.b);}}
+ return [n,box(w*.84,.05,len*.62,0,h-.3,len*.16,deck)];
 }
-const sail=()=>mergeGeometries([...hull(2.4,1.1,8,'#f4f4f0'),box(1.3,.6,2.2,0,1.05,.8,'#e8e6de'),cyl(.06,.08,11,0,6.2,-.6,'#c9ccce'),box(.07,.07,3.6,0,2,1.2,'#c9ccce'),box(.9,.5,3.2,0,1.0,-.1,'#1f3b5b')]);
-const motor=()=>mergeGeometries([...hull(2.2,1.0,6.5,'#e9e6dc'),box(1.5,.9,2.4,0,1.15,.6,'#f2f0ea'),box(1.52,.4,1.6,0,1.35,.3,'#2b3a44')]);
-const wooden=()=>mergeGeometries([...hull(3.6,1.6,12.5,'#2a2420','#9b7a52',.4),box(4.1,.3,16*.85,0,1.55,.4,'#7a2a20'),cyl(.14,.18,15,0,9,-2.5,'#5b4630',8),cyl(.12,.15,12,0,7.5,3.5,'#5b4630',8),
- box(.08,.08,6,0,13,-2.5,'#5b4630'),box(.08,.08,5,0,10,3.5,'#5b4630'),box(1.6,1.2,2.6,0,2.2,5.2,'#6b4d32')]);
-const ship=()=>mergeGeometries([...hull(7,3.6,30,'#3b2a1c','#a8875c',.9),box(7,.5,25,0,3.2,.8,'#c19a45'),box(6.8,2.2,4,0,4.3,12.5,'#4a3020'),
- ...[-9,0,8].flatMap((z,i)=>[cyl(.25,.32,[22,26,18][i],0,[11,13,9][i]+2,z,'#5b4630',8),box(9,4.5,.12,0,[11,14,9][i],z+.4,'#efe7d3'),box(7,3.5,.12,0,[16.5,20,13.5][i],z+.4,'#efe7d3')]),box(.2,.2,9,0,4,-17,'#5b4630'),box(.6,1.4,1.6,0,4.3,-15,'#c8202a')]);
+// A thin round spar between two points (masts, booms, stays, shrouds).
+const _up=new THREE.Vector3(0,1,0),_d=new THREE.Vector3(),_q=new THREE.Quaternion(),_m=new THREE.Matrix4();
+function rod(a,b,r,hex,seg=4){_d.set(b[0]-a[0],b[1]-a[1],b[2]-a[2]);const len=_d.length();_q.setFromUnitVectors(_up,_d.normalize());
+ const g=new THREE.CylinderGeometry(r,r,len,seg);g.applyMatrix4(_m.compose(new THREE.Vector3((a[0]+b[0])/2,(a[1]+b[1])/2,(a[2]+b[2])/2),_q,new THREE.Vector3(1,1,1)));return paint(g,hex);}
+const sail=()=>{const top=[0,12,-.6],deck=1.05;return mergeGeometries([...hull(2.4,1.1,8,'#f4f4f0','#c9b48a',.15,'#1f3b5b',.16),box(1.3,.55,2.2,0,1.05,.9,'#e8e6de'),box(1.32,.2,1.2,0,1.25,.5,'#2b3a44'),
+ rod([0,deck,-.6],top,.06,'#c9ccce',6),rod([0,2.1,-.5],[0,2.1,3],.05,'#c9ccce'),box(.32,.3,3,0,2.25,1.2,'#1f3b5b'), // mast, boom, sail cover
+ rod(top,[0,deck,-3.9],.012,'#8a8f93'),rod(top,[1.1,deck,-.2],.012,'#8a8f93'),rod(top,[-1.1,deck,-.2],.012,'#8a8f93'),rod(top,[0,deck+.2,3.9],.012,'#8a8f93')]);}; // stays and shrouds
+const motor=()=>mergeGeometries([...hull(2.2,1.0,6.5,'#e9e6dc','#c9b48a',.15,'#7b1f22',.12),box(1.5,.9,2.4,0,1.15,.6,'#f2f0ea'),box(1.52,.4,1.6,0,1.35,.3,'#2b3a44'),box(1.2,.05,1.6,0,1.62,.7,'#d9d6cc')]);
+// Nyhavn's wooden ships: dark tarred hull with a painted strake, deckhouse aft, two masts with booms and furled
+// sails, a bowsprit and the standing rigging.
+const wooden=()=>{const d=1.62,main=[0,15.5,-2],miz=[0,11.5,3.4],bow=[0,2.3,-9.4];return mergeGeometries([...hull(3.6,1.9,13,'#24201c','#a08058',.45,'#7c2a22',.34),
+ box(1.7,1.0,2.4,0,d+.5,4.2,'#6b4d32'),box(1.9,.12,2.6,0,d+1.05,4.2,'#3b2a1c'),box(.9,.5,1.1,0,d+.25,-3.6,'#6b4d32'), // deckhouse, roof, hatch
+ rod([0,d,-2],main,.15,'#6b5238',8),rod([0,d,3.4],miz,.12,'#6b5238',8),rod([0,1.95,-6.2],bow,.1,'#6b5238',6), // masts and bowsprit
+ rod([0,2.9,-2],[0,2.9,3],.08,'#6b5238',6),rod([0,2.9,3.4],[0,2.9,6.6],.07,'#6b5238',6), // booms
+ box(.42,.4,4.6,0,3.15,.5,'#e3d8c2'),box(.38,.36,2.9,0,3.15,5,'#e3d8c2'), // furled sails
+ rod(main,bow,.02,'#2a2622'),rod(main,miz,.02,'#2a2622'),rod(miz,[0,d,6.4],.02,'#2a2622'),
+ ...[-1,1].flatMap(sd=>[rod(main,[sd*1.75,d,-2.4],.018,'#2a2622'),rod(main,[sd*1.75,d,-1],.018,'#2a2622'),rod(miz,[sd*1.6,d,3.6],.018,'#2a2622')])]);};
+const ship=()=>mergeGeometries([...hull(7,3.6,30,'#3b2a1c','#a8875c',.9,'#c19a45',.5),box(6.8,2.2,4,0,4.3,12.5,'#4a3020'),
+ ...[-9,0,8].flatMap((z,i)=>[cyl(.25,.32,[22,26,18][i],0,[11,13,9][i]+2,z,'#5b4630',8),box(9,4.5,.12,0,[11,14,9][i],z+.4,'#efe7d3'),box(7,3.5,.12,0,[16.5,20,13.5][i],z+.4,'#efe7d3')]),rod([0,4,-14],[0,6.5,-21],.2,'#5b4630',6),box(.6,1.4,1.6,0,4.3,-15,'#c8202a')]);
 const tour=()=>mergeGeometries([...hull(4.6,1.2,17,'#1f3f63','#d9d6cc',.1),box(4.2,.12,13.5,0,1.9,.6,'#e9e7e0'),...[-5,-2.5,0,2.5,5].map(z=>box(4.25,.65,.06,0,1.55,z+.6,'#c9d6dd')),box(4.3,.06,14,0,1.25,.6,'#2b4a6e')]);
 // Havnebussen: a long low harbour bus, yellow hull, glazed cabin with a blue band, flat roof.
 const havnebus=()=>mergeGeometries([...hull(5.2,1.3,22,'#e2b33c','#5f6a70',.15),box(4.4,1.9,15,0,2.1,1.2,'#f2f0ea'),box(4.46,.9,14.4,0,2.35,1.2,'#25313a'),box(4.5,.22,15.2,0,1.32,1.2,'#1f4f8a'),box(4.6,.14,15.6,0,3.1,1.2,'#e9e7e0'),box(1.6,.9,2.2,0,3.6,4.8,'#f2f0ea')]);
