@@ -63,6 +63,19 @@ Notes:
 - `carriage.js`: the 1760 coach (player) and NPC coaches.
 - `landmarks.js`: Vor Frelsers stair, Børsen spire, Tivoli rides, statues, flags, 1760 windmills.
 - `parked-cars.js`, `boats.js`, `rails.js`, `trains.js`, `city-cyclists.js`, `cafes.js`: street life.
+- `harbour-bath.js`: Havnebadet Islands Brygge (decks, diving tower, bathers); `inHarbourBath()` keeps boats out.
+- `period-life.js`: 1760 crowds on squares, quays and gates, carts and animals. `soundscape.js`: engine, tyres, bells, hooves.
+- `big-map.js`: the full-screen map (M) with click-to-travel.
+
+## Performance knobs
+
+- `?quality=low` (or `?quality=1..3`) starts with the quality governor's steps applied: AO off, then bloom off
+  and a 1024 shadow map, then no MSAA. On weak GPUs the governor (src/quality-governor.js) takes the same steps
+  by itself once the lowest render scale (.75) is still too slow.
+- Near tiles draw waiting buildings from the merged shell with a per-part mask (src/tile-lod.js); a tile holds at
+  most 256 parts for that to work.
+- Dev helpers (vite dev only): `openCityDrive.pick(nx,ny)` names what is under a screen point,
+  `openCityDrive.inspectCamera({eye,target})` freezes a reference view, `getState().quality` shows the governor level.
 
 Shared changes: `facade-grain.js` (brick, plaster, roof courses, window grid on far shells),
 `night-windows.js` and the Night look in `weather.js`, lamp light in `mapped-furniture.js`,
