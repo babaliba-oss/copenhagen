@@ -47,8 +47,13 @@ function colour(samples,wall){
 }
 export function analyseBuilding(array,part,pixels){
  const faces=new Map(),roof=[],triangles=[];
+ // Some source meshes are wound inside-out (about half of the Copenhagen city model): orient every normal
+ // outward by the sign of the part's volume, or windows end up inside the wall and roofs read as walls.
+ let cx=0,cy=0,cz=0;const nv=part.count||1;for(let i=part.start;i<part.start+part.count;i++){cx+=array[i*5];cy+=array[i*5+1];cz+=array[i*5+2];}cx/=nv;cy/=nv;cz/=nv;
+ let vol=0;for(let i=part.start;i<part.start+part.count;i+=3){const o=i*5,ax=array[o]-cx,ay=array[o+1]-cy,az=array[o+2]-cz,bx=array[o+5]-cx,by=array[o+6]-cy,bz=array[o+7]-cz,qx=array[o+10]-cx,qy=array[o+11]-cy,qz=array[o+12]-cz;vol+=ax*(by*qz-bz*qy)-ay*(bx*qz-bz*qx)+az*(bx*qy-by*qx);}
+ const flip=vol<0?-1:1;
  for(let i=part.start;i<part.start+part.count;i+=3){
-  const v=[0,1,2].map(j=>Array.from(array.slice((i+j)*5,(i+j)*5+5))),a=new THREE.Vector3(...v[0]),b=new THREE.Vector3(...v[1]),c=new THREE.Vector3(...v[2]),n=b.clone().sub(a).cross(c.clone().sub(a));
+  const v=[0,1,2].map(j=>Array.from(array.slice((i+j)*5,(i+j)*5+5))),a=new THREE.Vector3(...v[0]),b=new THREE.Vector3(...v[1]),c=new THREE.Vector3(...v[2]),n=b.clone().sub(a).cross(c.clone().sub(a)).multiplyScalar(flip);
   const area=n.length()/2;if(area<.005)continue;n.normalize();
   const triangle={v,n,area,samples:[sample(pixels,(v[0][3]+v[1][3]+v[2][3])/3,(v[0][4]+v[1][4]+v[2][4])/3)]};triangles.push(triangle);
   if(Math.abs(n.y)>.12){roof.push(triangle);continue;}
@@ -136,6 +141,31 @@ export function createModelledBuilding(array,part,pixels,texture=null,includeHer
   let k=0;for(const {e,l} of ridgesFlat)for(const f of l>14?[.22,.78]:[.5]){if(k++>=3)break;const x=e.a[0]+(e.b[0]-e.a[0])*f,y=e.a[1]+(e.b[1]-e.a[1])*f,z=e.a[2]+(e.b[2]-e.a[2])*f,yaw=Math.atan2(e.b[0]-e.a[0],e.b[2]-e.a[2]);
    const g=new THREE.BoxGeometry(.75,1.5,1.1);g.rotateY(yaw);g.translate(x,y+.45,z);chimneys.push(g);const c=new THREE.BoxGeometry(.95,.14,1.3);c.rotateY(yaw);c.translate(x,y+1.25,z);chimneys.push(c);}
  }
+ // Dormers: a row of small windowed dormers on each pitched roof plane of older houses (the Copenhagen roofline).
+ const dormerWalls=[],dormerRoofs=[],dormerGlass=[];
+ if(!texture&&part.roofColor&&part.height>8&&part.height<32&&!part.modern&&!(part.year>1935)){
+  const planes=new Map();
+  for(const t of analysis.roof){if(t.n.y<.4||t.n.y>.9)continue;const hx=t.n.x,hz=t.n.z,hl=Math.hypot(hx,hz);if(hl<.2)continue;const v0=t.v[0],d=t.n.x*v0[0]+t.n.y*v0[1]+t.n.z*v0[2];
+   const key=`${Math.round(Math.atan2(hx,hz)*20)}:${Math.round(t.n.y*20)}:${Math.round(d)}`;if(!planes.has(key))planes.set(key,{n:t.n,h:[hx/hl,hz/hl],tris:[]});planes.get(key).tris.push(t);}
+  let count=0;
+  for(const pl of planes.values()){
+   const [hx,hz]=pl.h,ax=-hz,az=hx,loc=v=>[v[0]*ax+v[2]*az,v[1]];let ymin=Infinity,ymax=-Infinity;
+   for(const t of pl.tris)for(const v of t.v){ymin=Math.min(ymin,v[1]);ymax=Math.max(ymax,v[1]);}
+   if(ymax-ymin<2.6)continue;const yd=ymin+(ymax-ymin)*.3;
+   // along-range of the plane at the dormer height
+   let lo=Infinity,hi=-Infinity;for(const t of pl.tris){const L=t.v.map(loc);for(let i=0;i<3;i++){const a=L[i],b=L[(i+1)%3];if((a[1]-yd)*(b[1]-yd)>0||a[1]===b[1])continue;const s=a[0]+(b[0]-a[0])*(yd-a[1])/(b[1]-a[1]);lo=Math.min(lo,s);hi=Math.max(hi,s);}}
+   if(!(hi-lo>4.5))continue;
+   const n=Math.max(1,Math.floor((hi-lo-2.4)/3.6)),step=(hi-lo)/(n+1),yaw=Math.atan2(hx,hz);
+   for(let k=1;k<=n&&count<14;k++){const s0=lo+step*k;
+    // the roof point at (s0, yd): back along the horizontal normal to the plane
+    const t0=pl.tris[0].v[0],d=pl.n.x*t0[0]+pl.n.y*t0[1]+pl.n.z*t0[2];const bx=s0*ax,bz=s0*az,u=(d-pl.n.y*yd-(pl.n.x*bx+pl.n.z*bz))/(pl.n.x*hx+pl.n.z*hz);
+    const px=bx+hx*u,pz=bz+hz*u,W=1.35,H=1.5,D=2.2,cx=px+hx*(.25-D/2),cz=pz+hz*(.25-D/2);
+    const put=(g,list,y,ox=0,oz=0)=>{g.rotateY(yaw);g.translate(cx+hx*oz+ax*ox,y,cz+hz*oz+az*ox);list.push(g);};
+    put(new THREE.BoxGeometry(W,H,D),dormerWalls,yd+H/2-.2);
+    for(const sg of [-1,1]){const r=new THREE.BoxGeometry(W*.62,.08,D+.25);r.rotateZ(sg*-.62);r.translate(sg*W*.26,0,0);put(r,dormerRoofs,yd+H-.2+.2);}
+    put(new THREE.BoxGeometry(W*.62,H*.62,.06),dormerGlass,yd+H*.47-.2,0,D/2+.01);count++;}
+  }
+ }
  const meshes=[];
  const occlusion={opacity:1,clearTime:1};
  function mesh(g,material){if(!g)return;material.transparent=true;material.forceSinglePass=true;const m=new THREE.Mesh(g,material);m.castShadow=true;m.receiveShadow=true;m.userData.occlusion=occlusion;m.userData.box=new THREE.Box3(new THREE.Vector3(part.bbox[0]-.5,0,part.bbox[1]-.5),new THREE.Vector3(part.bbox[2]+.5,part.height+.5,part.bbox[3]+.5));meshes.push(m);}
@@ -166,8 +196,9 @@ export function createModelledBuilding(array,part,pixels,texture=null,includeHer
  // Trim, ridge seams and chimneys share one vertex-coloured mesh; with a described front they join its relief,
  // and the generated window glazing joins its glass (three draw calls per building instead of six).
  const tint=(list,hex)=>{const c=new THREE.Color(hex);return list.map(g0=>{const g=g0.index?g0.toNonIndexed():g0;if(g!==g0)g0.dispose();const n=g.attributes.position.count,a=new Float32Array(n*3);for(let i=0;i<n;i++)a.set([c.r,c.g,c.b],i*3);g.setAttribute('color',new THREE.BufferAttribute(a,3));if(g.attributes.uv)g.deleteAttribute('uv');return g;});};
- let plain=[...tint(trim,part.ratu===324?'#927e60':'#d6d1c4'),...tint(ridges,'#606869'),...tint(chimneys,'#8b4b3c')];
- let glass=tint(glazing,'#263e4d');
+ const hexArr=a=>'#'+a.map(v=>Math.round(Math.max(0,Math.min(1,v))*255).toString(16).padStart(2,'0')).join('');
+ let plain=[...tint(trim,part.ratu===324?'#927e60':'#d6d1c4'),...tint(ridges,'#606869'),...tint(chimneys,'#8b4b3c'),...(dormerWalls.length?[...tint(dormerWalls,hexArr((part.color||[.85,.82,.75]).map(v=>v+(1-v)*.35))),...tint(dormerRoofs,hexArr((part.roofColor||[.3,.3,.3]).map(v=>v*.85)))]:[])];
+ let glass=[...tint(glazing,'#263e4d'),...tint(dormerGlass,'#22313a')];
  if(described){const r=createFacade(analysis.faces,described),m=facadeMaterials();windows+=r.windows;
   /* merge only matching layouts (position, normal, colour; non-indexed): BoxGeometry carries uvs the facade batches do not, and a mismatch made mergeGeometries return null, dropping all glass */
   const same=list=>list.map(g0=>{let g=g0.index?g0.toNonIndexed():g0;for(const k of Object.keys(g.attributes))if(!['position','normal','color'].includes(k))g.deleteAttribute(k);if(!g.attributes.normal)g.computeVertexNormals();return g;});

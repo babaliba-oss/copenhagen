@@ -53,7 +53,7 @@ function pane(F,G,s,y,w,h,glass,arch=false){
  G.add(F.place(g,s,y,.035),glass,glassTone(glass,s,y,h));
 }
 const flat=(F,B,s,y,e,w,h,color)=>B.add(F.place(new THREE.PlaneGeometry(w,h),s,y,e),color);
-const slab=(F,B,s,y,e,w,h,depth,color)=>B.add(F.place(new THREE.BoxGeometry(w,h,depth),s,y,e+depth/2),color);
+const slab=(F,B,s,y,e,w,h,depth,color)=>{const g=new THREE.BoxGeometry(w,h,depth),i=g.index.array;g.setIndex([...i.slice(0,30)]);B.add(F.place(g,s,y,e+depth/2),color);}; // no back face (it lies on the wall)
 
 // Evenly spaced bay centres across [a,b] with at least `margin` at each end.
 export function bays(a,b,pitch,margin=.6){
@@ -85,7 +85,7 @@ function upperStorey(F,G,B,band,st,c){
    else for(let k=0;k<5;k++){const a=Math.PI*(k+.5)/5,r=w/2+.07;B.add(F.place(new THREE.BoxGeometry(.14,w*.34,.16).rotateZ(a),s+Math.cos(a)*r,y+hh/2-w/2+Math.sin(a)*r,.08),c.surround);}
    for(const dx of [-w/2+.04,w/2-.04])flat(F,B,s+dx,sideY,.045,.08,sideH,c.frame);
    if(!arch){flat(F,B,s,y+hh/2-.04,.045,w,.08,c.frame);flat(F,B,s,y-hh/2+.04,.045,w,.08,c.frame);}
-   if(st.shape!=='ribbon'&&w>.7){slab(F,B,s,y,.035,.07,hh-.1,.04,c.frame);if(!arch&&hh>1.2)slab(F,B,s,y+hh*.2,.035,w-.08,.07,.04,c.frame);}
+   if(st.shape!=='ribbon'&&w>.7){flat(F,B,s,y,.05,.07,hh-.1,c.frame);if(!arch&&hh>1.2)flat(F,B,s,y+hh*.2,.05,w-.08,.07,c.frame);}
    // Sill: projecting stone ledge; a hood moulding over the main-floor windows of older fronts.
    slab(F,B,s,y-hh/2-.1,0,w+.42,.1,.24,c.trim);
    if(st.hood&&!arch)slab(F,B,s,y+hh/2+.26,0,w+.5,.12,.22,c.cornice);
