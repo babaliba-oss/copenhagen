@@ -28,7 +28,12 @@ def wet(x, z):
     return 0 <= i < N and 0 <= j < N and water[i, j] and not roads[i, j]
 NYHAVN = L(12.5905, 55.6798); CHAVN = L(12.5915, 55.6735)
 rnd = random.Random(11); boats = []; taken = set()
+NOBOATS = ('lake', 'moat', 'pond', 'basin', 'reflecting_pool', 'reflection_pool', 'fountain')
+def navigable(w):  # harbour, canals and sea only: no ships in the Lakes, the moats or a fountain
+    n = (w.get('name') or '').lower()
+    return w.get('kind') not in NOBOATS and not any(k in n for k in ('grav', 'sø', 'spring', 'dam'))
 for w in city['water']:
+    if not navigable(w): continue
     for ring in w['rings']:
         for a, b in zip(ring, ring[1:]):
             dx, dz = b[0] - a[0], b[1] - a[1]; Lg = math.hypot(dx, dz)

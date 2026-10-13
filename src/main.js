@@ -199,6 +199,8 @@ let post=null;try{post=createPostPipeline(renderer);}catch(e){console.warn('Post
 let look=null;
 const ground=new THREE.Mesh(new THREE.PlaneGeometry(11000,11000),groundPatches(new THREE.MeshStandardMaterial({color:'#94988b',roughness:1})));ground.rotation.x=-Math.PI/2;ground.position.y=-.5;ground.receiveShadow=true;cityModel.add(ground);
 // Unmapped ground (yards, lots, verges): soft patches of worn grass and gravel instead of one flat grey.
+// Copenhagen's harbour reads blue, not Baltic grey: deeper blue body, a little less grey sky, livelier ripples.
+function tintSea(s){const u=s?.material?.uniforms;if(!u||!city?.id?.startsWith('copenhagen'))return;u.uDeep.value.set(city.era===1760?'#24566a':'#1c5b80');u.uShore.value.set('#3a5866');u.uReflect.value=.66;u.uRipple.value=1.35;}
 function groundPatches(material){
  material.onBeforeCompile=shader=>{
   shader.vertexShader=shader.vertexShader.replace('#include <common>','#include <common>\nvarying vec3 vGp;').replace('#include <project_vertex>','#include <project_vertex>\nvGp=(modelMatrix*vec4(transformed,1.)).xyz;');
@@ -437,7 +439,7 @@ async function ensureCityModel(){
  return cityModelPromise;
 }
 function rebuildSea(groundExtent){
- const next=createSea(data.water,data,{helsinkiHarbour:city.scenery==='helsinki',groundExtent}),old=sea;
+ const next=createSea(data.water,data,{helsinkiHarbour:city.scenery==='helsinki',groundExtent}),old=sea;tintSea(next);
  sea=next;cityModel.add(next.group);ground.geometry.dispose();ground.geometry=next.groundGeometry;
  if(!old)return;
  cityModel.remove(old.group);
@@ -933,7 +935,7 @@ async function boot(){
    // Hilly cities: everything below samples the shared height field; the flat ground plane gives way to a terrain mesh.
    if(setTerrain(await terrainData)){surfaceMaterial.defines={...surfaceMaterial.defines,TERRAIN:''};surfaceMaterial.needsUpdate=true;ground.visible=false;cityModel.add(createTerrainGround(ground.material,city.id.startsWith('copenhagen')?{cell:20,chunk:40}:undefined));}
    if((landcoverData.polygons||landcoverData.runs||[]).length)cityModel.add(settleObject(createLandcover(landcoverData)));
-   sea=createSea(data.water,data,{helsinkiHarbour:helsinki});cityModel.add(sea.group);ground.geometry.dispose();ground.geometry=sea.groundGeometry;
+   sea=createSea(data.water,data,{helsinkiHarbour:helsinki});tintSea(sea);cityModel.add(sea.group);ground.geometry.dispose();ground.geometry=sea.groundGeometry;
    // Helsinki's hand-built scenery (landmarks, harbour, street life, signs). Other cities get the generic engine only.
    async function buildHelsinkiScenery(){
    progress(30,'Loading roads and waterfront');

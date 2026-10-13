@@ -50,6 +50,7 @@ const SEA_FRAGMENT=`
 uniform sampler2D uRipples;
 uniform float uSeaTime;
 uniform vec3 uDeep,uSkyHorizon,uSkyMid,uSkyZenith,uShore,uSunDir,uSunColor;
+uniform float uReflect,uRipple;
 #include <common>
 #include <fog_pars_fragment>
 varying vec3 vSeaWorld;
@@ -60,7 +61,7 @@ void main(){
  s+=(texture2D(uRipples,mat2(.8,-.6,.6,.8)*p*.083+uSeaTime*vec2(-.0102,.0131)).xy*2.-1.)*.75;
  s+=(texture2D(uRipples,mat2(-.28,.96,-.96,-.28)*p*.27+uSeaTime*vec2(.029,.021)).xy*2.-1.)*.35*(1.-smoothstep(20.,70.,dist));
  // Calm harbour: gentle slopes, flatter still in the distance (less shimmer).
- float strength=mix(.05,.02,smoothstep(15.,300.,dist));
+ float strength=mix(.05,.02,smoothstep(15.,300.,dist))*uRipple;
  vec3 N=normalize(vec3(-s.x*strength,1.,-s.y*strength));
  float NdV=clamp(dot(N,V),0.,1.);
  float fresnel=.02+.98*pow(1.-NdV,5.);
@@ -73,7 +74,7 @@ void main(){
  sky=mix(sky,uSunColor,pow(toward,6.)*(1.-smoothstep(0.,.3,R.y))*.22);
  // Low reflected rays hit the opposite quays, boats and buildings.
  sky=mix(sky,uShore,(1.-smoothstep(.03,.26,R.y))*.85);
- vec3 color=mix(uDeep,sky*.72,fresnel);
+ vec3 color=mix(uDeep*(.85+.3*(s.x*.5+.5)),sky*.72,fresnel*uReflect);
  // Sun glint: a tight disc, a mid lobe broken up by the ripples, and a soft sheen.
  float sun=max(dot(R,uSunDir),0.);
  color+=uSunColor*(pow(sun,260.)*1.4+pow(sun,80.)*.12+pow(sun,28.)*.035)*(.35+.65*fresnel);
@@ -95,7 +96,7 @@ export function createSeaMaterial(time={value:0}){
  const horizon=c(SEA_DEFAULTS.horizon),zenith=skyZenith(horizon);
  Object.assign(uniforms,{
   uRipples:{value:createRippleTexture()},uSeaTime:time,
-  uDeep:{value:c(SEA_DEFAULTS.deep)},uShore:{value:c(SEA_DEFAULTS.shore)},
+  uDeep:{value:c(SEA_DEFAULTS.deep)},uShore:{value:c(SEA_DEFAULTS.shore)},uReflect:{value:1},uRipple:{value:1},
   uSkyHorizon:{value:horizon},uSkyMid:{value:skyMid(horizon,zenith)},uSkyZenith:{value:zenith},
   uSunDir:{value:new THREE.Vector3(...SEA_DEFAULTS.sunOffset).normalize()},uSunColor:{value:c(SEA_DEFAULTS.sunColor)},
  });

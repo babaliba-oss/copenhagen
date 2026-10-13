@@ -11,24 +11,24 @@ export function createSoundscape(ac,{era=null}={}){
  // tyres: band-passed noise
  const tyre=loop(noiseBuf),tBp=ac.createBiquadFilter(),tG=ac.createGain();tBp.type='bandpass';tBp.frequency.value=700;tBp.Q.value=.6;tG.gain.value=0;tyre.connect(tBp);tBp.connect(tG);tG.connect(out);
  // city bed
- const bed=loop(noiseBuf),bLp=ac.createBiquadFilter(),bG=ac.createGain();bLp.type='lowpass';bLp.frequency.value=era===1760?260:380;bG.gain.value=era===1760?.05:.09;bed.connect(bLp);bLp.connect(bG);bG.connect(out);
+ const bed=loop(noiseBuf),bLp=ac.createBiquadFilter(),bG=ac.createGain();bLp.type='lowpass';bLp.frequency.value=era===1760?260:380;bG.gain.value=era===1760?.05:.07;bed.connect(bLp);bLp.connect(bG);bG.connect(out);
  const ping=(f,t0,dur,vol,type='sine')=>{const o=ac.createOscillator(),g=ac.createGain();o.type=type;o.frequency.value=f;g.gain.setValueAtTime(0,t0);g.gain.linearRampToValueAtTime(vol,t0+.005);g.gain.exponentialRampToValueAtTime(.0001,t0+dur);o.connect(g);g.connect(out);o.start(t0);o.stop(t0+dur+.05);};
  const bell=()=>{const t=ac.currentTime,f=2400+Math.random()*500;ping(f,t,.9,.05);ping(f*2.76,t,.5,.02);ping(f,t+.16,.9,.045);ping(f*2.76,t+.16,.5,.018);};
  const hoof=(v)=>{const t=ac.currentTime,s=ac.createBufferSource(),bp=ac.createBiquadFilter(),g=ac.createGain();s.buffer=noiseBuf;bp.type='bandpass';bp.frequency.value=900+Math.random()*500;bp.Q.value=3;g.gain.setValueAtTime(v,t);g.gain.exponentialRampToValueAtTime(.0001,t+.09);s.connect(bp);bp.connect(g);g.connect(out);s.start(t,Math.random());s.stop(t+.12);};
  let hornG=null;
- function horn(on){if(on&&!hornG){const t=ac.currentTime;hornG=ac.createGain();hornG.gain.setValueAtTime(0,t);hornG.gain.linearRampToValueAtTime(.06,t+.02);const lp=ac.createBiquadFilter();lp.type='lowpass';lp.frequency.value=1800;
+ function horn(on){if(on&&!hornG){const t=ac.currentTime;hornG=ac.createGain();hornG.gain.setValueAtTime(0,t);hornG.gain.linearRampToValueAtTime(.035,t+.02);const lp=ac.createBiquadFilter();lp.type='lowpass';lp.frequency.value=1800;
    for(const f of era===1760?[330]:[392,494]){const o=ac.createOscillator();o.type=era===1760?'triangle':'square';o.frequency.value=f;o.connect(lp);o.start();hornG._o=[...(hornG._o||[]),o];}lp.connect(hornG);hornG.connect(out);}
   else if(!on&&hornG){const g=hornG;hornG=null;g.gain.setTargetAtTime(0,ac.currentTime,.03);setTimeout(()=>{for(const o of g._o||[])o.stop();g.disconnect();},300);}}
  let gear=1,bellT=8+Math.random()*15,stepT=0,lastSpeed=0;
  const GEARS=[0,9,17,25,34,99]; // m/s top of each gear
  function update(dt,{enabled,speed=0,mode='car',throttle=0}){
-  const t=ac.currentTime,v=Math.abs(speed);out.gain.setTargetAtTime(enabled?1:0,t,.15);if(!enabled)return;
+  const t=ac.currentTime,v=Math.abs(speed);out.gain.setTargetAtTime(enabled?.8:0,t,.15);if(!enabled)return;
   const car=mode==='car'&&era!==1760,coach=mode==='car'&&era===1760;
   if(car){while(gear<5&&v>GEARS[gear])gear++;while(gear>1&&v<GEARS[gear-1]-2)gear--;
    const lo=GEARS[gear-1],hi=GEARS[gear],rpm=.25+.75*Math.min(1,(v-lo)/Math.max(1,hi-lo)),f=38+rpm*70;
-   e1.frequency.setTargetAtTime(f,t,.06);e2.frequency.setTargetAtTime(f*1.01,t,.06);eLp.frequency.setTargetAtTime(220+rpm*600+throttle*700,t,.08);eG.gain.setTargetAtTime(.05+throttle*.05+rpm*.03,t,.1);}
+   e1.frequency.setTargetAtTime(f,t,.06);e2.frequency.setTargetAtTime(f*1.01,t,.06);eLp.frequency.setTargetAtTime(220+rpm*600+throttle*700,t,.08);eG.gain.setTargetAtTime(.011+throttle*.011+rpm*.008,t,.1);}
   else eG.gain.setTargetAtTime(0,t,.1);
-  tG.gain.setTargetAtTime(mode==='car'?Math.min(.07,v*.004):mode==='bike'?Math.min(.025,v*.004):0,t,.1);tBp.frequency.setTargetAtTime(500+v*30,t,.2);
+  tG.gain.setTargetAtTime(mode==='car'?Math.min(.025,v*.0015):mode==='bike'?Math.min(.012,v*.002):0,t,.1);tBp.frequency.setTargetAtTime(500+v*30,t,.2);
   if(coach&&v>.6){stepT-=dt*Math.min(4.5,v*.8);if(stepT<=0){stepT=1;hoof(.12);setTimeout(()=>hoof(.09),110);}}
   bellT-=dt;if(bellT<=0){bellT=10+Math.random()*25;bell();}
   lastSpeed=v;
