@@ -37,3 +37,15 @@ export function shellColourAttribute(array,parts,start,end){
  }
  return new THREE.BufferAttribute(out,3);
 }
+
+// Height above the part's own base and the part's height, per vertex (the far-shell window grid only
+// paints storeys that exist: nothing on low walls, kerbs or the bottom 2 m).
+export function shellHeightAttribute(array,parts,start,end){
+ const out=new Float32Array((end-start)*2);
+ for(const p of parts){
+  const a=Math.max(start,p.start),b=Math.min(end,p.start+p.count);if(b<=a)continue;
+  let lo=Infinity,hi=-Infinity;for(let v=p.start;v<p.start+p.count;v++){const y=array[v*5+1];if(y<lo)lo=y;if(y>hi)hi=y;}
+  for(let v=a;v<b;v++){out[(v-start)*2]=array[v*5+1]-lo;out[(v-start)*2+1]=hi-lo;}
+ }
+ return new THREE.BufferAttribute(out,2);
+}

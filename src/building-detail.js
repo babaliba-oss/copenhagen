@@ -141,9 +141,14 @@ export function createModelledBuilding(array,part,pixels,texture=null,includeHer
  function mesh(g,material){if(!g)return;material.transparent=true;material.forceSinglePass=true;const m=new THREE.Mesh(g,material);m.castShadow=true;m.receiveShadow=true;m.userData.occlusion=occlusion;m.userData.box=new THREE.Box3(new THREE.Vector3(part.bbox[0]-.5,0,part.bbox[1]-.5),new THREE.Vector3(part.bbox[2]+.5,part.height+.5,part.bbox[3]+.5));meshes.push(m);}
  function shell(p,c,roughness,metalness,map=texture){if(!p.length)return;const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(p,3));g.setAttribute('color',new THREE.Float32BufferAttribute(c,3));g.setAttribute('uv',new THREE.Float32BufferAttribute(p===walls?wallUV:roofUV,2));g.computeVertexNormals();g.computeBoundingSphere();mesh(g,new THREE.MeshStandardMaterial({map,vertexColors:!map,roughness,metalness,side:THREE.DoubleSide}));meshes.at(-1).userData.shell=true;}
  if(part.ratu===324||clean||corridor||described)texture=null; // clean granite/copper on the measured whole station; no baked trees/shadows
+ if(!texture&&walls.length&&roofs.length){ // untextured: walls and roofs in one shell mesh
+  walls.push(...roofs);wallColours.push(...roofColours);wallUV.push(...roofUV);roofs.length=0;roofColours.length=0;roofUV.length=0;
+  shell(walls,wallColours,.78,.06);meshes.at(-1).userData.role='facade';if(provisional)meshes.at(-1).userData.provisional=true;
+ }else{
  shell(walls,wallColours,.86,.02);if(walls.length)meshes.at(-1).userData.role='facade';
  if(walls.length&&provisional)meshes.at(-1).userData.provisional=true;
  shell(roofs,roofColours,.49,.28,part.ratu===405?null:texture);if(roofs.length)meshes.at(-1).userData.role='roof';
+ }
  if(includeHero)for(const m of part.ratu===410?[...createWaterfrontFront(410),...createMarketHallSides()]:part.ratu===488?createPalaceRestaurantFront():part.ratu===944?createLasipalatsiFront():part.ratu===588?createForumFront():part.ratu===1707?createSugarCubeFront():part.ratu===5?createGovernmentFront():createWaterfrontFront(part.ratu)){mesh(m.geometry,m.material);meshes.at(-1).userData.shell=true;}
  // Batch the individual Sokos elevations by material, not one draw per face.
  const authoredBatches=new Map();
@@ -158,8 +163,18 @@ export function createModelledBuilding(array,part,pixels,texture=null,includeHer
  }
  if(part.ratu===23)for(const f of analysis.faces)for(const m of createPalaceWingDetails(f)){mesh(m.geometry,m.material);meshes.at(-1).userData.shell=true;}
  if(corridor){const r=createCorridorFacade(part,analysis.faces,corridor);for(const m of r.meshes){mesh(m.geometry,m.material);meshes.at(-1).userData.shell=true;meshes.at(-1).userData.corridor=true;}windows+=r.windows;}
- if(described){const r=createFacade(analysis.faces,described),m=facadeMaterials();for(const k of ['glass','relief'])if(r[k]){mesh(r[k],m[k]);meshes.at(-1).userData.provisional=true;meshes.at(-1).userData.role='facade-detail';}else m[k].dispose();windows+=r.windows;}
- for(const [geometries,material] of [[trim,new THREE.MeshStandardMaterial({color:part.ratu===324?'#927e60':'#d6d1c4',roughness:.7})],[glazing,new THREE.MeshStandardMaterial({color:'#263e4d',roughness:.19,metalness:.55})],[ridges,new THREE.MeshStandardMaterial({color:'#606869',roughness:.48,metalness:.5})],[chimneys,new THREE.MeshStandardMaterial({color:'#8b4b3c',roughness:.88})]])if(geometries.length){mesh(mergeGeometries(geometries),material);geometries.forEach(g=>g.dispose());}else material.dispose();
+ // Trim, ridge seams and chimneys share one vertex-coloured mesh; with a described front they join its relief,
+ // and the generated window glazing joins its glass (three draw calls per building instead of six).
+ const tint=(list,hex)=>{const c=new THREE.Color(hex);return list.map(g0=>{const g=g0.index?g0.toNonIndexed():g0;if(g!==g0)g0.dispose();const n=g.attributes.position.count,a=new Float32Array(n*3);for(let i=0;i<n;i++)a.set([c.r,c.g,c.b],i*3);g.setAttribute('color',new THREE.BufferAttribute(a,3));if(g.attributes.uv)g.deleteAttribute('uv');return g;});};
+ let plain=[...tint(trim,part.ratu===324?'#927e60':'#d6d1c4'),...tint(ridges,'#606869'),...tint(chimneys,'#8b4b3c')];
+ let glass=tint(glazing,'#263e4d');
+ if(described){const r=createFacade(analysis.faces,described),m=facadeMaterials();windows+=r.windows;
+  const relief=r.relief?mergeGeometries([r.relief,...plain]):(plain.length?mergeGeometries(plain):null);if(r.relief)r.relief.dispose();plain.forEach(g=>g.dispose());plain=[];
+  const glassAll=r.glass?mergeGeometries([r.glass,...glass]):(glass.length?mergeGeometries(glass):null);if(r.glass)r.glass.dispose();glass.forEach(g=>g.dispose());glass=[];
+  for(const [g,mat] of [[glassAll,m.glass],[relief,m.relief]])if(g){g.computeBoundingSphere();mesh(g,mat);meshes.at(-1).userData.provisional=true;meshes.at(-1).userData.role='facade-detail';}else mat.dispose();
+ }
+ if(plain.length){mesh(mergeGeometries(plain),new THREE.MeshStandardMaterial({vertexColors:true,roughness:.72,metalness:.12}));plain.forEach(g=>g.dispose());}
+ if(glass.length){mesh(mergeGeometries(glass),new THREE.MeshStandardMaterial({vertexColors:true,roughness:.19,metalness:.55}));glass.forEach(g=>g.dispose());}
  // Keep the inexpensive interim window batches at follow-camera distance;
  // otherwise a building becomes a blank block again beyond the detail radius.
  if(provisional)for(const m of meshes)if(!m.userData.shell)m.userData.provisional=true;

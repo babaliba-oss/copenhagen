@@ -11,13 +11,13 @@ export function facadeGrain(material,{windows=false}={}){
  const prev=material.onBeforeCompile;
  material.onBeforeCompile=(shader,renderer)=>{prev?.(shader,renderer);
   shader.vertexShader=shader.vertexShader
-   .replace('#include <common>','#include <common>\nvarying vec3 vGrainPos;varying vec3 vGrainNormal;')
-   .replace('#include <project_vertex>','#include <project_vertex>\nvGrainPos=(modelMatrix*vec4(transformed,1.)).xyz;vGrainNormal=normalize(mat3(modelMatrix)*objectNormal);');
+   .replace('#include <common>','#include <common>\nvarying vec3 vGrainPos;varying vec3 vGrainNormal;'+(windows?'attribute vec2 aRel;varying vec2 vRel;':''))
+   .replace('#include <project_vertex>','#include <project_vertex>\nvGrainPos=(modelMatrix*vec4(transformed,1.)).xyz;vGrainNormal=normalize(mat3(modelMatrix)*objectNormal);'+(windows?'vRel=aRel;':''));
   shader.uniforms.uNight=WEATHER_UNIFORMS.night;
   shader.fragmentShader=shader.fragmentShader
    .replace('#include <common>',`#include <common>
 #define GRAIN_WINDOWS ${windows?1:0}
-uniform float uNight;
+uniform float uNight;${windows?'varying vec2 vRel;':''}
 varying vec3 vGrainPos;varying vec3 vGrainNormal;
 float gHash(vec2 p){return fract(sin(mod(dot(p,vec2(1.,57.)),997.)*1.371)*4375.85);}
 float gNoise(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);return mix(mix(gHash(i),gHash(i+vec2(1,0)),f.x),mix(gHash(i+vec2(0,1)),gHash(i+vec2(1,1)),f.x),f.y);}`)
@@ -44,16 +44,17 @@ float vWinLit=0.;
   c*=1.+plaster*((blot-.5)*.12-streak*.06);
 #if GRAIN_WINDOWS
   // window grid: 2.7 m bays, 3.1 m storeys, a 1.15 x 1.65 m opening with a light frame
-  vec2 w=vec2(along/2.7,(p.y-.6)/3.1);vec2 wc=floor(w),wf=fract(w);
+  vec2 w=vec2(along/2.7,(vRel.x-.25)/3.1);vec2 wc=floor(w),wf=fract(w);
   float fw=max(fwidth(w.x),fwidth(w.y));
-  float open=step(.29,wf.x)*step(wf.x,.71)*step(.3,wf.y)*step(wf.y,.83);
-  float frame=step(.25,wf.x)*step(wf.x,.75)*step(.26,wf.y)*step(wf.y,.87)-open;
+  float exists=step(5.5,vRel.y)*step(2.4,vRel.x)*step(vRel.x,vRel.y-1.2);
+  float open=step(.29,wf.x)*step(wf.x,.71)*step(.3,wf.y)*step(wf.y,.83)*exists;
+  float frame=(step(.25,wf.x)*step(wf.x,.75)*step(.26,wf.y)*step(wf.y,.87))*exists-open;
   float sharp=1.-smoothstep(.12,.45,fw);
   float h=fract(sin(mod(dot(wc,vec2(1.,57.)),997.)*1.371)*4375.85);
   vec3 glass=vec3(.05,.07,.09)+vec3(.04,.05,.06)*h;
   vec3 withWin=mix(mix(c,c*1.18+.05,frame),glass,open);
-  c=mix(mix(c,c*.8,.0+.35*(1.-sharp)),withWin,sharp);
-  vWinLit=open*sharp*step(.5,h)*uNight+(1.-sharp)*.18*uNight;
+  c=mix(mix(c,c*.8,.35*(1.-sharp)*exists),withWin,sharp);
+  vWinLit=open*sharp*step(.5,h)*uNight+(1.-sharp)*.18*uNight*exists;
 #endif
  } else if(n.y>.35){
   // roofs: courses running across the slope
