@@ -44,7 +44,7 @@ const SCRIPTS={
  },
  ole:{
   hello:()=>turn(y1760()?'Ole. I fish from here, like my father. If you are looking for my wife, she is the loud one selling it.':'Fifty years I fished out of here. Now I sit on the bench and tell tourists the fish was bigger in my day. It was.',[...sagaChoice('holger'),choice('strand','What was Gammel Strand?'),BYE]),
-  strand:()=>turn('The old beach. Fishing boats tied up right here, and the fishwives sold the catch on the quay. There is a statue of one of them along the canal. Fierce women.',[...sagaChoice('holger'),BYE]),
+  strand:()=>turn(y1760()?'The old beach. We tie up right here and the women sell the catch on the quay, across from the palace. Fierce women. Mine is the fiercest.':'The old beach. Fishing boats tied up right here, and the fishwives sold the catch on the quay. There is a statue of one of them along the canal. Fierce women.',[...sagaChoice('holger'),BYE]),
  },
  bent:{
   hello:()=>turn('Hej hej! Rød pølse? Ristet? You look like someone who rides on an empty stomach.',[choice('buy','One rød pølse, everything on it (40 kr)'),choice('fransk','What’s a fransk hotdog?'),BYE]),
