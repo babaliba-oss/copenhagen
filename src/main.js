@@ -22,9 +22,9 @@ import {makeCar,driveStep,simulationSteps,PLAYER_MAX_SPEED,displayedSpeedKmh} fr
 import {animateVehicle} from './vehicles.js';
 import {Mobility} from './mobility.js';
 import {createStreetLife} from './street-life.js';
-import {buildTileInWorker,materialiseBuilding,createSourceShell} from './building-loader.js';
+import {buildTileInWorker,materialiseBuilding} from './building-loader.js';
 import {attachFacades,applyFacadeHeights,estimateFacades} from './facade-data.js';
-import {tileLevel,applyTileLod,applyMeshLod,createMergedShells,freezeTileGroup,freezeMesh,applyTreeLod,createStaticShadowCuller} from './tile-lod.js';
+import {tileLevel,applyTileLod,applyMeshLod,createMergedShells,createShellMask,freezeTileGroup,freezeMesh,applyTreeLod,createStaticShadowCuller} from './tile-lod.js';
 import {loadTileImages,aheadPoint,tilePriority,createFrameQueue,createDetailScheduler} from './tile-streaming.js';
 import {createSurfaceStreamer} from './surface-streaming.js';
 import {createCathedral,createSenateSquare,loadSenateMaterials} from './cathedral.js';
@@ -391,8 +391,10 @@ async function buildRoof(t,at){
   applyFacadeHeights(a,t.parts);liftBuildings(a,t.parts); // terrain cities: each part stands on its lowest ground
   const parts=t.parts.filter(p=>![211,212,213,1796,57950,STATION_KIOSK_RATU,USPENSKI.ratu].includes(p.ratu)&&!placeHidden.has(p.id)); // place landmarks and shelters are drawn by place-scene.js
   // Far level: one merged shell per atlas. Near level: per-part shells until the worker's details replace them.
-  group.add(...createMergedShells(a,parts,textures));for(const part of parts)group.add(createSourceShell(a,part,textures.get(part.texture)));
-  Object.assign(group.userData,{textures,windows:0,tile:t,pending:{array:a,parts,images:new Map([...images].map(([f,i])=>[f,i.bytes]))}});
+  const mask=createShellMask(parts.length);group.add(...createMergedShells(a,parts,textures,mask));
+  // Waiting parts keep their own chase-camera fade, written into the mask (see the occlusion pass).
+  const waiting=parts.map((p,i)=>({i,id:p.id,occlusion:{opacity:1,clearTime:1},box:new THREE.Box3(new THREE.Vector3(p.bbox[0]-.5,0,p.bbox[1]-.5),new THREE.Vector3(p.bbox[2]+.5,p.height+.5,p.bbox[3]+.5))}));
+  Object.assign(group.userData,{textures,windows:0,tile:t,mask,waiting,pending:{array:a,parts,images:new Map([...images].map(([f,i])=>[f,i.bytes]))}});
   freezeTileGroup(group);applyTileLod(group,tileLevel(null,tileDistance(t,at)),at);loadedTiles.set(t.file,group);
   // One atlas upload per frame, then the tile itself: twenty tiles landing after a teleport no longer upload in one frame.
   for(const texture of textures.values())uploads.push(()=>{if(loadedTiles.get(t.file)===group)renderer.initTexture(texture);});
@@ -411,15 +413,16 @@ async function detailTile(group){
  if(loadedTiles.get(t.file)!==group)return;
  // Nearest buildings land first; each lands on its own (no walk over the whole tile).
  const dist=b=>{const q=b.part.bbox;return Math.hypot((q[0]+q[2])/2-focus.x,(q[1]+q[3])/2-focus.z);};
- const shells=new Map(group.children.filter(m=>m.userData.source).map(m=>[m.userData.id,m]));
+ const shells=new Map(group.userData.waiting.map(w=>[w.id,w]));
  for(const b of buildings)uploads.push(()=>{
   if(loadedTiles.get(t.file)!==group)return;
   const meshes=materialiseBuilding(b,textures);for(const m of meshes){freezeMesh(m);applyMeshLod(m,group.userData.level,focus);}
   // Shaders compile in the background first (parallel compile where the GPU offers it); a variant never seen
   // before no longer stalls a frame, the building just lands a moment later.
   const land=()=>{if(loadedTiles.get(t.file)!==group){for(const m of meshes){m.geometry.dispose();disposeMaterial(m.material);}return;}
-   const shell=shells.get(b.part.id);if(shell){group.remove(shell);shell.geometry.dispose();disposeMaterial(shell.material);}
-   group.add(...meshes);group.userData.windows+=b.windows;};
+   const w=shells.get(b.part.id);if(w){group.userData.mask.set(w.i,0);w.landed=true;group.userData.waiting=group.userData.waiting.filter(x=>x!==w);}
+   group.add(...meshes);group.userData.windows+=b.windows;
+   if(!group.userData.mask.shown)for(const m of group.children)if(m.userData.lod)applyMeshLod(m,group.userData.level,focus);};
   const tmp=new THREE.Group();tmp.add(...meshes);
   renderer.compileAsync(tmp,camera,scene).then(()=>{tmp.remove(...meshes);land();},()=>{tmp.remove(...meshes);land();});
  },()=>dist(b)); // nearest building first, across every tile in the queue
@@ -509,7 +512,7 @@ async function runTilePass(){
  await pool(near,4,loadRoof);
  for(const t of roofIndex.tiles){const m=loadedTiles.get(t.file);if(!m)continue;
   const d=tileDistance(t);
-  if(d>1000){detailScheduler.cancel(t.file);cityModel.remove(m);m.children.forEach(c=>{c.geometry.dispose();disposeMaterial(c.material);});m.userData.textures.forEach(x=>{x.image?.close?.();x.dispose();});loadedTiles.delete(t.file);continue;}
+  if(d>1000){detailScheduler.cancel(t.file);cityModel.remove(m);m.children.forEach(c=>{c.geometry.dispose();disposeMaterial(c.material);c.customDepthMaterial?.dispose();});m.userData.mask?.texture.dispose();m.userData.textures.forEach(x=>{x.image?.close?.();x.dispose();});loadedTiles.delete(t.file);continue;}
   const level=applyTileLod(m,tileLevel(m.userData.level,d),focus);
   // Only near-level tiles are worth the worker's time, nearest first.
   if(level==='near'&&m.userData.pending)detailScheduler.request(t.file,priority(t),()=>detailTile(m),handleTileError);
@@ -870,6 +873,7 @@ function frame(now){
   const updated=new Set(),decided=new Map();occlusionRay.ray.copy(ray);occlusionRay.far=Math.max(0,limit-3);
   for(const tile of loadedTiles.values())if(tile.visible)for(const mesh of tile.children){if(!mesh.visible||!mesh.userData.shell)continue;const state=mesh.userData.occlusion;if(!state||decided.get(state))continue;
    const near=!!ray.intersectBox(mesh.userData.box,hit)&&hit.distanceTo(camera.position)<limit-3;decided.set(state,near&&occlusionRay.intersectObject(mesh,false).length>0);}
+  for(const tile of loadedTiles.values())if(tile.visible&&tile.userData.level==='near'&&tile.userData.mask?.shown)for(const w of tile.userData.waiting){const was=w.occlusion.opacity;const fade=!!ray.intersectBox(w.box,hit)&&hit.distanceTo(camera.position)<limit-3;if(!fade&&was>.999)continue;advanceOcclusion(w.occlusion,fade,dt);tile.userData.mask.set(w.i,w.occlusion.opacity>.995?1:Math.max(.01,w.occlusion.opacity));}
   for(const tile of loadedTiles.values())if(tile.visible)for(const mesh of tile.children){if(!mesh.visible)continue;const state=mesh.userData.occlusion;if(!updated.has(state)){let fade;if(decided.has(state))fade=decided.get(state);else{const intersects=ray.intersectBox(mesh.userData.box,hit);fade=!!intersects&&hit.distanceTo(camera.position)<limit-3;}advanceOcclusion(state,fade,dt);updated.add(state);}mesh.material.opacity=state.opacity;mesh.material.depthWrite=state.opacity>.999;const fading=state.opacity<.999;if(mesh.material.transparent!==fading){mesh.material.transparent=fading;mesh.material.needsUpdate=true;}}
  }
  // Shadow box and texel snapping follow the active look's sun (weather.js re-applies the same offset below).
