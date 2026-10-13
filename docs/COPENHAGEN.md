@@ -25,6 +25,7 @@ python3 scripts/rails.py Copenhagen.osm.pbf copenhagen
 python3 scripts/cafes.py copenhagen
 python3 scripts/anchors.py copenhagen
 python3 scripts/district-styles.py copenhagen
+python3 scripts/save-years.py <kk data dir>/save.json copenhagen   # period window styles (today only)
 python3 scripts/nyhavn-facades.py && node scripts/facades.mjs copenhagen
 ```
 
