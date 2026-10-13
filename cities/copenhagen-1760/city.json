@@ -82,6 +82,13 @@
   "displayName": "København, Denmark"
  },
  "maxStarts": 16,
+ "liveries": {
+  "bus": {
+   "paint": "#f2b700",
+   "white": "#f6c935"
+  },
+  "note": "Movia city buses: yellow all over."
+ },
  "era": 1760,
  "note": "Copenhagen around 1760: built by scripts/era-1760.py from the 2026 city."
 }

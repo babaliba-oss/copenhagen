@@ -127,10 +127,30 @@ for e in out:
                 except Exception: pass
 paved = unary_union([OLD_TOWN, CHRISTIANSHAVN]).difference(unary_union(greens).buffer(1) if greens else Polygon()).difference(rampart.buffer(4)).difference(moat.buffer(2))
 for i, g in enumerate(ring_geo(paved)): out.append({'type': 'way', 'id': -(53000 + i), 'tags': {'highway': 'pedestrian', 'area': 'yes', 'surface': 'sett', 'name': 'Brosten'}, 'geometry': g})
-for i, g in enumerate(ring_geo(moat)): out.append({'type': 'way', 'id': -(51000 + i), 'tags': {'natural': 'water', 'name': 'Voldgrav'}, 'geometry': g})
+# Gates: every street that crosses the rampart passes through it (a 16 m gap); the rampart is cut into
+# ~150 m pieces so each piece loads, draws and collides like a normal building.
+from shapely.ops import substring
+src_hw = json.load(open(f'{SRC}/highways.json'))['elements']; hw_nodes = {e['id']: e for e in src_hw if e['type'] == 'node'}
+gaps = []; crossing = []
+for e in src_hw:
+    if e['type'] == 'way' and e['tags'].get('highway') in ('primary', 'secondary', 'tertiary', 'residential', 'pedestrian', 'unclassified', 'living_street'):
+        pts = [fwd(hw_nodes[n]['lon'], hw_nodes[n]['lat']) for n in e['nodes'] if n in hw_nodes]
+        if len(pts) > 1:
+            ln = LineString(pts)
+            if ln.intersects(rampart): gaps.append(ln.intersection(rampart.buffer(30)).buffer(8))
+            if ln.intersects(moat): crossing.append(ln.intersection(moat.buffer(6)).buffer(9))
+gate = unary_union(gaps) if gaps else Polygon()
+pieces = []
+for k in range(0, int(line.length), 150):
+    seg = substring(line, k, min(line.length, k + 150)).buffer(140, cap_style=2)
+    pieces.append(seg)
 for j, (poly, h) in enumerate(terraces):
-    for i, g in enumerate(ring_geo(poly)):
-        out.append({'type': 'way', 'id': -(52000 + j * 100 + i), 'tags': {'building': 'rampart', 'height': str(h), 'roof:shape': 'flat', 'name': 'Volden', 'era': '1760'}, 'geometry': g})
+  for pi, seg in enumerate(pieces):
+    part = poly.intersection(seg).difference(gate)
+    for i, g in enumerate(ring_geo(part)):
+        out.append({'type': 'way', 'id': -(520000 + j * 10000 + pi * 100 + i), 'tags': {'building': 'rampart', 'height': str(h), 'roof:shape': 'flat', 'name': 'Volden', 'era': '1760'}, 'geometry': g})
+moat = moat.difference(unary_union(crossing) if crossing else Polygon())  # causeways where the streets cross
+for i, g in enumerate(ring_geo(moat)): out.append({'type': 'way', 'id': -(51000 + i), 'tags': {'natural': 'water', 'name': 'Voldgrav'}, 'geometry': g})
 json.dump({'elements': out}, open(f'{DST}/areas.json', 'w')); print('areas', len(out), 'buildings dropped', dropped)
 
 # ---- highways ----

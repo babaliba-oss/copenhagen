@@ -21,7 +21,7 @@ export function useCity(city){dataRoot=city.dataRoot;return city;}
 
 // "Töölö (National Opera)" → "toolo-national-opera"
 export function slug(text){
- return String(text).normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
+ return String(text).replace(/[øØ]/g,'o').replace(/[æÆ]/g,'ae').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
 }
 
 export function selectCity(search=''){
