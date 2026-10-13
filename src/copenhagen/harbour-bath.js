@@ -37,9 +37,10 @@ export function createHarbourBath({createPeople}={}){
  // white railing on the outer edges (posts every 2 m, top and mid rails)
  const rail=(a0,b0,a1,b1)=>{const len=Math.hypot(a1-a0,b1-b0),ca=(a1-a0)/len,cb=(b1-b0)/len;for(let s=0;s<=len;s+=2){box(a0+ca*s,b0+cb*s,deck,.07,.07,1.05,WHITE);}
   const g=(y,t)=>{const geo=new THREE.BoxGeometry(t,t,len);geo.rotateY(Math.atan2(u[0]*ca+n[0]*cb,u[1]*ca+n[1]*cb));const [x,z]=W((a0+a1)/2,(b0+b1)/2);geo.translate(x,y,z);parts.push(paint(geo,WHITE));};g(deck+1.05,.08);g(deck+.55,.05);};
- rail(A0,B1,da-2,B1);rail(da+2,B1,A1,B1); // open where the boards reach outrail(A0,B0+2,A0,B1);rail(A1,B0+2,A1,B1);
+ rail(A0,B0+2,A0,B1);rail(A1,B0+2,A1,B1);
  // diving tower at the outer corner: three platforms (1, 3 and 5 m) on white legs, blue boards
  const da=A1-8,db=B1-1.6;
+ rail(A0,B1,da-2,B1);rail(da+2,B1,A1,B1); // outer rail, open where the boards reach out
  for(const [dx,dy] of [[-1.2,0],[1.2,0],[-1.2,-1.6],[1.2,-1.6]])box(da+dx,db+dy,deck,.22,.22,5.2,WHITE);
  for(const [h,len] of [[1,2.6],[3,3.2],[5,3.6]]){box(da,db+len/2-.4,deck+h,1.4,len,.12,BLUE);box(da,db+len-.45,deck+h+.12,1.5,.06,.9,WHITE);}
  box(da+1.6,db-.8,deck,.6,.08,5.2,WHITE); // ladder rail
