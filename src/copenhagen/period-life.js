@@ -37,10 +37,11 @@ export function createPeriodLife({city,world,water=[],squares=[],gates=[]}){
  const prop=(kind,x,z,yaw=r()*6.28)=>{if(!free(x,z,.5))return;(props[kind]??=[]).push([x,z,yaw]);};
  // squares: market crowd in small groups facing each other, a cart or two, hens about
  for(const sq of squares){
-  const groups=5+Math.floor(r()*4);
-  for(let g=0;g<groups;g++){const a=r()*6.28,d=4+r()*16,cx=sq.x+Math.cos(a)*d,cz=sq.z+Math.sin(a)*d,n=2+Math.floor(r()*3);
+  // a market-day crowd: knots of two to five people across the whole square, denser towards its middle
+  const groups=14+Math.floor(r()*8);
+  for(let g=0;g<groups;g++){const a=r()*6.28,d=3+Math.sqrt(r())*34,cx=sq.x+Math.cos(a)*d,cz=sq.z+Math.sin(a)*d,n=2+Math.floor(r()*3);
    for(let i=0;i<n;i++){const b=i/n*6.28+r()*.4,px=cx+Math.cos(b)*.8,pz=cz+Math.sin(b)*.8;person(px,pz,{heading:Math.atan2(px-cx,pz-cz)});}}
-  for(let i=0;i<3;i++){const a=r()*6.28,d=8+r()*14;prop(r()<.7?'handcart':'haywagon',sq.x+Math.cos(a)*d,sq.z+Math.sin(a)*d);}
+  for(let i=0;i<5;i++){const a=r()*6.28,d=8+r()*24;prop(r()<.7?'handcart':'haywagon',sq.x+Math.cos(a)*d,sq.z+Math.sin(a)*d);}
   if(r()<.7)animals.push({kind:r()<.5?'hen':'goose',x:sq.x+(r()-.5)*20,z:sq.z+(r()-.5)*20,n:5+Math.floor(r()*5)});
  }
  // quays: along navigable water, a sailor or dock hand every ~25 m, cargo stacked beside them
