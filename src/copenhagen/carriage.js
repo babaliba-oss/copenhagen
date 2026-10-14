@@ -35,11 +35,14 @@ function legGeometry(coat){
   sph(.055,0,-.95,0,coat),paint(new THREE.CylinderGeometry(.055,.065,.09,8).translate(0,-1.005,0),'#1b1714')]);
 }
 
+// Blender coach and horse body (scripts/blender/carriage.py): {coach: geometry, horse: parts} once loaded.
+let MODELS=null;
+export function setCarriageModels(models){MODELS=models?.coach&&models?.horse?models:null;}
 export function createCarriage(){
  const group=new THREE.Group();group.name='Coach and horses';
  const mat=new THREE.MeshStandardMaterial({vertexColors:true,roughness:.55,metalness:.12});
  const lacquer='#1f3a2c',gilt='#c19a45',dark='#16120e';
- const parts=[
+ const parts=MODELS?[MODELS.coach.clone(),...[[-.62,'#5b3a24'],[.62,'#2e2520']].map(([x,c])=>MODELS.bake(MODELS.horse,{coat:c}).translate(x,0,-3.25))]:[
   box(1.42,1.15,2.0,0,1.38,.45,lacquer),box(1.5,.08,2.12,0,2.0,.45,dark),box(1.3,.06,1.9,0,2.06,.45,'#24201b'), // body, roof
   box(1.44,.05,2.02,0,1.84,.45,gilt),box(1.44,.05,2.02,0,.84,.45,gilt), // gilt bands
   box(1.46,.5,.7,0,1.5,.45,'#0e1418'), // windows
@@ -52,7 +55,7 @@ export function createCarriage(){
   ...[[-.62,'#5b3a24'],[.62,'#2e2520']].flatMap(([x,c])=>horse(x,-3.25,c).body),
  ];
  // Coachman
- parts.push(box(.42,.55,.3,0,1.85,-.98,'#3a2c45'),box(.26,.26,.24,0,2.27,-.98,'#d9b49a'),box(.36,.12,.36,0,2.44,-.98,'#141414'),box(.42,.04,.42,0,2.38,-.98,'#141414'));
+ if(!MODELS)parts.push(box(.42,.55,.3,0,1.85,-.98,'#3a2c45'),box(.26,.26,.24,0,2.27,-.98,'#d9b49a'),box(.36,.12,.36,0,2.44,-.98,'#141414'),box(.42,.04,.42,0,2.38,-.98,'#141414'));
  const mesh=new THREE.Mesh(mergeGeometries(parts),mat);parts.forEach(g=>g.dispose());mesh.castShadow=true;group.add(mesh);
  // Legs: one pivot per leg at the shoulder/hip so they can swing.
  const legs=[];
