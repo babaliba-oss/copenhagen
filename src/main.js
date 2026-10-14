@@ -25,6 +25,7 @@ import {setLadcykelBox} from './player-ride-models.js';
 import {setScooterModel} from './parked-micromobility.js';
 import {setCarriageModels} from './copenhagen/carriage.js';
 import {loadVehicleBodies} from './vehicle-bodies.js';
+import {vehicleBodyParts,VEHICLE_SPECS} from './vehicle-models.js';
 import {animateVehicle} from './vehicles.js';
 import {Mobility} from './mobility.js';
 import {createStreetLife} from './street-life.js';
@@ -259,7 +260,7 @@ surfaceMaterial.onBeforeCompile=shader=>{
    vec2 au=vGround.xz/2.6,au2=mat2(.8,-.6,.6,.8)*vGround.xz/7.3;
    vec3 asp=mix(texture2D(tAsphaltC,au).rgb,texture2D(tAsphaltC,au2).rgb,.35);
    float tone=groundNoise(vGround.xz/11.0)-0.5;
-   diffuseColor.rgb=asp*vec3(0.86,0.9,0.95)*0.82*(1.0+tone*0.10);
+   diffuseColor.rgb=asp*vec3(0.95,0.95,0.97)*1.0*(1.0+tone*0.10);
    gN=texture2D(tAsphaltN,au).xyz*2.0-1.0;gNw=.8*texFade;gRough=texture2D(tAsphaltR,au).r;grain=0.0;
    // Wet asphalt: darker, puddles in the low spots of the tone field, far less grain.
    float puddle=smoothstep(0.62,0.75,groundNoise(vGround.xz/3.5+7.0))*uWetness;
@@ -1105,7 +1106,7 @@ async function boot(){
    {const sd=stallData&&await stallData;if(sd){const st=createStalls(sd);cityModel.add(st.group);streetObstacles.push(...st.obstacles);
     if(st.people.length){const cx=st.people.reduce((a,p)=>a+p.x,0)/st.people.length,cz=st.people.reduce((a,p)=>a+p.z,0)/st.people.length;cafeGuests=createInstancedPeople(st.people,{name:'Market people',center:{x:cx,z:cz},seed:1760});cityModel.add(cafeGuests.group);}}}
    {const rd=railData&&await railData;if(rd){cityModel.add(createRails(rd).group);trains=createTrains(rd);cityModel.add(trains.group);}}
-   {const pd=parkedData&&await parkedData;if(pd){parkedCars=createParkedCars(pd);cityModel.add(parkedCars.group);streetObstacles.push(...parkedCars.obstacles);}}
+   {const pd=parkedData&&await parkedData;if(pd){if(vehicleBodies)await vehicleBodies;parkedCars=createParkedCars(pd,{bodies:['hatchback','sedan','estate','crossover'].map(t=>({parts:vehicleBodyParts(t),spec:VEHICLE_SPECS[t]})).filter(b=>b.parts)});cityModel.add(parkedCars.group);streetObstacles.push(...parkedCars.obstacles);}}
    const mapped=furnitureData&&await furnitureData;let mappedFurniture=null;
    if(mapped?.items)for(const pl of places)mapped.items=mapped.items.filter(i=>!(pl.dropFurniture||[]).some(([x,z,r])=>Math.hypot(i.x-x,i.z-z)<r)); // replaced by the place's own lamps and masts
    if(mapped?.items?.length&&city.id.startsWith('copenhagen')){ /* furniture placed from photos can land on the carriageway: drop what stands in a traffic lane, off the pavement */
@@ -1150,7 +1151,7 @@ async function boot(){
    progress(58,'Preparing the driving map');await new Promise(r=>setTimeout(r,30));drawMapBase();
    progress(68,'Loading buildings and textures');focus.set(car.x,0,car.z);await Promise.all([ensureCityModel(),updateTiles()]);
    if(vehicleBodies)console.info('Blender car bodies',await vehicleBodies);
-   progress(88,'Loading traffic and pedestrians');mobility=helsinki?new Mobility(correctHarbourLanes(mobilityData),world,{stationCars:16,corridorCars:HARBOUR_CORRIDOR_CARS,corridor:harbourCorridor(world.roads)}):new Mobility(mobilityData,world,city.era===1760?{cars:20,people:320}:city.id==='copenhagen'?{cars:64,people:170}:undefined);mobility.reset(car);angryDrivers=createAngryDrivers({vehicleOf:a=>streetLife?.traffic?.vehicleOf(a)});scene.add(angryDrivers.group);mobility.onCrash=a=>angryDrivers.trigger(a,mobility.time);streetLife=createStreetLife(scene,mobility,{paintedMarkings:city.era!==1760,mappedSignalNear:mappedSignalNear(mappedFurniture)});streetLife.update(0,car);if(city.era===1760){streetLife.traffic.group.visible=false;coaches=createCarriageTraffic(mobility.cars);scene.add(coaches.group);}world.objects.add(breakableSigns.bodies); // 1760: the traffic is coaches and horses
+   progress(88,'Loading traffic and pedestrians');mobility=helsinki?new Mobility(correctHarbourLanes(mobilityData),world,{stationCars:16,corridorCars:HARBOUR_CORRIDOR_CARS,corridor:harbourCorridor(world.roads)}):new Mobility(mobilityData,world,city.era===1760?{cars:20,people:320}:city.id==='copenhagen'?{cars:72,people:300}:undefined);mobility.reset(car);angryDrivers=createAngryDrivers({vehicleOf:a=>streetLife?.traffic?.vehicleOf(a)});scene.add(angryDrivers.group);mobility.onCrash=a=>angryDrivers.trigger(a,mobility.time);streetLife=createStreetLife(scene,mobility,{paintedMarkings:city.era!==1760,mappedSignalNear:mappedSignalNear(mappedFurniture)});streetLife.update(0,car);if(city.era===1760){streetLife.traffic.group.visible=false;coaches=createCarriageTraffic(mobility.cars);scene.add(coaches.group);}world.objects.add(breakableSigns.bodies); // 1760: the traffic is coaches and horses
    trafficCars=city.era===1760?[]:mobility.cars.map(actor=>{const visual=streetLife.traffic.vehicleOf(actor);return {id:`traffic-${actor.id}`,label:visual?.type==='taxi'?'Taxi':'Car',actor,visual:{type:visual?.type||'sedan',paint:visual?.paint.getStyle()},claim(){if(actor.playerTaken||actor.edge===null||Math.abs(actor.speed)>1.2)return false;actor.playerTaken=true;actor.edge=null;actor.speed=0;return true;},release(){delete actor.playerTaken;}};});
    police=new PoliceSimulation(mobility.roads,world);police.relaxed=city.id.startsWith('copenhagen');if(city.era===1760)police.report=()=>false;/* no motor police in 1760 */policeRenderer=createPoliceRenderer(scene,police);police.onIncident=(...incident)=>finale.incident(...incident);roadblock=createRoadblock(scene,{world,police,carModel:carGroup,playerLook:travelRenderer.look,isVisible:trafficInView,obstacles:()=>[...mobility.cars.filter(c=>c.edge),...(tramSim?.bodies||[]),...(buses?.bodies||[]),...travel.parkedBodies(),...police.obstacles],onWarning:message=>toast(message,{important:true})});
    // Copenhagen has no street trams: its trams.json holds the S-train route relations, which run through the

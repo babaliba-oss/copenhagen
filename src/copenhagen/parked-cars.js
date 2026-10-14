@@ -25,23 +25,34 @@ function fixedGeometry(){
  return mergeGeometries(parts);
 }
 
-export function createParkedCars(data){
+// Blender bodies (scripts/blender/vehicles.py) when installed: the painted panels per instance colour, the rest
+// (glass, trim, lamps, plates) baked to vertex colours, wheels added. Four types, cycled along the kerb.
+const PART_COLOURS={glass:'#121c22',black:'#1b1f22',rubber:'#202326',chrome:'#c9ced0',head:'#e9eee6',tail:'#9e1f1a',plate:'#eff2e8'};
+function blenderCar(parts,spec){
+ const body=parts.get('paint');if(!body)return null;
+ const fixed=[];for(const [name,g] of parts)if(name!=='paint')fixed.push(paint(g.clone(),PART_COLOURS[name]||'#222'));
+ for(const sx of [-1,1])for(const sz of [-1,1]){const r=spec.r;fixed.push(paint(new THREE.CylinderGeometry(r,r,.21,14).rotateZ(Math.PI/2).translate(sx*(spec.w/2-.06),r,sz*spec.wb/2),'#151617'));fixed.push(paint(new THREE.CylinderGeometry(r*.62,r*.62,.215,12).rotateZ(Math.PI/2).translate(sx*(spec.w/2-.06),r,sz*spec.wb/2),'#9aa1a4'));}
+ return {body:paint(body.clone(),'#ffffff'),fixed:mergeGeometries(fixed)};
+}
+export function createParkedCars(data,{bodies=[]}={}){
  const group=new THREE.Group();group.name='Parked cars';
- const cars=data?.cars||[],paints=(data?.paints||['#ccc']).map(h=>new THREE.Color(h));
+ const cars=data?.cars||[],paints=(data?.paints||['#ccc']).map(h=>{const c=new THREE.Color(h),l=c.r*.3+c.g*.55+c.b*.15;return l<.035?c.lerp(new THREE.Color('#4a4e55'),.55):c;}); // black and navy read as holes in shadow
  if(!cars.length)return {group,obstacles:[],update(){}};
- const body=bodyGeometry(),fixed=fixedGeometry();
- const bodyMat=new THREE.MeshStandardMaterial({vertexColors:true,roughness:.32,metalness:.45}),fixedMat=new THREE.MeshStandardMaterial({vertexColors:true,roughness:.4,metalness:.2});
+ const models=bodies.map(({parts,spec})=>blenderCar(parts,spec)).filter(Boolean);if(!models.length)models.push({body:bodyGeometry(),fixed:fixedGeometry()});
+ const bodyMat=new THREE.MeshStandardMaterial({vertexColors:true,roughness:.35,metalness:.15}),fixedMat=new THREE.MeshStandardMaterial({vertexColors:true,roughness:.4,metalness:.2});
  const chunks=new Map();
  for(const c of cars){const k=`${Math.floor(c[0]/CHUNK)},${Math.floor(c[1]/CHUNK)}`;if(!chunks.has(k))chunks.set(k,[]);chunks.get(k).push(c);}
  const m=new THREE.Matrix4(),q=new THREE.Quaternion(),v=new THREE.Vector3(),one=new THREE.Vector3(1,1,1),UP=new THREE.Vector3(0,1,0),list=[],obstacles=[];
  let id=0;
- for(const [k,cs] of chunks){
-  const b=new THREE.InstancedMesh(body,bodyMat,cs.length),f=new THREE.InstancedMesh(fixed,fixedMat,cs.length);b.castShadow=f.castShadow=true;b.receiveShadow=true;
-  let cx=0,cz=0;
-  cs.forEach((c,i)=>{const [x,z,yaw,p]=c;m.compose(v.set(x,groundAt(x,z),z),q.setFromAxisAngle(UP,yaw),one);b.setMatrixAt(i,m);f.setMatrixAt(i,m);b.setColorAt(i,paints[p%paints.length]);cx+=x;cz+=z;
-   const co=Math.cos(yaw),si=Math.sin(yaw),ring=[[-.9,-2.15],[.9,-2.15],[.9,2.15],[-.9,2.15]].map(([a,d])=>[x+a*co+d*si,z-a*si+d*co]);
-   obstacles.push({id:`parked-car-${id++}`,name:'parked car',rings:[ring],bbox:[Math.min(...ring.map(p=>p[0])),Math.min(...ring.map(p=>p[1])),Math.max(...ring.map(p=>p[0])),Math.max(...ring.map(p=>p[1]))]});});
-  b.computeBoundingSphere();f.computeBoundingSphere();const g=new THREE.Group();g.add(b,f);group.add(g);list.push({g,x:cx/cs.length,z:cz/cs.length});
+ for(const [k,all] of chunks){
+  const g=new THREE.Group();let cx=0,cz=0;
+  models.forEach((model,mi)=>{const cs=all.filter((c,i)=>Math.abs(Math.round(c[0]*7+c[1]*13))%models.length===mi);if(!cs.length)return;
+   const b=new THREE.InstancedMesh(model.body,bodyMat,cs.length),f=new THREE.InstancedMesh(model.fixed,fixedMat,cs.length);b.castShadow=f.castShadow=true;b.receiveShadow=true;
+   cs.forEach((c,i)=>{const [x,z,yaw,p]=c;m.compose(v.set(x,groundAt(x,z),z),q.setFromAxisAngle(UP,yaw),one);b.setMatrixAt(i,m);f.setMatrixAt(i,m);b.setColorAt(i,paints[p%paints.length]);cx+=x;cz+=z;
+    const co=Math.cos(yaw),si=Math.sin(yaw),ring=[[-.9,-2.15],[.9,-2.15],[.9,2.15],[-.9,2.15]].map(([a,d])=>[x+a*co+d*si,z-a*si+d*co]);
+    obstacles.push({id:`parked-car-${id++}`,name:'parked car',rings:[ring],bbox:[Math.min(...ring.map(p=>p[0])),Math.min(...ring.map(p=>p[1])),Math.max(...ring.map(p=>p[0])),Math.max(...ring.map(p=>p[1]))]});});
+   b.computeBoundingSphere();f.computeBoundingSphere();g.add(b,f);});
+  group.add(g);list.push({g,x:cx/all.length,z:cz/all.length});
  }
  return {group,obstacles,update(p){if(!p)return;for(const c of list)c.g.visible=Math.hypot(c.x-p.x,c.z-p.z)<RANGE;}};
 }

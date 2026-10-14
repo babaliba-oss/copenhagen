@@ -102,7 +102,7 @@ export function createSquareCrowds({world,water=[],places=[],seed=2026}){
  const free=(x,z)=>!world.buildings.at(x,z)&&!world.roads.at(x,z)&&!wet(x,z)&&!world.buildings.at(x+.6,z)&&!world.buildings.at(x-.6,z)&&!world.buildings.at(x,z+.6)&&!world.buildings.at(x,z-.6);
  const list=[];
  for(const sq of places){
-  const groups=10+Math.floor(r()*8);
+  const groups=18+Math.floor(r()*12);
   for(let g=0;g<groups;g++){const a=r()*6.28,d=4+Math.sqrt(r())*40,cx=sq.x+Math.cos(a)*d,cz=sq.z+Math.sin(a)*d;
    if(r()<.35){if(free(cx,cz))list.push({x:cx,z:cz,heading:r()*6.28,pose:'browse',walking:false});continue;} // someone alone, looking at the sights
    const n=2+Math.floor(r()*3);for(let i=0;i<n;i++){const b=i/n*6.28+r()*.4,px=cx+Math.cos(b)*.75,pz=cz+Math.sin(b)*.75;if(free(px,pz))list.push({x:px,z:pz,heading:Math.atan2(px-cx,pz-cz),pose:r()<.7?'chat':'browse',walking:false});}}

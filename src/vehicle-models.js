@@ -20,6 +20,8 @@ const templates=new Map();
 // Blender-modelled bodies (scripts/blender/vehicles.py), per type a Map of material name -> geometry in the
 // model's frame. Installed before traffic is built; a type without one keeps the procedural body below.
 const bodies=new Map();
+export const VEHICLE_SPECS=specs;
+export function vehicleBodyParts(type){return bodies.get(type)||null;} // Blender body (material name -> geometry), if installed
 export function installVehicleBodies(map){for(const [type,parts] of Object.entries(map||{}))if(specs[type]&&parts?.get?.('paint')){bodies.set(type,parts);templates.delete(type);}return bodies.size;}
 // Showroom finishes: clearcoated paint, dark reflective glazing, polished
 // trim and satin rubber. Every reflective material shares the one sky PMREM
