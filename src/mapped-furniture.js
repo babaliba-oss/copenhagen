@@ -226,7 +226,7 @@ export function createMappedFurniture(layer,{player=()=>null,mobility=()=>null,c
   if(grad){grad.addColorStop(0,'rgba(255,255,255,1)');grad.addColorStop(.25,'rgba(255,255,255,.6)');grad.addColorStop(.6,'rgba(255,255,255,.18)');grad.addColorStop(1,'rgba(255,255,255,0)');g.fillStyle=grad;g.fillRect(0,0,64,64);}
   poolMat=new THREE.MeshBasicMaterial({color:'#ffc98a',fog:true,alphaMap:c?new THREE.CanvasTexture(c):null,transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,polygonOffset:true,polygonOffsetFactor:-4,opacity:0});
   const sphere=new THREE.SphereGeometry(.2,8,6),plane=new THREE.PlaneGeometry(1,1).rotateX(-Math.PI/2);
-  const R={lantern:6,lamp:12,'mast-lamp':9,'park-lamp':5.5,'wire-lamp':10},sc=new THREE.Vector3(),by=new Map();
+  const R={lantern:4,lamp:12,'mast-lamp':9,'park-lamp':5.5,'wire-lamp':10},sc=new THREE.Vector3(),by=new Map();
   for(const h of heads){const k=`${Math.floor(h.x/300)},${Math.floor(h.z/300)}`;if(!by.has(k))by.set(k,[]);by.get(k).push(h);}
   for(const list of by.values()){
    const glow=new THREE.InstancedMesh(sphere,glowMat,list.length),pools=new THREE.InstancedMesh(plane,poolMat,list.length);glow.name='Lamp heads lit';pools.name='Lamp light pools';pools.renderOrder=2;
