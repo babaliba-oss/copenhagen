@@ -72,11 +72,12 @@ export function createInstancedPeople(records,options={}){
    if(p.scared&&(p.scared.left-=step)<=0)p.scared=null;
    if(p.conversation){p.speed=0;continue;}
    // Authored chase (the Andersen easter egg): run at the player until caught or out of breath, then walk home.
-   if(p.chaseUntil){const now=performance.now()/1000;
-    if(now<p.chaseUntil&&player&&!p.caught){const cx=player.x-p.x,cz=player.z-p.z,cl=Math.hypot(cx,cz);
-     if(cl<1.3){p.caught=true;p.chaseUntil=now;options.onEvent?.('caught',p);}else{const v=Math.min(cl,3.4*step);p.x+=cx/cl*v;p.z+=cz/cl*v;p.speed=3.4;p.running=1;p.heading=Math.atan2(-cx,-cz);}continue;}
+   if(p.chaseUntil){p.chaseLeft=(p.chaseLeft??0)-step;const walk=options.walkable||(()=>true);
+    const go=(tx,tz,speed)=>{const dx=tx-p.x,dz=tz-p.z,l=Math.hypot(dx,dz);if(l<.05)return l;const v=Math.min(l,speed*step),x=p.x+dx/l*v,z=p.z+dz/l*v;if(walk(x,z)){p.x=x;p.z=z;}p.speed=speed;p.heading=Math.atan2(-dx,-dz);return l;};
+    const far=Math.hypot(p.x-p.homeX,p.z-p.homeZ)>45; // he stays on his own stretch of quay
+    if(p.chaseLeft>0&&player&&!p.caught&&!far){const l=go(player.x,player.z,3.4);p.running=1;if(l<1.3){p.caught=true;p.chaseLeft=0;options.onEvent?.('caught',p);}continue;}
     if(!p.gaveUp&&!p.caught){p.gaveUp=true;options.onEvent?.('gave-up',p);}
-    const hx=p.homeX-p.x,hz=p.homeZ-p.z,hl=Math.hypot(hx,hz);if(hl>.3){const v=Math.min(hl,1.2*step);p.x+=hx/hl*v;p.z+=hz/hl*v;p.speed=1.2;p.running=0;p.heading=Math.atan2(-hx,-hz);continue;}
+    p.running=0;if(go(p.homeX,p.homeZ,1.2)>.3)continue;
     p.chaseUntil=0;p.gaveUp=false;p.caught=false;p.speed=0;p.heading=p.homeHeading??p.heading;continue;}
    const distance=player?Math.hypot(p.x-player.x,p.z-player.z):Infinity,panic=player&&Math.abs(player.speed||0)>2&&distance<7;
    p.running=panic||p.panicUntil>time||p.scared?1:0;p.speed=0;

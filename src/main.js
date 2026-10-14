@@ -269,7 +269,7 @@ surfaceMaterial.onBeforeCompile=shader=>{
    diffuseColor.rgb*=1.0-uWetness*0.22-puddle*0.25;grain*=1.0-uWetness*0.7;wetRough=max(uWetness*0.5,puddle);
    #ifdef DIRT_ROADS
    // 1760: no asphalt anywhere; unpaved roads are packed earth with wheel ruts and gravel.
-   {float n=groundNoise(vGround.xz/4.0),rut=groundNoise(vGround.xz*vec2(.35,.35)+3.0);diffuseColor.rgb=vec3(0.20,0.16,0.11)*(0.82+n*0.32)*(1.0-smoothstep(0.55,0.75,rut)*0.18);diffuseColor.rgb*=1.0-puddle*0.35;}
+   gNw=0.;gRough=-1.;{float n=groundNoise(vGround.xz/4.0),rut=groundNoise(vGround.xz*vec2(.35,.35)+3.0);diffuseColor.rgb=vec3(0.20,0.16,0.11)*(0.82+n*0.32)*(1.0-smoothstep(0.55,0.75,rut)*0.18);diffuseColor.rgb*=1.0-puddle*0.35;}
    #endif
   }
   // Stone carriageways (aaa99e) get the shared photo-guided granite setts; light islands keep slabs.
@@ -370,7 +370,7 @@ async function createTrees(trees=data.trees){
  // Every drawn tree gets a solid trunk (src/tree-trunks.js); register points on a traffic lane's carriageway are dropped.
  if(treeTrunks){const t=treeTrunks.build(trees,world);trees=t.draw;world.objects.add(t.obstacles);}
  // Cities other than Helsinki: every registered tree gets its species' shape (src/tree-species.js).
- if(city.scenery!=='helsinki'){const before=trees.length;trees=trees.filter(t=>!world.buildings.at(...t.p)&&!(world.roads.at(...t.p)&&!world.pavement?.at(...t.p))); /* none standing in a carriageway or a house */if(before-trees.length)console.info(`Trees: ${before-trees.length} in carriageways or houses dropped`);speciesTrees=createSpeciesTrees(trees,{detailed:true});cityModel.add(speciesTrees.group);speciesTrees.update(focus);return;}
+ if(city.scenery!=='helsinki'){const before=trees.length;trees=trees.filter(t=>{const [x,z]=t.p;if(world.buildings.at(x,z))return false;if(world.pavement?.at(x,z))return true;return ![[0,0],[1.5,0],[-1.5,0],[0,1.5],[0,-1.5]].every(([a,b])=>world.roads.at(x+a,z+b));}); /* none standing in a carriageway or a house */if(before-trees.length)console.info(`Trees: ${before-trees.length} in carriageways or houses dropped`);speciesTrees=createSpeciesTrees(trees,{detailed:true});cityModel.add(speciesTrees.group);speciesTrees.update(focus);return;}
  const {createRouteTrees,detailedTreeArea,detailedTreeCell}=await import('./route-trees.js');
  const detailed=createRouteTrees(trees.filter(t=>detailedTreeArea(t)&&!world.buildings.at(...t.p)));cityModel.add(detailed);harbour.group.userData.detailedTrees=detailed.userData;
  // Detailed trees get blob proxies in cells matching createRouteTrees' buckets (detailedTreeCell); applyTreeLod swaps them by distance.
@@ -1084,7 +1084,7 @@ async function boot(){
     // Copenhagen's game layer (src/copenhagen): jobs, GPS line, sagas and the characters who give them.
     // The characters are spread across the city, so the crowd's single-centre culling is overridden.
     if(city.era===1760&&!carriage){const starter=carGroup.children[0];if(starter){starter.traverse(m=>{if(m.isMesh)m.visible=false;});carriage=createCarriage();carriage.position.z=1.2;starter.add(carriage);}} // 1760: the player's car becomes a coach and horses
-    if(city.id.startsWith('copenhagen')){cph?.dispose?.();cph=createCopenhagenGame({scene,city,mobilityData,cityData:data,toast,soundOn:()=>sound});const npcCentre={x:0,z:0},npc=createInstancedPeople(cph.people,{name:'Copenhagen characters',center:npcCentre,onEvent:(e,p)=>{if(p.script!=='hca')return;toast(e==='caught'?'H.C. Andersen: "Caught you! Now, Chapter One of The Snow Queen..."':'H.C. Andersen: "Fine! Run! I shall put you in a story. A sad one."');}});
+    if(city.id.startsWith('copenhagen')){cph?.dispose?.();cph=createCopenhagenGame({scene,city,mobilityData,cityData:data,toast,soundOn:()=>sound});const npcCentre={x:0,z:0},npc=createInstancedPeople(cph.people,{name:'Copenhagen characters',center:npcCentre,walkable:(x,z)=>!world?.buildings.at(x,z)&&!inWaterPolygons(world?.water,x,z),onEvent:(e,p)=>{if(p.script!=='hca')return;toast(e==='caught'?'H.C. Andersen: "Caught you! Now, Chapter One of The Snow Queen..."':'H.C. Andersen: "Fine! Run! I shall put you in a story. A sad one."');}});
      npc.update=(u=>(dt,player)=>{if(player){npcCentre.x=player.x;npcCentre.z=player.z;}u(dt,player);npc.group.visible=true;})(npc.update);cityModel.add(npc.group);marketLife={...life(),...npc,group:npc.group};detailPeople=npc.people;}
     harbour={group:new THREE.Group(),obstacles:[],knockables:null};knockables=combineKnockables([breakableSigns]); // traffic-signal posts bend when hit, in every city
     finale.zone=null; // station tram scheduling is Helsinki-specific
@@ -1129,7 +1129,7 @@ async function boot(){
     {const kept=new Map(),cell=(x,z)=>Math.floor(x/5)+','+Math.floor(z/5);let dropped=0;
      mapped.items=mapped.items.filter(it=>{if(it.k!=='traffic-light'&&it.k!=='crossing-light')return true;const gx=Math.floor(it.x/5),gz=Math.floor(it.z/5);
       for(let i=-1;i<=1;i++)for(let j=-1;j<=1;j++)for(const q of kept.get((gx+i)+','+(gz+j))||[])if(q.k===it.k&&Math.hypot(q.x-it.x,q.z-it.z)<5&&Math.abs(Math.atan2(Math.sin((q.yaw||0)-(it.yaw||0)),Math.cos((q.yaw||0)-(it.yaw||0))))<.6){dropped++;return false;}
-      {let n=0;for(let i=-1;i<=1;i++)for(let j=-1;j<=1;j++)for(const q of kept.get((gx+i)+','+(gz+j))||[])if(Math.hypot(q.x-it.x,q.z-it.z)<6)n++;if(n>=3){dropped++;return false;}} // a traffic island holds a few heads, not a forest
+      {let n=0;for(let i=-1;i<=1;i++)for(let j=-1;j<=1;j++)for(const q of kept.get((gx+i)+','+(gz+j))||[])if(q.k===it.k&&Math.hypot(q.x-it.x,q.z-it.z)<6)n++;if(n>=3){dropped++;return false;}} // a traffic island holds a few heads, not a forest
       const key=cell(it.x,it.z);if(!kept.has(key))kept.set(key,[]);kept.get(key).push(it);return true;});
      console.info(`Street furniture: ${dropped} duplicate signal heads dropped`);}
     // Photo 'poles': in Copenhagen mostly the post of a lamp or sign already mapped, never a timber utility pole.

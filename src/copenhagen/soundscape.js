@@ -29,9 +29,9 @@ export function createSoundscape(ac,{era=null}={}){
  const SCALE=era===1760?[62,64,66,67,69,71,73,74,76,78]:[65,67,69,72,74,76,77,79,81,84];
  const BAR=era===1760?2.4:3.2;
  function padNote(f,t0,dur,vol){const o1=ac.createOscillator(),o2=ac.createOscillator(),lp=ac.createBiquadFilter(),g=ac.createGain();o1.type='triangle';o2.type='sine';o1.frequency.value=f;o2.frequency.value=f*1.003;lp.type='lowpass';lp.frequency.value=900;
-  g.gain.setValueAtTime(0,t0);g.gain.linearRampToValueAtTime(vol,t0+dur*.35);g.gain.setValueAtTime(vol,t0+dur*.7);g.gain.linearRampToValueAtTime(0,t0+dur*1.05);o1.connect(lp);o2.connect(lp);lp.connect(g);g.connect(mus);o1.start(t0);o2.start(t0);o1.stop(t0+dur*1.1);o2.stop(t0+dur*1.1);}
+  g.gain.setValueAtTime(0,t0);g.gain.linearRampToValueAtTime(vol,t0+dur*.35);g.gain.setValueAtTime(vol,t0+dur*.7);g.gain.linearRampToValueAtTime(0,t0+dur*1.05);o1.connect(lp);o2.connect(lp);lp.connect(g);g.connect(mus);o1.start(t0);o2.start(t0);o1.stop(t0+dur*1.1);o2.stop(t0+dur*1.1);o1.onended=()=>{o1.disconnect();o2.disconnect();lp.disconnect();g.disconnect();};}
  function pluck(f,t0,vol){const o=ac.createOscillator(),g=ac.createGain(),lp=ac.createBiquadFilter();o.type=era===1760?'sawtooth':'triangle';o.frequency.value=f;lp.type='lowpass';lp.frequency.setValueAtTime(era===1760?3200:2400,t0);lp.frequency.exponentialRampToValueAtTime(500,t0+.6);
-  g.gain.setValueAtTime(0,t0);g.gain.linearRampToValueAtTime(vol,t0+.006);g.gain.exponentialRampToValueAtTime(.0001,t0+(era===1760?.7:1.1));o.connect(lp);lp.connect(g);g.connect(mus);g.connect(echo);o.start(t0);o.stop(t0+1.2);}
+  g.gain.setValueAtTime(0,t0);g.gain.linearRampToValueAtTime(vol,t0+.006);g.gain.exponentialRampToValueAtTime(.0001,t0+(era===1760?.7:1.1));o.connect(lp);lp.connect(g);g.connect(mus);g.connect(echo);o.start(t0);o.stop(t0+1.2);o.onended=()=>{o.disconnect();lp.disconnect();g.disconnect();};}
  let musT=0,bar=0,musicOn=(()=>{try{return localStorage.getItem('cph-music')!=='0';}catch{return true;}})(),lastNote=4;
  function scheduleMusic(){const t=ac.currentTime;if(musT<t)musT=t+.1;
   while(musT<t+1.5){const ch=CHORDS[bar%CHORDS.length];

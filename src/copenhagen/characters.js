@@ -62,7 +62,7 @@ const SCRIPTS={
   autograph:()=>turn('An autograph! Of course, of course. Just tell me first: you are not by any chance a critic? You have the look. That little notebook. That face.',[choice('critic','Well... I did write one review'),choice('fan','No, a big fan!'),BYE]),
   fan:()=>turn('Then here. H.C. Andersen, with a little paper cut-out of a swan. I cut them out at dinner parties. People find it charming. Mostly.',[BYE]),
   critic:()=>turn('A CRITIC! The one who called The Little Mermaid "too sad for children"?! Stand still. I have a FAIRY TALE for you. It is very long and nobody is happy at the end.',[choice('run','Run!')],'angry'),
-  run:(m,person)=>{if(person){person.chaseUntil=performance.now()/1000+25;person.caught=false;}return {close:true,message:'Run!'};},
+  run:(m,person)=>{if(person){person.chaseLeft=25;person.chaseUntil=1;person.caught=false;person.gaveUp=false;}return {close:true,message:'Run!'};},
  },
  mette:{
   hello:()=>turn('Welcome. Three rules here: no running, no photos, no cars.',[choice('run','Why no running?'),choice('cars','Why no cars?'),BYE]),
