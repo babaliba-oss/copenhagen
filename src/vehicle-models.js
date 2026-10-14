@@ -17,6 +17,10 @@ const specs={
 };
 const palette=['#b8bcb8','#e5e7e1','#284c65','#be3529','#344a3e','#393b41','#a29b8b','#577383','#794537'];
 const templates=new Map();
+// Blender-modelled bodies (scripts/blender/vehicles.py), per type a Map of material name -> geometry in the
+// model's frame. Installed before traffic is built; a type without one keeps the procedural body below.
+const bodies=new Map();
+export function installVehicleBodies(map){for(const [type,parts] of Object.entries(map||{}))if(specs[type]&&parts?.get?.('paint')){bodies.set(type,parts);templates.delete(type);}return bodies.size;}
 // Showroom finishes: clearcoated paint, dark reflective glazing, polished
 // trim and satin rubber. Every reflective material shares the one sky PMREM
 // (see environment.js), so instanced traffic batches reflect the same sky as
@@ -91,6 +95,9 @@ function build(type,detailed){
  // Body panels hang under one pivot (after the four wheel pivots) so braking
  // dive, acceleration squat and roll can tilt the shell without the wheels.
  const body=new THREE.Group();body.name='body';group.add(body);
+ if(!detailed&&bodies.has(type)){for(const gs of batches.values())gs.forEach(g=>g.dispose());batches.clear();
+  for(const [name,g] of bodies.get(type)){const mesh=new THREE.Mesh(g,mats[name]||mats.black);mesh.name=name;mesh.castShadow=true;mesh.receiveShadow=true;body.add(mesh);}
+  return group;}
  for(const [name,gs]of batches){const mesh=new THREE.Mesh(mergeGeometries(gs),mats[name]);mesh.name=name;mesh.castShadow=true;mesh.receiveShadow=true;body.add(mesh);gs.forEach(g=>g.dispose());}
  return group;
 }
