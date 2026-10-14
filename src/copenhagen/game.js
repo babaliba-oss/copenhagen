@@ -237,9 +237,9 @@ export function createCopenhagenGame({scene,city,mobilityData,cityData,toast,sou
  }
  function rebuild(){const t=target();routeFor=t.p;const G=mode==='car'?road:walk;const a=G.nearest(player.x,player.z),b=G.nearest(t.p[0],t.p[1]);const pts=G.route(a,b);line.set(pts?[[player.x,player.z],...trimStart(pts,player.x,player.z),t.p]:null);}
  // The nearest graph node is often behind the car: the route then ran back to it and returned past the car
- // (a loop around the player). Start from the closest point of the route's first 150 m instead.
+ // (a loop around the player). Start from the closest point of the route's first 60 m instead.
  function trimStart(pts,x,z){if(pts.length<2)return pts;let best=-1,bd=Infinity,bp=null,run=0;
-  for(let i=0;i<pts.length-1&&run<150;i++){const [ax,az]=pts[i],[bx,bz]=pts[i+1],dx=bx-ax,dz=bz-az,L2=dx*dx+dz*dz||1,u=Math.max(0,Math.min(1,((x-ax)*dx+(z-az)*dz)/L2)),px=ax+dx*u,pz=az+dz*u,d=Math.hypot(px-x,pz-z);
+  for(let i=0;i<pts.length-1&&run<60;i++){const [ax,az]=pts[i],[bx,bz]=pts[i+1],dx=bx-ax,dz=bz-az,L2=dx*dx+dz*dz||1,u=Math.max(0,Math.min(1,((x-ax)*dx+(z-az)*dz)/L2)),px=ax+dx*u,pz=az+dz*u,d=Math.hypot(px-x,pz-z);
    if(d<bd-.5){bd=d;best=i;bp=[px,pz];}run+=Math.sqrt(L2);}
   return best>0||bp&&best===0?[bp,...pts.slice(best+1)]:pts;}
 
