@@ -144,7 +144,7 @@ export function createLandmarks({era=null,mills=[],anchors={}}={}){
   add(mermaid(),1465.3,-1438.7,{y:-1.2,rot:2.2});
   add(rider(4.5),1076.2,-438.8,{rot:.12});add(rider(3.6,'#4d6a59'),191.9,194.8,{rot:-1.2});add(gefion(),1371.2,-729.5,{rot:-.6});
  }
- add(rider(3.2,era===1760?'#b8a46a':'#55715f'),603.9,16.7,{rot:.6}); // Christian V (1688; gilded lead until 1940s)
+ add(rider(3.2,era===1760?'#b8a46a':'#55715f'),624.6,-57.9,{rot:.6}); // in the middle of Krinsen (the mapped lawn's centroid) // Christian V (1688; gilded lead until 1940s)
  for(const [x,z,h] of flagTops){const pole=add(mergeGeometries([paint(new THREE.CylinderGeometry(.08,.1,8,6).translate(0,4,0),'#e9e6dc')]),x,z,{y:groundAt(x,z)+h});const f=flag();f.position.set(x,groundAt(x,z)+h+7.2,z);group.add(f);flags.push(f);}
  if(era===1760){
   add(gothicChurch(),-205,66.3,{rot:.318,material:built}); // Vor Frue (old church, spire to ~110 m; lost in 1807)
