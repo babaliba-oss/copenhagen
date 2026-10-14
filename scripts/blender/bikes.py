@@ -25,7 +25,7 @@ class M:
         return self.mats[name]
     def add(self, ob, key):
         ob.data.materials.append(self.mat(key)); return ob
-    def rod(self, a, b, r, key, seg=5):
+    def rod(self, a, b, r, key, seg=4):
         a, b = Vector(a), Vector(b); d = b - a
         bpy.ops.mesh.primitive_cylinder_add(radius=r, depth=d.length, vertices=seg, location=(a + b) / 2, end_fill_type='NOTHING')
         ob = bpy.context.active_object; ob.rotation_mode = 'QUATERNION'; ob.rotation_quaternion = Vector((0, 0, 1)).rotation_difference(d.normalized())
@@ -59,8 +59,8 @@ def rack_bike(m):
     """Upright city bike (step-through frame, swept bars, front basket, mudguards, chain guard). ~300 tris."""
     R = .33; back, front = (0, -.56, R), (0, .56, R)            # Blender Y = -game Z: front wheel at +Y
     for y in (-.56, .56):
-        m.ring(y, R, R, .028, '#1a1a1a', 14, 3)
-        m.ring(y, R, R + .045, .028, FRAME, 18, 3, arc=-.02)     # mudguard over the top
+        m.ring(y, R, R, .028, '#1a1a1a', 12, 3)
+        m.ring(y, R, R + .045, .028, FRAME, 12, 3, arc=-.02)     # mudguard over the top
     bb, seat, head_lo, head_hi = (0, -.05, .34), (0, -.25, .86), (0, .42, .55), (0, .44, .93)
     for a, b in [(back, seat), (back, bb), (bb, head_lo), (bb, (0, -.21, .74)), (head_lo, head_hi), (head_lo, front)]:
         m.rod(a, b, .022, FRAME)

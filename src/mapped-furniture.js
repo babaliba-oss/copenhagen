@@ -261,7 +261,7 @@ export function createMappedFurniture(layer,{player=()=>null,mobility=()=>null,c
  function update(){
   const p=player();updateLights(p);if(!p)return;
   for(const c of chunks.values()){const d=Math.hypot(c.centre[0]-p.x,c.centre[1]-p.z);c.group.visible=d<VIEW_RANGE+CHUNK*.71;
-   if(c.group.visible)for(const m of c.group.children)if(m.name==='Parked bicycles')m.visible=d<170+CHUNK*.71;} // small and many: bikes stop at a shorter range
+   if(c.group.visible)for(const m of c.group.children)if(m.name==='Parked bicycles')m.visible=d<100+CHUNK*.71;} // small and many: bikes stop at a shorter range
   updateLenses(p);
  }
  const counts={};for(const it of items)counts[it.k]=(counts[it.k]||0)+1;
