@@ -112,7 +112,7 @@ export function createModelledBuilding(array,part,pixels,texture=null,includeHer
   else if(!pixels&&!f.windows.length&&!part.noFacade&&![23,1707,324].includes(part.ratu)){
    f.windows=provisionalWindows(f);if(f.windows.length){provisional=true;f.color=[.73,.72,.67];}
   }
-  else if(!pixels&&!f.windows.length&&part.noFacade)f.windows=churchWindows(f); // churches and towers: tall windows, wall colour kept
+  else if(!pixels&&!f.windows.length&&part.noFacade&&/kirke|kapel|tårn/i.test(part.name||''))f.windows=churchWindows(f); // churches and towers: tall windows, wall colour kept
   // Untextured meshes from a city's official model can carry their own wall and roof colours.
   if(!pixels&&!described&&!corridor&&!clean&&part.roofColor&&part.color)f.color=part.color;
   triangles(f.triangles,clean?clean.wallRGB:part.ratu===324?[.65,.55,.47]:part.ratu===23?[.83,.8,.71]:f.color,walls,wallColours);

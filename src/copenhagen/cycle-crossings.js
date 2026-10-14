@@ -9,7 +9,8 @@ import {drapeGeometry} from '../terrain-mesh.js';
 const isCycle=p=>/pyör|Pyör|cycle/.test(p?.kind||'');
 
 export function createCycleCrossings({pavement=[],world}){
- const quads=[],at=[];
+ const quads=[],at=[],done=new Set();
+ const axisOf=poly=>{const r=poly.rings[0];let mx=0,mz=0;for(const q of r){mx+=q[0];mz+=q[1];}mx/=r.length;mz/=r.length;let a=0,b=0,c=0;for(const q of r){const x=q[0]-mx,z=q[1]-mz;a+=x*x;b+=x*z;c+=z*z;}const t=.5*Math.atan2(2*b,a-c);return [Math.cos(t),Math.sin(t)];};
  for(const poly of pavement){if(!isCycle(poly))continue;
   const ring=poly.rings?.[0];if(!ring||ring.length<4)continue;
   // track axis by principal component (the polygons are buffered lines with rounded ends)
@@ -20,10 +21,14 @@ export function createCycleCrossings({pavement=[],world}){
   const width=whi-wlo;if(hi-lo<8||width<1.2||width>4.5||(hi-lo)<width*3)continue; // a straight strip, not a plaza
   for(const [t,sg] of [[lo,-1],[hi,1]]){const ox=ax*sg,oz=az*sg,cn=(wlo+whi)/2,ex=mx+ax*t-az*cn,ez=mz+az*t+ax*cn;
    if(!world.roads.at(ex+ox*1.2,ez+oz*1.2))continue; // the track ends at a carriageway
-   let landed=0;
-   for(let s=1;s<=30;s+=.5){const x=ex+ox*s,z=ez+oz*s;if(world.roads.at(x,z))continue;const p=world.pavement.at(x,z);if(isCycle(p)&&p!==poly)landed=s;break;}
+   let landed=0,far=null;
+   for(let s=1;s<=30;s+=.5){const x=ex+ox*s,z=ez+oz*s;if(world.roads.at(x,z))continue;const p=world.pavement.at(x,z);if(isCycle(p)&&p!==poly){landed=s;far=p;}break;}
    if(landed<4)continue;
-   const w=Math.min(2.4,Math.max(1.6,width)),px=-oz*w/2,pz=ox*w/2,e=landed-.3,s0=.2;
+   // the same track continuing (parallel within 25 degrees), each pair painted once
+   const [bx,bz]=axisOf(far);if(Math.abs(bx*ax+bz*az)<Math.cos(25*Math.PI/180))continue;
+   const key=[poly.id??poly.bbox?.join(),far.id??far.bbox?.join()].sort().join('|');if(done.has(key))continue;done.add(key);
+   {let lo2=landed-.5,hi2=landed;for(let k=0;k<5;k++){const m=(lo2+hi2)/2;world.roads.at(ex+ox*m,ez+oz*m)?lo2=m:hi2=m;}landed=hi2;}
+   const w=Math.min(2.4,Math.max(1.6,width)),px=-oz*w/2,pz=ox*w/2,e=landed-.05,s0=-.1;
    const corners=[[ex+px+ox*s0,ez+pz+oz*s0],[ex-px+ox*s0,ez-pz+oz*s0],[ex-px+ox*e,ez-pz+oz*e],[ex+px+ox*e,ez+pz+oz*e]];
    const g=new THREE.BufferGeometry(),y=.118,pos=[],tri=[[0,1,2],[0,2,3]];
    const up=(corners[1][0]-corners[0][0])*(corners[2][1]-corners[0][1])-(corners[1][1]-corners[0][1])*(corners[2][0]-corners[0][0]);
