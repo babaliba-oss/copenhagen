@@ -3,7 +3,7 @@ import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';
 import {isGovernmentFront,createGovernmentFront} from './government-palace.js';
 import {isWaterfrontFront,createWaterfrontFront,createPalaceWingDetails,cleanWaterfrontShell} from './kauppatori-buildings.js';
 import {isSugarCubeFront,createSugarCubeFront} from './sugar-cube.js';
-import {provisionalWindows} from './provisional-facades.js';
+import {provisionalWindows,churchWindows} from './provisional-facades.js';
 import {isForumFront,createForumFront} from './forum-building.js';
 import {isSokosFront,createSokosFace} from './sokos-building.js';
 import {isLasipalatsiFront,createLasipalatsiFront} from './lasipalatsi-building.js';
@@ -112,6 +112,7 @@ export function createModelledBuilding(array,part,pixels,texture=null,includeHer
   else if(!pixels&&!f.windows.length&&!part.noFacade&&![23,1707,324].includes(part.ratu)){
    f.windows=provisionalWindows(f);if(f.windows.length){provisional=true;f.color=[.73,.72,.67];}
   }
+  else if(!pixels&&!f.windows.length&&part.noFacade)f.windows=churchWindows(f); // churches and towers: tall windows, wall colour kept
   // Untextured meshes from a city's official model can carry their own wall and roof colours.
   if(!pixels&&!described&&!corridor&&!clean&&part.roofColor&&part.color)f.color=part.color;
   triangles(f.triangles,clean?clean.wallRGB:part.ratu===324?[.65,.55,.47]:part.ratu===23?[.83,.8,.71]:f.color,walls,wallColours);
