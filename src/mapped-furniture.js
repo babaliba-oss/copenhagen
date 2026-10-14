@@ -21,6 +21,7 @@ export const POSTS={
  'crossing-light':{height:2.9,radius:.075,strength:1.6},
  sign:{height:3,radius:.04,strength:1},
  pole:{height:8.5,radius:.14,strength:3.2},
+ 'steel-pole':{height:4.2,radius:.06,strength:2}, // Copenhagen: a plain galvanised post (photo 'poles' there are not timber utility poles)
  'parking-meter':{height:1.55,radius:.1,strength:1.3},
  'mast-lamp':{height:5.6,radius:.075,strength:2.2}, // Copenhagen conical graphite mast with a top lantern (register: 5–6 m)
  'park-lamp':{height:3.2,radius:.06,strength:1.4}, // short park lantern with stacked shades
@@ -54,6 +55,7 @@ function postParts(kind){
  if(kind==='lamp')return [cyl(.055,.1,8.4,4.2,METAL),box(.07,.07,1.5,0,8.3,.72,METAL),box(.26,.1,.6,0,8.27,1.5,'#3a4245'),box(.2,.02,.5,0,8.21,1.5,'#f2efe0')];
  if(kind==='traffic-light')return [cyl(.065,.085,3.4,1.7,'#566166',6),box(.27,.8,.23,0,3.1,.05,DARK)];
  if(kind==='crossing-light')return [cyl(.06,.075,2.85,1.42,'#566166',6),box(.25,.56,.2,0,2.5,.05,DARK)];
+ if(kind==='steel-pole')return [cyl(.05,.06,4.2,2.1,'#8b9496',7),cyl(.06,.06,.05,4.22,'#5d6567',7)];
  if(kind==='pole')return [cyl(.11,.14,8.5,4.25,WOOD),box(1.4,.08,.08,0,7.9,0,WOOD)];
  if(kind==='mast-lamp')return [cyl(.04,.075,5.4,2.7,'#3b3f42',8),cyl(.05,.05,.12,5.42,'#2c3033',8),cyl(.12,.24,.34,5.62,'#2c3033',10),cyl(.2,.2,.04,5.44,'#fff3d6',10)];
  if(kind==='park-lamp')return [cyl(.045,.06,2.8,1.4,'#3b3f42',8),cyl(.08,.22,.12,2.9,'#e9e6dc',12),cyl(.1,.28,.12,3.02,'#e9e6dc',12),cyl(.04,.12,.1,3.14,'#e9e6dc',12),cyl(.16,.16,.03,2.86,'#fff3d6',10)];

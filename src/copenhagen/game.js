@@ -44,8 +44,16 @@ function createRouteLine(scene,{historic=false}={}){
  let mesh=null,pts=null,cum=null,seg=0;const out={points:null};
  out.set=points=>{if(mesh){scene.remove(mesh);mesh.geometry.dispose();mesh=null;}pts=points;out.points=points;seg=0;u.uProg.value=0;if(!points||points.length<2)return;
   cum=[0];for(let i=1;i<pts.length;i++)cum.push(cum[i-1]+dist(pts[i],pts[i-1]));
-  const pos=[],rd=[];for(let i=0;i<pts.length-1;i++){const [ax,az]=pts[i],[bx,bz]=pts[i+1],l=dist(pts[i],pts[i+1]);if(l<.1)continue;const nx=-(bz-az)/l*.5,nz=(bx-ax)/l*.5,ya=groundAt(ax,az)+.22,yb=groundAt(bx,bz)+.22;
-   pos.push(ax+nx,ya,az+nz,bx+nx,yb,bz+nz,bx-nx,yb,bz-nz,ax+nx,ya,az+nz,bx-nx,yb,bz-nz,ax-nx,ya,az-nz);rd.push(cum[i],cum[i+1],cum[i+1],cum[i],cum[i+1],cum[i]);}
+  // One continuous strip with mitred joins: separate quads per segment overlapped at every bend, and the
+  // overlaps showed as darker wedges through the transparent ribbon.
+  const P=[],C=[];for(let i=0;i<pts.length;i++){if(P.length&&dist(pts[i],P.at(-1))<.4)continue;P.push(pts[i]);C.push(cum[i]);}
+  const pos=[],rd=[],side=[];
+  for(let i=0;i<P.length;i++){const a=P[Math.max(0,i-1)],b=P[i],c=P[Math.min(P.length-1,i+1)];
+   const n1=i>0?[-(b[1]-a[1]),b[0]-a[0]]:null,n2=i<P.length-1?[-(c[1]-b[1]),c[0]-b[0]]:null,norm=v=>{const l=Math.hypot(v[0],v[1])||1;return [v[0]/l,v[1]/l];};
+   const u1=n1&&norm(n1),u2=n2&&norm(n2),m=norm(u1&&u2?[u1[0]+u2[0],u1[1]+u2[1]]:(u1||u2)),k=u1&&u2?Math.min(2,1/Math.max(.5,m[0]*u1[0]+m[1]*u1[1])):1;
+   side.push([m[0]*.5*k,m[1]*.5*k]);}
+  for(let i=0;i<P.length-1;i++){const [ax,az]=P[i],[bx,bz]=P[i+1],[nax,naz]=side[i],[nbx,nbz]=side[i+1],ya=groundAt(ax,az)+.22,yb=groundAt(bx,bz)+.22;
+   pos.push(ax+nax,ya,az+naz,bx+nbx,yb,bz+nbz,bx-nbx,yb,bz-nbz,ax+nax,ya,az+naz,bx-nbx,yb,bz-nbz,ax-nax,ya,az-naz);rd.push(C[i],C[i+1],C[i+1],C[i],C[i+1],C[i]);}
   const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));g.setAttribute('rd',new THREE.Float32BufferAttribute(rd,1));
   mesh=new THREE.Mesh(g,mat);mesh.renderOrder=3;mesh.frustumCulled=false;scene.add(mesh);};
  // Progress: project the player onto the next few segments; returns the distance off the line.
@@ -235,7 +243,7 @@ export function createCopenhagenGame({scene,city,mobilityData,cityData,toast,sou
   if(state!=='b'&&save.active){const q=byId[save.active.id],f=frontier().filter(k=>!q.steps[k].clue);if(f.length){let best=f[0];for(const k of f)if(dist(q.steps[k].p,[player.x,player.z])<dist(q.steps[best].p,[player.x,player.z]))best=k;return {p:q.steps[best].p,kind:'saga'};}}
   return {p:state==='a'?job().A:job().B,kind:'job'};
  }
- function rebuild(){const t=target();routeFor=t.p;const G=mode==='car'?road:walk;const a=G.nearest(player.x,player.z),b=G.nearest(t.p[0],t.p[1]);const pts=G.route(a,b);line.set(pts?[[player.x,player.z],...trimStart(pts,player.x,player.z),t.p]:null);}
+ function rebuild(){const t=target();routeFor=t.p;const G=mode==='car'?road:walk;const a=G.nearest(player.x,player.z),b=G.nearest(t.p[0],t.p[1]);const pts=G.route(a,b);const on=pts&&trimStart(pts,player.x,player.z);line.set(on?[...(on.length&&dist(on[0],[player.x,player.z])>3?[[player.x,player.z]]:[]),...on,t.p]:null);}
  // The nearest graph node is often behind the car: the route then ran back to it and returned past the car
  // (a loop around the player). Start from the closest point of the route's first 60 m instead.
  function trimStart(pts,x,z){if(pts.length<2)return pts;let best=-1,bd=Infinity,bp=null,run=0;
