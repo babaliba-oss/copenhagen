@@ -645,7 +645,8 @@ async function prefetchOtherEra(){
  if(eraPrefetched||!city?.id?.startsWith('copenhagen')||!car)return;eraPrefetched=true;
  const other=CITIES[city.id==='copenhagen'?'copenhagen-1760':'copenhagen'];if(!other?.dataRoot)return;
  const get=f=>fetch(`${other.dataRoot}/${f}`,{priority:'low'}).then(r=>r.ok?r:null).catch(()=>null);
- for(const f of ['city.pack','mobility.json','surface-index.json','landcover.json','trams.json','terrain.pack','anchors.json','era.json','boats.json','furniture.json','parked.json','cafes.json','stalls.json','bus-corridors.json','facades.json'])await get(f);
+ const files=['city.pack','mobility.json','surface-index.json','landcover.json','trams.json','terrain.pack','anchors.json','boats.json','furniture.json','bus-corridors.json',...(other.era===1760?['era.json','stalls.json']:['parked.json','cafes.json','facades.json','rails.json'])]; // only what that era has (no 404s)
+ for(const f of files)await get(f);
  const idx=await get('buildings3d-index.json').then(r=>r?.json()).catch(()=>null);
  const near=(idx?.tiles||[]).filter(t=>Math.hypot((t.bbox[0]+t.bbox[2])/2-car.x,(t.bbox[1]+t.bbox[3])/2-car.z)<500);
  for(const t of near)await get(t.file);
