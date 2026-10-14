@@ -51,7 +51,7 @@ function pane(F,G,s,y,w,h,glass,arch=false){
  let g;
  if(arch){const r=w/2,sh=new THREE.Shape();sh.moveTo(-r,-h/2);sh.lineTo(r,-h/2);sh.lineTo(r,h/2-r);sh.absarc(0,h/2-r,r,0,Math.PI,false);sh.lineTo(-r,-h/2);g=new THREE.ShapeGeometry(sh,5);}
  else g=new THREE.PlaneGeometry(w,h);
- G.add(F.place(g,s,y,.035),glass,glassTone(glass,s,y,h));
+ G.add(F.place(g,s,y,.08),glass,glassTone(glass,s,y,h)); // 8 cm proud: overlapping LOD2 walls a few cm in front must not swallow it
 }
 const flat=(F,B,s,y,e,w,h,color)=>B.add(F.place(new THREE.PlaneGeometry(w,h),s,y,e),color);
 const slab=(F,B,s,y,e,w,h,depth,color)=>{const g=new THREE.BoxGeometry(w,h,depth),i=g.index.array;g.setIndex([...i.slice(0,30)]);B.add(F.place(g,s,y,e+depth/2),color);}; // no back face (it lies on the wall)
@@ -62,7 +62,7 @@ export function bays(a,b,pitch,margin=.6){
  return Array.from({length:n},(_,i)=>(a+b)/2+(i-(n-1)/2)*pitch);
 }
 
-function upperStorey(F,G,B,band,st,c){
+function upperStorey(F,G,B,band,st,c,avoid=null){
  const span=[F.s0,F.s1],h=band.y1-band.y0;if(st.shape==='none'||h<1.6)return 0;
  const wh=Math.min(st.height,h-.7),ww=st.width,y=band.y0+Math.max(.55,(h-wh)/2-.1)+wh/2;let n=0;
  if(st.shape==='ribbon'){
@@ -76,6 +76,7 @@ function upperStorey(F,G,B,band,st,c){
  for(const s of bays(...span,st.pitch)){
   const arch=st.shape==='arch',w=st.shape==='square'?Math.min(ww,wh):ww,hh=st.shape==='square'?w:wh;
   if(!F.rect(s-w/2-.2,s+w/2+.2,y-hh/2-.25,y+hh/2+.2))continue;
+  if(avoid&&Math.abs(s-avoid)<w/2+.21+1.0)continue; // the street door takes this bay (its sill would cross the door)
   pane(F,G,s,y,w,hh,c.glass,arch);
   const sideH=hh-(arch?w/2:0),sideY=y-(arch?w/4:0);
   if(deep){
@@ -84,18 +85,18 @@ function upperStorey(F,G,B,band,st,c){
    for(const dx of [-1,1])slab(F,B,s+dx*(w/2+.07),sideY,0,.14,sideH+.14,.16,c.surround);
    if(!arch)slab(F,B,s,y+hh/2+.07,0,w+.28,.14,.16,c.surround);
    else for(let k=0;k<5;k++){const a=Math.PI*(k+.5)/5,r=w/2+.07;B.add(F.place(new THREE.BoxGeometry(.14,w*.34,.16).rotateZ(a),s+Math.cos(a)*r,y+hh/2-w/2+Math.sin(a)*r,.08),c.surround);}
-   for(const dx of [-w/2+.04,w/2-.04])flat(F,B,s+dx,sideY,.045,.08,sideH,c.frame);
-   if(!arch){flat(F,B,s,y+hh/2-.04,.045,w,.08,c.frame);flat(F,B,s,y-hh/2+.04,.045,w,.08,c.frame);}
-   if(st.shape!=='ribbon'&&w>.7){flat(F,B,s,y,.05,.07,hh-.1,c.frame);if(!arch&&hh>1.2)flat(F,B,s,y+hh*.2,.05,w-.08,.07,c.frame);}
+   for(const dx of [-w/2+.04,w/2-.04])flat(F,B,s+dx,sideY,.09,.08,sideH,c.frame);
+   if(!arch){flat(F,B,s,y+hh/2-.04,.09,w,.08,c.frame);flat(F,B,s,y-hh/2+.04,.09,w,.08,c.frame);}
+   if(st.shape!=='ribbon'&&w>.7){flat(F,B,s,y,.095,.07,hh-.1,c.frame);if(!arch&&hh>1.2)flat(F,B,s,y+hh*.2,.095,w-.08,.07,c.frame);}
    // Wooden shutters folded back beside the window (1760 houses).
    if(c.shutter&&!arch)for(const dx of [-1,1])slab(F,B,s+dx*(w/2+.16+w*.25),y,0,w*.48,hh,.05,c.shutter);
    // Sill: projecting stone ledge; a hood moulding over the main-floor windows of older fronts.
    slab(F,B,s,y-hh/2-.1,0,w+.42,.1,.24,c.trim);
    if(st.hood&&!arch)slab(F,B,s,y+hh/2+.26,0,w+.5,.12,.22,c.cornice);
   }else{
-   for(const dx of [-w/2,w/2])flat(F,B,s+dx,sideY,.06,.1,sideH,c.frame);
-   if(!arch)flat(F,B,s,y+hh/2,.06,w+.1,.1,c.frame);
-   if(w>1.1&&!arch)flat(F,B,s,y,.06,.06,hh,c.frame);
+   for(const dx of [-w/2,w/2])flat(F,B,s+dx,sideY,.1,.1,sideH,c.frame);
+   if(!arch)flat(F,B,s,y+hh/2,.1,w+.1,.1,c.frame);
+   if(w>1.1&&!arch)flat(F,B,s,y,.1,.06,hh,c.frame);
    flat(F,B,s,y-hh/2-.05,.2,w+.3,.1,c.trim);B.add(F.place(new THREE.PlaneGeometry(w+.3,.18).rotateX(-Math.PI/2),s,y-hh/2,.11),c.trim);
   }
   n++;
@@ -151,10 +152,16 @@ export function createFacade(faces,spec){
   for(const band of bands){
    if(band.index===0&&spec.storeys>1&&spec.ground?.type==='solid'&&spec.estimated){
     // Estimated fronts: windows on the ground floor too, and a street door in the widest run.
-    windows+=upperStorey(F,G,B,band,storeyStyle(spec,1,spec.storeys),c);
     let best=null;for(const [a,b] of runs(F,band.y0+1.2,[F.s0,F.s1]))if(!best||b-a>best[1]-best[0])best=[a,b];
-    if(best&&best[1]-best[0]>3){const s=(best[0]+best[1])/2+((F.s0*7.3)%1-.5)*(best[1]-best[0])*.4;
-     slab(F,B,s,band.y0+1.25,.03,1.3,2.5,.16,c.door);slab(F,B,s,band.y0+2.62,.03,1.5,.14,.2,c.cornice);}
+    const door=best&&best[1]-best[0]>3?(best[0]+best[1])/2+((F.s0*7.3)%1-.5)*(best[1]-best[0])*.4:null;
+    windows+=upperStorey(F,G,B,band,storeyStyle(spec,1,spec.storeys),c,door);
+    if(door!==null){const s=door,y0=band.y0;
+     // Street door: stone surround, two panelled leaves set back in it, a glazed fanlight and a step.
+     for(const dx of [-.74,.74])slab(F,B,s+dx,y0+1.4,0,.18,2.8,.14,c.surround);slab(F,B,s,y0+2.86,0,1.66,.16,.18,c.cornice);
+     flat(F,B,s,y0+1.12,.02,1.3,2.24,c.door);flat(F,B,s,y0+1.12,.03,.04,2.2,linear('#1c1410'));
+     for(const dx of [-.33,.33])for(const [py,ph] of [[.62,.8],[1.62,.9]])flat(F,B,s+dx,y0+py,.035,.42,ph,c.door.clone().multiplyScalar(1.25));
+     pane(F,G,s,y0+2.5,1.3,.42,c.glass);flat(F,B,s,y0+2.27,.04,1.32,.06,c.surround);
+     slab(F,B,s,y0+.07,0,1.8,.14,.42,c.plinth);}
     continue;}
    if(band.index===0&&spec.storeys>1){windows+=groundStorey(F,G,B,band,spec.ground,c);continue;}
    // Balconies on newer blocks: a slab and a front rail on every other bay.
