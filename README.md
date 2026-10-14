@@ -174,6 +174,22 @@ npm run data:textured
 npm run data:mobility
 ```
 
+## Rebuilding the Blender models
+
+Copenhagen's cars, buses, boats, bikes, scooter, 1760 coach and horses, and street furniture are original models made by Python scripts in `scripts/blender/`, run headless with Blender's `bpy` module. Each script writes GLB files to `public/models/`, and the game falls back to its procedural models when a file is missing. Add `?car=classic` to the URL to see the procedural versions.
+
+```sh
+uv venv -p 3.11 bpyenv && uv pip install --python bpyenv bpy==4.2.0
+bpyenv/bin/python scripts/blender/player-car.py public/models/player-car.glb
+bpyenv/bin/python scripts/blender/vehicles.py   public/models/vehicles
+bpyenv/bin/python scripts/blender/bus.py        public/models/buses
+bpyenv/bin/python scripts/blender/boats.py      public/models/boats
+bpyenv/bin/python scripts/blender/bikes.py      public/models/bikes
+bpyenv/bin/python scripts/blender/scooter.py    public/models/bikes/scooter.glb
+bpyenv/bin/python scripts/blender/carriage.py   public/models/carriage
+bpyenv/bin/python scripts/blender/furniture.py  public/models/furniture
+```
+
 ## Contributing
 
 This is a community project, and contributions of every size are welcome.
