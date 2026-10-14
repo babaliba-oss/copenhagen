@@ -209,7 +209,7 @@ export function createModelledBuilding(array,part,pixels,texture=null,includeHer
   if(r.signs){const sm=new THREE.MeshStandardMaterial({roughness:.6});sm.userData.signs=true;mesh(r.signs,sm);meshes.at(-1).userData.role='signs';}
   // Glass and relief in one mesh (one draw call per building); aGlass marks the glazing for its roughness and night glow.
   const flag=(g,v)=>{if(g)g.setAttribute('aGlass',new THREE.BufferAttribute(new Float32Array(g.attributes.position.count).fill(v),1));return g;};
-  const parts=[flag(glassAll,1),flag(relief,0)].filter(Boolean);m.glass.dispose();m.relief.dispose();
+  const parts=[flag(glassAll,part.noFacade&&/kirke|kapel|tårn/i.test(part.name||'')?.45:1),flag(relief,0)].filter(Boolean); // church glass (<.5) stays dark at night: no lit-flat stripes on tall windowsm.glass.dispose();m.relief.dispose();
   // Untextured: the wall/roof shell joins the same mesh (one draw call per building). It stays a shell for the
   // camera fade, shadows and LOD; the loader adds the wall grain and the window glow to its material.
   const shellIdx=!texture?meshes.findIndex(m=>m.userData.shell&&m.userData.role==='facade'&&!m.material.map):-1;
