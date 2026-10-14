@@ -276,7 +276,7 @@ surfaceMaterial.onBeforeCompile=shader=>{
  }else if(vGround.y>0.04&&vGround.y<0.06){
   #ifdef ASPHALT_CYCLE_TRACKS
   // Copenhagen's cycle tracks are asphalt, a shade lighter than the carriageway (the data paints them red-beige).
-  if(diffuseColor.r-diffuseColor.b>0.15){diffuseColor.rgb=vec3(0.105,0.11,0.112)*(1.0+(groundNoise(vGround.xz/7.0)-0.5)*0.16+grain*0.12);}
+  if(diffuseColor.r-diffuseColor.b>0.15){vec2 cu=vGround.xz/2.1;diffuseColor.rgb=texture2D(tAsphaltC,cu).rgb*vec3(0.9,0.93,0.96)*1.0*(1.0+(groundNoise(vGround.xz/7.0)-0.5)*0.1);gN=texture2D(tAsphaltN,cu).xyz*2.0-1.0;gNw=.7*texFade;gRough=texture2D(tAsphaltR,cu).r;grain=0.0;} // cycle track: the same scanned asphalt, a shade lighter
   else
   #endif
   { // Pavement: 62.5 cm concrete slabs (Copenhagen fortovsfliser), each its own shade, scanned surface, sunk joints.
