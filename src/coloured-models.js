@@ -16,8 +16,9 @@ export async function loadColouredParts(url){
  }catch(e){console.warn('Model not loaded, procedural kept:',url,e?.message||e);return null;}
 }
 // Bake parts into one geometry with a `color` attribute; `recolour` maps a material name to a hex colour.
-export function bakeColoured(parts,recolour={}){
- const gs=parts.map(({name,geometry,color})=>{const g=geometry.clone(),c=recolour[name]!=null?new THREE.Color(recolour[name]):color,a=new Float32Array(g.attributes.position.count*3);for(let i=0;i<a.length;i+=3){a[i]=c.r;a[i+1]=c.g;a[i+2]=c.b;}g.setAttribute('color',new THREE.BufferAttribute(a,3));return g;});
+// `paint` names a material whose vertices get paint = 1 (others 0) in a `paint` attribute, for models the game tints.
+export function bakeColoured(parts,recolour={},{paint=null}={}){
+ const gs=parts.map(({name,geometry,color})=>{const g=geometry.clone(),c=recolour[name]!=null?new THREE.Color(recolour[name]):color,n=g.attributes.position.count,a=new Float32Array(n*3);for(let i=0;i<a.length;i+=3){a[i]=c.r;a[i+1]=c.g;a[i+2]=c.b;}g.setAttribute('color',new THREE.BufferAttribute(a,3));if(paint)g.setAttribute('paint',new THREE.BufferAttribute(new Float32Array(n).fill(name===paint?1:0),1));return g;});
  const merged=mergeGeometries(gs);gs.forEach(g=>g.dispose());merged?.computeBoundingSphere();return merged;
 }
 export async function loadColouredModel(url,recolour){const parts=await loadColouredParts(url);if(!parts)return null;const g=bakeColoured(parts,recolour);parts.forEach(p=>p.geometry.dispose());return g;}

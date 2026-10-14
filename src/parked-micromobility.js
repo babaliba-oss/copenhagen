@@ -159,7 +159,10 @@ function coloured(g,hex,paint=0){g=nonIndexed(g);const n=g.attributes.position.c
 function tube(a,b,r,hex,paint=0,segments=5){const av=new THREE.Vector3(...a),bv=new THREE.Vector3(...b),d=bv.clone().sub(av),g=new THREE.CylinderGeometry(r,r,d.length(),segments);g.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,1,0),d.clone().normalize()));g.translate(...av.add(bv).multiplyScalar(.5).toArray());return coloured(g,hex,paint);}
 function merge(parts){const g=mergeGeometries(parts);parts.forEach(p=>p.dispose());g.computeVertexNormals();return g;}
 // Stand-up shared e-scooter: deck, raked stem, bar, two 10" wheels. Stem and rear guard carry the operator colour.
+let scooterModel=null; // Blender e-scooter (scripts/blender/scooter.py) with `color` and `paint` attributes
+export function setScooterModel(geometry){scooterModel=geometry||null;}
 export function scooterGeometry(){
+ if(scooterModel)return scooterModel.clone();
  const dark='#24282a',parts=[coloured(new THREE.BoxGeometry(.17,.045,.56).translate(0,.165,-.02),dark),coloured(new THREE.BoxGeometry(.15,.01,.5).translate(0,.193,-.02),'#3a3f42')];
  parts.push(tube([0,.2,-.34],[0,1.14,-.45],.021,'#ffffff',1,6),tube([0,.1,-.42],[0,.36,-.4],.026,dark));
  parts.push(coloured(new THREE.BoxGeometry(.5,.028,.028).translate(0,1.15,-.455),dark),coloured(new THREE.BoxGeometry(.08,.035,.1).translate(0,1.12,-.42),dark));
