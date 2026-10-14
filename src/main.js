@@ -368,7 +368,7 @@ async function createTrees(trees=data.trees){
  // Every drawn tree gets a solid trunk (src/tree-trunks.js); register points on a traffic lane's carriageway are dropped.
  if(treeTrunks){const t=treeTrunks.build(trees,world);trees=t.draw;world.objects.add(t.obstacles);}
  // Cities other than Helsinki: every registered tree gets its species' shape (src/tree-species.js).
- if(city.scenery!=='helsinki'){speciesTrees=createSpeciesTrees(trees.filter(t=>!world.buildings.at(...t.p)),{detailed:true});cityModel.add(speciesTrees.group);speciesTrees.update(focus);return;}
+ if(city.scenery!=='helsinki'){const before=trees.length;trees=trees.filter(t=>!world.buildings.at(...t.p)&&!(world.roads.at(...t.p)&&!world.pavement?.at(...t.p))); /* none standing in a carriageway or a house */if(before-trees.length)console.info(`Trees: ${before-trees.length} in carriageways or houses dropped`);speciesTrees=createSpeciesTrees(trees,{detailed:true});cityModel.add(speciesTrees.group);speciesTrees.update(focus);return;}
  const {createRouteTrees,detailedTreeArea,detailedTreeCell}=await import('./route-trees.js');
  const detailed=createRouteTrees(trees.filter(t=>detailedTreeArea(t)&&!world.buildings.at(...t.p)));cityModel.add(detailed);harbour.group.userData.detailedTrees=detailed.userData;
  // Detailed trees get blob proxies in cells matching createRouteTrees' buckets (detailedTreeCell); applyTreeLod swaps them by distance.
