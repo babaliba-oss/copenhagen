@@ -20,6 +20,7 @@ import {createStartPicker,pickerStep} from './start-picker.js';
 import {createAdaptiveResolution} from './adaptive-quality.js';
 import {createQualityGovernor} from './quality-governor.js';
 import {makeCar,driveStep,simulationSteps,PLAYER_MAX_SPEED,displayedSpeedKmh} from './physics.js';
+import {loadColouredModels} from './coloured-models.js';
 import {loadVehicleBodies} from './vehicle-bodies.js';
 import {animateVehicle} from './vehicles.js';
 import {Mobility} from './mobility.js';
@@ -149,6 +150,7 @@ let angryDrivers=null,photoMode=false,captureMode=false,captureBadgeTimer=0,high
 const driveCamera=createDriveCameraState();let cameraFov=DRIVE_FOV.min,cameraRoll=0,cameraShake=[0,0,0];
 // Cobblestone rumble (src/road-surface.js): mapped sett polygons bounce the car body and, at half amplitude, the drive camera.
 const roadRumble=createRumbleState();let cameraRumble=[0,0,0],surfaceNow={surface:'off',roughness:0},rumbleNow={bob:0,roll:0,pitch:0,intensity:0};
+const blenderModels=()=>city?.id?.startsWith('copenhagen')&&new URLSearchParams(location.search).get('car')!=='classic'; // ?car=classic: the procedural models throughout
 let vehicleBodies=null,treeTrunks=null,cityModelPromise,surfaceStreamer=null,extensionStreamer=null,switchingStart=false,startVisitVersion=0,places=[],speciesTrees=null;const placeHidden=new Set();
 let birds=null,birdColonies=[],crowd=null; // gulls, pigeons, crows and sparrows from the city's map data (birds.js)
 let cyclists,cyclistRenderer,npcScooters,npcScooterRenderer,buses,police,policeRenderer,roadblock; // shared riders and police in every city
@@ -1056,7 +1058,7 @@ async function boot(){
    staticCars=[...(furniture.enterableCars||[]),...(harbour.enterableCars||[]),...(stationStreetLife?.enterableCars||[])];
    // Detected street furniture: solid boxes join the obstacles; posts, bins and barriers can be knocked down.
    {const an=anchorData&&await anchorData;if(an){const ed=eraData&&await eraData;landmarks=createLandmarks({era:city.era,anchors:an,mills:ed?.mills||[]});cityModel.add(landmarks.group);}}
-   {const bd=boatData&&await boatData;if(bd){boats=createBoats(bd,{waterY:CPH_WATER+(sea?.group?.position?.y||0),era:city.era});cityModel.add(boats.group);}}
+   {const bd=boatData&&await boatData;if(bd){boats=createBoats(bd,{waterY:CPH_WATER+(sea?.group?.position?.y||0),era:city.era,models:blenderModels()?await loadColouredModels('/models/boats/',['sail','motor','wooden','ship','tour','havnebus']):{}});cityModel.add(boats.group);}}
    harbourBath=city.id==='copenhagen'?createHarbourBath({createPeople:createInstancedPeople}):null;if(harbourBath)cityModel.add(harbourBath.group);
    {const cd=cafeData&&await cafeData;if(cd){const c=createCafes(cd);cityModel.add(c.group);streetObstacles.push(...(c.obstacles||[]));
     // Guests standing at the café tables, chatting (two at most tables).

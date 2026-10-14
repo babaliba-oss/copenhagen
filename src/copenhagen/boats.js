@@ -48,14 +48,14 @@ const tour=()=>mergeGeometries([...hull(4.6,1.2,17,'#1f3f63','#d9d6cc',.1),box(4
 const havnebus=()=>mergeGeometries([...hull(5.2,1.3,22,'#e2b33c','#5f6a70',.15),box(4.4,1.9,15,0,2.1,1.2,'#f2f0ea'),box(4.46,.9,14.4,0,2.35,1.2,'#25313a'),box(4.5,.22,15.2,0,1.32,1.2,'#1f4f8a'),box(4.6,.14,15.6,0,3.1,1.2,'#e9e7e0'),box(1.6,.9,2.2,0,3.6,4.8,'#f2f0ea')]);
 const BUILD={sail,motor,wooden,ship,tour};
 
-export function createBoats(data,{waterY=-1.2,era=null}={}){
+export function createBoats(data,{waterY=-1.2,era=null,models={}}={}){
  const group=new THREE.Group();group.name='Boats';
  // The sea surface is drawn at the terrain's water level (sea.js drapes it 10 cm under waterAt); a fixed level
  // left boats metres above the water. Each boat sits on the water under it.
  const level=(x,z)=>{const w=waterAt(x,z);return (w==null?waterY:w-.1);};
  const boats=(data?.boats||[]).filter(b=>era===1760||!inHarbourBath(b[0],b[1])),mat=new THREE.MeshStandardMaterial({vertexColors:true,roughness:.6,metalness:.05});
  // Chunked by 300 m and kind: chunks frustum-cull, hide past 1 km, and only those near the player bob.
- const chunks=new Map(),geos={};
+ const chunks=new Map(),geos={...models}; // Blender models (scripts/blender/boats.py) where loaded
  for(const bt of boats){if(!BUILD[bt[3]])continue;const k=`${Math.floor(bt[0]/300)},${Math.floor(bt[1]/300)}`;if(!chunks.has(k))chunks.set(k,{list:{},x:0,z:0,n:0});const c=chunks.get(k);(c.list[bt[3]]??=[]).push(bt);c.x+=bt[0];c.z+=bt[1];c.n++;}
  const meshes=[],m4=new THREE.Matrix4(),q=new THREE.Quaternion(),e=new THREE.Euler(),v=new THREE.Vector3(),s=new THREE.Vector3();
  for(const c of chunks.values()){c.x/=c.n;c.z/=c.n;c.meshes=[];
@@ -64,12 +64,12 @@ export function createBoats(data,{waterY=-1.2,era=null}={}){
  const movers=[];
  if(era!==1760)for(const r of data?.routes||[]){const pts=[...r,r[0]];let len=0;const cum=[0];for(let i=1;i<pts.length;i++){len+=Math.hypot(pts[i][0]-pts[i-1][0],pts[i][1]-pts[i-1][1]);cum.push(len);}
   for(let k=0;k<2;k++)movers.push({pts,cum,len,s:len*k/2});}
- let tourMesh=null;if(movers.length){tourMesh=new THREE.InstancedMesh(tour(),mat,movers.length);tourMesh.castShadow=true;tourMesh.frustumCulled=false;tourMesh.userData.shadowLod=true;tourMesh.name='Canal tour boats';group.add(tourMesh);}
+ let tourMesh=null;if(movers.length){tourMesh=new THREE.InstancedMesh(models.tour||tour(),mat,movers.length);tourMesh.castShadow=true;tourMesh.frustumCulled=false;tourMesh.userData.shadowLod=true;tourMesh.name='Canal tour boats';group.add(tourMesh);}
  // Harbour buses: along the ferry path end to end and back, 15 s at each stop.
  const ferries=[];
  if(era!==1760)for(const f of data?.ferries||[]){const pts=f.path,cum=[0];for(let i=1;i<pts.length;i++)cum.push(cum[i-1]+Math.hypot(pts[i][0]-pts[i-1][0],pts[i][1]-pts[i-1][1]));
   const stops=f.stops.map(i=>cum[i]);for(let k=0;k<2;k++)ferries.push({pts,cum,stops,s:k?cum.at(-1)*.55:0,dir:k?-1:1,wait:0,yaw:0});}
- let ferryMesh=null;if(ferries.length){ferryMesh=new THREE.InstancedMesh(havnebus(),mat,ferries.length);ferryMesh.castShadow=true;ferryMesh.frustumCulled=false;ferryMesh.name='Harbour buses';group.add(ferryMesh);}
+ let ferryMesh=null;if(ferries.length){ferryMesh=new THREE.InstancedMesh(models.havnebus||havnebus(),mat,ferries.length);ferryMesh.castShadow=true;ferryMesh.frustumCulled=false;ferryMesh.name='Harbour buses';group.add(ferryMesh);}
  const ferryAt=(f,s)=>{let k=1;while(k<f.cum.length-1&&f.cum[k]<s)k++;const a=f.pts[k-1],b=f.pts[k],u=(s-f.cum[k-1])/Math.max(.01,f.cum[k]-f.cum[k-1]);return [a[0]+(b[0]-a[0])*u,a[1]+(b[1]-a[1])*u,Math.atan2(-(b[0]-a[0]),-(b[1]-a[1]))];};
  let t=0;
  function placeMesh(im,list){for(let i=0;i<list.length;i++){const b=list[i],x=b[0],z=b[1],sc=b[4],ph=x*.13+z*.07;e.set(Math.sin(t*.9+ph)*.025,b[2],Math.sin(t*.7+ph)*.035);b.wl??=level(x,z);m4.compose(v.set(x,b.wl-.35+Math.sin(t*1.1+ph)*.06,z),q.setFromEuler(e),s.set(sc,sc,sc));im.setMatrixAt(i,m4);}im.instanceMatrix.needsUpdate=true;}
