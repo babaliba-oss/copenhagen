@@ -48,12 +48,22 @@ const tour=()=>mergeGeometries([...hull(4.6,1.2,17,'#1f3f63','#d9d6cc',.1),box(4
 const havnebus=()=>mergeGeometries([...hull(5.2,1.3,22,'#e2b33c','#5f6a70',.15),box(4.4,1.9,15,0,2.1,1.2,'#f2f0ea'),box(4.46,.9,14.4,0,2.35,1.2,'#25313a'),box(4.5,.22,15.2,0,1.32,1.2,'#1f4f8a'),box(4.6,.14,15.6,0,3.1,1.2,'#e9e7e0'),box(1.6,.9,2.2,0,3.6,4.8,'#f2f0ea')]);
 const BUILD={sail,motor,wooden,ship,tour};
 
+// The mooring data packs boats closer than their own length (a forest of masts along the quays): keep one per
+// 1.4 boat lengths, measured by the larger of the two hulls.
+const BOAT_LEN={wooden:11,sail:7,motor:6,ship:26};
+export function thinMoorings(list,factor=1.4){
+ const kept=[],grid=new Map(),C=40,len=b=>(BOAT_LEN[b[3]]||8)*(b[4]||1);
+ for(const b of list){const gx=Math.floor(b[0]/C),gz=Math.floor(b[1]/C);let clash=false;
+  for(let i=-1;i<=1&&!clash;i++)for(let j=-1;j<=1&&!clash;j++)for(const q of grid.get((gx+i)+','+(gz+j))||[])if(Math.hypot(b[0]-q[0],b[1]-q[1])<Math.max(len(b),len(q))*factor){clash=true;break;}
+  if(clash)continue;kept.push(b);const k=gx+','+gz;if(!grid.has(k))grid.set(k,[]);grid.get(k).push(b);}
+ return kept;
+}
 export function createBoats(data,{waterY=-1.2,era=null,models={}}={}){
  const group=new THREE.Group();group.name='Boats';
  // The sea surface is drawn at the terrain's water level (sea.js drapes it 10 cm under waterAt); a fixed level
  // left boats metres above the water. Each boat sits on the water under it.
  const level=(x,z)=>{const w=waterAt(x,z);return (w==null?waterY:w-.1);};
- const boats=(data?.boats||[]).filter(b=>era===1760||!inHarbourBath(b[0],b[1])),mat=new THREE.MeshStandardMaterial({vertexColors:true,roughness:.6,metalness:.05});
+ const boats=thinMoorings((data?.boats||[]).filter(b=>era===1760||!inHarbourBath(b[0],b[1]))),mat=new THREE.MeshStandardMaterial({vertexColors:true,roughness:.6,metalness:.05});
  // Chunked by 300 m and kind: chunks frustum-cull, hide past 1 km, and only those near the player bob.
  const chunks=new Map(),geos={...models}; // Blender models (scripts/blender/boats.py) where loaded
  for(const bt of boats){if(!BUILD[bt[3]])continue;const k=`${Math.floor(bt[0]/300)},${Math.floor(bt[1]/300)}`;if(!chunks.has(k))chunks.set(k,{list:{},x:0,z:0,n:0});const c=chunks.get(k);(c.list[bt[3]]??=[]).push(bt);c.x+=bt[0];c.z+=bt[1];c.n++;}
