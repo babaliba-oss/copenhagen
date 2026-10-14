@@ -89,3 +89,12 @@ test('a region download finishing after disposal cannot install or open its area
  const pending=s.ensureStart({extension:'outer'}),rejected=assert.rejects(pending,/disposed/);await tick();s.dispose();await rejected;
  gate.resolve();await tick();assert.equal(installs,0);assert.equal(s.state('outer'),'cancelled');
 });
+
+test('evictFar unloads far ready records, hands their values over and lets them load again',async()=>{
+ const loads=[];const s=createSpatialStreamer({load:r=>{loads.push(r.id);return {id:r.id};},keyOf:r=>r.id,boundsOf:r=>r.bbox});
+ s.add([{id:'a',bbox:[0,0,10,10]},{id:'b',bbox:[2000,0,2010,10]}]);
+ await s.ensure({x:0,z:0},{radius:5000});assert.deepEqual(loads.sort(),['a','b']);
+ const evicted=[];assert.equal(s.evictFar({x:0,z:0},1000,v=>evicted.push(v.id)),1);assert.deepEqual(evicted,['b']);
+ assert.equal(s.state('b'),'idle');assert.equal(s.state('a'),'ready');
+ await s.ensure({x:2005,z:5},{radius:100});assert.equal(loads.filter(x=>x==='b').length,2);
+});

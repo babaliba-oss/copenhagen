@@ -66,6 +66,11 @@ export function createSpatialStreamer({load,keyOf=r=>r.id??r.file,boundsOf=r=>r.
  const api={add,update,require:requireKeys,
   ensure(position,options={}){update(position,options);return requireKeys([...jobs.values()].filter(j=>j.near).map(j=>j.key));},
   get(key){return jobs.get(key)?.value;},
+  // Unload what is far away (beyond `distance` of position): the value goes to onEvict and the record
+  // returns to idle, so it loads again when the player comes back. Only for purely visual records.
+  evictFar(position,distance,onEvict){if(disposed||!position)return 0;let n=0;
+   for(const j of jobs.values())if(j.status==='ready'&&!j.waiters.length&&distanceToBounds(boundsOf(j.record),position)>distance){const v=j.value;j.value=undefined;j.status='idle';j.attempts=0;j.near=false;n++;onEvict?.(v,j.record);}
+   return n;},
   state(key){return jobs.get(key)?.status??null;},
   snapshot(){const counts={total:jobs.size,ready:0,loading:0,queued:0,failed:0};for(const j of jobs.values()){if(j.status==='ready')counts.ready++;else if(j.status==='loading')counts.loading++;else if(j.status==='error')counts.failed++;else if(wanted(j))counts.queued++;}return counts;},
   dispose(){disposed=true;controller.abort(Error('The streamer was disposed'));if(timer!==null)clearTimer(timer);timer=null;for(const j of jobs.values()){j.near=false;if(j.status==='loading')j.status='cancelled';for(const w of j.waiters.splice(0))w.reject(controller.signal.reason);}},
