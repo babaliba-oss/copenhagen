@@ -63,8 +63,8 @@ export function annotateCrossings(walks,{axes,canon}){
 // (around the cluster's nodes, wide enough to hold every lane and track conflict), in the signal group of
 // the heading it leaves the area with.
 export function annotateTramSignals(paths,signals,{axes,radius}){
- for(const path of paths){path.signalStops=[];
-  for(const [id,axis] of axes.entries()){if(axis===undefined)continue;const [px,pz]=signals[id].p,r=radius[id];let inside=false,stop=null;
+ for(const path of paths){path.signalStops=[];let x0=Infinity,z0=Infinity,x1=-Infinity,z1=-Infinity;for(const q of path.points){if(q[0]<x0)x0=q[0];if(q[0]>x1)x1=q[0];if(q[1]<z0)z0=q[1];if(q[1]>z1)z1=q[1];}
+  for(const [id,axis] of axes.entries()){if(axis===undefined)continue;const [px,pz]=signals[id].p,r=radius[id];if(px+r<x0||px-r>x1||pz+r<z0||pz-r>z1)continue;let inside=false,stop=null; // signal nowhere near this path
    for(let i=1;i<path.points.length;i++){const a=path.points[i-1],b=path.points[i];if(Math.min(a[0],b[0])>px+r||Math.max(a[0],b[0])<px-r||Math.min(a[1],b[1])>pz+r||Math.max(a[1],b[1])<pz-r){inside=false;continue;}
     const l=path.cumulative[i]-path.cumulative[i-1];for(let t=0;t<=l;t+=1){const x=a[0]+(b[0]-a[0])*t/(l||1),z=a[1]+(b[1]-a[1])*t/(l||1),now=Math.hypot(x-px,z-pz)<r;
      const heading=Math.atan2(a[0]-b[0],a[1]-b[1]);

@@ -119,10 +119,16 @@ export function lakeSurface({reach=8,rise=.3,below=.05}={}){
  const f=terrain();if(!f?.lake)return null;
  const key=`${reach},${rise},${below}`;if(lastLake?.f===f&&lastLake.key===key)return lastLake.w;
  const n=f.size,level=f.lake.slice();
- for(let pass=0;pass<reach;pass++){const next=level.slice();let grew=0;
-  for(let j=0;j<n;j++)for(let i=0;i<n;i++){const k=j*n+i;if(!Number.isNaN(level[k]))continue;
-   for(const [di,dj] of [[1,0],[-1,0],[0,1],[0,-1]]){const ii=i+di,jj=j+dj;if(ii<0||jj<0||ii>=n||jj>=n)continue;const v=level[jj*n+ii];if(!Number.isNaN(v)&&f.ground[jj*n+ii]<v+.5+rise){next[k]=v;grew++;break;}}}
-  level.set(next);if(!grew)break;}
+ // Grown pass by pass from a frontier (dry cells beside water), not by rescanning the whole grid each pass;
+ // the same result: a dry cell takes the first wet neighbour's level (E, W, S, N) whose bank is low enough.
+ const D=[[1,0],[-1,0],[0,1],[0,-1]],wet=k=>!Number.isNaN(level[k]),seen=new Uint8Array(n*n);
+ let front=[];const queue=k=>{if(!seen[k]&&!wet(k)){seen[k]=1;front.push(k);}};
+ const around=(k,fn)=>{const i=k%n,j=(k-i)/n;for(const [di,dj] of D){const ii=i+di,jj=j+dj;if(ii>=0&&jj>=0&&ii<n&&jj<n)fn(jj*n+ii);}};
+ for(let k=0;k<n*n;k++)if(wet(k))around(k,queue);
+ for(let pass=0;pass<reach&&front.length;pass++){const filled=[];
+  for(const k of front){seen[k]=0;let v=NaN;around(k,q=>{if(Number.isNaN(v)&&wet(q)&&f.ground[q]<level[q]+.5+rise)v=level[q];});if(!Number.isNaN(v))filled.push(k,v);}
+  for(let t=0;t<filled.length;t+=2)level[filled[t]]=filled[t+1];
+  front=[];for(let t=0;t<filled.length;t+=2)around(filled[t],queue);}
  const depth=new Float32Array(n*n);
  for(let k=0;k<n*n;k++)depth[k]=Number.isNaN(level[k])?-1:level[k]-below+.5+rise-f.ground[k];
  const w={n,level,depth};lastLake={f,key,w};return w;

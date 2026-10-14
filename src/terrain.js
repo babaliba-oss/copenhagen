@@ -110,7 +110,7 @@ export function flattenWaterBodies(f=field){
  for(let s=0;s<n*n;s++){if(Number.isNaN(w[s])||label[s]>=0)continue;
   const cells=[];label[s]=regions;stack.push(s);
   while(stack.length){const k=stack.pop();cells.push(k);const r=(k/n)|0,c=k-r*n;
-   for(const q of [c>0?k-1:-1,c<n-1?k+1:-1,r>0?k-n:-1,r<n-1?k+n:-1])if(q>=0&&label[q]<0&&!Number.isNaN(w[q])){label[q]=regions;stack.push(q);}}
+   const visit=q=>{if(label[q]<0&&!Number.isNaN(w[q])){label[q]=regions;stack.push(q);}};if(c>0)visit(k-1);if(c<n-1)visit(k+1);if(r>0)visit(k-n);if(r<n-1)visit(k+n);}
   const vals=Float32Array.from(cells,k=>w[k]).sort(),mid=vals[vals.length>>1];for(const k of cells)if(w[k]>mid)w[k]=mid;regions++;} // only bumps come down; nothing is raised
  return regions;
 }
