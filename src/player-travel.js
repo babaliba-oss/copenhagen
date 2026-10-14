@@ -89,15 +89,17 @@ export function starterRides(car,world){
   // Parked on the pavement (never the carriageway or a cycle track) when there is any within 30 m;
   // only a start with no pavement near falls back to the nearest clear spot.
   for(const strict of [true,false]){
-   for(let radius=3;radius<=(strict?30:22);radius+=1.5)for(let i=0;i<24;i++){
-    const a=i*Math.PI/12,q={x:car.x+Math.cos(a)*radius,z:car.z+Math.sin(a)*radius,heading:car.heading};
-    const pavement=world.pavement?.at(q.x,q.z),onWalk=!!pavement&&!world.roads.at(q.x,q.z)&&!/pyör|Pyör|cycle/.test(pavement.kind||'');
-    if(strict&&!onWalk)continue;
+   for(let radius=3;radius<=(strict?30:22);radius+=1.5){const steps=radius>10?48:24;for(let i=0;i<steps;i++){
+    const a=i*2*Math.PI/steps,q={x:car.x+Math.cos(a)*radius,z:car.z+Math.sin(a)*radius,heading:car.heading};
+    const pavement=world.pavement?.at(q.x,q.z),cycle=/pyör|Pyör|cycle/.test(pavement?.kind||''),onWalk=!!pavement&&!cycle&&!world.roads.at(q.x,q.z);
+    // a quay or square mapped as neither road nor pavement (Nyhavn's quayside) is fine too, kept a metre clear of the carriageway
+    const offStreet=!onWalk&&!cycle&&!pavement&&[[0,0],[1.2,0],[-1.2,0],[0,1.2],[0,-1.2]].every(([dx,dz])=>!world.roads.at(q.x+dx,q.z+dz))&&!world.water?.some(b=>pointInPolygon(q.x,q.z,b.rings));
+    if(strict&&!onWalk&&!offStreet)continue;
     // on the pavement only the spot itself must be clear (parked cars or racks along the kerb may stand between)
     if(travelCollision(q,mode,world,[car,...rides])||(strict?!reachable(origin,q,world):!clearTravelPath(origin,q,world,[car,...rides]))||rides.some(r=>gap(r,q)<2.3))continue;
-    const score=gap(origin,q)+(onWalk?0:14);
+    const score=gap(origin,q)+(onWalk?0:offStreet?3:14);
     if(!best||score<best.score)best={...q,score};
-   }
+   }}
    if(best)break;
   }
   if(best)rides.push({...makeActor({x:best.x,z:best.z,heading:best.heading},mode),id:mode,mode,parked:true,...(STARTER_VISUALS[mode]?{visual:{...STARTER_VISUALS[mode]}}:{})});
