@@ -107,7 +107,7 @@ function plateGeometry(size,rect){
  g.deleteAttribute('normal');g.computeVertexNormals();return g.toNonIndexed();
 }
 
-export function createMappedFurniture(layer,{player=()=>null,mobility=()=>null,canvas=globalThis.document,poleAllowed=()=>true,wallAt=null,rackBikes=null}={}){
+export function createMappedFurniture(layer,{player=()=>null,mobility=()=>null,canvas=globalThis.document,poleAllowed=()=>true,wallAt=null,rackBikes=null,models={}}={}){
  const group=new THREE.Group();group.name='Mapped street furniture';
  const items=layer?.items||[],obstacles=[],chunks=new Map(),lights=[];
  const painted=new THREE.MeshStandardMaterial({vertexColors:true,roughness:.6,metalness:.2});
@@ -133,7 +133,7 @@ export function createMappedFurniture(layer,{player=()=>null,mobility=()=>null,c
   if(layout.length)height=Math.max(...layout.map(p=>p.y+p.height/2))+.05;
   const i=chunk.signs.post({id:itemId(it,index),x:it.x,z:it.z,y:groundAt(it.x,it.z),yaw,height,radius:spec.radius,strength:spec.strength});
   if(it.k==='sign')place(cyl(.031,.031,height,height/2,'#929b9d',6),it.x,it.z,0,chunk,i,chunk.painted);
-  else{if(!templates.has(it.k))templates.set(it.k,mergeGeometries(postParts(it.k)));place(templates.get(it.k).clone(),it.x,it.z,yaw,chunk,i,chunk.painted);}
+  else{if(!templates.has(it.k))templates.set(it.k,models[it.k]||mergeGeometries(postParts(it.k))); /* Blender model (scripts/blender/furniture.py) where loaded */place(templates.get(it.k).clone(),it.x,it.z,yaw,chunk,i,chunk.painted);}
   for(const p of layout){const rect=atlas?.uv.get(`${p.face}:0`),back=atlas?.uv.get(`${p.face}:1`);if(!rect)continue;const size=Math.max(p.width,p.height);
    const front=plateGeometry(size,rect);front.translate(0,p.y,.045);place(front,it.x,it.z,p.yaw,chunk,i,chunk.plates);
    const rear=plateGeometry(size,back);rear.rotateY(Math.PI);rear.translate(0,p.y,.035);place(rear,it.x,it.z,p.yaw,chunk,i,chunk.plates);}
@@ -203,7 +203,7 @@ export function createMappedFurniture(layer,{player=()=>null,mobility=()=>null,c
  const coneParts=()=>[box(.34,.04,.34,0,.02,0,'#1d2022'),cyl(.03,.15,.68,.36,'#f06a2a',10),cyl(.075,.105,.12,.42,'#f5f5ef',10)];
  for(const [kind,parts] of [['bin',binParts],['barrier',barrierParts],['cone',coneParts]]){
   const list=items.filter(i=>i.k===kind);if(!list.length)continue;
-  const g=mergeGeometries(parts());g.computeVertexNormals();
+  const g=models[kind]?models[kind].clone():mergeGeometries(parts());if(!models[kind])g.computeVertexNormals();
   const k=createKnockables(list.map((it,i)=>({id:itemId(it,i),x:it.x,z:it.z,yaw:it.yaw||0})),[{geometry:g,material:painted}],KNOCKABLE[kind]);
   k.group.name=`Mapped ${kind}s`;group.add(k.group);knock.push(k);
  }
@@ -225,7 +225,7 @@ export function createMappedFurniture(layer,{player=()=>null,mobility=()=>null,c
  }}
  for(const [kind,size] of Object.entries(SOLIDS)){
   const list=items.filter(i=>i.k===kind);if(!list.length)continue;
-  const g=mergeGeometries(solidParts[kind](size));g.computeVertexNormals();
+  const g=models[kind]?models[kind].clone():mergeGeometries(solidParts[kind](size));if(!models[kind])g.computeVertexNormals();
   chunkedInstances(list,g,painted,`Mapped ${kind}`,it=>[it.x,it.z,it.yaw]);
   list.forEach((it,i)=>{const yaw=it.yaw||0;
    const [w,d]=size,c=Math.cos(yaw),s=Math.sin(yaw),ring=[[-w/2,-d/2],[w/2,-d/2],[w/2,d/2],[-w/2,d/2]].map(([a,b])=>[it.x+a*c+b*s,it.z-a*s+b*c]);
