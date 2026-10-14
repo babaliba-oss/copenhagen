@@ -18,3 +18,6 @@ for kind, suffix in [('color', 'Color'), ('normal', 'NormalGL'), ('rough', 'Roug
 for kind, suffix in [('color', 'Color'), ('normal', 'NormalGL')]:
     im = Image.open(f'{SRC}/Grass005_1K-JPG/Grass005_1K-JPG_{suffix}.jpg')
     save(im.convert('RGB').resize((512, 512), Image.LANCZOS), f'grass-{kind}.jpg')
+for kind, suffix in [('color', 'Color'), ('normal', 'NormalGL')]:   # facades and roofs (src/facade-grain.js)
+    save(Image.open(f'{SRC}/Bricks104_1K-JPG/Bricks104_1K-JPG_{suffix}.jpg').convert('RGB'), f'brick-{kind}.jpg', 80)
+    save(Image.open(f'{SRC}/RoofingTiles014A_1K-JPG/RoofingTiles014A_1K-JPG_{suffix}.jpg').convert('RGB').resize((512, 512), Image.LANCZOS), f'rooftile-{kind}.jpg', 80)
