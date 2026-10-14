@@ -987,7 +987,7 @@ async function boot(){
    // ~0.375 px per metre, as before, whatever the map frame size.
    mapCache.width=mapCache.height=Math.min(4096,Math.round(mapView.size*.375));
    // Hilly cities: everything below samples the shared height field; the flat ground plane gives way to a terrain mesh.
-   if(setTerrain(await terrainData)){if(city.id.startsWith('copenhagen'))console.info('Water bodies levelled',flattenWaterBodies());surfaceMaterial.defines={...surfaceMaterial.defines,TERRAIN:''};surfaceMaterial.needsUpdate=true;ground.visible=false;cityModel.add(createTerrainGround(ground.material,city.id.startsWith('copenhagen')?{cell:20,chunk:40}:undefined));}
+   if(setTerrain(await terrainData)){if(city.id==='copenhagen')console.info('Water bodies levelled',flattenWaterBodies());surfaceMaterial.defines={...surfaceMaterial.defines,TERRAIN:''};surfaceMaterial.needsUpdate=true;ground.visible=false;cityModel.add(createTerrainGround(ground.material,city.id.startsWith('copenhagen')?{cell:20,chunk:40}:undefined));}
    if((landcoverData.polygons||landcoverData.runs||[]).length)cityModel.add(settleObject(createLandcover(landcoverData)));
    sea=createSea(data.water,data,{helsinkiHarbour:helsinki});tintSea(sea);cityModel.add(sea.group);ground.geometry.dispose();ground.geometry=sea.groundGeometry;
    // Helsinki's hand-built scenery (landmarks, harbour, street life, signs). Other cities get the generic engine only.
@@ -1077,7 +1077,7 @@ async function boot(){
     // Sign clutter: photo detections give blank blue 'generic plates' (no readable type) and the same sign seen
     // from several photos. Keep posts with a real face, one per face within 5 m, and at most 3 posts in 8 m.
     {const grid=new Map(),key=(x,z)=>Math.floor(x/8)+','+Math.floor(z/8),near=(x,z)=>{const out=[],gx=Math.floor(x/8),gz=Math.floor(z/8);for(let i=-1;i<=1;i++)for(let j=-1;j<=1;j++)for(const q of grid.get((gx+i)+','+(gz+j))||[])if(Math.hypot(q.x-x,q.z-z)<8)out.push(q);return out;};let dropped=0;
-     mapped.items=mapped.items.filter(it=>{if(it.k!=='sign')return true;const faces=(it.faces||[]).filter(f=>f!=='generic-plate');if(!faces.length){dropped++;return false;}
+     mapped.items=mapped.items.filter(it=>{if(it.k!=='sign')return true;const keep=(it.faces||[]).map((f,i)=>f!=='generic-plate'?i:-1).filter(i=>i>=0),faces=keep.map(i=>it.faces[i]);if(!faces.length){dropped++;return false;}if(Array.isArray(it.yaws)&&it.yaws.length===it.faces.length)it.yaws=keep.map(i=>it.yaws[i]);
       const ns=near(it.x,it.z);if(ns.length>=3||ns.some(q=>Math.hypot(q.x-it.x,q.z-it.z)<5&&q.faces.some(f=>faces.includes(f)))){dropped++;return false;}
       it.faces=faces;const k=key(it.x,it.z);if(!grid.has(k))grid.set(k,[]);grid.get(k).push(it);return true;});
      console.info(`Street furniture: ${dropped} duplicate or blank signs dropped`);}}

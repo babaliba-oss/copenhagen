@@ -6,7 +6,7 @@ export function createSoundscape(ac,{era=null}={}){
  const loop=(buf)=>{const s=ac.createBufferSource();s.buffer=buf;s.loop=true;s.start();return s;};
  // engine: two detuned saws -> low-pass -> gain
  const e1=ac.createOscillator(),e2=ac.createOscillator(),eLp=ac.createBiquadFilter(),eG=ac.createGain();
- e1.type='triangle';e2.type='sawtooth';e2.detune.value=-14;eLp.type='lowpass';eLp.Q.value=1.5; // soft hum under the city, not a buzzeG.gain.value=0;
+ e1.type='triangle';e2.type='sawtooth';e2.detune.value=-14;eLp.type='lowpass';eLp.Q.value=1.5;eG.gain.value=0; // soft hum under the city, not a buzz
  e1.connect(eLp);e2.connect(eLp);eLp.connect(eG);eG.connect(out);e1.start();e2.start();
  // tyres: band-passed noise
  const tyre=loop(noiseBuf),tBp=ac.createBiquadFilter(),tG=ac.createGain();tBp.type='bandpass';tBp.frequency.value=700;tBp.Q.value=.6;tG.gain.value=0;tyre.connect(tBp);tBp.connect(tG);tG.connect(out);

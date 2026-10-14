@@ -44,9 +44,9 @@ export function createStreetLife(scene,mobility,{paintedMarkings=true}={}){ // p
   markings.push(g);
  }
  // Road centrelines only where the municipal graph indicates a two-way carriageway.
- for(const edge of roads){if(edge.separateCarriageway||edge.lane<1||edge.from>edge.to||edge.length<12)continue;
-  // dashes run the whole edge (short blocks too), stopping 4 m short of each junction
-  for(let s=4+((edge.length-8)%6)/2;s<=edge.length-4;s+=6){const p=routePoint(edge,s,0);if(!mobility.world.roads.at(p.x,p.z)||mobility.world.buildings.at(p.x,p.z))continue;const g=new THREE.PlaneGeometry(.10,2.7);g.rotateX(-Math.PI/2);g.rotateY(p.heading);g.translate(p.x,.092,p.z);markings.push(g);}
+ for(const edge of roads){if(edge.separateCarriageway||edge.lane<1||edge.from>edge.to||edge.length<18)continue;
+  // dashes run the whole edge (short blocks too), stopping 7 m short of each junction box
+  for(let s=7+((edge.length-14)%6)/2;s<=edge.length-7;s+=6){const p=routePoint(edge,s,0);if(!mobility.world.roads.at(p.x,p.z)||mobility.world.buildings.at(p.x,p.z))continue;const g=new THREE.PlaneGeometry(.10,2.7);g.rotateX(-Math.PI/2);g.rotateY(p.heading);g.translate(p.x,.092,p.z);markings.push(g);}
  }
  if(!paintedMarkings){markings.forEach(g=>g.dispose());markings.length=0;}
  if(markings.length){const geometries=markings.map(g=>g.index?g.toNonIndexed():g);const m=new THREE.Mesh(drapeGeometry(mergeGeometries(geometries)),new THREE.MeshStandardMaterial({color:'#e7e3d4',roughness:1,side:THREE.DoubleSide,polygonOffset:true,polygonOffsetFactor:-1}));m.receiveShadow=true;group.add(m);new Set([...geometries,...markings]).forEach(g=>g.dispose());}

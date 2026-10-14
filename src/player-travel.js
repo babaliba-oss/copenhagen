@@ -77,6 +77,9 @@ function makeActor(p,mode,distance=0){return {...p,speed:0,steer:0,distance,trav
 // start. Their positions do not claim to be real rental stations.
 // Per-city look of the starter rides, e.g. {bike:{kind:'ladcykel',color:'#2d3a33'}} (set by main.js before the game starts).
 export const STARTER_VISUALS={};
+// Walkable in a straight line past buildings and water (street furniture and parked cars ignored).
+function reachable(a,b,world){const n=Math.max(1,Math.ceil(gap(a,b)/.5));for(let i=1;i<=n;i++){const x=a.x+(b.x-a.x)*i/n,z=a.z+(b.z-a.z)*i/n;
+ if((world.collisionBuildings||world.buildings).at(x,z))return false;if(!world.roads.at(x,z)&&!world.pavement?.at(x,z)&&world.water?.some(w=>pointInPolygon(x,z,w.rings)))return false;}return true;}
 export function starterRides(car,world){
  const origin=exitPosition(car,'car',world),rides=[];
  if(!origin)return rides;
@@ -91,7 +94,7 @@ export function starterRides(car,world){
     const pavement=world.pavement?.at(q.x,q.z),onWalk=!!pavement&&!world.roads.at(q.x,q.z)&&!/pyör|Pyör|cycle/.test(pavement.kind||'');
     if(strict&&!onWalk)continue;
     // on the pavement only the spot itself must be clear (parked cars or racks along the kerb may stand between)
-    if(travelCollision(q,mode,world,[car,...rides])||(!strict&&!clearTravelPath(origin,q,world,[car,...rides]))||rides.some(r=>gap(r,q)<2.3))continue;
+    if(travelCollision(q,mode,world,[car,...rides])||(strict?!reachable(origin,q,world):!clearTravelPath(origin,q,world,[car,...rides]))||rides.some(r=>gap(r,q)<2.3))continue;
     const score=gap(origin,q)+(onWalk?0:14);
     if(!best||score<best.score)best={...q,score};
    }
