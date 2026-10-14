@@ -144,7 +144,7 @@ export function createMappedFurniture(layer,{player=()=>null,mobility=()=>null,c
  const wireLamps=items.filter(it=>it.k==='wire-lamp'),wirePoles=[];
  if(wireLamps.length){
   {const hung=[];for(const it of wireLamps){const chunk=chunkOf(it.x,it.z);if(wireLines(it,chunk.wires??=[],wirePoles,{poleAllowed,wallAt}))hung.push(it);}wireLamps.length=0;wireLamps.push(...hung);} // a shade with no wire is left out
-  const shade=mergeGeometries([cyl(.012,.012,.5,WIRE_LOW+.3,'#24282a',4),cyl(.06,.06,.1,WIRE_LOW+.5,'#2c3033',8),cyl(.09,.42,.24,WIRE_LOW+.32,'#2c3033',8),cyl(.3,.3,.03,WIRE_LOW+.19,'#fff3d6',8)]);
+  const shade=models['wire-shade']?models['wire-shade'].clone().translate(0,WIRE_LOW+.18,0):mergeGeometries([cyl(.012,.012,.5,WIRE_LOW+.3,'#24282a',4),cyl(.06,.06,.1,WIRE_LOW+.5,'#2c3033',8),cyl(.09,.42,.24,WIRE_LOW+.32,'#2c3033',8),cyl(.3,.3,.03,WIRE_LOW+.19,'#fff3d6',8)]);
   chunkedInstances(wireLamps,shade,painted,'Wire lamp shades',it=>[it.x,it.z,it.yaw],{shadow:false});
   // Poles are already allowed where they stand and shared by wires ending within 3 m (wireLines snaps them).
   if(wirePoles.length){chunkedInstances(wirePoles,mergeGeometries([cyl(.06,.09,8.2,4.1,'#3b3f42',7)]),painted,'Wire poles',p=>[p[0],p[1],0]);

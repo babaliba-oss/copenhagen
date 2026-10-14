@@ -101,6 +101,32 @@ def bin_(m):
     m.cone(.23, .1, .1, 1.25, '#2a3833', 12)
     m.box((.16, .02, .06), (0, -.205, 1.05), '#20302a')                     # throw-in slot lip
 
+def traffic_light(m):
+    """Signal post: tapered pole and a three-lens head with hoods, facing the game's +Z (Blender -Y); the
+    lenses themselves are drawn by the game in front of the head (y 3.35 / 3.1 / 2.85)."""
+    m.cone(.085, .065, 3.4, 0, '#566166', 8)
+    m.box((.27, .23, .82), (0, -.05, 3.1), '#1d2629', bevel=.03)
+    for z in (3.35, 3.1, 2.85):
+        m.box((.22, .14, .03), (0, -.2, z + .11), '#1d2629', rot=(-.35, 0, 0))   # hood over each lens
+    m.box((.36, .03, .95), (0, .07, 3.1), '#1d2629', bevel=.02)                    # backplate
+    m.box((.06, .06, .16), (0, 0, 3.47), '#566166')
+
+def crossing_light(m):
+    """Pedestrian signal post: shorter pole and a two-lens head with hoods."""
+    m.cone(.075, .06, 2.85, 0, '#566166', 8)
+    m.box((.25, .2, .58), (0, -.05, 2.5), '#1d2629', bevel=.03)
+    for z in (2.62, 2.38): m.box((.2, .12, .03), (0, -.18, z + .1), '#1d2629', rot=(-.35, 0, 0))
+    m.box((.2, .14, .3), (0, .06, 1.1), '#e6c63a', bevel=.02)                      # push-button box
+
+def wire_shade(m):
+    """Copenhagen wire-hung street light: a shallow dark dome with a white diffuser, on a short hanger. Local
+    height 0 is the bottom of the diffuser; the game lifts it to the wire."""
+    m.rod((0, 0, .32), (0, 0, .56), .012, '#24282a', 4)
+    m.cone(.07, .07, .08, .26, '#2c3033', 10)
+    m.cone(.44, .1, .22, .05, '#2c3033', 16)                                       # dome
+    m.cone(.43, .43, .02, .04, '#2c3033', 16)
+    m.cone(.34, .34, .03, .0, '#fff3d6', 16)                                       # diffuser
+
 os.makedirs(OUT, exist_ok=True)
-for name, fn in [('lamp', lamp), ('mast-lamp', mast_lamp), ('park-lamp', park_lamp), ('bench', bench), ('bin', bin_)]:
+for name, fn in [('lamp', lamp), ('mast-lamp', mast_lamp), ('park-lamp', park_lamp), ('bench', bench), ('bin', bin_), ('traffic-light', traffic_light), ('crossing-light', crossing_light), ('wire-shade', wire_shade)]:
     m = M(); fn(m); m.export(os.path.join(OUT, name + '.glb'))
