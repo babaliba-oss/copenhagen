@@ -240,8 +240,8 @@ surfaceMaterial.onBeforeCompile=shader=>{
    vec2 bay=vGround.xz/vec2(6.5,4.2);vec2 cell=floor(bay);float bayHash=groundHash(cell+0.37);
    vec2 toEdge=min(fract(bay),1.0-fract(bay))*vec2(6.5,4.2);float edge=min(toEdge.x,toEdge.y);
    float patchDetail=1.0-smoothstep(0.25,1.0,footprint);
-   float bayPatch=step(0.87,bayHash)*patchDetail,seam=(1.0-smoothstep(0.02,0.06+footprint*0.8,edge))*bayPatch;
-   diffuseColor.rgb*=(1.0+tone*0.18)*(1.0-bayPatch*(0.12+0.06*groundHash(cell+0.71)))*(1.0-seam*0.35);
+   float bayPatch=step(0.93,bayHash)*patchDetail,seam=(1.0-smoothstep(0.02,0.06+footprint*0.8,edge))*bayPatch;
+   diffuseColor.rgb*=(1.0+tone*0.18)*(1.0-bayPatch*(0.06+0.04*groundHash(cell+0.71)))*(1.0-seam*0.16); /* subtle: world-aligned bays read as a tile grid when strong */
    // Wet asphalt: darker, puddles in the low spots of the tone field, far less grain.
    float puddle=smoothstep(0.62,0.75,groundNoise(vGround.xz/3.5+7.0))*uWetness;
    diffuseColor.rgb*=1.0-uWetness*0.22-puddle*0.25;grain*=1.0-uWetness*0.7;wetRough=max(uWetness*0.5,puddle);
