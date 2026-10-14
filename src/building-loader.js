@@ -25,7 +25,7 @@ export function materialiseBuilding(data,textures){
  return data.meshes.map(source=>{
   const geometry=new THREE.BufferGeometry();for(const [name,a] of Object.entries(source.attributes))geometry.setAttribute(name,new THREE.BufferAttribute(a.array,a.itemSize,a.normalized));if(source.index)geometry.setIndex(new THREE.BufferAttribute(source.index,1));geometry.computeBoundingSphere();
   const {textured,signs,combined,...values}=source.material,material=signs?signMaterial():new THREE.MeshStandardMaterial({...values,map:textured?textures.get(p.texture):null,forceSinglePass:true});if(signs){material.transparent=true;material.forceSinglePass=true;}
-  if(source.shell&&!textured)facadeGrain(material);
+  if(source.shell&&!textured)facadeGrain(material,{stone:!!p.noFacade}); // churches and towers: dressed stone
   if(combined)litWindows(material,{attribute:'aGlass'});
   else if((values.roughness===.19&&values.metalness===.55)||(values.roughness===.3&&values.metalness===.1&&values.vertexColors))litWindows(material); // window glazing (building-detail.js) lights up at night
   const mesh=new THREE.Mesh(geometry,material);mesh.castShadow=source.shell;mesh.receiveShadow=true;mesh.userData={box,occlusion,shell:source.shell,ratu:p.ratu,role:source.role||'detail',provisional:!!source.provisional};return mesh;

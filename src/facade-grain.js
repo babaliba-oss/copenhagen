@@ -17,7 +17,7 @@ function grainTextures(){
 }
 // options.windows: also paint a storey-and-bay window grid on walls (far shells and shells waiting for detail,
 // which have no window geometry yet); windows glow at night like the real ones.
-export function facadeGrain(material,{windows=false}={}){
+export function facadeGrain(material,{windows=false,stone=false}={}){
  const prev=material.onBeforeCompile;
  material.onBeforeCompile=(shader,renderer)=>{prev?.(shader,renderer);
   shader.vertexShader=shader.vertexShader
@@ -27,6 +27,7 @@ export function facadeGrain(material,{windows=false}={}){
   shader.fragmentShader=shader.fragmentShader
    .replace('#include <common>',`#include <common>
 #define GRAIN_WINDOWS ${windows?1:0}
+#define GRAIN_STONE ${stone?1:0}
 uniform float uNight;uniform sampler2D tBrickC,tBrickN,tPlasterC,tPlasterN,tRoofC,tRoofN;${windows?'varying vec2 vRel;':''}
 varying vec3 vGrainPos;varying vec3 vGrainNormal;
 float gHash(vec2 p){return fract(sin(mod(dot(p,vec2(1.,57.)),997.)*1.371)*4375.85);}
@@ -52,6 +53,12 @@ float vWinLit=0.;vec3 fN=vec3(0.,0.,1.),fT=vec3(1.,0.,0.),fB=vec3(0.,1.,0.);floa
   float plaster=1.-brick;
   c*=1.+plaster*((blot-.5)*.12-streak*.06);
   c*=mix(1.,dot(texture2D(tPlasterC,vec2(along,p.y)/2.3).rgb,vec3(.3333))/.51,.55*plaster); // scanned render
+#if GRAIN_STONE
+  // churches and towers: dressed stone (ashlar) courses instead of render, each block its own shade
+  {vec2 sb=vec2(along/.9,p.y/.42);float sr=floor(sb.y);sb.x+=mod(sr,2.)*.5;vec2 sf=fract(sb),sc=floor(sb);
+   float sfw=1.-smoothstep(.2,.8,max(fwidth(sb.x),fwidth(sb.y)));float joint=(1.-step(.035,sf.y)*step(.02,sf.x))*sfw;
+   c=mix(c,c*(.9+.2*gHash(sc+7.)),plaster*sfw);c=mix(c,c*.72,joint*plaster*.8);fNw=max(fNw,.0);}
+#endif
 #if GRAIN_WINDOWS
   // window grid: 2.7 m bays, 3.1 m storeys, a 1.15 x 1.65 m opening with a light frame
   vec2 w=vec2(along/2.7,(vRel.x-.25)/3.1);vec2 wc=floor(w),wf=fract(w);
@@ -87,6 +94,6 @@ float vWinLit=0.;vec3 fN=vec3(0.,0.,1.),fT=vec3(1.,0.,0.),fB=vec3(0.,1.,0.);floa
    .replace('#include <emissivemap_fragment>','#include <emissivemap_fragment>\ntotalEmissiveRadiance+=vec3(1.,.62,.28)*vWinLit*.65;');
  };
  const key=material.customProgramCacheKey?.bind(material);
- material.customProgramCacheKey=()=>(key?key():'')+'|facade-grain2'+(windows?'-w':'');
+ material.customProgramCacheKey=()=>(key?key():'')+'|facade-grain2'+(windows?'-w':'')+(stone?'-s':'');
  return material;
 }

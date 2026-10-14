@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import {facadeGrain} from '../facade-grain.js';
 import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';
 import {groundAt} from '../terrain.js';
 
@@ -130,7 +131,7 @@ function buildingSite(r=17,h=13){
 export const HIDE_1760=['kk-osm-way-25451190','kk-osm-way-134471983','kk-osm-way-36790389','kk-osm-way-26604470','kk-osm-way-89752515','kk-osm-way-55601707','kk-osm-way-133986381','kk-osm-relation-8833442'];
 export function createLandmarks({era=null,mills=[],anchors={}}={}){
  const group=new THREE.Group();group.name='Hand-built landmarks';
- const mat=new THREE.MeshStandardMaterial({vertexColors:true,roughness:.45,metalness:.35});
+ const mat=facadeGrain(new THREE.MeshStandardMaterial({vertexColors:true,roughness:.6,metalness:.2})); // brick, plaster and roof courses like the city's own buildings
  const add=(geo,x,z,{y=null,rot=0}={})=>{const m=new THREE.Mesh(geo,mat);m.position.set(x,y??groundAt(x,z),z);m.rotation.y=rot;m.castShadow=true;m.receiveShadow=true;group.add(m);return m;};
  const today=era!==1760,flags=[],rotors=[];
  const scaled=(geo,a,design)=>{const m=add(geo,a[0],a[2]);m.scale.y=a[1]/design;return m;};
