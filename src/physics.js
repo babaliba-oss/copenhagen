@@ -1,4 +1,4 @@
-import { insidePlayable, pointInPolygon, segmentDistance } from './geo.js';
+import { insidePlayable, pointInPolygon, segmentDistance, inWaterPolygons } from './geo.js';
 import {consumeBattery} from './battery.js';
 import {groundPose,lakeAt} from './terrain.js';
 export const GRAVITY=9.81;
@@ -80,7 +80,7 @@ export function driveStep(car,keys,dt,world) {
    const samples=carSamples(car,nx,nz);
    const from={...car,heading:i?car.heading:oldHeading},next={...car,x:nx,z:nz};
    if(world.objects?.blocksStep(from,next)||samples.some(([x,z])=>collisionBuildings.at(x,z))&&!canExitBuildings(from,next,collisionBuildings)){collision='building';break;}
-   if(samples.some(([x,z])=>!world.roads.at(x,z)&&!world.pavement.at(x,z)&&(world.water.some(w=>pointInPolygon(x,z,w.rings))||lakeAt(x,z)!==null))){collision='water';break;}
+   if(samples.some(([x,z])=>!world.roads.at(x,z)&&!world.pavement.at(x,z)&&(inWaterPolygons(world.water,x,z)||lakeAt(x,z)!==null))){collision='water';break;}
    car.distance+=Math.hypot(nx-car.x,nz-car.z);car.x=nx;car.z=nz;
  }
  car.battery=consumeBattery(car.battery??1,car.distance-distanceBefore,car.speed);

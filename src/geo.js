@@ -85,3 +85,13 @@ export class SpatialIndex {
     return undefined;
   }
 }
+
+// Point-in-water against a world's water polygon list, through a spatial index built once per list (and
+// rebuilt when streaming appends to it). A linear scan of every harbour polygon was the slow path.
+const waterIndexes=new WeakMap();
+export function inWaterPolygons(water,x,z){
+ if(!water?.length)return false;
+ let entry=waterIndexes.get(water);
+ if(!entry||entry.count!==water.length){entry={count:water.length,index:new SpatialIndex(water.filter(w=>w?.rings?.length))};waterIndexes.set(water,entry);}
+ return !!entry.index.at(x,z);
+}

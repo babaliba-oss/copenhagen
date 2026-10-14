@@ -1,5 +1,5 @@
 // Shared player travel for every city. Distances and speeds are world metres.
-import {insidePlayable,pointInPolygon} from './geo.js';
+import {insidePlayable,pointInPolygon,inWaterPolygons} from './geo.js';
 import {makeCar} from './physics.js';
 import {sweptContact} from './contact-geometry.js';
 import {slopeAt} from './terrain.js';
@@ -40,7 +40,7 @@ export function travelCollision(p,mode,world,obstacles=[],ignore=[],from=null){
   if(!insidePlayable(q.x,q.z,.2))return 'boundary';
   const building=ignore.length&&buildings.near?buildings.near(q.x,q.z).find(b=>!b.disabled&&!ignore.includes(b)&&pointInPolygon(q.x,q.z,b.rings)):buildings.at(q.x,q.z);
   if(building&&!ignore.includes(building))return 'building';
-  if(!world.roads.at(q.x,q.z)&&!world.pavement?.at(q.x,q.z)&&world.water?.some(b=>pointInPolygon(q.x,q.z,b.rings)))return 'water';
+  if(!world.roads.at(q.x,q.z)&&!world.pavement?.at(q.x,q.z)&&inWaterPolygons(world.water,q.x,q.z))return 'water';
  }
  const dimensions={halfWidth:w,halfLength:l,ignore};
  if(from&&world.objects?.blocksStep?world.objects.blocksStep(from,p,dimensions):world.objects?.overlap(p,dimensions))return 'building';
@@ -79,7 +79,7 @@ function makeActor(p,mode,distance=0){return {...p,speed:0,steer:0,distance,trav
 export const STARTER_VISUALS={};
 // Walkable in a straight line past buildings and water (street furniture and parked cars ignored).
 function reachable(a,b,world){const n=Math.max(1,Math.ceil(gap(a,b)/.5));for(let i=1;i<=n;i++){const x=a.x+(b.x-a.x)*i/n,z=a.z+(b.z-a.z)*i/n;
- if((world.collisionBuildings||world.buildings).at(x,z))return false;if(!world.roads.at(x,z)&&!world.pavement?.at(x,z)&&world.water?.some(w=>pointInPolygon(x,z,w.rings)))return false;}return true;}
+ if((world.collisionBuildings||world.buildings).at(x,z))return false;if(!world.roads.at(x,z)&&!world.pavement?.at(x,z)&&inWaterPolygons(world.water,x,z))return false;}return true;}
 export function starterRides(car,world){
  const origin=exitPosition(car,'car',world),rides=[];
  if(!origin)return rides;
@@ -89,11 +89,11 @@ export function starterRides(car,world){
   // Parked on the pavement (never the carriageway or a cycle track) when there is any within 30 m;
   // only a start with no pavement near falls back to the nearest clear spot.
   for(const strict of [true,false]){
-   for(let radius=3;radius<=(strict?30:22);radius+=1.5){const steps=radius>10?48:24;for(let i=0;i<steps;i++){
+   for(let radius=3;radius<=(strict?30:22)&&!(best&&radius-3.5>best.score);radius+=1.5){const steps=radius>10?48:24;for(let i=0;i<steps;i++){
     const a=i*2*Math.PI/steps,q={x:car.x+Math.cos(a)*radius,z:car.z+Math.sin(a)*radius,heading:car.heading};
     const pavement=world.pavement?.at(q.x,q.z),cycle=/pyör|Pyör|cycle/.test(pavement?.kind||''),onWalk=!!pavement&&!cycle&&!world.roads.at(q.x,q.z);
     // a quay or square mapped as neither road nor pavement (Nyhavn's quayside) is fine too, kept a metre clear of the carriageway
-    const offStreet=!onWalk&&!cycle&&!pavement&&[[0,0],[1.2,0],[-1.2,0],[0,1.2],[0,-1.2]].every(([dx,dz])=>!world.roads.at(q.x+dx,q.z+dz))&&![[0,0],[1.2,0],[-1.2,0],[0,1.2],[0,-1.2]].some(([dx,dz])=>world.water?.some(b=>pointInPolygon(q.x+dx,q.z+dz,b.rings)));
+    const offStreet=!onWalk&&!cycle&&!pavement&&[[0,0],[1.2,0],[-1.2,0],[0,1.2],[0,-1.2]].every(([dx,dz])=>!world.roads.at(q.x+dx,q.z+dz))&&![[0,0],[1.2,0],[-1.2,0],[0,1.2],[0,-1.2]].some(([dx,dz])=>inWaterPolygons(world.water,q.x+dx,q.z+dz));
     if(strict&&!onWalk&&!offStreet)continue;
     // on the pavement only the spot itself must be clear (parked cars or racks along the kerb may stand between)
     if(travelCollision(q,mode,world,[car,...rides])||(strict?!reachable(origin,q,world):!clearTravelPath(origin,q,world,[car,...rides]))||rides.some(r=>gap(r,q)<2.3))continue;

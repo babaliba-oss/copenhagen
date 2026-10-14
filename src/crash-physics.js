@@ -3,7 +3,7 @@
 // Equal masses, partly inelastic. Not a tyre model; it only has to look like
 // metal moving instead of a wall.
 import {carSamples} from './physics.js';
-import {pointInPolygon} from './geo.js';
+import {inWaterPolygons} from './geo.js';
 import {trafficFootprintsOverlap} from './contact-geometry.js';
 
 export const RESTITUTION=.3,FRICTION=6.5,SPIN_FRICTION=2.5,REST_SPEED=.15,REST_RECYCLE_AFTER=30,MIN_KNOCK_SPEED=.05,HALF_WIDTH=.98,HALF_LENGTH=2.36,PUSH_SPEED=2,PUSH_MAX=3,PUSH_HOLD=.15;
@@ -57,7 +57,7 @@ export function stepKnocked(a,dt,world,time,{cars=[],obstacles=[],knock=null}={}
  k.spin=Math.sign(k.spin)*Math.max(0,Math.abs(k.spin)-SPIN_FRICTION*dt);
  const nx=a.x+k.vx*dt,nz=a.z+k.vz*dt,heading=a.heading+k.spin*dt;
  const samples=carSamples({heading},nx,nz);
- const blocked=samples.some(([x,z])=>world.buildings.at(x,z))||samples.some(([x,z])=>!world.roads.at(x,z)&&!world.pavement.at(x,z)&&world.water?.some(w=>w.rings&&pointInPolygon(x,z,w.rings)));
+ const blocked=samples.some(([x,z])=>world.buildings.at(x,z))||samples.some(([x,z])=>!world.roads.at(x,z)&&!world.pavement.at(x,z)&&inWaterPolygons(world.water,x,z));
  if(blocked){k.vx*=-.15;k.vz*=-.15;k.spin*=.3;a.speed=Math.hypot(k.vx,k.vz);return true;}
  const pose={x:nx,z:nz,heading,vx:k.vx,vz:k.vz,speed:Math.hypot(k.vx,k.vz)};
  for(const b of cars){
