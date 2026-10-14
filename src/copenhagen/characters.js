@@ -55,6 +55,15 @@ const SCRIPTS={
   hello:()=>turn('Rundetårn was built as an observatory in the 1640s. No stairs inside, just a spiral ramp.',[choice('ramp','Why a ramp?'),BYE]),
   ramp:()=>turn('So instruments could go up by horse and cart. A Russian tsar is said to have ridden up on horseback in 1716.',[BYE]),
  },
+ hca:{ // easter egg: the tall gentleman in the black coat on the Nyhavn quay
+  hello:m=>turn(m.visits>1?'You again! Have you come to apologise for the review?':'Ah, a reader! Hans Christian Andersen, at your service. I wrote my first fairy tales right here, at number 20. Later I lived at 67, and at 18. I move a lot. Landladies.',[choice('mermaid','The Little Mermaid?'),choice('duckling','Was the ugly duckling you?'),choice('autograph','Can I have an autograph?'),BYE]),
+  mermaid:()=>turn('She sits out at Langelinie. Tourists say she is small. She is life-size. Mermaids are not tall. Also, in my version nobody is happy at the end. Remember that.',[choice('autograph','Can I have an autograph?'),BYE]),
+  duckling:()=>turn('A poor boy from Odense with big feet and a big nose, laughed at by the whole yard, who turns out to be a swan? I cannot imagine where I got the idea.',[choice('autograph','Can I have an autograph?'),BYE]),
+  autograph:()=>turn('An autograph! Of course, of course. Just tell me first: you are not by any chance a critic? You have the look. That little notebook. That face.',[choice('critic','Well... I did write one review'),choice('fan','No, a big fan!'),BYE]),
+  fan:()=>turn('Then here. H.C. Andersen, with a little paper cut-out of a swan. I cut them out at dinner parties. People find it charming. Mostly.',[BYE]),
+  critic:()=>turn('A CRITIC! The one who called The Little Mermaid "too sad for children"?! Stand still. I have a FAIRY TALE for you. It is very long and nobody is happy at the end.',[choice('run','Run!')],'angry'),
+  run:(m,person)=>{if(person){person.chaseUntil=performance.now()/1000+25;person.caught=false;}return {close:true,message:'Run!'};},
+ },
  mette:{
   hello:()=>turn('Welcome. Three rules here: no running, no photos, no cars.',[choice('run','Why no running?'),choice('cars','Why no cars?'),BYE]),
   run:()=>turn('Running makes people think the police are coming. Then everybody runs. Then the police actually come.',[choice('cars','And no cars?'),BYE]),
@@ -70,6 +79,7 @@ export function authoredCharacter(person){
 }
 export function authoredBegin(person,memory){memory.visits=(memory.visits||0)+1;memory.topics??=[];return SCRIPTS[person.script].hello(memory);}
 export function authoredNext(id,person,memory){
+ if(id==='run'&&person?.script==='hca'){SCRIPTS.hca.run(memory,person);return {close:true,message:'Run!'};} // he gives chase (market-life.js moves him)
  if(id.startsWith('saga:'))return game?.sagaIntro(id.slice(5))||null;
  if(id.startsWith('accept:'))return game?.sagaAccept(id.slice(7))||null;
  if(id.startsWith('wait:'))return game?.sagaIntro(id.slice(5))||null;

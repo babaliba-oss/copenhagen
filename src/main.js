@@ -25,6 +25,7 @@ import {setLadcykelBox} from './player-ride-models.js';
 import {setScooterModel} from './parked-micromobility.js';
 import {setCarriageModels} from './copenhagen/carriage.js';
 import {loadVehicleBodies} from './vehicle-bodies.js';
+import {inWaterPolygons} from './geo.js';
 import {vehicleBodyParts,VEHICLE_SPECS} from './vehicle-models.js';
 import {animateVehicle} from './vehicles.js';
 import {Mobility} from './mobility.js';
@@ -1082,7 +1083,7 @@ async function boot(){
     // Copenhagen's game layer (src/copenhagen): jobs, GPS line, sagas and the characters who give them.
     // The characters are spread across the city, so the crowd's single-centre culling is overridden.
     if(city.era===1760&&!carriage){const starter=carGroup.children[0];if(starter){starter.traverse(m=>{if(m.isMesh)m.visible=false;});carriage=createCarriage();carriage.position.z=1.2;starter.add(carriage);}} // 1760: the player's car becomes a coach and horses
-    if(city.id.startsWith('copenhagen')){cph?.dispose?.();cph=createCopenhagenGame({scene,city,mobilityData,cityData:data,toast,soundOn:()=>sound});const npcCentre={x:0,z:0},npc=createInstancedPeople(cph.people,{name:'Copenhagen characters',center:npcCentre});
+    if(city.id.startsWith('copenhagen')){cph?.dispose?.();cph=createCopenhagenGame({scene,city,mobilityData,cityData:data,toast,soundOn:()=>sound});const npcCentre={x:0,z:0},npc=createInstancedPeople(cph.people,{name:'Copenhagen characters',center:npcCentre,onEvent:(e,p)=>{if(p.script!=='hca')return;toast(e==='caught'?'H.C. Andersen: "Caught you! Now, Chapter One of The Snow Queen..."':'H.C. Andersen: "Fine! Run! I shall put you in a story. A sad one."');}});
      npc.update=(u=>(dt,player)=>{if(player){npcCentre.x=player.x;npcCentre.z=player.z;}u(dt,player);npc.group.visible=true;})(npc.update);cityModel.add(npc.group);marketLife={...life(),...npc,group:npc.group};detailPeople=npc.people;}
     harbour={group:new THREE.Group(),obstacles:[],knockables:null};knockables=combineKnockables([breakableSigns]); // traffic-signal posts bend when hit, in every city
     finale.zone=null; // station tram scheduling is Helsinki-specific
@@ -1140,6 +1141,11 @@ async function boot(){
    if(mapped?.items?.length){const bikeParts=blenderLoads?await blenderLoads.rackBike:null,furnitureModels=blenderLoads?await blenderLoads.furniture:{};
     mappedFurniture=createMappedFurniture(mapped,{models:furnitureModels,rackBikes:bikeParts&&['#1d1f22','#2d4f7a','#7a2a20','#3f5d45','#c9c4b8','#e8e4da','#5b6d3a'].map(c=>bakeColoured(bikeParts,{frame:c})).filter(Boolean),player:()=>car,mobility:()=>mobility,poleAllowed:mapped.poleAllowed,wallAt:(()=>{const b=new SpatialIndex(data.buildings||[]);return (x,z)=>!!b.at(x,z);})()});cityModel.add(mappedFurniture.group);streetObstacles.push(...mappedFurniture.obstacles);bikeParts?.forEach(p=>p.geometry.dispose());knockables=combineKnockables([knockables,mappedFurniture.knockables]);}
    world={buildings:new SpatialIndex([...data.buildings,...streetObstacles.filter(o=>!o.breakable),...ads.obstacles]),roads:new SpatialIndex(data.roads.filter(r=>!/Koroke/.test(r.kind))),pavement:new SpatialIndex(data.pavement),trafficForbidden:new SpatialIndex(helsinki?[...data.pavement.filter(inHarbour),...data.roads.filter(r=>/Koroke/.test(r.kind)),...olympiaTramOnlySurfaces(data)]:data.roads.filter(r=>/Koroke/.test(r.kind))),water:data.water};
+   // Authored characters whose surveyed spot lands inside a house (the coordinates are approximate): step them out
+   // onto the nearest open pavement or quay, so they stand where you can walk up and talk to them.
+   for(const p of detailPeople){if(!p.script||!world.buildings.at(p.x,p.z))continue;let best=null;
+    for(let r=1;r<=30&&!best;r+=1)for(let k=0;k<24;k++){const a=k*Math.PI/12,x=p.x+Math.cos(a)*r,z=p.z+Math.sin(a)*r;if(!world.buildings.at(x,z)&&!world.roads.at(x,z)&&!inWaterPolygons(world.water,x,z)&&[[.8,0],[-.8,0],[0,.8],[0,-.8]].every(([dx,dz])=>!world.buildings.at(x+dx,z+dz))){best=[x,z];break;}}
+    if(best){p.x=p.homeX=best[0];p.z=p.homeZ=best[1];}}
    if(city.era===1760){const gateNames=/Vesterport|Nørreport|Østerport/,lm=data.landmarks||[];periodLife=createPeriodLife({city,world,water:data.water,squares:lm.filter(l=>!gateNames.test(l.name)&&l.name!=='Little Mermaid'),gates:lm.filter(l=>gateNames.test(l.name))});cityModel.add(periodLife.group);console.info('1760 life',periodLife.group.userData);}
    else if(city.id==='copenhagen'){periodLife=createSquareCrowds({world,water:data.water,places:data.landmarks||[]});cityModel.add(periodLife.group);const cc=createCycleCrossings({pavement:data.pavement,world});cityModel.add(cc);console.info('Blue cycle crossings',cc.userData.crossings);}
    world.cameraBuildings=new SpatialIndex(data.buildings);world.sightBuildings=world.cameraBuildings; // mapped buildings only: the camera boom and the police surge's line of sight ignore street furniture
@@ -1243,6 +1249,7 @@ async function boot(){
    // Debug: hide/show a named detail group (e.g. 'Route street furniture', 'Granite kerbstones') to measure its render cost.
    if(import.meta.env.DEV)window.openCityDrive.pick=(nx,ny)=>{const rc=new THREE.Raycaster();rc.setFromCamera(new THREE.Vector2(nx,ny),camera);const shown=o=>{for(let q=o;q;q=q.parent)if(!q.visible)return false;return true;};return rc.intersectObjects(scene.children,true).filter(h=>shown(h.object)).slice(0,4).map(h=>{let n=h.object.name,p=h.object.parent;while(!n&&p){n=p.name;p=p.parent;}return {name:n,id:h.object.userData?.id,role:h.object.userData?.role,mat:h.object.material?.name,inst:h.instanceId,d:+h.distance.toFixed(1),p:[+h.point.x.toFixed(1),+h.point.y.toFixed(2),+h.point.z.toFixed(1)]};});}; // debug: what is under a screen point (NDC)
    if(import.meta.env.DEV)window.openCityDrive.ray=(eye,target)=>{const rc=new THREE.Raycaster(new THREE.Vector3(...eye),new THREE.Vector3(...target).sub(new THREE.Vector3(...eye)).normalize());const shown=o=>{for(let q=o;q;q=q.parent)if(!q.visible)return false;return true;};const ms=[];scene.traverse(o=>{if(o.isMesh&&!o.isLineSegments2&&!o.isInstancedMesh)ms.push(o);});return rc.intersectObjects(ms,false).filter(h=>shown(h.object)).slice(0,6).map(h=>{let n=h.object.name,p=h.object.parent;while(!n&&p){n=p.name;p=p.parent;}const u=h.object.userData||{};return {name:n,id:u.id,role:u.role,shell:u.shell,prov:u.provisional,mat:h.object.material?.name,trans:h.object.material?.transparent,op:h.object.material?.opacity,d:+h.distance.toFixed(2),p:h.point.toArray().map(v=>+v.toFixed(2))};});}; // debug: hits along a ray
+   if(import.meta.env.DEV)window.openCityDrive.characters=()=>detailPeople; // tests: the authored characters
    if(import.meta.env.DEV)window.openCityDrive.mappedFurniture=mappedFurniture; // tests: placed furniture and its hittable posts
    if(import.meta.env.DEV)window.openCityDrive.setDetailVisible=(name,visible)=>{let n=0;scene.traverse(o=>{if(o.name===name){o.visible=!!visible;n++;}});return n;};
  }catch(e){

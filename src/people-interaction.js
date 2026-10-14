@@ -123,6 +123,7 @@ export class PeopleInteraction {
   if(id==='bye'){this.close();return {ok:true,closed:true,message:'See you around!'};}
   if(id==='shop'&&this.session.person.vendor?.stallId){const stallId=this.session.person.vendor.stallId;this.close();return {ok:true,closed:true,action:{type:'shop',stallId}};}
   const dialogue=nextDialogue(id,this.session.person,this.session.memory,this.cityContext());if(!dialogue)return {ok:false};
+  if(dialogue.close){this.close();return {ok:true,closed:true,message:dialogue.message||''};} // an authored line that ends the talk (and maybe starts something)
   this.session.history.push({you:option.label,response:this.session.response});if(this.session.history.length>6)this.session.history.shift();
   Object.assign(this.session,dialogue,{idle:0});this.deliver(this.session);
   return {ok:true,message:this.session.response};

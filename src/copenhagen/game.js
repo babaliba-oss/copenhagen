@@ -82,7 +82,7 @@ export function createCopenhagenGame({scene,city,mobilityData,cityData,toast,sou
  const jobs=(ERA==='h'?JOBS_1760:JOBS).map(j=>({...j,A:ll(j.a),B:ll(j.b),aName:j.a[2],bName:j.b[2]}));
  const sagas=SAGAS.filter(s=>inEra(s.era)).map(s=>({...s,steps:s.steps.map(st=>({...st,p:ll(st.at)}))}));
  const byId=Object.fromEntries(sagas.map(s=>[s.id,s]));
- const people=cast.map(c=>{const [x,z]=ll(c.at);return {id:`cph-${c.id}`,script:c.id,x,z,heading:0,pose:'chat',walking:false,talkable:true,shirt:c.look.coat,coat:.7,...(c.look.height?{height:c.look.height}:{})};});
+ const people=cast.map(c=>{const [x,z]=c.local||ll(c.at); /* local: a hand-placed spot in game metres */return {id:`cph-${c.id}`,script:c.id,x,z,heading:0,pose:'chat',walking:false,talkable:true,shirt:c.look.coat,coat:.7,...(c.look.height?{height:c.look.height}:{})};});
 
  // ---- save ----
  let save={money:0,job:0,done:{},lore:[],active:null,nisser:[]};
