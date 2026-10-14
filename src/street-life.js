@@ -11,7 +11,7 @@ import {createBreakableSigns} from './breakable-signs.js';
 import {groundAt} from './terrain.js';
 import {drapeGeometry,settleObject} from './terrain-mesh.js';
 
-export function createStreetLife(scene,mobility,{paintedMarkings=true}={}){ // paintedMarkings:false for 1760 (no zebra stripes or centre lines)
+export function createStreetLife(scene,mobility,{paintedMarkings=true,mappedSignalNear=null}={}){ // paintedMarkings:false for 1760 (no zebra stripes or centre lines)
  const group=new THREE.Group();scene.add(group);
  const traffic=createTrafficRenderer(mobility.cars);group.add(traffic.group);
  // Walking pedestrians share the articulated person model used by every crowd.
@@ -69,6 +69,7 @@ export function createStreetLife(scene,mobility,{paintedMarkings=true}={}){ // p
  // One post per approach that stops at the signal (lane-model.js), showing that approach's own phase.
  for(const e of mobility.roads.edges){if(e.signal<0||e.length<4)continue;const key=`${e.signal}:${Math.round(routePoint(e,e.length-3).heading/1.6)}`;if(used.has(key))continue;
   const p=signalAnchor(e,mobility.world);if(!p)continue;used.add(key);
+  if(mappedSignalNear?.(p.x,p.z))continue; // a surveyed signal head (photo-mapped) already stands here: no second post
   const root=new THREE.Group(),y=groundAt(p.x,p.z);root.position.set(p.x,y,p.z);root.rotation.y=p.heading;
   const pole=new THREE.Mesh(poleGeometry,poleMaterial);pole.position.y=1.7;const box=new THREE.Mesh(housingGeometry,housingMaterial);box.position.set(0,3.1,.05);root.add(pole,box);
   const lamps=[0,1,2].map(i=>{const m=new THREE.Mesh(new THREE.SphereGeometry(.083,8,6),new THREE.MeshBasicMaterial({color:'#263633'}));m.position.set(0,3.35-i*.25,.18);root.add(m);return m;});group.add(root);

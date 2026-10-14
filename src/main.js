@@ -153,6 +153,9 @@ let angryDrivers=null,photoMode=false,captureMode=false,captureBadgeTimer=0,high
 const driveCamera=createDriveCameraState();let cameraFov=DRIVE_FOV.min,cameraRoll=0,cameraShake=[0,0,0];
 // Cobblestone rumble (src/road-surface.js): mapped sett polygons bounce the car body and, at half amplitude, the drive camera.
 const roadRumble=createRumbleState();let cameraRumble=[0,0,0],surfaceNow={surface:'off',roughness:0},rumbleNow={bob:0,roll:0,pitch:0,intensity:0};
+// Photo-mapped traffic-light heads, for street-life to skip its generic per-approach posts where one already stands.
+const mappedSignalNear=f=>{const ls=(f?.lights||[]).filter(l=>l.kind==='traffic-light');if(!ls.length)return null;const g=new Map(),k=(x,z)=>Math.floor(x/10)+','+Math.floor(z/10);for(const l of ls){const key=k(l.x,l.z);if(!g.has(key))g.set(key,[]);g.get(key).push(l);}
+ return (x,z)=>{const gx=Math.floor(x/10),gz=Math.floor(z/10);for(let i=-1;i<=1;i++)for(let j=-1;j<=1;j++)for(const l of g.get((gx+i)+','+(gz+j))||[])if(Math.hypot(l.x-x,l.z-z)<9)return true;return false;};};
 const blenderModels=()=>city?.id?.startsWith('copenhagen')&&new URLSearchParams(location.search).get('car')!=='classic'; // ?car=classic: the procedural models throughout
 let vehicleBodies=null,blenderLoads=null,treeTrunks=null,cityModelPromise,surfaceStreamer=null,extensionStreamer=null,switchingStart=false,startVisitVersion=0,places=[],speciesTrees=null;const placeHidden=new Set();
 let birds=null,birdColonies=[],crowd=null; // gulls, pigeons, crows and sparrows from the city's map data (birds.js)
@@ -1095,6 +1098,13 @@ async function boot(){
       const ns=near(it.x,it.z);if(ns.length>=3||ns.some(q=>Math.hypot(q.x-it.x,q.z-it.z)<5&&q.faces.some(f=>faces.includes(f)))){dropped++;return false;}
       it.faces=faces;const k=key(it.x,it.z);if(!grid.has(k))grid.set(k,[]);grid.get(k).push(it);return true;});
      console.info(`Street furniture: ${dropped} duplicate or blank signs dropped`);}
+    // Signal heads: one head seen from several photos lands as several posts a few metres apart. Keep one per
+    // kind and facing (35 degrees) within 5 m.
+    {const kept=new Map(),cell=(x,z)=>Math.floor(x/5)+','+Math.floor(z/5);let dropped=0;
+     mapped.items=mapped.items.filter(it=>{if(it.k!=='traffic-light'&&it.k!=='crossing-light')return true;const gx=Math.floor(it.x/5),gz=Math.floor(it.z/5);
+      for(let i=-1;i<=1;i++)for(let j=-1;j<=1;j++)for(const q of kept.get((gx+i)+','+(gz+j))||[])if(q.k===it.k&&Math.hypot(q.x-it.x,q.z-it.z)<5&&Math.abs(Math.atan2(Math.sin((q.yaw||0)-(it.yaw||0)),Math.cos((q.yaw||0)-(it.yaw||0))))<.6){dropped++;return false;}
+      const key=cell(it.x,it.z);if(!kept.has(key))kept.set(key,[]);kept.get(key).push(it);return true;});
+     console.info(`Street furniture: ${dropped} duplicate signal heads dropped`);}
     // Photo 'poles': in Copenhagen mostly the post of a lamp or sign already mapped, never a timber utility pole.
     // Drop those within 2.5 m of another post or 6 m of a kept pole; the rest stand as plain galvanised posts.
     {const POSTED=/^(lamp|sign|traffic-light|crossing-light|mast-lamp|park-lamp|parking-meter)$/,grid=new Map(),cell=(x,z)=>Math.floor(x/6)+','+Math.floor(z/6);
@@ -1118,7 +1128,7 @@ async function boot(){
    progress(58,'Preparing the driving map');await new Promise(r=>setTimeout(r,30));drawMapBase();
    progress(68,'Loading buildings and textures');focus.set(car.x,0,car.z);await Promise.all([ensureCityModel(),updateTiles()]);
    if(vehicleBodies)console.info('Blender car bodies',await vehicleBodies);
-   progress(88,'Loading traffic and pedestrians');mobility=helsinki?new Mobility(correctHarbourLanes(mobilityData),world,{stationCars:16,corridorCars:HARBOUR_CORRIDOR_CARS,corridor:harbourCorridor(world.roads)}):new Mobility(mobilityData,world,city.era===1760?{cars:20,people:320}:city.id==='copenhagen'?{cars:64,people:170}:undefined);mobility.reset(car);angryDrivers=createAngryDrivers({vehicleOf:a=>streetLife?.traffic?.vehicleOf(a)});scene.add(angryDrivers.group);mobility.onCrash=a=>angryDrivers.trigger(a,mobility.time);streetLife=createStreetLife(scene,mobility,{paintedMarkings:city.era!==1760});streetLife.update(0,car);if(city.era===1760){streetLife.traffic.group.visible=false;coaches=createCarriageTraffic(mobility.cars);scene.add(coaches.group);}world.objects.add(breakableSigns.bodies); // 1760: the traffic is coaches and horses
+   progress(88,'Loading traffic and pedestrians');mobility=helsinki?new Mobility(correctHarbourLanes(mobilityData),world,{stationCars:16,corridorCars:HARBOUR_CORRIDOR_CARS,corridor:harbourCorridor(world.roads)}):new Mobility(mobilityData,world,city.era===1760?{cars:20,people:320}:city.id==='copenhagen'?{cars:64,people:170}:undefined);mobility.reset(car);angryDrivers=createAngryDrivers({vehicleOf:a=>streetLife?.traffic?.vehicleOf(a)});scene.add(angryDrivers.group);mobility.onCrash=a=>angryDrivers.trigger(a,mobility.time);streetLife=createStreetLife(scene,mobility,{paintedMarkings:city.era!==1760,mappedSignalNear:mappedSignalNear(mappedFurniture)});streetLife.update(0,car);if(city.era===1760){streetLife.traffic.group.visible=false;coaches=createCarriageTraffic(mobility.cars);scene.add(coaches.group);}world.objects.add(breakableSigns.bodies); // 1760: the traffic is coaches and horses
    trafficCars=city.era===1760?[]:mobility.cars.map(actor=>{const visual=streetLife.traffic.vehicleOf(actor);return {id:`traffic-${actor.id}`,label:visual?.type==='taxi'?'Taxi':'Car',actor,visual:{type:visual?.type||'sedan',paint:visual?.paint.getStyle()},claim(){if(actor.playerTaken||actor.edge===null||Math.abs(actor.speed)>1.2)return false;actor.playerTaken=true;actor.edge=null;actor.speed=0;return true;},release(){delete actor.playerTaken;}};});
    police=new PoliceSimulation(mobility.roads,world);police.relaxed=city.id.startsWith('copenhagen');if(city.era===1760)police.report=()=>false;/* no motor police in 1760 */policeRenderer=createPoliceRenderer(scene,police);police.onIncident=(...incident)=>finale.incident(...incident);roadblock=createRoadblock(scene,{world,police,carModel:carGroup,playerLook:travelRenderer.look,isVisible:trafficInView,obstacles:()=>[...mobility.cars.filter(c=>c.edge),...(tramSim?.bodies||[]),...(buses?.bodies||[]),...travel.parkedBodies(),...police.obstacles],onWarning:message=>toast(message,{important:true})});
    // Copenhagen has no street trams: its trams.json holds the S-train route relations, which run through the
