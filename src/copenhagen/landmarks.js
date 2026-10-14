@@ -131,10 +131,10 @@ function buildingSite(r=17,h=13){
 export const HIDE_1760=['kk-osm-way-25451190','kk-osm-way-134471983','kk-osm-way-36790389','kk-osm-way-26604470','kk-osm-way-89752515','kk-osm-way-55601707','kk-osm-way-133986381','kk-osm-relation-8833442'];
 export function createLandmarks({era=null,mills=[],anchors={}}={}){
  const group=new THREE.Group();group.name='Hand-built landmarks';
- const mat=facadeGrain(new THREE.MeshStandardMaterial({vertexColors:true,roughness:.6,metalness:.2})); // brick, plaster and roof courses like the city's own buildings
- const add=(geo,x,z,{y=null,rot=0}={})=>{const m=new THREE.Mesh(geo,mat);m.position.set(x,y??groundAt(x,z),z);m.rotation.y=rot;m.castShadow=true;m.receiveShadow=true;group.add(m);return m;};
+ const mat=new THREE.MeshStandardMaterial({vertexColors:true,roughness:.45,metalness:.35}),built=facadeGrain(new THREE.MeshStandardMaterial({vertexColors:true,roughness:.6,metalness:.2})); // built: brick, plaster and roof courses like the city's own buildings (statues and rides keep the plain finish)
+ const add=(geo,x,z,{y=null,rot=0,material=mat}={})=>{const m=new THREE.Mesh(geo,material);m.position.set(x,y??groundAt(x,z),z);m.rotation.y=rot;m.castShadow=true;m.receiveShadow=true;group.add(m);return m;};
  const today=era!==1760,flags=[],rotors=[];
- const scaled=(geo,a,design)=>{const m=add(geo,a[0],a[2]);m.scale.y=a[1]/design;return m;};
+ const scaled=(geo,a,design)=>{const m=add(geo,a[0],a[2],{material:built});m.scale.y=a[1]/design;return m;};
  if(anchors.vorFrelsers?.[3]>60)scaled(vorFrelsers(),anchors.vorFrelsers,86);
  if(anchors.borsen?.[3]>35)scaled(borsen(),anchors.borsen,53);
  const flagTops=[];if(anchors.christiansborg?.[3]>80)flagTops.push([anchors.christiansborg[0],anchors.christiansborg[2],anchors.christiansborg[1]]);
@@ -147,11 +147,11 @@ export function createLandmarks({era=null,mills=[],anchors={}}={}){
  add(rider(3.2,era===1760?'#b8a46a':'#55715f'),603.9,16.7,{rot:.6}); // Christian V (1688; gilded lead until 1940s)
  for(const [x,z,h] of flagTops){const pole=add(mergeGeometries([paint(new THREE.CylinderGeometry(.08,.1,8,6).translate(0,4,0),'#e9e6dc')]),x,z,{y:groundAt(x,z)+h});const f=flag();f.position.set(x,groundAt(x,z)+h+7.2,z);group.add(f);flags.push(f);}
  if(era===1760){
-  add(gothicChurch(),-205,66.3,{rot:.318}); // Vor Frue (old church, spire to ~110 m; lost in 1807)
-  add(spireTower(),336,158); // Sankt Nikolaj tower and spire (lost in 1795)
+  add(gothicChurch(),-205,66.3,{rot:.318,material:built}); // Vor Frue (old church, spire to ~110 m; lost in 1807)
+  add(spireTower(),336,158,{material:built}); // Sankt Nikolaj tower and spire (lost in 1795)
   if(anchors.marmorkirken)add(buildingSite(),anchors.marmorkirken[0],anchors.marmorkirken[2]); // Frederik's Church, building site
  }
- if(era===1760)for(const [x,z] of mills){add(windmill(),x,z,{y:groundAt(x,z)+7});const r=new THREE.Mesh(sails(),mat);r.position.set(x,groundAt(x,z)+14.6,z+2.3);group.add(r);rotors.push(r);}
+ if(era===1760)for(const [x,z] of mills){add(windmill(),x,z,{y:groundAt(x,z)+7,material:built});const r=new THREE.Mesh(sails(),mat);r.position.set(x,groundAt(x,z)+14.6,z+2.3);group.add(r);rotors.push(r);}
  let t=0,acc=0;
  return {group,update(dt){t+=dt;acc+=dt;for(const r of rotors)r.rotation.z-=dt*.6;for(const sp of spinners){if(sp.axis==='z')sp.m.rotation.z+=dt*sp.rate;else sp.m.rotation.y+=dt*sp.rate;}if(acc>.05){acc=0;for(const f of flags)f.userData.wave?.(t);}}};
 }
