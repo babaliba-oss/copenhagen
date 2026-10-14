@@ -11,7 +11,7 @@ import {createBreakableSigns} from './breakable-signs.js';
 import {groundAt} from './terrain.js';
 import {drapeGeometry,settleObject} from './terrain-mesh.js';
 
-export function createStreetLife(scene,mobility){
+export function createStreetLife(scene,mobility,{paintedMarkings=true}={}){ // paintedMarkings:false for 1760 (no zebra stripes or centre lines)
  const group=new THREE.Group();scene.add(group);
  const traffic=createTrafficRenderer(mobility.cars);group.add(traffic.group);
  // Walking pedestrians share the articulated person model used by every crowd.
@@ -47,6 +47,7 @@ export function createStreetLife(scene,mobility){
  for(const edge of roads){if(edge.separateCarriageway||edge.lane<1||edge.from>edge.to||edge.length<25)continue;
   for(let s=8;s<edge.length-7;s+=8){const p=routePoint(edge,s,0);if(!mobility.world.roads.at(p.x,p.z)||mobility.world.buildings.at(p.x,p.z))continue;const g=new THREE.PlaneGeometry(.10,2.7);g.rotateX(-Math.PI/2);g.rotateY(p.heading);g.translate(p.x,.092,p.z);markings.push(g);}
  }
+ if(!paintedMarkings){markings.forEach(g=>g.dispose());markings.length=0;}
  if(markings.length){const geometries=markings.map(g=>g.index?g.toNonIndexed():g);const m=new THREE.Mesh(drapeGeometry(mergeGeometries(geometries)),new THREE.MeshStandardMaterial({color:'#e7e3d4',roughness:1,side:THREE.DoubleSide,polygonOffset:true,polygonOffsetFactor:-1}));m.receiveShadow=true;group.add(m);new Set([...geometries,...markings]).forEach(g=>g.dispose());}
  const kerbs=[];
  // Raised granite kerbstones follow surveyed pavement boundaries adjacent to a carriageway,
