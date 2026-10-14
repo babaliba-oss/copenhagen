@@ -167,10 +167,16 @@ export function createMappedFurniture(layer,{player=()=>null,mobility=()=>null,c
   let k=0;for(const l of lights){l.lens=k;l.shown=false;k+=LENSES[l.kind].length;}
   m4.makeScale(0,0,0);for(let i=0;i<lensCount;i++)lenses.setMatrixAt(i,m4);
  }
+ let signalGrid=null;
  function signalEdge(l,roads){
   // The head faces oncoming traffic: the approach that ends near it and travels towards its face.
   const fx=Math.sin(l.yaw),fz=Math.cos(l.yaw);let best=null,score=Infinity;
-  for(const e of roads.edges){if(e.signal<0||e.points.length<2)continue;const a=e.points.at(-2),b=e.points.at(-1),d=Math.hypot(b[0]-l.x,b[1]-l.z);if(d>35)continue;
+  // approaches indexed by their end point (40 m cells), rebuilt when streaming adds edges: scanning every
+  // edge in the city per light made a long frame whenever a district's lights came into range together
+  if(!signalGrid||signalGrid.count!==roads.edges.length){const g=new Map();roads.edges.forEach((e,i)=>{if(e.signal<0||e.points.length<2)return;const b=e.points.at(-1),k=Math.floor(b[0]/40)+','+Math.floor(b[1]/40);let list=g.get(k);if(!list)g.set(k,list=[]);list.push([i,e]);});signalGrid={count:roads.edges.length,g};}
+  const near=[],gx=Math.floor(l.x/40),gz=Math.floor(l.z/40);for(let i=-1;i<=1;i++)for(let j=-1;j<=1;j++)for(const item of signalGrid.g.get((gx+i)+','+(gz+j))||[])near.push(item);
+  near.sort((a,b)=>a[0]-b[0]); // edge order, so ties resolve as in a full scan
+  for(const [,e] of near){if(e.signal<0||e.points.length<2)continue;const a=e.points.at(-2),b=e.points.at(-1),d=Math.hypot(b[0]-l.x,b[1]-l.z);if(d>35)continue;
    const len=Math.hypot(b[0]-a[0],b[1]-a[1])||1,facing=((b[0]-a[0])*fx+(b[1]-a[1])*fz)/len,s=d+12*(1+facing);if(s<score){score=s;best=e;}}
   return best;
  }
