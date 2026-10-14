@@ -938,7 +938,7 @@ async function boot(){
     const today=city.era!==1760;
     blenderLoads={boats:loadColouredModels('/models/boats/',today?['sail','motor','wooden','tour','havnebus']:['ship']),
      rackBike:today?loadColouredParts('/models/bikes/rack-bike.glb'):Promise.resolve(null),
-     furniture:today?loadColouredModels('/models/furniture/',['lamp','mast-lamp','park-lamp','bench','bin','traffic-light','crossing-light','wire-shade']):Promise.resolve({}),
+     furniture:loadColouredModels('/models/furniture/',today?['lamp','mast-lamp','park-lamp','bench','bin','traffic-light','crossing-light','wire-shade','bollard','shelter']:['lantern']),
      scooter:today?loadColouredParts('/models/bikes/scooter.glb').then(parts=>{if(parts){setScooterModel(bakeColoured(parts,{},{paint:'paint'}));parts.forEach(p=>p.geometry.dispose());}}):Promise.resolve(),
      buses:today?Promise.all(['city','trunk'].map(async k=>{const parts=await loadColouredParts(`/models/buses/${k}.glb`);if(parts){const by=new Map();for(const p of parts){if(!by.has(p.name))by.set(p.name,[]);by.get(p.name).push(p.geometry);}setBusBodies({[k]:new Map(Array.from(by,([n,gs])=>[n,gs.length>1?mergeGeometries(gs):gs[0]]))});}})):Promise.resolve(),
      carriage:today?Promise.resolve():Promise.all([loadColouredModel('/models/carriage/coach.glb'),loadColouredParts('/models/carriage/horse.glb')]).then(([coach,horse])=>setCarriageModels({coach,horse,bake:bakeColoured}))};}if(city.era===1760){STARTER_VISUALS.none=['bike','scooter'];PERSON_PERIOD.year=1760;document.body.classList.add('era-1760');

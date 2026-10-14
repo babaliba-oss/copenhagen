@@ -127,6 +127,37 @@ def wire_shade(m):
     m.cone(.43, .43, .02, .04, '#2c3033', 16)
     m.cone(.34, .34, .03, .0, '#fff3d6', 16)                                       # diffuser
 
+def lantern(m):
+    """1760 oil lantern on a wooden post: a tapered glazed box with a pyramid cap, hung on a bracket 0.42 m
+    out towards the street (the game's +Z, Blender -Y; HEAD.lantern in mapped-furniture.js)."""
+    Y = -.42
+    m.cone(.08, .06, 2.6, 0, '#3b2e22', 6)
+    m.box((.06, .5, .06), (0, Y / 2, 2.55), '#2a221a')                             # bracket
+    m.rod((0, 0, 2.2), (0, Y * .8, 2.53), .02, '#2a221a', 4)                     # brace
+    m.cone(.12, .17, .36, 2.44, '#f6dca0', 4, y=Y).rotation_euler.z = math.pi / 4  # glass
+    m.cone(.2, .02, .2, 2.8, '#1d1a17', 4, y=Y).rotation_euler.z = math.pi / 4      # cap
+    m.cone(.14, .14, .04, 2.42, '#1d1a17', 4, y=Y).rotation_euler.z = math.pi / 4
+
+def bollard(m):
+    """Cast bollard with a brass band and a rounded top (0.22 x 0.95 m)."""
+    m.cone(.11, .095, .86, 0, '#2f3436', 10)
+    m.cone(.112, .112, .06, .74, '#c9a64a', 10)
+    bpy.ops.mesh.primitive_uv_sphere_add(radius=.1, segments=10, ring_count=5, location=(0, 0, .86)); m.add(bpy.context.active_object, '#2f3436')
+
+def shelter(m):
+    """Bus shelter 3.6 x 1.5 x 2.5, open towards the road (the game's +Z, Blender -Y): slim steel frame, a thin
+    roof that overhangs, glass back and end, an advert case at the other end and a bench."""
+    W, D, H, STEEL, GLASS = 3.6, 1.5, 2.5, '#3e4a4f', '#a9c4cb'
+    for x in (-W / 2 + .05, W / 2 - .05):
+        for y in (D / 2 - .06, -D / 2 + .12): m.box((.07, .07, H), (x, y, H / 2), STEEL)
+    m.box((W + .25, D + .3, .08), (0, 0, H + .04), '#4a565b', bevel=.03)
+    m.box((W + .2, .04, .12), (0, -D / 2 - .14, H - .02), '#2c3438')                # fascia
+    m.box((W - .1, .02, H - .35), (0, D / 2 - .06, H / 2 + .1), GLASS)
+    m.box((.02, D * .6, H - .35), (-W / 2 + .05, D * .2, H / 2 + .1), GLASS)
+    m.box((.1, D * .62, 1.75), (W / 2 - .05, D * .18, 1.15), '#d8d3c4', bevel=.02)   # advert case
+    m.box((1.5, .38, .05), (-.3, D / 2 - .3, .47), '#5c4a3a', bevel=.01)
+    for x in (-.95, .35): m.box((.05, .3, .45), (x, D / 2 - .3, .23), '#2d3133')
+
 os.makedirs(OUT, exist_ok=True)
-for name, fn in [('lamp', lamp), ('mast-lamp', mast_lamp), ('park-lamp', park_lamp), ('bench', bench), ('bin', bin_), ('traffic-light', traffic_light), ('crossing-light', crossing_light), ('wire-shade', wire_shade)]:
+for name, fn in [('lamp', lamp), ('mast-lamp', mast_lamp), ('park-lamp', park_lamp), ('bench', bench), ('bin', bin_), ('traffic-light', traffic_light), ('crossing-light', crossing_light), ('wire-shade', wire_shade), ('lantern', lantern), ('bollard', bollard), ('shelter', shelter)]:
     m = M(); fn(m); m.export(os.path.join(OUT, name + '.glb'))
