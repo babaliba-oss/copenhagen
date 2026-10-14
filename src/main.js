@@ -244,6 +244,10 @@ surfaceMaterial.onBeforeCompile=shader=>{
    // Wet asphalt: darker, puddles in the low spots of the tone field, far less grain.
    float puddle=smoothstep(0.62,0.75,groundNoise(vGround.xz/3.5+7.0))*uWetness;
    diffuseColor.rgb*=1.0-uWetness*0.22-puddle*0.25;grain*=1.0-uWetness*0.7;wetRough=max(uWetness*0.5,puddle);
+   #ifdef DIRT_ROADS
+   // 1760: no asphalt anywhere; unpaved roads are packed earth with wheel ruts and gravel.
+   {float n=groundNoise(vGround.xz/4.0),rut=groundNoise(vGround.xz*vec2(.35,.35)+3.0);diffuseColor.rgb=vec3(0.20,0.16,0.11)*(0.82+n*0.32)*(1.0-smoothstep(0.55,0.75,rut)*0.18);diffuseColor.rgb*=1.0-puddle*0.35;}
+   #endif
   }
   // Stone carriageways (aaa99e) get the shared photo-guided granite setts; light islands keep slabs.
   else if(diffuseColor.r<0.55){float settGloss;diffuseColor.rgb=vec3(0.235,0.230,0.226)*graniteSetts(vGround.xz,settFp,1.0,settGloss);grain=0.0;}
@@ -921,7 +925,7 @@ requestAnimationFrame(frame);
 async function boot(){
  try{
    try{registerCities((await json('/cities/index.json')).cities);}catch{} // community-built cities
-   city=useCity(selectCity(location.search));if(city.scenery!=='helsinki')for(const m of [ground.material,surfaceMaterial]){m.defines={...m.defines,NO_PORT_YARD:''};m.needsUpdate=true;}if(city.id==='copenhagen'){surfaceMaterial.defines={...surfaceMaterial.defines,ASPHALT_CYCLE_TRACKS:''};surfaceMaterial.needsUpdate=true;}if(city.era===1760)for(const id of HIDE_1760)placeHidden.add(id);if(city.id==='copenhagen'){ground.material.defines={...ground.material.defines,URBAN_GROUND:''};ground.material.needsUpdate=true;} /* unmapped ground in the city is paving, not grass: parks and lawns are mapped */ // Helsinki's lower port yard cut-out
+   city=useCity(selectCity(location.search));if(city.scenery!=='helsinki')for(const m of [ground.material,surfaceMaterial]){m.defines={...m.defines,NO_PORT_YARD:''};m.needsUpdate=true;}if(city.id==='copenhagen'){surfaceMaterial.defines={...surfaceMaterial.defines,ASPHALT_CYCLE_TRACKS:''};surfaceMaterial.needsUpdate=true;}if(city.era===1760){surfaceMaterial.defines={...surfaceMaterial.defines,DIRT_ROADS:''};surfaceMaterial.needsUpdate=true;}if(city.era===1760)for(const id of HIDE_1760)placeHidden.add(id);if(city.id==='copenhagen'){ground.material.defines={...ground.material.defines,URBAN_GROUND:''};ground.material.needsUpdate=true;} /* unmapped ground in the city is paving, not grass: parks and lawns are mapped */ // Helsinki's lower port yard cut-out
    if(city.id==='copenhagen')STARTER_VISUALS.bike={kind:'ladcykel',color:'#26302b'};if(city.era===1760){STARTER_VISUALS.none=['bike','scooter'];PERSON_PERIOD.year=1760;document.body.classList.add('era-1760');
     // the errand boy dresses for the century too: red wool coat, breeches, stockings and a black hat
     Object.assign(travelRenderer.look,personLook(2026,{height:1.75,skirt:false,age:'adult',shirt:'#8a2a22',trousers:'#3b2f25',coat:.8,outer:'coat',hat:'#1d1b19',hairStyle:'cap',tights:'#e6e0d0',shoes:'#1b1714',bagType:'shoulder',bagColor:'#6b4a32',accessory:null,phoneWalk:false,scarf:null,stoop:0}));}updateWorldhoodBrand(city);setPlayableRadius(city.radius||2000);

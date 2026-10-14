@@ -56,7 +56,7 @@ export function createPeriodLife({city,world,water=[],squares=[],gates=[]}){
      const ox=px+ux*1.6,oz=pz+uz*1.6;const k=r();prop(k<.45?'barrel':k<.75?'crate':'sack',ox,oz);if(r()<.5)prop('barrel',ox+ux*.7,oz+uz*.7);if(r()<.3)prop('sack',ox-ux*.6,oz-uz*.6);
      break;}}}}
  // city gates: two to four soldiers in the King's blue
- for(const g of gates)for(let i=0;i<4;i++){const a=i*Math.PI/2+.3;person(g.x+Math.cos(a)*3.5,g.z+Math.sin(a)*3.5,{pose:null,heading:a+Math.PI,shirt:'#23325e',trousers:'#e8e0cc',hat:'#151515',coat:.9,talkable:false});}
+ for(const g of gates)for(let i=0;i<4;i++){const a=i*Math.PI/2+.3;person(g.x+Math.cos(a)*3.5,g.z+Math.sin(a)*3.5,{pose:null,heading:a+Math.PI,shirt:'#23325e',trousers:'#23325e',tights:'#e8e0cc',hat:'#151515',coat:.9,talkable:false});}
  // build crowds (one instanced batch per 350 m cell: far cells are culled whole)
  const batches=[];let seed=1;
  for(const [k,list] of crowds){const cx=list.reduce((s,p)=>s+p.x,0)/list.length,cz=list.reduce((s,p)=>s+p.z,0)/list.length;
