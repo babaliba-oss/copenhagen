@@ -11,7 +11,7 @@ export function createEzTrees(items){ // items: [{x,z,y,kind,width,height,yaw,ti
  const byKind=new Map();items.forEach((it,i)=>{if(it.kind==null)return;if(!byKind.has(it.kind))byKind.set(it.kind,[]);byKind.get(it.kind).push(i);});
  const slot=new Array(items.length).fill(null),m=new THREE.Object3D(),c=new THREE.Color();let triangles=0;
  for(const [kind,list] of byKind){
-  const parts=template(kind,SEED[kind],true),meshes=[];
+  const parts=template(kind,SEED[kind],false),meshes=[]; // the full crowns: the reduced 'far' cards read as bare, wintry trees up close
   for(const [pi,{geometry,material}] of parts.entries()){
    const bm=new THREE.BatchedMesh(list.length,geometry.attributes.position.count,geometry.index?.count||0,material);
    const gid=bm.addGeometry(geometry);bm.name=`Detailed trees ${kind}/${pi}`;bm.perObjectFrustumCulled=true;bm.castShadow=true;bm.receiveShadow=true;bm.userData.shadowLod=true;

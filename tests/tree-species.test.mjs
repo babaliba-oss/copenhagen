@@ -36,5 +36,5 @@ test('one batched mesh per level; trees shown by distance', () => {
  const s=createSpeciesTrees(trees);
  assert.equal(s.group.children.length,3);assert.equal(s.stats.drawCalls,3);
  s.update({x:0,z:0});assert.deepEqual(s.levels(),{near:1,mid:1,far:1});
- assert.equal(treeLevel(100),'near');assert.equal(treeLevel(1000),null);
+ assert.equal(treeLevel(80),'near');assert.equal(treeLevel(100),'mid');assert.equal(treeLevel(1000),null); // near is 95 m (full EZ crowns)
 });
