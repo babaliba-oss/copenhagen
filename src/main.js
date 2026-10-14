@@ -1190,7 +1190,7 @@ async function boot(){
     inspectionCamera={eye,target};setPaused(true);
    };
    // Debug: hide/show a named detail group (e.g. 'Route street furniture', 'Granite kerbstones') to measure its render cost.
-   if(import.meta.env.DEV)window.openCityDrive.pick=(nx,ny)=>{const rc=new THREE.Raycaster();rc.setFromCamera(new THREE.Vector2(nx,ny),camera);const shown=o=>{for(let q=o;q;q=q.parent)if(!q.visible)return false;return true;};return rc.intersectObjects(scene.children,true).filter(h=>shown(h.object)).slice(0,4).map(h=>{let n=h.object.name,p=h.object.parent;while(!n&&p){n=p.name;p=p.parent;}return {name:n,inst:h.instanceId,d:+h.distance.toFixed(1),p:[+h.point.x.toFixed(1),+h.point.y.toFixed(2),+h.point.z.toFixed(1)]};});}; // debug: what is under a screen point (NDC)
+   if(import.meta.env.DEV)window.openCityDrive.pick=(nx,ny)=>{const rc=new THREE.Raycaster();rc.setFromCamera(new THREE.Vector2(nx,ny),camera);const shown=o=>{for(let q=o;q;q=q.parent)if(!q.visible)return false;return true;};return rc.intersectObjects(scene.children,true).filter(h=>shown(h.object)).slice(0,4).map(h=>{let n=h.object.name,p=h.object.parent;while(!n&&p){n=p.name;p=p.parent;}return {name:n,id:h.object.userData?.id,role:h.object.userData?.role,mat:h.object.material?.name,inst:h.instanceId,d:+h.distance.toFixed(1),p:[+h.point.x.toFixed(1),+h.point.y.toFixed(2),+h.point.z.toFixed(1)]};});}; // debug: what is under a screen point (NDC)
    if(import.meta.env.DEV)window.openCityDrive.mappedFurniture=mappedFurniture; // tests: placed furniture and its hittable posts
    if(import.meta.env.DEV)window.openCityDrive.setDetailVisible=(name,visible)=>{let n=0;scene.traverse(o=>{if(o.name===name){o.visible=!!visible;n++;}});return n;};
  }catch(e){
