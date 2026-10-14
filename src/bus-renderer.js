@@ -10,6 +10,10 @@ export {THREE}; // Also lets the isolated preview use the exact same engine inst
 // A city can repaint its city buses (cities/<id>/city.json → liveries.bus), e.g. Tampere's Nysse.
 let BUS_LIVERY={};
 export function setBusLivery(livery={}){BUS_LIVERY=livery;}
+// Blender bodies (scripts/blender/bus.py) per kind: Map of material name -> geometry. Doors, wheels, lamps,
+// mirrors and the destination screen stay procedural.
+const BUS_BODIES={};
+export function setBusBodies(map){Object.assign(BUS_BODIES,map||{});}
 export function createBusModel(kind='city',{line='',destination='HELSINKI'}={}){
  const d=BUS_DIMENSIONS[kind],tourist=kind==='tourist',trunk=kind==='trunk',group=new THREE.Group(),parts=new Map();
  const mats={paint:new THREE.MeshStandardMaterial({color:tourist?'#b5242b':trunk?'#ed6b21':'#098bd0',roughness:.4,metalness:.18}),white:new THREE.MeshStandardMaterial({color:'#e5ebe7',roughness:.5}),glass:new THREE.MeshStandardMaterial({color:'#13272f',roughness:.17,metalness:.4}),black:new THREE.MeshStandardMaterial({color:'#151c20',roughness:.85}),alloy:new THREE.MeshStandardMaterial({color:'#aab2b4',roughness:.35,metalness:.75}),roof:new THREE.MeshStandardMaterial({color:'#c0c8c7',roughness:.7}),head:new THREE.MeshStandardMaterial({color:'#f9f4da',emissive:'#fff2c8',emissiveIntensity:.7}),tail:new THREE.MeshStandardMaterial({color:'#dc1832',emissive:'#cb1222',emissiveIntensity:.5}),amber:new THREE.MeshStandardMaterial({color:'#e7ac24',emissive:'#cd830b',emissiveIntensity:.35})};
@@ -18,6 +22,8 @@ export function createBusModel(kind='city',{line='',destination='HELSINKI'}={}){
  const add=(g,m,x=0,y=0,z=0,rotZ=0)=>{g.rotateZ(rotZ);g.translate(x,y,z);if(g.index)g=g.toNonIndexed();g.deleteAttribute('uv');if(!parts.has(m))parts.set(m,[]);parts.get(m).push(g);};
  const box=(w,h,l,m,x,y,z)=>add(new THREE.BoxGeometry(w,h,l),m,x,y,z);
  const round=(w,h,l,r,m,x,y,z)=>add(new RoundedBoxGeometry(w,h,l,2,r),m,x,y,z);
+ const blender=BUS_BODIES[kind];
+ if(!blender){
  round(2.52,1.05,d.length,.12,'paint',0,.95,0);
  round(2.47,1.38,d.length-.14,.12,'glass',0,2.09,0);
  box(2.55,.12,d.length-.1,'paint',0,1.45,0);
@@ -26,12 +32,13 @@ export function createBusModel(kind='city',{line='',destination='HELSINKI'}={}){
  // HSL-family white lower flank accent (not a pasted photo texture).
  for(const x of [-1.27,1.27]){box(.025,.2,d.length*.7,'white',x,.70,1.05);for(let z=-d.length/2+.5;z<d.length/2-.2;z+=1.25)box(.05,1.34,.065,'black',x,2.11,z);for(const z of [-4.5,0,4.8])box(.03,.10,.23,'amber',x,.91,z);}
  if(!tourist&&kind!=='coach')for(const side of [-1,1])for(const z of [-1.25,0,1.25]){const g=new THREE.TorusGeometry(.55,.032,5,32);g.scale(1,1.35,1);g.rotateY(Math.PI/2);add(g,'white',side*1.302,1.69,z+.25);}
+ }
  // Right-side front/middle/rear double doors and step edge, lime grab poles.
  // The glazed door leaves are their own two batches (forward and rear leaf of each door) so they can open at stops.
  const doorZ=tourist||kind==='coach'?[-4.9,1.5]:trunk?[-6.3,.05,5.3]:[-4.8,.05,3.95],leaves=[[],[]];
  for(const z of doorZ){box(.04,2.27,1.17,'black',1.295,1.63,z);box(.06,.07,1.10,'white',1.36,.57,z);for(const [k,side] of [[0,-1],[1,1]]){const g=new THREE.BoxGeometry(.055,1.85,.5);g.translate(1.322,1.8,z+side*.255);leaves[k].push(g);const pole=new THREE.BoxGeometry(.06,1.9,.05);pole.translate(1.36,1.75,z+side*.03);leaves[k].push(pole);}}
  // Raked-looking split windscreen surround and wiper arms.
- box(2.18,1.18,.05,'glass',0,2.05,-d.length/2-.018);
+ if(!blender)box(2.18,1.18,.05,'glass',0,2.05,-d.length/2-.018);
  box(.055,1.05,.065,'black',0,2.0,-d.length/2-.055);
  for(const x of [-.57,.57]){add(new THREE.BoxGeometry(.035,.55,.03),'black',x,1.70,-d.length/2-.075,-.4);box(.52,.15,.08,'head',x,.91,-d.length/2-.06);box(.15,.12,.085,'amber',x*.95,.70,-d.length/2-.055);box(.13,.50,.09,'tail',x*1.9,1.02,d.length/2+.025);}
  box(.63,.15,.035,'white',0,.60,-d.length/2-.04);box(.63,.15,.035,'white',0,.59,d.length/2+.035);
@@ -52,9 +59,10 @@ export function createBusModel(kind='city',{line='',destination='HELSINKI'}={}){
   for(const x of [-1.20,1.20]){box(.06,.46,d.length-3.5,'glass',x,3.86,1.72);for(let z=-2.8;z<5.2;z+=1.2)box(.06,.6,.06,'alloy',x,3.9,z);}
   for(let z=-2.35;z<4.6;z+=.83)for(const x of [-.73,.73]){box(.72,.10,.5,'black',x,3.68,z);round(.72,.42,.13,.05,'paint',x,3.93,z+.21);}
   box(1.0,.9,1.1,'paint',-.7,4.05,d.length/2-.75);box(.9,.4,1.0,'glass',-.7,4.1,d.length/2-.75);
- }else{
+ }else if(!blender){
   round(2.04,.27,5.4,.09,'roof',0,3.12,.65);round(1.3,.23,1.6,.08,'roof',0,3.10,-3.5);for(let z=-1;z<3;z+=.27)box(1.61,.014,.035,'black',0,3.26,z);
  }
+ if(blender)for(const [name,g] of blender){if(!parts.has(name))parts.set(name,[]);parts.get(name).push(g.clone());}
  for(const [name,gs]of parts){const mesh=new THREE.Mesh(mergeGeometries(gs),mats[name]);mesh.castShadow=true;mesh.receiveShadow=true;group.add(mesh);gs.forEach(g=>g.dispose());}
  // Route text is drawn once. Defaults avoid inventing real line numbers.
  if(typeof document!=='undefined'){
