@@ -61,7 +61,7 @@ function createRouteLine(scene,{historic=false}={}){
 function beam(scene,color,h=80){
  const g=new THREE.Group();
  const col=new THREE.Mesh(new THREE.CylinderGeometry(2.4,2.4,h,20,1,true),new THREE.MeshBasicMaterial({color,transparent:true,opacity:.18,side:THREE.DoubleSide,depthWrite:false,fog:false}));col.position.y=h/2;
- const ring=new THREE.Mesh(new THREE.TorusGeometry(4.2,.28,6,36),new THREE.MeshBasicMaterial({color,fog:false}));ring.rotation.x=Math.PI/2;ring.position.y=.6;
+ const ring=new THREE.Mesh(new THREE.TorusGeometry(4.2,.16,6,36),new THREE.MeshBasicMaterial({color,fog:false,transparent:true,opacity:.75,depthWrite:false}));ring.rotation.x=Math.PI/2;ring.position.y=.3; // a slim ground ring, not a wall around the player
  g.add(col,ring);g.visible=false;scene.add(g);return g;
 }
 
