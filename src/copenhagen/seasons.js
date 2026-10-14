@@ -3,7 +3,7 @@ import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';
 import {groundAt} from '../terrain.js';
 
 // Seasonal dressing for today's Copenhagen, chosen by the date (or ?season=halloween|christmas|none):
-//  - Halloween (15 Oct - 2 Nov): carved pumpkins glowing on doorsteps along the pavements and by café tables,
+//  - Halloween (10 Oct - 2 Nov): carved pumpkins glowing on doorsteps along the pavements and by café tables,
 //    and orange string lights over Nyhavn's quay.
 //  - Christmas (20 Nov - 6 Jan): big lit trees on the main squares, warm bulb strings across the shopping
 //    streets, wreaths of light on the pavements, and gently falling snow around the player.
@@ -11,7 +11,7 @@ import {groundAt} from '../terrain.js';
 export function currentSeason(date=new Date(),search=globalThis.location?.search||''){
  const forced=new URLSearchParams(search).get('season');if(forced)return forced==='none'?null:forced;
  const m=date.getMonth()+1,d=date.getDate();
- if((m===10&&d>=15)||(m===11&&d<=2))return 'halloween';
+ if((m===10&&d>=10)||(m===11&&d<=2))return 'halloween';
  if((m===11&&d>=20)||m===12||(m===1&&d<=6))return 'christmas';
  return null;
 }
