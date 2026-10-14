@@ -75,9 +75,12 @@ function wireLines(it,out,poles,{poleAllowed=()=>true,wallAt=null}={}){
   const at=d=>[it.x+s*dir*d,it.z+c*dir*d];
   if(!pole&&wallAt){let hit=0;for(let d=Math.max(1.5,len-3);d<=len+6;d+=.5)if(wallAt(...at(d))){hit=d;break;}if(hit)len=hit;else pole=true;}
   if(pole&&!poleAllowed(...at(len))){let ok=0;for(let d=len-.5;d>=2;d-=.5)if(poleAllowed(...at(d))){ok=d;break;}if(!ok)continue;len=ok;}
+  // several wires ending together share one pole: snap to a pole already standing within 3 m
+  let [ex,ez]=at(len);if(pole){const g=poles.grid??=new Map(),gx=Math.floor(ex/3),gz=Math.floor(ez/3);let near=null;for(let i=-1;i<=1&&!near;i++)for(let j=-1;j<=1&&!near;j++)near=(g.get((gx+i)+','+(gz+j))||[]).find(p=>Math.hypot(p[0]-ex,p[1]-ez)<3)||null;
+   if(near)[ex,ez]=near;else{const p=[ex,ez];poles.push(p);const k=gx+','+gz;if(!g.has(k))g.set(k,[]);g.get(k).push(p);}}
   const top=pole?8.2:8.9,steps=4;let px=it.x,pz=it.z,py=gy+WIRE_LOW+.55;
-  for(let k=1;k<=steps;k++){const t=k/steps,d=dir*len*t,x=it.x+s*d,z=it.z+c*d,y=gy+WIRE_LOW+.55+(top-WIRE_LOW-.55)*Math.pow(t,1.6);out.push(px,py,pz,x,y,z);px=x;py=y;pz=z;}
-  if(pole)poles.push([it.x+s*dir*len,it.z+c*dir*len]);drawn++;
+  for(let k=1;k<=steps;k++){const t=k/steps,x=it.x+(ex-it.x)*t,z=it.z+(ez-it.z)*t,y=gy+WIRE_LOW+.55+(top-WIRE_LOW-.55)*Math.pow(t,1.6);out.push(px,py,pz,x,y,z);px=x;py=y;pz=z;}
+  drawn++;
  }
  return drawn;
 }
@@ -143,8 +146,7 @@ export function createMappedFurniture(layer,{player=()=>null,mobility=()=>null,c
   {const hung=[];for(const it of wireLamps){const chunk=chunkOf(it.x,it.z);if(wireLines(it,chunk.wires??=[],wirePoles,{poleAllowed,wallAt}))hung.push(it);}wireLamps.length=0;wireLamps.push(...hung);} // a shade with no wire is left out
   const shade=mergeGeometries([cyl(.012,.012,.5,WIRE_LOW+.3,'#24282a',4),cyl(.06,.06,.1,WIRE_LOW+.5,'#2c3033',8),cyl(.09,.42,.24,WIRE_LOW+.32,'#2c3033',8),cyl(.3,.3,.03,WIRE_LOW+.19,'#fff3d6',8)]);
   chunkedInstances(wireLamps,shade,painted,'Wire lamp shades',it=>[it.x,it.z,it.yaw],{shadow:false});
-  // No pole in a traffic lane, and one pole where several wires end together (junction clusters).
-  {const kept=[];for(const p of wirePoles){if(!poleAllowed(p[0],p[1]))continue;if(kept.some(q=>Math.hypot(q[0]-p[0],q[1]-p[1])<3))continue;kept.push(p);}wirePoles.length=0;wirePoles.push(...kept);}
+  // Poles are already allowed where they stand and shared by wires ending within 3 m (wireLines snaps them).
   if(wirePoles.length){chunkedInstances(wirePoles,mergeGeometries([cyl(.06,.09,8.2,4.1,'#3b3f42',7)]),painted,'Wire poles',p=>[p[0],p[1],0]);
    wirePoles.forEach(([x,z],i)=>obstacles.push({id:`wire-pole-${i}`,name:'pole',rings:[[[x-.1,z-.1],[x+.1,z-.1],[x+.1,z+.1],[x-.1,z+.1]]],bbox:[x-.1,z-.1,x+.1,z+.1]}));}
  }
@@ -226,7 +228,7 @@ export function createMappedFurniture(layer,{player=()=>null,mobility=()=>null,c
 
  // Lamp light after dark (weather.js night look): a bright head that blooms and a warm pool on the ground.
  const HEAD={lantern:[0,2.62,.42],lamp:[0,8.2,1.5],'mast-lamp':[0,5.42,0],'park-lamp':[0,2.85,0],'wire-lamp':[0,7.28,0]};
- const heads=items.filter(it=>HEAD[it.k]).map(it=>{const [hx,hy,hz]=HEAD[it.k],yaw=it.yaw||0,x=it.x+Math.sin(yaw)*hz,z=it.z+Math.cos(yaw)*hz;return {x,z,y:groundAt(it.x,it.z)+hy,k:it.k};});
+ const hungLamps=new Set(wireLamps),heads=items.filter(it=>HEAD[it.k]&&(it.k!=='wire-lamp'||hungLamps.has(it))).map(it=>{const [hx,hy,hz]=HEAD[it.k],yaw=it.yaw||0,x=it.x+Math.sin(yaw)*hz,z=it.z+Math.cos(yaw)*hz;return {x,z,y:groundAt(it.x,it.z)+hy,k:it.k};});
  // Chunked (300 m) so only lights near the player are drawn after dark.
  const lightChunks=[];let glowMat=null,poolMat=null;
  if(heads.length){

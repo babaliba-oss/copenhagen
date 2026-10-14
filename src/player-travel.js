@@ -93,7 +93,7 @@ export function starterRides(car,world){
     const a=i*2*Math.PI/steps,q={x:car.x+Math.cos(a)*radius,z:car.z+Math.sin(a)*radius,heading:car.heading};
     const pavement=world.pavement?.at(q.x,q.z),cycle=/pyör|Pyör|cycle/.test(pavement?.kind||''),onWalk=!!pavement&&!cycle&&!world.roads.at(q.x,q.z);
     // a quay or square mapped as neither road nor pavement (Nyhavn's quayside) is fine too, kept a metre clear of the carriageway
-    const offStreet=!onWalk&&!cycle&&!pavement&&[[0,0],[1.2,0],[-1.2,0],[0,1.2],[0,-1.2]].every(([dx,dz])=>!world.roads.at(q.x+dx,q.z+dz))&&!world.water?.some(b=>pointInPolygon(q.x,q.z,b.rings));
+    const offStreet=!onWalk&&!cycle&&!pavement&&[[0,0],[1.2,0],[-1.2,0],[0,1.2],[0,-1.2]].every(([dx,dz])=>!world.roads.at(q.x+dx,q.z+dz))&&![[0,0],[1.2,0],[-1.2,0],[0,1.2],[0,-1.2]].some(([dx,dz])=>world.water?.some(b=>pointInPolygon(q.x+dx,q.z+dz,b.rings)));
     if(strict&&!onWalk&&!offStreet)continue;
     // on the pavement only the spot itself must be clear (parked cars or racks along the kerb may stand between)
     if(travelCollision(q,mode,world,[car,...rides])||(strict?!reachable(origin,q,world):!clearTravelPath(origin,q,world,[car,...rides]))||rides.some(r=>gap(r,q)<2.3))continue;

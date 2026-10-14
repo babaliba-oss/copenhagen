@@ -40,7 +40,8 @@ export function createPlayerCarRenderer(scene){
   if(!groups.has('paint'))return false;
   for(const m of [...body.children]){body.remove(m);m.geometry.dispose();}
   const merged=[];for(const [name,gs] of groups){const mesh=new THREE.Mesh(mergeGeometries(gs),byName.get(name));mesh.name=name;mesh.castShadow=mesh.receiveShadow=true;body.add(mesh);merged.push(mesh.geometry);gs.forEach(g=>g.dispose());}
-  first.damage=createVehicleDamage(starter);const live=new Set(body.children.map(m=>m.geometry));merged.forEach(g=>{if(!live.has(g))g.dispose();}); // damage replaced these with its own clones
+  const before=[];starter.traverse(o=>{if(o.isMesh&&!merged.includes(o.geometry))before.push(o.geometry);});
+  first.damage=createVehicleDamage(starter);const live=new Set();starter.traverse(o=>{if(o.isMesh)live.add(o.geometry);});[...merged,...before].forEach(g=>{if(!live.has(g))g.dispose();}); // damage replaced these with its own clones (the old damage's clones too)
   return true;
  }};
 }

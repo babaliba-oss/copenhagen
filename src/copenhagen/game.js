@@ -46,12 +46,13 @@ function createRouteLine(scene,{historic=false}={}){
   cum=[0];for(let i=1;i<pts.length;i++)cum.push(cum[i-1]+dist(pts[i],pts[i-1]));
   // One continuous strip with mitred joins: separate quads per segment overlapped at every bend, and the
   // overlaps showed as darker wedges through the transparent ribbon.
-  const P=[],C=[];for(let i=0;i<pts.length;i++){if(P.length&&dist(pts[i],P.at(-1))<.4)continue;P.push(pts[i]);C.push(cum[i]);}
+  const P=[],C=[];for(let i=0;i<pts.length;i++){if(P.length&&dist(pts[i],P.at(-1))<.4){if(i===pts.length-1&&P.length>1){P[P.length-1]=pts[i];C[C.length-1]=cum[i];}continue;}P.push(pts[i]);C.push(cum[i]);}
+  if(P.length<2){pts=null;out.points=null;return;}
   const pos=[],rd=[],side=[];
   for(let i=0;i<P.length;i++){const a=P[Math.max(0,i-1)],b=P[i],c=P[Math.min(P.length-1,i+1)];
    const n1=i>0?[-(b[1]-a[1]),b[0]-a[0]]:null,n2=i<P.length-1?[-(c[1]-b[1]),c[0]-b[0]]:null,norm=v=>{const l=Math.hypot(v[0],v[1])||1;return [v[0]/l,v[1]/l];};
-   const u1=n1&&norm(n1),u2=n2&&norm(n2),m=norm(u1&&u2?[u1[0]+u2[0],u1[1]+u2[1]]:(u1||u2)),k=u1&&u2?Math.min(2,1/Math.max(.5,m[0]*u1[0]+m[1]*u1[1])):1;
-   side.push([m[0]*.5*k,m[1]*.5*k]);}
+   const u1=n1&&norm(n1),u2=n2&&norm(n2),sharp=u1&&u2&&u1[0]*u2[0]+u1[1]*u2[1]<-.2,m=sharp?u2:norm(u1&&u2?[u1[0]+u2[0],u1[1]+u2[1]]:(u1||u2)),k=u1&&u2&&!sharp?Math.min(2,1/Math.max(.5,m[0]*u1[0]+m[1]*u1[1])):1;
+   side.push([m[0]*.5*k,m[1]*.5*k]);} // a hairpin (over ~100 degrees) gets a plain butt joint, not a mitre that folds the strip
   for(let i=0;i<P.length-1;i++){const [ax,az]=P[i],[bx,bz]=P[i+1],[nax,naz]=side[i],[nbx,nbz]=side[i+1],ya=groundAt(ax,az)+.22,yb=groundAt(bx,bz)+.22;
    pos.push(ax+nax,ya,az+naz,bx+nbx,yb,bz+nbz,bx-nbx,yb,bz-nbz,ax+nax,ya,az+naz,bx-nbx,yb,bz-nbz,ax-nax,ya,az-naz);rd.push(C[i],C[i+1],C[i+1],C[i],C[i+1],C[i]);}
   const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));g.setAttribute('rd',new THREE.Float32BufferAttribute(rd,1));
