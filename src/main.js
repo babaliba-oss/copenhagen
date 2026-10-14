@@ -260,7 +260,7 @@ surfaceMaterial.onBeforeCompile=shader=>{
    vec2 au=vGround.xz/2.6,au2=mat2(.8,-.6,.6,.8)*vGround.xz/7.3;
    vec3 asp=mix(texture2D(tAsphaltC,au).rgb,texture2D(tAsphaltC,au2).rgb,.35);
    float tone=groundNoise(vGround.xz/11.0)-0.5;
-   diffuseColor.rgb=asp*vec3(0.95,0.95,0.97)*1.0*(1.0+tone*0.10);
+   diffuseColor.rgb=asp*vec3(1.0,0.97,0.92)*1.6*(1.0+tone*0.10); // weathered asphalt (albedo about 0.12): the fresh-black scan read purple-black under the evening sky
    gN=texture2D(tAsphaltN,au).xyz*2.0-1.0;gNw=.8*texFade;gRough=texture2D(tAsphaltR,au).r;grain=0.0;
    // Wet asphalt: darker, puddles in the low spots of the tone field, far less grain.
    float puddle=smoothstep(0.62,0.75,groundNoise(vGround.xz/3.5+7.0))*uWetness;
@@ -277,7 +277,7 @@ surfaceMaterial.onBeforeCompile=shader=>{
  }else if(vGround.y>0.04&&vGround.y<0.06){
   #ifdef ASPHALT_CYCLE_TRACKS
   // Copenhagen's cycle tracks are asphalt, a shade lighter than the carriageway (the data paints them red-beige).
-  if(diffuseColor.r-diffuseColor.b>0.15){vec2 cu=vGround.xz/2.1;diffuseColor.rgb=texture2D(tAsphaltC,cu).rgb*vec3(0.9,0.93,0.96)*1.0*(1.0+(groundNoise(vGround.xz/7.0)-0.5)*0.1);gN=texture2D(tAsphaltN,cu).xyz*2.0-1.0;gNw=.7*texFade;gRough=texture2D(tAsphaltR,cu).r;grain=0.0;} // cycle track: the same scanned asphalt, a shade lighter
+  if(diffuseColor.r-diffuseColor.b>0.15){vec2 cu=vGround.xz/2.1;diffuseColor.rgb=texture2D(tAsphaltC,cu).rgb*vec3(1.0,0.97,0.93)*1.9*(1.0+(groundNoise(vGround.xz/7.0)-0.5)*0.1);gN=texture2D(tAsphaltN,cu).xyz*2.0-1.0;gNw=.7*texFade;gRough=texture2D(tAsphaltR,cu).r;grain=0.0;} // cycle track: the same scanned asphalt, a shade lighter
   else
   #endif
   { // Pavement: 62.5 cm concrete slabs (Copenhagen fortovsfliser), each its own shade, scanned surface, sunk joints.
