@@ -230,27 +230,35 @@ function groundPatches(material){
  return material;
 }
 const surfaceMaterial=new THREE.MeshStandardMaterial({vertexColors:true,roughness:1,side:THREE.DoubleSide});
+// Photo-scanned ground (ambientCG, CC0; scripts/textures/prepare.py): asphalt cut from Road007 between its lane
+// markings (mirrored so the cut tiles), PavingStones150 cobbles for stone carriageways and squares, Grass005 for lawns.
+const GROUND_TEX=(()=>{const L=new THREE.TextureLoader(),t=(f,srgb,wrap=THREE.RepeatWrapping)=>{const x=L.load(`/materials/${f}`);x.wrapS=x.wrapT=wrap;x.anisotropy=8;if(srgb)x.colorSpace=THREE.SRGBColorSpace;return x;};
+ const M=THREE.MirroredRepeatWrapping;
+ return {tAsphaltC:{value:t('asphalt-color.jpg',true,M)},tAsphaltN:{value:t('asphalt-normal.jpg',false,M)},tAsphaltR:{value:t('asphalt-rough.jpg',false,M)},
+  tSettsC:{value:t('setts-color.jpg',true)},tSettsN:{value:t('setts-normal.jpg',false)},tSettsR:{value:t('setts-rough.jpg',false)},
+  tSlabC:{value:t('slab-color.jpg',true)},tSlabN:{value:t('slab-normal.jpg',false)},
+  tGrassC:{value:t('grass-color.jpg',true)},tGrassN:{value:t('grass-normal.jpg',false)}};})();
 surfaceMaterial.onBeforeCompile=shader=>{
+ Object.assign(shader.uniforms,GROUND_TEX);
  shader.vertexShader='varying vec3 vGround;\n#ifdef TERRAIN\nattribute float terrainY;\n#endif\n'+shader.vertexShader.replace('#include <begin_vertex>','#include <begin_vertex>\nvGround=position;\n#ifdef TERRAIN\nvGround.y-=terrainY;\n#endif');
  // uWetness comes from weather.js (WEATHER_UNIFORMS.wetness): rain darkens and smooths the asphalt bays.
  shader.uniforms.uWetness=WEATHER_UNIFORMS.wetness;
- shader.fragmentShader='varying vec3 vGround;uniform float uWetness;\nfloat groundHash(vec2 p){return fract(sin(dot(p,vec2(41.7,113.1)))*4371.3);}\nfloat groundNoise(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.0-2.0*f);return mix(mix(groundHash(i),groundHash(i+vec2(1,0)),f.x),mix(groundHash(i+vec2(0,1)),groundHash(i+vec2(1,1)),f.x),f.y);}\n'+GRANITE_SETTS_GLSL+shader.fragmentShader.replace('#include <color_fragment>',`#include <color_fragment>
+ shader.fragmentShader='varying vec3 vGround;uniform float uWetness;uniform sampler2D tAsphaltC,tAsphaltN,tAsphaltR,tSettsC,tSettsN,tSettsR,tSlabC,tSlabN,tGrassC,tGrassN;\nfloat groundHash(vec2 p){return fract(sin(dot(p,vec2(41.7,113.1)))*4371.3);}\nfloat groundNoise(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.0-2.0*f);return mix(mix(groundHash(i),groundHash(i+vec2(1,0)),f.x),mix(groundHash(i+vec2(0,1)),groundHash(i+vec2(1,1)),f.x),f.y);}\n'+GRANITE_SETTS_GLSL+shader.fragmentShader.replace('#include <color_fragment>',`#include <color_fragment>
  // Filter sub-pixel masonry and grain; unfiltered fract() patterns sparkle in motion.
  float footprint=max(length(dFdx(vGround.xz)),length(dFdy(vGround.xz)));
  vec2 settFp=vec2(length(vec2(dFdx(vGround.x),dFdy(vGround.x))),length(vec2(dFdx(vGround.z),dFdy(vGround.z))));
  float detail=1.0-smoothstep(0.07,0.40,footprint);
  float grain=(fract(sin(dot(floor(vGround.xz*18.0),vec2(12.9898,78.233)))*43758.5453)-0.5)*(1.0-smoothstep(0.02,0.08,footprint));
- float wetRough=0.0;
+ float wetRough=0.0;vec3 gN=vec3(0.,0.,1.);float gNw=0.,gRough=-1.;
+ float texFade=1.0-smoothstep(0.08,0.45,footprint); // photo normals fade out where a texel is smaller than a pixel
  if(vGround.y>0.065&&vGround.y<0.075){
   if(diffuseColor.r<0.35){
-   diffuseColor.rgb=mix(vec3(0.075,0.084,0.087),diffuseColor.rgb,0.10);
-   // Asphalt: slow tone drift (resurfaced bays), sparse darker patches with a seam, both fading to their mean with distance.
-   float tone=groundNoise(vGround.xz/9.0)-0.5;
-   vec2 bay=vGround.xz/vec2(6.5,4.2);vec2 cell=floor(bay);float bayHash=groundHash(cell+0.37);
-   vec2 toEdge=min(fract(bay),1.0-fract(bay))*vec2(6.5,4.2);float edge=min(toEdge.x,toEdge.y);
-   float patchDetail=1.0-smoothstep(0.25,1.0,footprint);
-   float bayPatch=step(0.93,bayHash)*patchDetail,seam=(1.0-smoothstep(0.02,0.06+footprint*0.8,edge))*bayPatch;
-   diffuseColor.rgb*=(1.0+tone*0.18)*(1.0-bayPatch*(0.06+0.04*groundHash(cell+0.71)))*(1.0-seam*0.16); /* subtle: world-aligned bays read as a tile grid when strong */
+   // Asphalt: the scanned surface at two scales (breaks up the repeat), a slow tone drift, no painted patches.
+   vec2 au=vGround.xz/2.6,au2=mat2(.8,-.6,.6,.8)*vGround.xz/7.3;
+   vec3 asp=mix(texture2D(tAsphaltC,au).rgb,texture2D(tAsphaltC,au2).rgb,.35);
+   float tone=groundNoise(vGround.xz/11.0)-0.5;
+   diffuseColor.rgb=asp*vec3(0.86,0.9,0.95)*0.82*(1.0+tone*0.10);
+   gN=texture2D(tAsphaltN,au).xyz*2.0-1.0;gNw=.8*texFade;gRough=texture2D(tAsphaltR,au).r;grain=0.0;
    // Wet asphalt: darker, puddles in the low spots of the tone field, far less grain.
    float puddle=smoothstep(0.62,0.75,groundNoise(vGround.xz/3.5+7.0))*uWetness;
    diffuseColor.rgb*=1.0-uWetness*0.22-puddle*0.25;grain*=1.0-uWetness*0.7;wetRough=max(uWetness*0.5,puddle);
@@ -260,7 +268,7 @@ surfaceMaterial.onBeforeCompile=shader=>{
    #endif
   }
   // Stone carriageways (aaa99e) get the shared photo-guided granite setts; light islands keep slabs.
-  else if(diffuseColor.r<0.55){float settGloss;diffuseColor.rgb=vec3(0.235,0.230,0.226)*graniteSetts(vGround.xz,settFp,1.0,settGloss);grain=0.0;}
+  else if(diffuseColor.r<0.55){vec2 su=vGround.xz/vec2(2.2,1.1);diffuseColor.rgb=texture2D(tSettsC,su).rgb*vec3(0.92,0.92,0.95)*(1.0+(groundNoise(vGround.xz/9.0)-0.5)*0.12);gN=texture2D(tSettsN,su).xyz*2.0-1.0;gNw=texFade;gRough=texture2D(tSettsR,su).r;grain=0.0;} // scanned cobbles
   else {vec2 cell=abs(fract(vGround.xz/vec2(0.28,0.2))-0.5);float seam=smoothstep(0.42,0.49,max(cell.x,cell.y));diffuseColor.rgb*=1.0-mix(0.2,seam,detail)*0.22;}
   diffuseColor.rgb*=1.0+grain*0.13;
  }else if(vGround.y>0.04&&vGround.y<0.06){
@@ -269,9 +277,14 @@ surfaceMaterial.onBeforeCompile=shader=>{
   if(diffuseColor.r-diffuseColor.b>0.15){diffuseColor.rgb=vec3(0.105,0.11,0.112)*(1.0+(groundNoise(vGround.xz/7.0)-0.5)*0.16+grain*0.12);}
   else
   #endif
-  {vec2 grid=abs(fract(vGround.xz/vec2(0.7,0.48))-0.5);float seam=smoothstep(0.46,0.50,max(grid.x,grid.y));diffuseColor.rgb*=0.62-mix(0.15,seam,detail)*0.10+grain*0.04;}
+  { // Pavement: 62.5 cm concrete slabs (Copenhagen fortovsfliser), each its own shade, scanned surface, sunk joints.
+   vec2 sl=vGround.xz/0.625,slc=floor(sl),g2=abs(fract(sl)-0.5);float seam=smoothstep(0.465,0.5,max(g2.x,g2.y))*detail;
+   vec3 plaster=texture2D(tSlabC,vGround.xz/1.9+groundHash(slc)*0.0).rgb;float pl=dot(plaster,vec3(.3333));
+   diffuseColor.rgb*=0.66*(0.9+0.2*groundHash(slc+3.1))*(0.75+0.35*pl/0.75)*(1.0-seam*0.35);
+   gN=texture2D(tSlabN,vGround.xz/1.9).xyz*2.0-1.0;gNw=0.6*texFade;grain=0.0;}
  }else diffuseColor.rgb*=1.0+grain*0.04;
- `).replace('#include <roughnessmap_fragment>','#include <roughnessmap_fragment>\n roughnessFactor*=1.0-wetRough*0.6;');
+ `).replace('#include <roughnessmap_fragment>','#include <roughnessmap_fragment>\n if(gRough>=0.0)roughnessFactor=mix(roughnessFactor,clamp(gRough*1.1,0.35,1.0),0.85);\n roughnessFactor*=1.0-wetRough*0.6;')
+  .replace('#include <normal_fragment_maps>','#include <normal_fragment_maps>\n if(gNw>0.0){vec3 nW=normalize(vec3(gN.x,gN.z,gN.y));normal=normalize(mix(normal,normalize((viewMatrix*vec4(nW,0.0)).xyz)*(gl_FrontFacing?1.0:-1.0),gNw));}');
 };
 const buildingMaterial=facadeGrain(new THREE.MeshStandardMaterial({vertexColors:true,roughness:.88}));
 look=createLook({scene,sky,hemi,sun,post,surfaces:[surfaceMaterial],getSea:()=>sea,initial:'golden'}); // golden evening is the default look; T cycles the others
