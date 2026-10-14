@@ -766,6 +766,7 @@ window.addEventListener('keydown',e=>{
  if(e.code==='KeyE'&&!paused&&canTalk()&&(marketShop?.intent()||gullEncounter.snapshot().phase==='chase'&&marketShop?.hand?.item.encounter==='gulls')){e.preventDefault();marketAction();return;} // otherwise E keeps looking right
  if(marketShop?.open&&/^(Digit|Numpad)[1-9]$/.test(e.code)){e.preventDefault();const item=marketShop.menu()[Number(e.code.at(-1))-1];if(item)buyAtStall(item.id);return;}
  if(e.code==='KeyB'){soundscape?.horn(true);return;}
+ if(e.code==='KeyU'&&soundscape?.music){const on=soundscape.music();try{localStorage.setItem('cph-music',on?'1':'0');}catch{}toast(on?'Music on (U)':'Music off (U)');return;}
  if(e.code==='KeyN'&&cph?.photo){e.preventDefault();const d=camera.getWorldDirection(new THREE.Vector3());cph.photo({dir:[d.x,d.z],snap:snapPhoto});return;}
  if(e.code==='KeyM'){showDialog('map-dialog');return;}
  if(e.code==='KeyR'){reset();return;}
