@@ -53,7 +53,10 @@ export function createRideVehicle(visual={},mode='bike'){
 
 // Christiania-style cargo trike front: a plywood box on two small front wheels, ahead of the handlebars
 // (the bicycle's own front wheel sits under the box's back edge). Local frame: forward is -Z.
+let ladcykelModel=null; // Blender cargo box (scripts/blender/bikes.py), vertex coloured
+export function setLadcykelBox(geometry){ladcykelModel=geometry||null;}
 export function ladcykelBox(){
+ if(ladcykelModel){const mesh=new THREE.Mesh(ladcykelModel.clone(),new THREE.MeshStandardMaterial({vertexColors:true,roughness:.7,metalness:.08}));mesh.castShadow=true;mesh.name='Ladcykel box';return mesh;}
  const parts=[],paint=(g,hex)=>{const n=g.index?g.toNonIndexed():g;if(n!==g)g.dispose();n.deleteAttribute('uv');const c=new THREE.Color(hex),a=new Float32Array(n.attributes.position.count*3);for(let i=0;i<a.length;i+=3)a.set([c.r,c.g,c.b],i);n.setAttribute('color',new THREE.BufferAttribute(a,3));return n;};
  const box=(w,h,d,x,y,z,hex)=>parts.push(paint(new THREE.BoxGeometry(w,h,d).translate(x,y,z),hex));
  const W=.86,D=.78,Z=-1.08,B=.42,H=.5,T=.018,ply='#c89a62',edge='#a87a45';

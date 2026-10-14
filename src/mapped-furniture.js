@@ -107,7 +107,7 @@ function plateGeometry(size,rect){
  g.deleteAttribute('normal');g.computeVertexNormals();return g.toNonIndexed();
 }
 
-export function createMappedFurniture(layer,{player=()=>null,mobility=()=>null,canvas=globalThis.document,poleAllowed=()=>true,wallAt=null}={}){
+export function createMappedFurniture(layer,{player=()=>null,mobility=()=>null,canvas=globalThis.document,poleAllowed=()=>true,wallAt=null,rackBikes=null}={}){
  const group=new THREE.Group();group.name='Mapped street furniture';
  const items=layer?.items||[],obstacles=[],chunks=new Map(),lights=[];
  const painted=new THREE.MeshStandardMaterial({vertexColors:true,roughness:.6,metalness:.2});
@@ -218,7 +218,7 @@ export function createMappedFurniture(layer,{player=()=>null,mobility=()=>null,c
  {const racks=items.filter(i=>i.k==='bike-rack');if(racks.length){
   const T=(r,x,z,c)=>{const g=new THREE.TorusGeometry(r,.025,3,8);g.rotateY(Math.PI/2);g.translate(x,r,z);return paint(g,c);};
   const bar=(a,b,c,r=.02)=>{const A=new THREE.Vector3(...a),B=new THREE.Vector3(...b),d=B.clone().sub(A),g=new THREE.CylinderGeometry(r,r,d.length(),4);g.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,1,0),d.normalize()));g.translate((A.x+B.x)/2,(A.y+B.y)/2,(A.z+B.z)/2);return paint(g,c);};
-  const bikes=['#1d1f22','#2d4f7a','#7a2a20','#3f5d45','#c9c4b8'].map(c=>mergeGeometries([T(.33,0,-.55,'#1a1a1a'),T(.33,0,.55,'#1a1a1a'),bar([0,.36,.55],[0,.82,.22],c),bar([0,.36,.55],[0,.38,.05],c),bar([0,.82,.22],[0,.38,.05],c),bar([0,.38,.05],[0,.92,-.42],c),bar([0,.82,.22],[0,.92,-.42],c),bar([0,.92,-.42],[0,.36,-.55],c),bar([-.26,1.05,-.45],[.26,1.05,-.45],'#2a2a2a'),bar([0,.92,-.42],[0,1.05,-.45],'#555'),paint(new THREE.BoxGeometry(.12,.05,.26).translate(0,.92,.24),'#222')]));
+  const bikes=rackBikes?.length?rackBikes:['#1d1f22','#2d4f7a','#7a2a20','#3f5d45','#c9c4b8'].map(c=>mergeGeometries([T(.33,0,-.55,'#1a1a1a'),T(.33,0,.55,'#1a1a1a'),bar([0,.36,.55],[0,.82,.22],c),bar([0,.36,.55],[0,.38,.05],c),bar([0,.82,.22],[0,.38,.05],c),bar([0,.38,.05],[0,.92,-.42],c),bar([0,.82,.22],[0,.92,-.42],c),bar([0,.92,-.42],[0,.36,-.55],c),bar([-.26,1.05,-.45],[.26,1.05,-.45],'#2a2a2a'),bar([0,.92,-.42],[0,1.05,-.45],'#555'),paint(new THREE.BoxGeometry(.12,.05,.26).translate(0,.92,.24),'#222')]));
   const lists=bikes.map(()=>[]);let n=0;
   racks.forEach((it,i)=>{if((i*7919)%10<1)return;const c=Math.cos(it.yaw||0),sn=Math.sin(it.yaw||0);const slots=[-.9,-.3,.3,.9].filter((_,j)=>((i*13+j*7)%9)>2||j===1);for(const off of slots){const k=(i*31+n++)%bikes.length;lists[k].push([it.x+c*off,it.z-sn*off,(it.yaw||0)+(off>0?Math.PI:0)+((i%3)-1)*.06]);}});
   lists.forEach((l,k)=>{if(l.length)chunkedInstances(l,bikes[k],painted,'Parked bicycles',b=>b,{shadow:false});});
