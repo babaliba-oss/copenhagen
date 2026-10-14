@@ -656,7 +656,7 @@ function eraJump(){
  const to=city.id==='copenhagen'?'copenhagen-1760':'copenhagen';if(!CITIES[to]||!car)return;
  try{sessionStorage.setItem('era-jump',JSON.stringify({to,x:car.x,z:car.z,heading:car.heading}));}catch{}
  showEraCard(to==='copenhagen'?'today':'1760');
- const u=new URL(location.href);u.searchParams.set('city',to);u.searchParams.delete('start');setTimeout(()=>{location.href=u.href;},900);
+ const u=new URL(location.href);u.searchParams.set('city',to);u.searchParams.delete('start');setTimeout(()=>{location.href=u.href;},450);
 }
 function showEraCard(era,hold=false){
  let el=document.getElementById('era-card');if(!el){el=document.createElement('div');el.id='era-card';document.body.append(el);}
