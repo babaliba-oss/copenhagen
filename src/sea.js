@@ -24,10 +24,10 @@ export function createRippleTexture(size=128,seed=7){
  let s=seed>>>0;const rnd=()=>((s=(s*1664525+1013904223)>>>0)/4294967296);
  const waves=[];
  for(let i=0;i<28;i++){let kx,ky;do{kx=Math.round((rnd()*2-1)*11);ky=Math.round((rnd()*2-1)*11);}while(Math.hypot(kx,ky)<2);waves.push([kx,ky,rnd()*Math.PI*2,1/Math.pow(Math.hypot(kx,ky),1.35)]);}
- const sx=new Float32Array(size*size),sz=new Float32Array(size*size);let max=0;
- for(let y=0;y<size;y++)for(let x=0;x<size;x++){let dx=0,dz=0;for(const [kx,ky,ph,a] of waves){const c=Math.cos((kx*x+ky*y)*2*Math.PI/size+ph)*a;dx+=c*kx;dz+=c*ky;}const i=y*size+x;sx[i]=dx;sz[i]=dz;max=Math.max(max,Math.abs(dx),Math.abs(dz));}
+ const sx=new Float32Array(size*size),sz=new Float32Array(size*size),sh=new Float32Array(size*size);let max=0,hmax=0;
+ for(let y=0;y<size;y++)for(let x=0;x<size;x++){let dx=0,dz=0,h=0;for(const [kx,ky,ph,a] of waves){const c=Math.cos((kx*x+ky*y)*2*Math.PI/size+ph)*a;dx+=c*kx;dz+=c*ky;h+=c;}const i=y*size+x;sx[i]=dx;sz[i]=dz;sh[i]=h;max=Math.max(max,Math.abs(dx),Math.abs(dz));hmax=Math.max(hmax,Math.abs(h));}
  const data=new Uint8Array(size*size*4);
- for(let i=0;i<size*size;i++){data[i*4]=Math.round(127.5+127*sx[i]/max);data[i*4+1]=Math.round(127.5+127*sz[i]/max);data[i*4+2]=128;data[i*4+3]=255;}
+ for(let i=0;i<size*size;i++){data[i*4]=Math.round(127.5+127*sx[i]/max);data[i*4+1]=Math.round(127.5+127*sz[i]/max);data[i*4+2]=Math.round(127.5+127*sh[i]/hmax);data[i*4+3]=255;}
  const t=new THREE.DataTexture(data,size,size,THREE.RGBAFormat);
  t.wrapS=t.wrapT=THREE.RepeatWrapping;t.magFilter=THREE.LinearFilter;t.minFilter=THREE.LinearMipmapLinearFilter;t.generateMipmaps=true;t.anisotropy=4;t.colorSpace=THREE.NoColorSpace;t.needsUpdate=true;
  return t;
@@ -61,7 +61,9 @@ void main(){
  s+=(texture2D(uRipples,mat2(.8,-.6,.6,.8)*p*.083+uSeaTime*vec2(-.0102,.0131)).xy*2.-1.)*.75;
  s+=(texture2D(uRipples,mat2(-.28,.96,-.96,-.28)*p*.27+uSeaTime*vec2(.029,.021)).xy*2.-1.)*.35*(1.-smoothstep(20.,70.,dist));
  // Calm harbour: gentle slopes, flatter still in the distance (less shimmer).
- float strength=mix(.05,.02,smoothstep(15.,300.,dist))*uRipple;
+ // Wind gusts (cat's paws): slow-moving patches where the ripples are rougher and the water reads darker.
+ float gust=smoothstep(.35,.8,texture2D(uRipples,p*.0042+uSeaTime*vec2(.0024,-.0017)).z*.6+texture2D(uRipples,p*.011-uSeaTime*vec2(.0031,.0011)).z*.4);
+ float strength=mix(.085,.03,smoothstep(15.,300.,dist))*uRipple*(.75+.6*gust);
  vec3 N=normalize(vec3(-s.x*strength,1.,-s.y*strength));
  float NdV=clamp(dot(N,V),0.,1.);
  float fresnel=.02+.98*pow(1.-NdV,5.);
@@ -74,10 +76,13 @@ void main(){
  sky=mix(sky,uSunColor,pow(toward,6.)*(1.-smoothstep(0.,.3,R.y))*.22);
  // Low reflected rays hit the opposite quays, boats and buildings.
  sky=mix(sky,uShore,(1.-smoothstep(.03,.26,R.y))*.85);
- vec3 color=mix(uDeep*(.85+.3*(s.x*.5+.5)),sky*.72,fresnel*uReflect);
+ vec3 deep=uDeep*(.85+.3*(s.x*.5+.5))*(1.-gust*.12)+vec3(-.004,.012,.01); // a touch of canal green-teal
+ vec3 color=mix(deep,sky*.72,fresnel*uReflect*(1.-gust*.15));
  // Sun glint: a tight disc, a mid lobe broken up by the ripples, and a soft sheen.
  float sun=max(dot(R,uSunDir),0.);
  color+=uSunColor*(pow(sun,260.)*1.4+pow(sun,80.)*.12+pow(sun,28.)*.035)*(.35+.65*fresnel);
+ // sparkle: individual ripple facets catching the sun, near the viewer
+ color+=uSunColor*pow(sun,900.)*6.*(1.-smoothstep(30.,160.,dist))*step(.55,fract(s.x*7.+s.y*5.));
  gl_FragColor=vec4(color,1.);
  #include <tonemapping_fragment>
  #include <colorspace_fragment>

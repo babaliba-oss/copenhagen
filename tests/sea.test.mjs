@@ -40,8 +40,8 @@ test('water shader: Fresnel sky reflection, multi-scale ripples, sun glint and f
  for(const u of ['uRipples','uSeaTime','uDeep','uSkyHorizon','uSkyZenith','uSunDir','uSunColor','fogColor','fogNear','fogFar'])assert.ok(u in m.uniforms,u);
  const f=m.fragmentShader;
  assert.match(f,/fresnel=.*pow\(1\.-NdV,5\.\)/);
- assert.match(f,/mix\(uDeep[^,]*,sky\*[\d.]+,fresnel(\*uReflect)?\)/);
- assert.equal((f.match(/texture2D\(uRipples/g)||[]).length,3,'three ripple scales');
+ assert.match(f,/vec3 deep=uDeep/);assert.match(f,/mix\(deep,sky\*[\d.]+,fresnel\*uReflect/);
+ assert.equal((f.match(/texture2D\(uRipples/g)||[]).length,5,'three ripple scales and two wind-gust samples');
  assert.match(f,/dot\(R,uSunDir\)/);
  assert.match(f,/#include <fog_fragment>/);assert.match(f,/#include <tonemapping_fragment>/);
  assert.doesNotMatch(f,/sin\(dot\(/,'no analytic sine stripes');
