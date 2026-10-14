@@ -105,14 +105,14 @@ def coach(m):
 
 def horse(m):
     """Horse body over a skeleton (rump to muzzle), mane, tail, collar and harness pad; no legs."""
-    V = [(0, -.62, 1.36), (0, -.2, 1.33), (0, .25, 1.33), (0, .6, 1.4), (0, .82, 1.68), (0, .98, 1.92), (0, 1.14, 2.02), (0, 1.38, 1.92), (0, 1.55, 1.82)]
+    V = [(0, -.9, 1.4), (0, -.62, 1.36), (0, -.2, 1.33), (0, .25, 1.33), (0, .6, 1.4), (0, .82, 1.68), (0, .98, 1.92), (0, 1.14, 2.02), (0, 1.38, 1.92), (0, 1.55, 1.82)]
     E = [(i, i + 1) for i in range(len(V) - 1)]
-    R = [(.3, .36), (.3, .33), (.29, .33), (.29, .34), (.17, .2), (.14, .15), (.11, .13), (.1, .11), (.08, .09)]
+    R = [(.2, .24), (.3, .36), (.3, .33), (.29, .33), (.29, .34), (.17, .2), (.14, .15), (.11, .13), (.1, .11), (.08, .09)]
     m.skin(V, E, R, ('coat', '#5b3a24'))
     for x in (-.06, .06):
         bpy.ops.mesh.primitive_cone_add(radius1=.045, radius2=0, depth=.15, vertices=5, location=(x, 1.12, 2.18)); m.add(bpy.context.active_object, ('coat', '#5b3a24'))
     m.box((.05, .1, .55), (0, .86, 1.95), '#1e1712', rot=(-.62, 0, 0))                     # mane
-    m.rod((0, -.84, 1.48), (0, -.98, .95), .05, '#1e1712', 6)                              # tail
+    m.rod((0, -1.02, 1.5), (0, -1.12, .95), .05, '#1e1712', 6)                              # tail
     bpy.ops.mesh.primitive_torus_add(major_radius=.2, minor_radius=.04, major_segments=14, minor_segments=6, location=(0, .76, 1.66), rotation=(-.95, 0, 0))
     m.add(bpy.context.active_object, '#2b1d14')
     m.box((.58, .5, .06), (0, .05, 1.68), '#2b1d14', bevel=.02); m.box((.62, .08, .05), (0, .05, 1.3), '#2b1d14')

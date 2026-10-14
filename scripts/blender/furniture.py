@@ -78,7 +78,7 @@ def park_lamp(m):
     m.cone(.06, .045, 2.8, 0, GRAPHITE, 8)
     m.cone(.16, .16, .03, 2.84, LIGHT, 12)
     for z, r0, r1, h in [(2.86, .24, .1, .1), (2.97, .29, .12, .1), (3.08, .14, .05, .1)]:
-        m.cone(r0, r1, h, z, WHITE, 14, cap=False)
+        m.cone(r0, r1, h, z, WHITE, 14)
     m.rod((0, 0, 2.8), (0, 0, 3.16), .015, GRAPHITE, 4)
 
 def bench(m):
