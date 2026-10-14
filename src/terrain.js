@@ -100,3 +100,17 @@ export function lakeAt(x,z){
  const i=Math.round((x+f.extent)/f.cell),j=Math.round((z+f.extent)/f.cell);if(i<0||j<0||i>=f.size||j>=f.size)return null;
  const v=f.lake[j*f.size+i];return Number.isNaN(v)?null:v;
 }
+
+// Cities whose mapped water is level within each body (Copenhagen's harbour, canals and moats are all at sea
+// level): the elevation model still put bumps of a few metres into the water layer along narrow canals and
+// under bridges, which drew the water surface as a ramp over the quay. Each 4-connected water region of the
+// grid takes its median level.
+export function flattenWaterBodies(f=field){
+ if(!f?.water)return 0;const w=f.water,n=f.size,label=new Int32Array(n*n).fill(-1),stack=[];let regions=0;
+ for(let s=0;s<n*n;s++){if(Number.isNaN(w[s])||label[s]>=0)continue;
+  const cells=[];label[s]=regions;stack.push(s);
+  while(stack.length){const k=stack.pop();cells.push(k);const r=(k/n)|0,c=k-r*n;
+   for(const q of [c>0?k-1:-1,c<n-1?k+1:-1,r>0?k-n:-1,r<n-1?k+n:-1])if(q>=0&&label[q]<0&&!Number.isNaN(w[q])){label[q]=regions;stack.push(q);}}
+  const vals=cells.map(k=>w[k]).sort((a,b)=>a-b),mid=vals[vals.length>>1];for(const k of cells)w[k]=mid;regions++;}
+ return regions;
+}

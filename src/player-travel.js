@@ -83,11 +83,19 @@ export function starterRides(car,world){
  for(const mode of ['bike','scooter']){
   if(STARTER_VISUALS.none?.includes(mode))continue;
   let best=null;
-  for(let radius=3;radius<=22;radius+=1.5)for(let i=0;i<24;i++){
-   const a=i*Math.PI/12,q={x:car.x+Math.cos(a)*radius,z:car.z+Math.sin(a)*radius,heading:car.heading};
-   if(travelCollision(q,mode,world,[car,...rides])||!clearTravelPath(origin,q,world,[car,...rides])||rides.some(r=>gap(r,q)<2.3))continue;
-   const pavement=world.pavement?.at(q.x,q.z),score=gap(origin,q)+(pavement&&!world.roads.at(q.x,q.z)?0:14);
-   if(!best||score<best.score)best={...q,score};
+  // Parked on the pavement (never the carriageway or a cycle track) when there is any within 30 m;
+  // only a start with no pavement near falls back to the nearest clear spot.
+  for(const strict of [true,false]){
+   for(let radius=3;radius<=(strict?30:22);radius+=1.5)for(let i=0;i<24;i++){
+    const a=i*Math.PI/12,q={x:car.x+Math.cos(a)*radius,z:car.z+Math.sin(a)*radius,heading:car.heading};
+    const pavement=world.pavement?.at(q.x,q.z),onWalk=!!pavement&&!world.roads.at(q.x,q.z)&&!/pyör|Pyör|cycle/.test(pavement.kind||'');
+    if(strict&&!onWalk)continue;
+    // on the pavement only the spot itself must be clear (parked cars or racks along the kerb may stand between)
+    if(travelCollision(q,mode,world,[car,...rides])||(!strict&&!clearTravelPath(origin,q,world,[car,...rides]))||rides.some(r=>gap(r,q)<2.3))continue;
+    const score=gap(origin,q)+(onWalk?0:14);
+    if(!best||score<best.score)best={...q,score};
+   }
+   if(best)break;
   }
   if(best)rides.push({...makeActor({x:best.x,z:best.z,heading:best.heading},mode),id:mode,mode,parked:true,...(STARTER_VISUALS[mode]?{visual:{...STARTER_VISUALS[mode]}}:{})});
  }

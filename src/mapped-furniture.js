@@ -64,9 +64,15 @@ function postParts(kind){
 // One wire lamp: wire points (pairs for LineSegments) rising from the shade to anchors a and b metres either
 // side, plus pole positions where no wall was in reach. The shade itself is instanced.
 const WIRE_LOW=7.1;
-function wireLines(it,out,poles){
+function wireLines(it,out,poles,{poleAllowed=()=>true,wallAt=null}={}){
  const yaw=it.yaw||0,gy=groundAt(it.x,it.z),c=Math.cos(yaw),s=Math.sin(yaw);
- for(const [len,dir,pole] of [[it.a||7,1,it.pa],[it.b||7,-1,it.pb]]){
+ for(let [len,dir,pole] of [[it.a||7,1,it.pa],[it.b||7,-1,it.pb]]){
+  // Every wire must end on something: a wall (searched a few metres either side of the mapped anchor) or a
+  // pole that is allowed where it stands (moved back toward the lamp if the mapped spot is in a lane).
+  // Wires that ended in mid-air, where a pole was dropped from a lane or no wall stood, read as cut lines.
+  const at=d=>[it.x+s*dir*d,it.z+c*dir*d];
+  if(!pole&&wallAt){let hit=0;for(let d=Math.max(1.5,len-3);d<=len+6;d+=.5)if(wallAt(...at(d))){hit=d;break;}if(hit)len=hit;else pole=true;}
+  if(pole&&!poleAllowed(...at(len))){let ok=0;for(let d=len-.5;d>=2;d-=.5)if(poleAllowed(...at(d))){ok=d;break;}if(!ok)continue;len=ok;}
   const top=pole?8.2:8.9,steps=4;let px=it.x,pz=it.z,py=gy+WIRE_LOW+.55;
   for(let k=1;k<=steps;k++){const t=k/steps,d=dir*len*t,x=it.x+s*d,z=it.z+c*d,y=gy+WIRE_LOW+.55+(top-WIRE_LOW-.55)*Math.pow(t,1.6);out.push(px,py,pz,x,y,z);px=x;py=y;pz=z;}
   if(pole)poles.push([it.x+s*dir*len,it.z+c*dir*len]);
@@ -95,7 +101,7 @@ function plateGeometry(size,rect){
  g.deleteAttribute('normal');g.computeVertexNormals();return g.toNonIndexed();
 }
 
-export function createMappedFurniture(layer,{player=()=>null,mobility=()=>null,canvas=globalThis.document,poleAllowed=()=>true}={}){
+export function createMappedFurniture(layer,{player=()=>null,mobility=()=>null,canvas=globalThis.document,poleAllowed=()=>true,wallAt=null}={}){
  const group=new THREE.Group();group.name='Mapped street furniture';
  const items=layer?.items||[],obstacles=[],chunks=new Map(),lights=[];
  const painted=new THREE.MeshStandardMaterial({vertexColors:true,roughness:.6,metalness:.2});
@@ -131,7 +137,7 @@ export function createMappedFurniture(layer,{player=()=>null,mobility=()=>null,c
  // (register span to the nearest wall on each side; a slim pole where no wall is in reach).
  const wireLamps=items.filter(it=>it.k==='wire-lamp'),wirePoles=[];
  if(wireLamps.length){
-  for(const it of wireLamps){const chunk=chunkOf(it.x,it.z);wireLines(it,chunk.wires??=[],wirePoles);}
+  for(const it of wireLamps){const chunk=chunkOf(it.x,it.z);wireLines(it,chunk.wires??=[],wirePoles,{poleAllowed,wallAt});}
   const shade=mergeGeometries([cyl(.012,.012,.5,WIRE_LOW+.3,'#24282a',4),cyl(.06,.06,.1,WIRE_LOW+.5,'#2c3033',8),cyl(.09,.42,.24,WIRE_LOW+.32,'#2c3033',8),cyl(.3,.3,.03,WIRE_LOW+.19,'#fff3d6',8)]);
   chunkedInstances(wireLamps,shade,painted,'Wire lamp shades',it=>[it.x,it.z,it.yaw],{shadow:false});
   // No pole in a traffic lane, and one pole where several wires end together (junction clusters).

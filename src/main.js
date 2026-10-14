@@ -128,7 +128,7 @@ import {createMobileControls} from './mobile-controls.js';
 import {updateWorldhoodBrand} from './worldhood-brand.js';
 import {installMapillaryAttribution} from './mapillary-attribution.js';
 import './worldhood-brand.css';
-import {decodeTerrain,setTerrain,hasTerrain,groundAt,groundPose,liftBuildings,footprintBase} from './terrain.js';
+import {decodeTerrain,setTerrain,hasTerrain,groundAt,groundPose,liftBuildings,footprintBase,flattenWaterBodies} from './terrain.js';
 import {drapeGeometry,settleObject,createTerrainGround,drawLakeMap} from './terrain-mesh.js';
 const impacts=new ImpactSystem();impacts.onVehicleHit=(from,car,a)=>mobility?.knock(a,from,car)??null;
 const finale=new Finale({doc:document}); // shared offence log, pursuit pressure, arrest cinematic and BUSTED screen
@@ -987,7 +987,7 @@ async function boot(){
    // ~0.375 px per metre, as before, whatever the map frame size.
    mapCache.width=mapCache.height=Math.min(4096,Math.round(mapView.size*.375));
    // Hilly cities: everything below samples the shared height field; the flat ground plane gives way to a terrain mesh.
-   if(setTerrain(await terrainData)){surfaceMaterial.defines={...surfaceMaterial.defines,TERRAIN:''};surfaceMaterial.needsUpdate=true;ground.visible=false;cityModel.add(createTerrainGround(ground.material,city.id.startsWith('copenhagen')?{cell:20,chunk:40}:undefined));}
+   if(setTerrain(await terrainData)){if(city.id.startsWith('copenhagen'))console.info('Water bodies levelled',flattenWaterBodies());surfaceMaterial.defines={...surfaceMaterial.defines,TERRAIN:''};surfaceMaterial.needsUpdate=true;ground.visible=false;cityModel.add(createTerrainGround(ground.material,city.id.startsWith('copenhagen')?{cell:20,chunk:40}:undefined));}
    if((landcoverData.polygons||landcoverData.runs||[]).length)cityModel.add(settleObject(createLandcover(landcoverData)));
    sea=createSea(data.water,data,{helsinkiHarbour:helsinki});tintSea(sea);cityModel.add(sea.group);ground.geometry.dispose();ground.geometry=sea.groundGeometry;
    // Helsinki's hand-built scenery (landmarks, harbour, street life, signs). Other cities get the generic engine only.
@@ -1073,8 +1073,15 @@ async function boot(){
    if(mapped?.items?.length&&city.id.startsWith('copenhagen')){ /* furniture placed from photos can land on the carriageway: drop what stands in a traffic lane, off the pavement */
     const lanes=new SpatialIndex(data.roads.filter(r=>/^Ajorata/.test(r.kind))),walk=new SpatialIndex(data.pavement);const before=mapped.items.length;
     const inLane=(x,z)=>[[0,0],[.6,0],[-.6,0],[0,.6],[0,-.6]].some(([a,b])=>lanes.at(x+a,z+b))&&!walk.at(x,z);mapped.poleAllowed=(x,z)=>!inLane(x,z);
-    mapped.items=mapped.items.filter(it=>!(lanes.at(it.x,it.z)&&!walk.at(it.x,it.z)));console.info(`Street furniture: ${before-mapped.items.length} items in traffic lanes dropped`);}
-   if(mapped?.items?.length){mappedFurniture=createMappedFurniture(mapped,{player:()=>car,mobility:()=>mobility,poleAllowed:mapped.poleAllowed});cityModel.add(mappedFurniture.group);streetObstacles.push(...mappedFurniture.obstacles);knockables=combineKnockables([knockables,mappedFurniture.knockables]);}
+    mapped.items=mapped.items.filter(it=>!(lanes.at(it.x,it.z)&&!walk.at(it.x,it.z)));console.info(`Street furniture: ${before-mapped.items.length} items in traffic lanes dropped`);
+    // Sign clutter: photo detections give blank blue 'generic plates' (no readable type) and the same sign seen
+    // from several photos. Keep posts with a real face, one per face within 5 m, and at most 3 posts in 8 m.
+    {const grid=new Map(),key=(x,z)=>Math.floor(x/8)+','+Math.floor(z/8),near=(x,z)=>{const out=[],gx=Math.floor(x/8),gz=Math.floor(z/8);for(let i=-1;i<=1;i++)for(let j=-1;j<=1;j++)for(const q of grid.get((gx+i)+','+(gz+j))||[])if(Math.hypot(q.x-x,q.z-z)<8)out.push(q);return out;};let dropped=0;
+     mapped.items=mapped.items.filter(it=>{if(it.k!=='sign')return true;const faces=(it.faces||[]).filter(f=>f!=='generic-plate');if(!faces.length){dropped++;return false;}
+      const ns=near(it.x,it.z);if(ns.length>=3||ns.some(q=>Math.hypot(q.x-it.x,q.z-it.z)<5&&q.faces.some(f=>faces.includes(f)))){dropped++;return false;}
+      it.faces=faces;const k=key(it.x,it.z);if(!grid.has(k))grid.set(k,[]);grid.get(k).push(it);return true;});
+     console.info(`Street furniture: ${dropped} duplicate or blank signs dropped`);}}
+   if(mapped?.items?.length){mappedFurniture=createMappedFurniture(mapped,{player:()=>car,mobility:()=>mobility,poleAllowed:mapped.poleAllowed,wallAt:(()=>{const b=new SpatialIndex(data.buildings||[]);return (x,z)=>!!b.at(x,z);})()});cityModel.add(mappedFurniture.group);streetObstacles.push(...mappedFurniture.obstacles);knockables=combineKnockables([knockables,mappedFurniture.knockables]);}
    world={buildings:new SpatialIndex([...data.buildings,...streetObstacles.filter(o=>!o.breakable),...ads.obstacles]),roads:new SpatialIndex(data.roads.filter(r=>!/Koroke/.test(r.kind))),pavement:new SpatialIndex(data.pavement),trafficForbidden:new SpatialIndex(helsinki?[...data.pavement.filter(inHarbour),...data.roads.filter(r=>/Koroke/.test(r.kind)),...olympiaTramOnlySurfaces(data)]:data.roads.filter(r=>/Koroke/.test(r.kind))),water:data.water};
    if(city.era===1760){const gateNames=/Vesterport|Nørreport|Østerport/,lm=data.landmarks||[];periodLife=createPeriodLife({city,world,water:data.water,squares:lm.filter(l=>!gateNames.test(l.name)&&l.name!=='Little Mermaid'),gates:lm.filter(l=>gateNames.test(l.name))});cityModel.add(periodLife.group);console.info('1760 life',periodLife.group.userData);}
    else if(city.id==='copenhagen'){periodLife=createSquareCrowds({world,water:data.water,places:data.landmarks||[]});cityModel.add(periodLife.group);const cc=createCycleCrossings({pavement:data.pavement,world});cityModel.add(cc);console.info('Blue cycle crossings',cc.userData.crossings);}
