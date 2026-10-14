@@ -43,15 +43,20 @@ export class FaceFrame{
 
 // Glass reads as glass without an environment map: lighter toward the top (sky reflection),
 // a few panes with warm light or a pale blind behind them.
-function glassTone(base,s,y,h){
+function glassTone(s,y,h,base){
  const r=hash(s,y),tint=r<.12?WARM:r<.2?linear('#d8d2c4'):null;
  return (c,worldY)=>{const v=Math.min(1,Math.max(0,(worldY-y)/h+.5));c.lerp(SKY,.06+.26*v*v);if(tint)c.lerp(tint,.4*(1-v));};
 }
-function pane(F,G,s,y,w,h,glass,arch=false){
+// Shop windows: dark glass with the lit shop behind it (warm, brighter toward the display at the bottom),
+// a sky reflection at the top, and every few bays a pale blind or a dark closed one.
+const SHOP_LIGHT=[linear('#e2c08a'),linear('#d8d2c4'),linear('#c7a27e'),linear('#b9c6c9')];
+function shopTone(s,y,h){const r=hash(s,y*1.7),light=SHOP_LIGHT[Math.floor(r*4)%4],lit=r<.82;
+ return (c,worldY)=>{const v=Math.min(1,Math.max(0,(worldY-y)/h+.5));if(lit)c.lerp(light,.55*(1-v)*(1-v)+.08);c.lerp(SKY,.05+.3*v*v);};}
+function pane(F,G,s,y,w,h,glass,arch=false,tone=null){
  let g;
  if(arch){const r=w/2,sh=new THREE.Shape();sh.moveTo(-r,-h/2);sh.lineTo(r,-h/2);sh.lineTo(r,h/2-r);sh.absarc(0,h/2-r,r,0,Math.PI,false);sh.lineTo(-r,-h/2);g=new THREE.ShapeGeometry(sh,5);}
  else g=new THREE.PlaneGeometry(w,h);
- G.add(F.place(g,s,y,.08),glass,glassTone(glass,s,y,h)); // 8 cm proud: overlapping LOD2 walls a few cm in front must not swallow it
+ G.add(F.place(g,s,y,.08),glass,(tone||glassTone)(s,y,h,glass)); // 8 cm proud: overlapping LOD2 walls a few cm in front must not swallow it
 }
 const flat=(F,B,s,y,e,w,h,color)=>B.add(F.place(new THREE.PlaneGeometry(w,h),s,y,e),color);
 const slab=(F,B,s,y,e,w,h,depth,color)=>{const g=new THREE.BoxGeometry(w,h,depth),i=g.index.array;g.setIndex([...i.slice(0,30)]);B.add(F.place(g,s,y,e+depth/2),color);}; // no back face (it lies on the wall)
@@ -126,7 +131,8 @@ function groundStorey(F,G,B,band,g,c){
   if(g.type==='solid')continue;
   for(const s of bays(a,b,g.pitch,.4)){
    const w=g.pitch-(g.type==='glass'?.12:.7),h=glassTop-base,y=base+h/2;
-   pane(F,G,s,y,w,h,c.shop,g.type==='arcade');
+   pane(F,G,s,y,w,h,c.shop,g.type==='arcade',shopTone);
+   if(g.type!=='arcade'&&w>1.4)slab(F,B,s,base+h*.62,.03,w,.06,.06,c.groundFrame); // transom bar
    for(const dx of [-w/2,w/2])slab(F,B,s+dx,y-(g.type==='arcade'?w/4:0),.03,.12,h-(g.type==='arcade'?w/2:0),.09,c.groundFrame);
    if(g.type!=='glass')slab(F,B,s,base-.2,.02,w,.4,.1,c.groundFrame);
    if(g.awning)B.add(F.place(new THREE.BoxGeometry(w*.92,.05,1.0).rotateX(-.3),s,glassTop+.05,.55),c.awning);
@@ -139,7 +145,7 @@ function groundStorey(F,G,B,band,g,c){
 // Meshes for every wall face of one described building part. Returns {glass,relief,windows,triangles}.
 export function createFacade(faces,spec){
  const c={glass:linear(spec.windows.glass),frame:linear(spec.windows.frame),trim:linear(spec.trim||spec.windows.frame),
-  shop:linear('#7d7a70'),band:linear(spec.ground?.band||'#2e3134'),groundFrame:linear(spec.ground?.frame||'#2b2d2f'),
+  shop:linear('#30363a'),band:linear(spec.ground?.band||'#2e3134'),groundFrame:linear(spec.ground?.frame||'#2b2d2f'),
   awning:linear(spec.ground?.awning||'#2b2d2f'),canopy:linear(spec.ground?.canopy||'#2b2d2f'),door:linear(spec.door||'#3a2a20'),lower:spec.wallLower&&linear(spec.wallLower),cornice:linear(spec.cornice||spec.trim||spec.wall)};
  c.plinth=linear(spec.plinth||'#5d5a55');c.rail=linear(spec.rail||'#3a3f42');c.shutter=spec.windows.shutters?linear(spec.windows.shutters):null;c.surround=linear(spec.surround||spec.cornice||spec.trim||spec.windows.frame);
  const G=new Batch(),B=new Batch();let windows=0;c.signs=[];
