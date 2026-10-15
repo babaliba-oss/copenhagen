@@ -32,11 +32,11 @@ export function subdivideGeometry(source,maxEdge=4,{height=null,tolerance=.03}={
 
 // Drapes a geometry (world-space positions) over the ground. `mark` keeps the added height in a
 // `terrainY` attribute, so shaders that read layer heights from position.y can subtract it again.
-export function drapeGeometry(geometry,{maxEdge=4,lift=0,water=false,mark=false,lines=false}={}){
+export function drapeGeometry(geometry,{maxEdge=4,lift=0,water=false,mark=false,lines=false,tolerance=.03}={}){
  if(!hasTerrain())return geometry;
  if(lines)geometry.userData.lines=true;
  const surface=(x,z)=>{if(water){const w=waterAt(x,z);if(w!==null)return w;const s=seaLevel(),g=groundAt(x,z);if(s!==null&&g<s)return s;return g;}return groundAt(x,z);};
- const g=maxEdge?subdivideGeometry(geometry,maxEdge,{height:lines?null:surface}):geometry,p=g.attributes.position,added=mark?new Float32Array(p.count):null;
+ const g=maxEdge?subdivideGeometry(geometry,maxEdge,{height:lines?null:surface,tolerance}):geometry,p=g.attributes.position,added=mark?new Float32Array(p.count):null;
  const hs=new Float32Array(p.count);for(let i=0;i<p.count;i++){const x=p.getX(i),z=p.getZ(i),h=surface(x,z)+lift;hs[i]=h-lift;p.setY(i,p.getY(i)+h);if(added)added[i]=h;}
  if(added)g.setAttribute('terrainY',new THREE.BufferAttribute(added,1));
  p.needsUpdate=true;
@@ -81,7 +81,7 @@ export function groundUnder(object){
 // Puts a built scene on the ground: world-space meshes are subdivided and draped, instanced meshes get
 // each instance lifted, and positioned objects move as a whole (by the lowest ground under them when
 // marked `userData.building`/`rigid`, else by the ground at their origin). Call once after building.
-export function settleObject(root,{maxEdge=4,skip=null}={}){
+export function settleObject(root,{maxEdge=4,skip=null,tolerance=.03}={}){
  if(!hasTerrain()||!root)return root;
  root.updateMatrixWorld(true);const done=new WeakSet();
  const rigid=o=>{const h=o.userData.building||o.userData.rigid?groundUnder(o):groundAt(v.setFromMatrixPosition(o.matrixWorld).x,v.z);o.position.y+=h;o.updateMatrixWorld(true);};
@@ -93,7 +93,7 @@ export function settleObject(root,{maxEdge=4,skip=null}={}){
    o.instanceMatrix.needsUpdate=true;o.computeBoundingSphere?.();o.computeBoundingBox?.();return;}
   if((o.isMesh||o.isLine||o.isPoints)&&o.geometry){
    if(!identity(o.matrixWorld)){rigid(o);return;}
-   if(done.has(o.geometry))return;const old=o.geometry,lines=!!o.isLineSegments,g=drapeGeometry(old,{maxEdge:o.isPoints?0:maxEdge,lines});
+   if(done.has(o.geometry))return;const old=o.geometry,lines=!!o.isLineSegments,g=drapeGeometry(old,{maxEdge:o.isPoints?0:maxEdge,lines,tolerance});
    if(g!==old){old.dispose();o.geometry=g;}done.add(g);return;}
   if(o!==root&&!identity(o.matrixWorld)){rigid(o);return;}
   for(const c of [...o.children])visit(c);

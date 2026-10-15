@@ -301,7 +301,12 @@ surfaceMaterial.onBeforeCompile=shader=>{
    float sh=groundHash(slc+3.1),stain=step(0.92,groundHash(slc+8.3))*(0.6+0.4*groundNoise(vGround.xz*1.7));
    vec3 slab=mix(diffuseColor.rgb,vec3(dot(diffuseColor.rgb,vec3(.3333))),.85)*vec3(1.04,1.0,.93); // grey concrete, not the data's blue tint
    diffuseColor.rgb=slab*0.66*(0.97+0.06*sh)*(0.82+0.25*pl/0.75)*(1.0-stain*0.06)*(1.0-seam*0.16)*(1.0+(groundNoise(vGround.xz/6.0)-0.5)*0.08); // even, quiet slabs: strong per-slab tones read as holes
-   gN=textureGrad(tSlabN,vGround.xz/1.9,GDX/1.9,GDY/1.9).xyz*2.0-1.0;gNw=0.35*texFade;grain=0.0;}
+   gN=textureGrad(tSlabN,vGround.xz/1.9,GDX/1.9,GDY/1.9).xyz*2.0-1.0;gNw=0.35*texFade;grain=0.0;
+   #ifdef DIRT_ROADS
+   // 1760: no concrete pavements. Walkways are small field-stone cobbles, worn pale and dusty.
+   {vec2 su=vGround.xz/vec2(1.5,.75);diffuseColor.rgb=textureGrad(tSettsC,su,GDX/vec2(1.5,.75),GDY/vec2(1.5,.75)).rgb*vec3(1.08,1.0,.88)*1.12*(1.0+(groundNoise(vGround.xz/7.0)-0.5)*0.16);gN=textureGrad(tSettsN,su,GDX/vec2(1.5,.75),GDY/vec2(1.5,.75)).xyz*2.0-1.0;gNw=texFade*.8;}
+   #endif
+  }
  }else if(diffuseColor.g>diffuseColor.r*1.06&&diffuseColor.g>diffuseColor.b*1.04){
   // lawns in the surface data (pale green): scanned grass at two scales, a deeper summer green
   vec2 gu=vGround.xz/2.2;vec3 gr=mix(textureGrad(tGrassC,gu,GDX/2.2,GDY/2.2).rgb,textureGrad(tGrassC,mat2(.8,-.6,.6,.8)*vGround.xz/6.1,mat2(.8,-.6,.6,.8)*GDX/6.1,mat2(.8,-.6,.6,.8)*GDY/6.1).rgb,.4);
@@ -1029,6 +1034,8 @@ async function boot(){
    let mobilityData,landcoverData,tramData;[data,roofIndex,surfaceIndex,mobilityData,landcoverData,tramData,extensions]=await Promise.all([d,json(dataUrl('buildings3d-index.json')),json(dataUrl('surface-index.json')),json(dataUrl('mobility.json')),json(dataUrl('landcover.json')),json(dataUrl('trams.json')),loadExtensionIndex(json)]);
    if(city.id.startsWith('copenhagen'))tramData={...tramData,paths:[],stops:[]}; // no street trams: its trams.json holds S-train route relations (Boulevard tunnel); drawn as tram track they crossed Nørreport at street level
    if(city.id.startsWith('copenhagen')){const dup=new Set(await json(dataUrl('duplicates.json')).catch(()=>[]));let n=0;for(const t of roofIndex.tiles)for(const p of t.parts)if(dup.has(t.file+':'+p.start)){p.duplicate=true;n++;}console.info('Duplicate building copies dropped',n);} // the city model's double copies, found by comparing triangles (scripts/building-duplicates.mjs)
+   if(city.era===1760){let n=0;for(const t of roofIndex.tiles)for(const p of t.parts){if(p.name||p.noFacade||p.duplicate||p.height<=13.5)continue;let h=0;for(const ch of p.id)h=(h*31+ch.charCodeAt(0))>>>0;
+     p.sourceHeight??=p.height;p.height=p.measuredHeight=9.5+(h%9)*.5;n++;}console.info('1760: houses brought down to period height',n);} // the municipal model is today's city: 5-7 storey blocks. In 1760 houses had 2-4 storeys under steep roofs
    if(city.id.startsWith('copenhagen')){const afloat=[];for(const t of roofIndex.tiles)for(const p of t.parts){const [a,b,c,d]=p.bbox,ix=(c-a)*.25,iz=(d-b)*.25,wet=[[(a+c)/2,(b+d)/2],[a+ix,b+iz],[c-ix,b+iz],[a+ix,d-iz],[c-ix,d-iz]].filter(([x,z])=>inWaterPolygons(data.water,x,z)).length;if(wet>=4){if(city.era===1760)p.duplicate=true;else if(!p.id.startsWith('kk-')&&p.height===10){p.sourceHeight=10;p.height=p.measuredHeight=3.4;}afloat.push(p);}}console.info('Buildings standing in the water (houseboats: low, none in 1760)',afloat.length);if(import.meta.env.DEV)window.__afloat=afloat.map(p=>[p.id,p.name||'',p.height,p.bbox.map(Math.round).join(',')]);} // houseboats and ships mapped as buildings: OpenStreetMap's default 10 m made them tall boxes in the canals
    if(city.facades)attachFacades(roofIndex,await json(dataUrl(city.facades)).catch(()=>null)); // photo-described street fronts (optional, any city)
    if(city.estimatedFacades)estimateFacades(roofIndex,{era:city.era}); // plausible fronts for untextured official meshes (see facade-data.js)
@@ -1072,7 +1079,7 @@ async function boot(){
    // Hilly cities: everything below samples the shared height field; the flat ground plane gives way to a terrain mesh.
    if(setTerrain(await terrainData)){if(city.id==='copenhagen')console.info('Water bodies levelled',flattenWaterBodies());if(city.id.startsWith('copenhagen'))buildWaterMask(data.water,terrain()?.extent);{const t0=performance.now(),n=raiseDryHollows((x,z)=>inWaterPolygons(data.water,x,z));console.info('Dry hollows raised to quay height',n,Math.round(performance.now()-t0)+' ms');}surfaceMaterial.defines={...surfaceMaterial.defines,TERRAIN:''};surfaceMaterial.needsUpdate=true;ground.visible=false;cityModel.add(createTerrainGround(ground.material,city.id.startsWith('copenhagen')?{cell:10,chunk:40,wet:(x,z)=>inWaterPolygons(data.water,x,z)}:undefined));}
    if((landcoverData.polygons||landcoverData.runs||[]).length)cityModel.add(settleObject(createLandcover(landcoverData)));
-   if(city.id.startsWith('copenhagen')){const lawns=(data.parks||[]).filter(p=>/Nurmikko|Kenttä/.test(p.kind)&&p.rings?.[0]?.length>3).map(p=>p.rings);if(lawns.length){const g=settleObject(createLandcover({polygons:lawns,chunk:400}));g.name='Mapped lawns (under the surfaces)';cityModel.add(g);}} // lawns the surface data leaves bare (Krinsen on Kongens Nytorv, park lawns)
+   if(city.id.startsWith('copenhagen')){const lawns=(data.parks||[]).filter(p=>/Nurmikko|Kenttä/.test(p.kind)&&p.rings?.[0]?.length>3).map(p=>p.rings);if(lawns.length){const g=settleObject(createLandcover({polygons:lawns,chunk:400}),{maxEdge:6,tolerance:.18}); /* lawns lie under the surfaces: a coarser drape (1760's fields and ramparts made ~5M triangles) */g.name='Mapped lawns (under the surfaces)';cityModel.add(g);}} // lawns the surface data leaves bare (Krinsen on Kongens Nytorv, park lawns)
    sea=createSea(data.water,data,{helsinkiHarbour:helsinki});tintSea(sea);cityModel.add(sea.group);ground.geometry.dispose();ground.geometry=sea.groundGeometry;
    // Helsinki's hand-built scenery (landmarks, harbour, street life, signs). Other cities get the generic engine only.
    async function buildHelsinkiScenery(){
