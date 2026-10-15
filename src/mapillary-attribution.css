@@ -1,11 +1,14 @@
-.mapillary-attribution{display:none;position:absolute;left:38px;bottom:5px;z-index:22;align-items:center;min-height:44px;line-height:0;border-radius:4px}
-.mapillary-attribution img,.mapillary-source-logo img{display:block;width:120px;height:40px;border-radius:3px}
+.mapillary-attribution{display:none;position:absolute;left:38px;bottom:6px;z-index:22;align-items:center;line-height:0;border-radius:3px;opacity:.5;transition:opacity .2s}
+.mapillary-attribution:hover{opacity:1}
+/* The credit Mapillary's terms ask for (street furniture extracted from their imagery): small and quiet in play. */
+.mapillary-attribution img{display:block;width:57px;height:19px;border-radius:2px}
+.mapillary-source-logo img{display:block;width:120px;height:40px;border-radius:3px}
 /* Keep required data credit visible in the default minimal desktop HUD and captures. */
 body.driving:not(.booting):not(.busted) .mapillary-attribution{display:flex}
 .mapillary-source-credit{display:flex;align-items:center;gap:12px;font-size:11px;line-height:1.5;margin:18px 0 0}
 .mapillary-source-logo{flex:none;min-height:44px;display:flex;align-items:center}
 @media(pointer:coarse){
  .mapillary-attribution{left:var(--mobile-left,12px);bottom:auto;top:calc(var(--mobile-top,12px) + 51px)}
- .mapillary-attribution img{width:105px;height:35px}
+ .mapillary-attribution img{width:51px;height:17px}
  .mapillary-source-credit{align-items:flex-start;flex-wrap:wrap}
 }

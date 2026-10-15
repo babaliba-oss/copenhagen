@@ -68,7 +68,7 @@ export function surfaceAt(world,x,z){return surfaceDetailAt(world,x,z).surface;}
 //    standard deviation ~5-7 mm at 30 km/h (about a third of the body's).
 // Intensity eases in/out over ~0.1 s at surface boundaries so entering or
 // leaving setts never pops; everything is exactly zero on asphalt.
-export const RUMBLE={maxAmplitude:.066,minHz:8,maxHz:12,tilt:.3*Math.PI/180,easeRate:9,bodyLowpassHz:24,cameraLowpassHz:5,camera:.42,cameraTilt:.3};
+export const RUMBLE={maxAmplitude:.04,minHz:8,maxHz:12,tilt:.3*Math.PI/180,easeRate:9,bodyLowpassHz:24,cameraLowpassHz:5,camera:.42,cameraTilt:.3};
 const clamp=(v,lo,hi)=>Math.min(hi,Math.max(lo,v));
 const hash=(k,seed)=>{const s=Math.sin(k*12.9898+seed*78.233)*43758.5453;return s-Math.floor(s);};
 const smooth=t=>t*t*(3-2*t);
@@ -78,7 +78,7 @@ function envelope(phase,seed,lo=.6){const k=Math.floor(phase/Math.PI),t=smooth(p
 // Raw (pre-filter) body bump amplitude in metres: 3 cm at 20 km/h, ~4.1 cm at 30, ~6.4 cm at 50, capped 6.6 cm.
 export function rumbleAmplitude(speed){
  const kmh=Math.abs(speed)*3.6;
- return Math.min(RUMBLE.maxAmplitude,kmh<20?.03*(kmh/20):.03+(kmh-20)*(.034/30));
+ return Math.min(RUMBLE.maxAmplitude,kmh<20?.018*(kmh/20):.018+(kmh-20)*(.02/30)); // gentler: the full rumble read as the car shaking
 }
 export function rumbleFrequency(speed){return RUMBLE.minHz+(RUMBLE.maxHz-RUMBLE.minHz)*clamp(Math.abs(speed)*3.6/50,0,1);}
 export function createRumbleState(seed=1){return {seed,intensity:0,phase:0,bob:0,roll:0,pitch:0,cameraBob:0,cameraRoll:0,bobVel:0,rollVel:0,pitchVel:0,cameraBobVel:0,cameraRollVel:0,surface:'off'};}

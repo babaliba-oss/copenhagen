@@ -233,8 +233,17 @@ test('dry samples at sea-bed height outside the mapped water are raised to quay 
  const {raiseDryHollows}=await import('../src/terrain.js');
  const size=5,ground=new Float32Array(size*size).fill(-8),water=new Float32Array(size*size).fill(-6);
  const f={size,cell:2,extent:4,ground,water};
- const n=raiseDryHollows((x,z)=>x<0,{},f); // the west half is mapped water
+ const n=raiseDryHollows((x,z)=>x<0,{shelf:false},f); // the west half is mapped water
  assert.equal(n,15);                             // x = 0, 2, 4 are dry
  assert.equal(ground[0],-8);                      // x=-4: water, untouched
  assert.ok(Math.abs(ground[4]-(-4.4))<1e-6);      // x=+4: dry, raised to water+1.6
+});
+
+test('the first water sample beside a quay takes the quay height (no slope into the canal)', async () => {
+ const {raiseDryHollows}=await import('../src/terrain.js');
+ const size=5,ground=new Float32Array(size*size),water=new Float32Array(size*size).fill(-6);
+ for(let j=0;j<size;j++)for(let i=0;i<size;i++)ground[j*size+i]=i<2?-8:-4;   // canal west, quay at -4 east
+ raiseDryHollows((x,z)=>x<0,{},{size,cell:2,extent:4,ground,water});
+ assert.equal(ground[2*size+1],-4);   // x=-2, beside the quay: shelf
+ assert.equal(ground[2*size+0],-8);   // x=-4: canal bed
 });

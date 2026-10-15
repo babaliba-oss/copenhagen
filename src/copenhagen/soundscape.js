@@ -46,13 +46,13 @@ export function createSoundscape(ac,{era=null}={}){
   const car=mode==='car'&&era!==1760,coach=mode==='car'&&era===1760;
   if(car){while(gear<5&&v>GEARS[gear])gear++;while(gear>1&&v<GEARS[gear-1]-2)gear--;
    const lo=GEARS[gear-1],hi=GEARS[gear],rpm=.25+.75*Math.min(1,(v-lo)/Math.max(1,hi-lo)),f=38+rpm*70;
-   e1.frequency.setTargetAtTime(f,t,.06);e2.frequency.setTargetAtTime(f*1.01,t,.06);eLp.frequency.setTargetAtTime(150+rpm*300+throttle*260,t,.08);eG.gain.setTargetAtTime(.0035+throttle*.0045+rpm*.003,t,.12);}
+   e1.frequency.setTargetAtTime(f,t,.06);e2.frequency.setTargetAtTime(f*1.01,t,.06);eLp.frequency.setTargetAtTime(220+rpm*480+throttle*380,t,.08);eG.gain.setTargetAtTime(.014+throttle*.022+rpm*.012,t,.12);} // engine: audible under the music, still a hum rather than a buzz
   else eG.gain.setTargetAtTime(0,t,.1);
-  tG.gain.setTargetAtTime(mode==='car'?Math.min(.016,v*.001):mode==='bike'?Math.min(.012,v*.002):0,t,.1);tBp.frequency.setTargetAtTime(500+v*30,t,.2);
+  tG.gain.setTargetAtTime(mode==='car'?Math.min(.03,v*.0018):mode==='bike'?Math.min(.012,v*.002):0,t,.1);tBp.frequency.setTargetAtTime(500+v*30,t,.2);
   if(coach&&v>.6){stepT-=dt*Math.min(4.5,v*.8);if(stepT<=0){stepT=1;hoof(.12);setTimeout(()=>hoof(.09),110);}}
   bellT-=dt;if(bellT<=0){bellT=10+Math.random()*25;bell();}
   lastSpeed=v;
-  mus.gain.setTargetAtTime(musicOn?.6:0,t,.8);if(musicOn)scheduleMusic();
+  mus.gain.setTargetAtTime(musicOn?.42:0,t,.8);if(musicOn)scheduleMusic();
  }
  return {update,horn,bell,music(on){musicOn=on===undefined?!musicOn:!!on;return musicOn;}};
 }

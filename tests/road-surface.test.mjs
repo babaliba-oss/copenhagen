@@ -48,23 +48,23 @@ const peak=samples=>Math.max(...samples.map(s=>Math.abs(s.bob)));
 const std=values=>{const m=values.reduce((a,b)=>a+b,0)/values.length;return Math.sqrt(values.reduce((a,v)=>a+(v-m)**2,0)/values.length);};
 const crossingsPerSecond=(samples,dt)=>{let n=0;for(let i=1;i<samples.length;i++)if((samples[i].bob>=0)!==(samples[i-1].bob>=0))n++;return n/2/(samples.length*dt);};
 
-test('body bob scales with speed: ~2.5 cm peak at 20 km/h, ~5 cm at 50 km/h, 15-20 mm standard deviation at 30 km/h, nothing at rest',()=>{
+test('body bob scales with speed: ~1.5 cm peak at 20 km/h, ~3 cm at 50 km/h, 9-12 mm standard deviation at 30 km/h, nothing at rest',()=>{
  assert.equal(rumbleAmplitude(0),0);
- assert.ok(rumbleAmplitude(20/3.6)>=.025&&rumbleAmplitude(20/3.6)<=.035);
- assert.ok(rumbleAmplitude(50/3.6)>=.055&&rumbleAmplitude(50/3.6)<=.07);
+ assert.ok(rumbleAmplitude(20/3.6)>=.015&&rumbleAmplitude(20/3.6)<=.021);
+ assert.ok(rumbleAmplitude(50/3.6)>=.034&&rumbleAmplitude(50/3.6)<=.04);
  assert.equal(rumbleAmplitude(140/3.6),RUMBLE.maxAmplitude);
  const slow=run('setts',20/3.6,3,1/120).slice(60),fast=run('setts',50/3.6,3,1/120).slice(60),mid=run('setts',30/3.6,4,1/120).slice(120);
- assert.ok(peak(slow)>=.018&&peak(slow)<=.032,`20 km/h peak ${peak(slow)}`);
- assert.ok(peak(fast)>=.038&&peak(fast)<=.06,`50 km/h peak ${peak(fast)}`);
+ assert.ok(peak(slow)>=.01&&peak(slow)<=.02,`20 km/h peak ${peak(slow)}`);
+ assert.ok(peak(fast)>=.022&&peak(fast)<=.038,`50 km/h peak ${peak(fast)}`);
  const bodyStd=std(mid.map(s=>s.bob));
- assert.ok(bodyStd>=.015&&bodyStd<=.02,`body std at 30 km/h ${bodyStd}`);
+ assert.ok(bodyStd>=.008&&bodyStd<=.013,`body std at 30 km/h ${bodyStd}`);
  const rest=run('setts',0,2,1/60);assert.ok(rest.every(s=>s.bob===0&&s.roll===0&&s.cameraBob===0),'parked on setts: still');
 });
 
-test('camera sway is a gentle third of the body: 5-8 mm standard deviation at 30 km/h, nothing above ~6 Hz',()=>{
+test('camera sway is a gentle third of the body: 3-5 mm standard deviation at 30 km/h, nothing above ~6 Hz',()=>{
  const mid=run('setts',30/3.6,6,1/240).slice(240),fast=run('setts',50/3.6,6,1/240).slice(240);
  const camStd=std(mid.map(s=>s.cameraBob)),bodyStd=std(mid.map(s=>s.bob));
- assert.ok(camStd>=.005&&camStd<=.008,`camera std at 30 km/h ${camStd}`);
+ assert.ok(camStd>=.0028&&camStd<=.0052,`camera std at 30 km/h ${camStd}`);
  assert.ok(camStd<bodyStd*.45,`camera ${camStd} vs body ${bodyStd}`);
  for(const [label,samples] of [['30',mid],['50',fast]]){
   const f=crossingsPerSecond(samples.map(s=>s.cameraBob),1/240);

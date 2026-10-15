@@ -154,10 +154,12 @@ export function createSpeciesTrees(trees,{detailed=false}={}){
   geos.forEach(g=>g.dispose());
   bm.perObjectFrustumCulled=true;bm.castShadow=level==='near';bm.receiveShadow=level!=='far';bm.userData.shadowLod=true;meshes[level]=bm;group.add(bm);
  }
- let last=null;const shown=new Array(items.length).fill(null);
- const update=focus=>{
-  if(last&&Math.hypot(focus.x-last.x,focus.z-last.z)<8)return;last={x:focus.x,z:focus.z};
-  items.forEach(({t},i)=>{const l=treeLevel(Math.hypot(t.p[0]-focus.x,t.p[1]-focus.z));if(l===shown[i])return;
+ let last=null,lastHigh=false;const shown=new Array(items.length).fill(null);
+ // high: the camera looks down from well above the street (high camera, overhead views). The detailed crowns'
+ // leaf cards stand mostly upright and read as bare branches from above, so the procedural 'mid' crowns are used.
+ const update=(focus,{high=false}={})=>{
+  if(last&&high===lastHigh&&Math.hypot(focus.x-last.x,focus.z-last.z)<8)return;last={x:focus.x,z:focus.z};lastHigh=high;
+  items.forEach(({t},i)=>{let l=treeLevel(Math.hypot(t.p[0]-focus.x,t.p[1]-focus.z));if(high&&l==='near')l='mid';if(l===shown[i])return;
    const vis=(lv,on)=>{if(lv==='near'&&ez?.has(i))ez.show(i,on);else meshes[lv].setVisibleAt(ids[lv][i],on);};
    if(shown[i])vis(shown[i],false);if(l)vis(l,true);shown[i]=l;});
  };

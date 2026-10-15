@@ -155,6 +155,9 @@ export class Mobility {
    const p=this.position(a);
    if(a.stationOnly&&!inStationTrafficArea(p))continue;
    if(!a.walking&&(this.cars.some(b=>b!==a&&b.edge&&trafficFootprintsOverlap(p,b))||this.hitsBody(carBox(p,1))||this.inConflict(a.edge,a.s)))continue;
+   // Walkers spread out: at most one per 8 m of footway. Where few paths are near (a pier, a quay between
+   // canals) the 300 walkers otherwise all landed on the same few edges and moved about as one clump.
+   if(a.walking){let on=0;for(const b of this.people)if(b!==a&&b.edge===a.edge)on++;if(on>=Math.max(1,a.edge.length/8))continue;}
    if(this.world.buildings.at(p.x,p.z)||(a.walking?!this.walkable(p.x,p.z,a.edge):!vehicleFitsRoad(p,this.world)))continue;
    // A long straight main road is almost always in view; corridor cars may appear there, but only in the far haze.
    const distance=Math.hypot(p.x-player.x,p.z-player.z);

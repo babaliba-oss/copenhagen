@@ -117,10 +117,19 @@ export function lakeAt(x,z){
 // quay edge at sea-bed height. Where that happens outside the mapped water (isWet false) the ground showed as
 // a dark pit beside the promenade that the car and people could drop into: raise those samples to quay
 // height (lift metres above the water). Returns the number of samples raised.
-export function raiseDryHollows(isWet,{lift=1.6,below=1.2}={},f=field){
+export function raiseDryHollows(isWet,{lift=1.6,below=1.2,shelf=true}={},f=field){
  if(!f?.water)return 0;const n=f.size,w=f.water,g=f.ground,sea=seaLevel(f);let raised=0;
+ // wet: 1 = inside the mapped water, 2 = dry land. Deep samples are water without asking the polygons.
+ const wet=new Uint8Array(n*n),at=k=>{if(!wet[k]){const wl=w[k];wet[k]=!Number.isNaN(wl)&&(g[k]<wl-2.5||isWet(-f.extent+(k%n)*f.cell,-f.extent+((k/n)|0)*f.cell))?1:2;}return wet[k];};
  for(let j=0;j<n;j++)for(let i=0;i<n;i++){const k=j*n+i,wl=Number.isNaN(w[k])?sea:w[k];if(wl===null||g[k]>=wl+below)continue; // away from water: pits below the harbour level (light wells, survey noise)
-  if(isWet(-f.extent+i*f.cell,-f.extent+j*f.cell))continue;g[k]=wl+lift;raised++;}
+  if(at(k)===1)continue;g[k]=wl+lift;raised++;}
+ // Quay shelf: the first water sample beside dry land takes the land's height, so the bilinear ground under
+ // a pavement running to the quay edge stays level instead of sloping down into the water over the last 3 m.
+ // (Drawn ground under water is sunk below the surface anyway; the quay wall hides the step.)
+ if(shelf){const set=[];
+  for(let j=1;j<n-1;j++)for(let i=1;i<n-1;i++){const k=j*n+i;if(Number.isNaN(w[k])||at(k)!==1||g[k]>=w[k]+below)continue;let top=-Infinity;
+   for(const q of [k-1,k+1,k-n,k+n])if(at(q)===2&&g[q]>top)top=g[q];if(top>g[k])set.push(k,top);}
+  for(let x=0;x<set.length;x+=2)g[set[x]]=set[x+1];raised+=set.length/2;}
  return raised;
 }
 export function flattenWaterBodies(f=field){
