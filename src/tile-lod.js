@@ -54,7 +54,7 @@ export function createMergedShells(array,parts,textures,mask=null){
   const texture=r.texture?textures.get(r.texture)||null:null;
   if(!texture){geometry.setAttribute('color',shellColourAttribute(array,parts,r.start,r.end));geometry.setAttribute('aRel',shellHeightAttribute(array,parts,r.start,r.end));}
   const material=texture?new THREE.MeshStandardMaterial({map:texture,roughness:.86,side:THREE.DoubleSide}):facadeGrain(new THREE.MeshStandardMaterial({vertexColors:true,roughness:.86,side:THREE.DoubleSide}),{windows:true});
-  const mesh=new THREE.Mesh(geometry,material);mesh.castShadow=false;mesh.receiveShadow=true;
+  const mesh=new THREE.Mesh(geometry,material);mesh.castShadow=false;mesh.receiveShadow=true;mesh.userData.range=[r.start,r.end]; // source vertex range (occlusion tests per part)
   if(mask){const bid=new Float32Array(r.end-r.start);for(const p of parts)if(p.start>=r.start&&p.start<r.end)bid.fill(index.get(p),p.start-r.start,p.start-r.start+p.count);geometry.setAttribute('aBid',new THREE.BufferAttribute(bid,1));
    const uniforms={uMask:{value:mask.data},uMaskOn:{value:0}};maskShader(material,uniforms);mesh.customDepthMaterial=maskShader(new THREE.MeshDepthMaterial({depthPacking:THREE.RGBADepthPacking}),uniforms,{fragment:false});mesh.userData.maskOn=uniforms.uMaskOn;mesh.userData.mask=mask;}
   geometry.computeBoundingBox();

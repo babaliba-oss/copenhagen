@@ -74,7 +74,9 @@ export function createKnockables(items,parts,{radius=.3,height=1.1,range=Infinit
 
   // Instances are packed: only items within `range` of the focus (the player) are drawn, so a city-wide set
   // (thousands of bins) costs only the nearby few in triangles and shadow passes.
-  function update(focus){
+  let lastFocus=null;
+  function update(focus=lastFocus){
+    if(focus)lastFocus={x:focus.x,z:focus.z};
     let n=0;
     for(const b of bodies){
       if(b.playerTaken||b.disabled){if(range===Infinity){matrix.makeScale(0,0,0);for(const m of meshes)m.setMatrixAt(n,matrix);n++;}continue;} // unpacked sets keep instance i = item i (per-item colours)

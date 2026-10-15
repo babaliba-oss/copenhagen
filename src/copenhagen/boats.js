@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';
-import {waterAt} from '../terrain.js';
+import {waterAt,groundAt} from '../terrain.js';
 import {inHarbourBath} from './harbour-bath.js';
 
 // Boats (scripts/boats.py → boats.json): moored sailboats, motor boats and wooden boats along the quays,
@@ -61,7 +61,7 @@ export function thinMoorings(list,factor=1.4){
 // Moored boats must float: a hull poking onto the quay (mooring points sit on the quay edge) is nudged out
 // across the water, up to 5 m; one that cannot be cleared is left out.
 const BOAT_BEAM={wooden:3.7,sail:2.5,motor:2.3,ship:7.2};
-export function floatMoorings(list,wet=(x,z)=>waterAt(x,z)!==null){
+export function floatMoorings(list,wet=(x,z)=>{const w=waterAt(x,z);return w!==null&&groundAt(x,z)<w-.2;}){ // the water level is spread a few cells onto the banks: open water is ground below it
  const out=[];
  for(const b of list){const L=(BOAT_LEN[b[3]]||8)*(b[4]||1)/2,W=(BOAT_BEAM[b[3]]||2.5)*(b[4]||1)/2,c=Math.cos(b[2]),s=Math.sin(b[2]);
   // local x across the hull, z along it (rotation about Y by yaw)

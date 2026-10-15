@@ -137,7 +137,7 @@ import {createMobileControls} from './mobile-controls.js';
 import {updateWorldhoodBrand} from './worldhood-brand.js';
 import {installMapillaryAttribution} from './mapillary-attribution.js';
 import './worldhood-brand.css';
-import {decodeTerrain,setTerrain,hasTerrain,groundAt,groundPose,liftBuildings,footprintBase,flattenWaterBodies} from './terrain.js';
+import {decodeTerrain,setTerrain,hasTerrain,groundAt,groundPose,liftBuildings,footprintBase,flattenWaterBodies,waterAt} from './terrain.js';
 import {drapeGeometry,dropSunkenSurfaces,settleObject,createTerrainGround,drawLakeMap} from './terrain-mesh.js';
 const impacts=new ImpactSystem();impacts.onVehicleHit=(from,car,a)=>mobility?.knock(a,from,car)??null;
 const finale=new Finale({doc:document}); // shared offence log, pursuit pressure, arrest cinematic and BUSTED screen
@@ -406,6 +406,16 @@ async function createTrees(trees=data.trees){
  for(const mesh of detailed.children){mesh.userData.shadowLod=true;cells.get(mesh.userData.cell)?.detailed[mesh.userData.lod==='far'?'far':'near'].push(mesh);}
 }
 const FALLBACK_WALLS=['#d9b46a','#c9c2b0','#e3d6b8','#a8503a','#d8a77a','#b9c4bd','#e6dfcf','#9c4a36'];
+// Does the camera ray hit one waiting part's walls (its own triangles in the tile's merged shell) within `far`?
+const _ra=new THREE.Vector3(),_rb=new THREE.Vector3(),_rc=new THREE.Vector3(),_rh=new THREE.Vector3(),_rl=new THREE.Ray(),_rm=new THREE.Matrix4();
+function partOnRay(tile,w,ray,far){
+ for(const m of tile.children){const r=m.userData.range;if(!r||w.start<r[0]||w.start>=r[1])continue;
+  const p=m.geometry.attributes.position;_rl.copy(ray).applyMatrix4(_rm.copy(m.matrixWorld).invert());
+  for(let v=w.start-r[0],e=Math.min(p.count,v+w.count);v+2<e;v+=3){_ra.fromBufferAttribute(p,v);_rb.fromBufferAttribute(p,v+1);_rc.fromBufferAttribute(p,v+2);
+   if(_rl.intersectTriangle(_ra,_rb,_rc,false,_rh)&&_rh.applyMatrix4(m.matrixWorld).distanceTo(ray.origin)<far)return true;}
+  return false;}
+ return false;
+}
 function createFallbackBuildings(buildings=data.buildings){
  const geoms=[];
  const models=roofIndex.tiles.flatMap(t=>t.parts),ratus=new Set(models.filter(m=>m.ratu>0).map(m=>String(m.ratu))),index=new SpatialIndex(models);
@@ -418,7 +428,7 @@ function createFallbackBuildings(buildings=data.buildings){
   const base=.1+footprintBase(b.rings),g=new THREE.ExtrudeGeometry(shape,{depth:h,bevelEnabled:false,steps:1});g.rotateX(-Math.PI/2);g.translate(0,base,0);g.deleteAttribute('uv');
   // Houses without a 3D model: a plausible town-house colour, a darker roof and the shader's storey-and-bay
   // window grid (aRel = height above the base, total height), so they read as buildings, not blank boxes.
-  const k=Math.abs(Math.sin(bb[0]*12.9898+bb[1]*78.233)*43758.5453)%1,wall=new THREE.Color(FALLBACK_WALLS[Math.floor(k*FALLBACK_WALLS.length)]).convertSRGBToLinear(),roof=new THREE.Color(small?'#4a4744':'#5a3a30').convertSRGBToLinear();
+  const k=Math.abs(Math.sin(bb[0]*12.9898+bb[1]*78.233)*43758.5453)%1,wall=new THREE.Color(FALLBACK_WALLS[Math.floor(k*FALLBACK_WALLS.length)]),roof=new THREE.Color(small?'#4a4744':'#5a3a30'); // hex strings are already converted to linear
   const pos=g.attributes.position,nor=g.attributes.normal,col=new Float32Array(pos.count*3),rel=new Float32Array(pos.count*2);
   for(let i=0;i<pos.count;i++){const c=nor.getY(i)>.5?roof:wall;col.set([c.r,c.g,c.b],i*3);rel[i*2]=pos.getY(i)-base;rel[i*2+1]=h;}
   g.setAttribute('color',new THREE.BufferAttribute(col,3));g.setAttribute('aRel',new THREE.BufferAttribute(rel,2));geoms.push(g);
@@ -454,7 +464,7 @@ async function buildRoof(t,at){
   // Far level: one merged shell per atlas. Near level: per-part shells until the worker's details replace them.
   const mask=createShellMask(parts.length);group.add(...createMergedShells(a,parts,textures,mask));
   // Waiting parts keep their own chase-camera fade, written into the mask (see the occlusion pass).
-  const waiting=parts.map((p,i)=>({i,id:p.id,start:p.start,occlusion:{opacity:1,clearTime:1},box:new THREE.Box3(new THREE.Vector3(p.bbox[0]-.5,0,p.bbox[1]-.5),new THREE.Vector3(p.bbox[2]+.5,p.height+.5,p.bbox[3]+.5))}));
+  const waiting=parts.map((p,i)=>({i,id:p.id,start:p.start,count:p.count,occlusion:{opacity:1,clearTime:1},box:new THREE.Box3(new THREE.Vector3(p.bbox[0]-.5,0,p.bbox[1]-.5),new THREE.Vector3(p.bbox[2]+.5,p.height+.5,p.bbox[3]+.5))}));
   Object.assign(group.userData,{textures,windows:0,tile:t,mask,waiting,pending:{array:a,parts,images:new Map([...images].map(([f,i])=>[f,i.bytes]))}});
   freezeTileGroup(group);applyTileLod(group,tileLevel(null,tileDistance(t,at)),at);loadedTiles.set(t.file,group);
   // One atlas upload per frame, then the tile itself: twenty tiles landing after a teleport no longer upload in one frame.
@@ -505,7 +515,7 @@ async function updatePhotos(){
 }
 function initSurfaceStreamer(){
  surfaceStreamer??=createSurfaceStreamer({concurrency:3,onError:handleTileError,load:async (t,{signal}={})=>{
-  const g=dropSunkenSurfaces(drapeGeometry(removeLegacyWater(await geometry(dataUrl(t.file))),{maxEdge:4,mark:true}));
+  const g=dropSunkenSurfaces(drapeGeometry(removeLegacyWater(await geometry(dataUrl(t.file))),{maxEdge:4,mark:true}),{water:(x,z)=>inWaterPolygons(data.water,x,z)?waterAt(x,z):null}); // the mapped water, not the level spread onto the banks
   if(signal?.aborted||gameIsStopped()){g.dispose();return;}
   const m=new THREE.Mesh(g,surfaceMaterial);m.receiveShadow=true;cityModel.add(m);return m;
  }});
@@ -940,8 +950,8 @@ function frame(now){
   // building with a wall missing), so a part fades only if the camera ray really hits its walls in the merged shell.
   for(const tile of loadedTiles.values())if(tile.visible&&tile.userData.level==='near'&&tile.userData.mask?.shown){
    const boxed=new Set();for(const w of tile.userData.waiting)if(ray.intersectBox(w.box,hit)&&hit.distanceTo(camera.position)<limit-3)boxed.add(w);
-   const walls=new Set();if(boxed.size)for(const m of tile.children){const bid=m.geometry?.attributes?.aBid;if(!bid||!m.visible)continue;for(const h of occlusionRay.intersectObject(m,false))walls.add(Math.round(bid.getX(h.face.a)));}
-   for(const w of tile.userData.waiting){const was=w.occlusion.opacity;const fade=boxed.has(w)&&walls.has(w.i);if(!fade&&was>.999)continue;advanceOcclusion(w.occlusion,fade,dt);tile.userData.mask.set(w.i,w.occlusion.opacity>.995?1:Math.max(.01,w.occlusion.opacity));}}
+   const walls=new Set();for(const w of boxed)if(partOnRay(tile,w,ray,limit-3))walls.add(w); // only the boxed parts' own triangles
+   for(const w of tile.userData.waiting){const was=w.occlusion.opacity;const fade=walls.has(w);if(!fade&&was>.999)continue;advanceOcclusion(w.occlusion,fade,dt);tile.userData.mask.set(w.i,w.occlusion.opacity>.995?1:Math.max(.01,w.occlusion.opacity));}}
   for(const tile of loadedTiles.values())if(tile.visible)for(const mesh of tile.children){if(!mesh.visible)continue;const state=mesh.userData.occlusion;if(!updated.has(state)){let fade;if(decided.has(state))fade=decided.get(state);else{const intersects=ray.intersectBox(mesh.userData.box,hit);fade=!!intersects&&hit.distanceTo(camera.position)<limit-3;}advanceOcclusion(state,fade,dt);updated.add(state);}mesh.material.opacity=state.opacity;mesh.material.depthWrite=state.opacity>.999;const fading=state.opacity<.999;if(mesh.material.transparent!==fading){mesh.material.transparent=fading;mesh.material.needsUpdate=true;}}
  }
  // Shadow box and texel snapping follow the active look's sun (weather.js re-applies the same offset below).
