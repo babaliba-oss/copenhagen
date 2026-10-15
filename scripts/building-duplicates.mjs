@@ -3,8 +3,8 @@
 // the same walls. Both drawn, the coplanar walls z-fight into two-tone triangles. Bounding boxes can't tell a
 // copy from a part that holds a building's other walls, so this compares the actual triangles: a part is a copy
 // when at least 85 % of its surface lies within 0.5 m of another part's surface (and that other part is not
-// itself mostly covered by it, else the smaller / unnamed of the two goes). A crude stand-in of a few triangles
-// lying within 2 m of a detailed part's walls goes too.
+// itself mostly covered by it, else the smaller / unnamed of the two goes). Small model fragments near a detailed part
+// are NOT copies: they are often the walls the detailed part lacks (dropping them left buildings hollow).
 // Writes public/cities/<city>/duplicates.json: ["<tile file>:<vertex start>", ...].   node scripts/building-duplicates.mjs copenhagen
 import fs from 'node:fs';import zlib from 'node:zlib';
 const city=process.argv[2]||'copenhagen',dir=`public/cities/${city}`;
@@ -44,8 +44,7 @@ for(const list of grid.values())for(let x=0;x<list.length;x++)for(let y=x+1;y<li
  if(both<.5*Math.min(ar(a),ar(b)))continue;pairs++;
  const ab=coverage(A,B),ba=coverage(B,A);let loser=null;
  if(ab>=.85&&ba>=.85)loser=(!!A.p.name!==!!B.p.name)?(A.p.name?B:A):(A.tri.length<B.tri.length?A:B);else if(ab>=.85)loser=A;else if(ba>=.85)loser=B;
- else{ // a crude stand-in (a few triangles) sitting within 2 m of a detailed part's walls: the same building, roughly
-  const [c,d]=A.tri.length<B.tri.length?[A,B]:[B,A];if(c.tri.length<=40&&c.tri.length*4<=d.tri.length&&coverage(c,d,4)>=.7)loser=c;}
+
  if(loser)drop.add(loser.p.key);}
 fs.writeFileSync(`${dir}/duplicates.json`,JSON.stringify([...drop]));
 console.log(city,'pairs checked',pairs,'copies',drop.size);

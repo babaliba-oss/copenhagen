@@ -286,7 +286,7 @@ surfaceMaterial.onBeforeCompile=shader=>{
    #endif
   }
   // Stone carriageways (aaa99e) get the shared photo-guided granite setts; light islands keep slabs.
-  else if(diffuseColor.r<0.55){vec2 su=vGround.xz/vec2(2.2,1.1);diffuseColor.rgb=textureGrad(tSettsC,su,GDX/vec2(2.2,1.1),GDY/vec2(2.2,1.1)).rgb*vec3(0.92,0.92,0.95)*(1.0+(groundNoise(vGround.xz/9.0)-0.5)*0.12);gN=textureGrad(tSettsN,su,GDX/vec2(2.2,1.1),GDY/vec2(2.2,1.1)).xyz*2.0-1.0;gNw=texFade;gRough=textureGrad(tSettsR,su,GDX/vec2(2.2,1.1),GDY/vec2(2.2,1.1)).r;grain=0.0;} // scanned cobbles
+  else if(diffuseColor.r<0.55){vec2 su=vGround.xz/vec2(2.2,1.1);{vec3 st=textureGrad(tSettsC,su,GDX/vec2(2.2,1.1),GDY/vec2(2.2,1.1)).rgb;diffuseColor.rgb=mix(st,vec3(dot(st,vec3(.3,.59,.11))),.55)*vec3(0.95,0.95,0.98)*(1.0+(groundNoise(vGround.xz/9.0)-0.5)*0.12);} /* granite grey: the scan alone read as orange dirt in low sun */gN=textureGrad(tSettsN,su,GDX/vec2(2.2,1.1),GDY/vec2(2.2,1.1)).xyz*2.0-1.0;gNw=texFade;gRough=textureGrad(tSettsR,su,GDX/vec2(2.2,1.1),GDY/vec2(2.2,1.1)).r;grain=0.0;} // scanned cobbles
   else {vec2 cell=abs(fract(vGround.xz/vec2(0.28,0.2))-0.5);float seam=smoothstep(0.42,0.49,max(cell.x,cell.y));diffuseColor.rgb*=1.0-mix(0.2,seam,detail)*0.22;}
   diffuseColor.rgb*=1.0+grain*0.13;
  }else if(vGround.y>0.04&&vGround.y<0.06){
