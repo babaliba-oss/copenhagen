@@ -103,14 +103,14 @@ export function settleObject(root,{maxEdge=4,skip=null}={}){
 
 // The bare ground: chunked grids following the terrain half a metre below street level (as the flat
 // ground plane was), with a coarse skirt out to the horizon. Normals give the hills their shading.
-export function createTerrainGround(material,{cell=10,chunk=32,size=11000,depth=-.5}={}){
+export function createTerrainGround(material,{cell=10,chunk=32,size=11000,depth=-.5,wet=null}={}){
  const f=terrain(),group=new THREE.Group();group.name='Terrain ground';if(!f)return group;
  const E=Math.floor(f.extent/cell)*cell,n=Math.round(2*E/cell);
  const grid=(xs,zs)=>{const pos=[],nor=[],idx=[],w=xs.length;
   // Under (or next to) water the ground drops 2 m below the water surface: the elevation model's ground is often
   // above the water layer in the harbour and canals, and drawing it there hid the water (the "muddy" harbour).
   const sink=(x,z)=>{let w=null;for(const [a,b] of [[0,0],[cell/2,0],[-cell/2,0],[0,cell/2],[0,-cell/2]]){const v=waterAt(x+a,z+b);if(v!=null)w=w==null?v:Math.min(w,v);}return w;};
-  for(const z of zs)for(const x of xs){const g0=groundAt(x,z),w0=sink(x,z),w=w0!=null&&g0<w0+1?w0:null; // banks well above the water (quays) keep their height: sinking every vertex near a canal dug pits beside the streets
+  for(const z of zs)for(const x of xs){const g0=groundAt(x,z),w0=sink(x,z),w=w0!=null&&(g0<w0+1||wet?.(x,z))?w0:null; // banks well above the water (quays) keep their height: sinking every vertex near a canal dug pits beside the streets
    pos.push(x,w==null?g0+depth:Math.min(g0+depth,w-2),z);const dx=groundAt(x+1,z)-groundAt(x-1,z),dz=groundAt(x,z+1)-groundAt(x,z-1),l=Math.hypot(dx,2,dz);nor.push(-dx/l,2/l,-dz/l);}
   for(let j=0;j+1<zs.length;j++)for(let i=0;i+1<w;i++){const a=j*w+i,b=a+1,c=a+w,d=c+1;idx.push(a,c,b,b,c,d);}
   const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));g.setAttribute('normal',new THREE.Float32BufferAttribute(nor,3));g.setIndex(idx);g.computeBoundingSphere();g.computeBoundingBox();return g;};
