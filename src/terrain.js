@@ -51,6 +51,14 @@ export function groundAt(x,z){
  const a=u-i,b=v-j,g=f.ground,k=j*f.size+i;
  return (g[k]*(1-a)+g[k+1]*a)*(1-b)+(g[k+f.size]*(1-a)+g[k+f.size+1]*a)*b;
 }
+// The common water level (median of every levelled water sample): the harbour. For mapped water the field
+// gave no level (narrow slips, small basins), so it is not draped onto the sea bed and out of sight.
+let seaCache=null;
+export function seaLevel(f=field){
+ if(!f?.water)return null;if(seaCache?.f===f)return seaCache.v;
+ const v=[];for(let k=0;k<f.water.length;k+=7)if(!Number.isNaN(f.water[k]))v.push(f.water[k]);v.sort((a,b)=>a-b);
+ seaCache={f,v:v.length?v[v.length>>1]:null};return seaCache.v;
+}
 // Water surface height (relative to base) where mapped water has a level, else null.
 export function waterAt(x,z){
  const f=field;if(f===null||!f.water)return null;
@@ -105,6 +113,16 @@ export function lakeAt(x,z){
 // level): the elevation model still put bumps of a few metres into the water layer along narrow canals and
 // under bridges, which drew the water surface as a ramp over the quay. Each 4-connected water region of the
 // grid takes its median level.
+// The water level is spread a few cells onto the banks, and the elevation model sometimes reads a pier or a
+// quay edge at sea-bed height. Where that happens outside the mapped water (isWet false) the ground showed as
+// a dark pit beside the promenade that the car and people could drop into: raise those samples to quay
+// height (lift metres above the water). Returns the number of samples raised.
+export function raiseDryHollows(isWet,{lift=1.6,below=1.2}={},f=field){
+ if(!f?.water)return 0;const n=f.size,w=f.water,g=f.ground,sea=seaLevel(f);let raised=0;
+ for(let j=0;j<n;j++)for(let i=0;i<n;i++){const k=j*n+i,wl=Number.isNaN(w[k])?sea:w[k];if(wl===null||g[k]>=wl+below)continue; // away from water: pits below the harbour level (light wells, survey noise)
+  if(isWet(-f.extent+i*f.cell,-f.extent+j*f.cell))continue;g[k]=wl+lift;raised++;}
+ return raised;
+}
 export function flattenWaterBodies(f=field){
  if(!f?.water)return 0;const w=f.water,n=f.size,label=new Int32Array(n*n).fill(-1),stack=[];let regions=0;
  for(let s=0;s<n*n;s++){if(Number.isNaN(w[s])||label[s]>=0)continue;

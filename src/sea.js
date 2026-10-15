@@ -3,6 +3,7 @@ import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';
 import {WATER_LEVEL,extractQuayEdges,buildQuayGeometry,createGroundGeometry,groundSizeForExtent} from './quay.js';
 import {ALLAS} from './waterfront-landmarks.js';
 import {drapeGeometry,createLakeGeometry} from './terrain-mesh.js';
+import {hasTerrain,seaLevel,terrain} from './terrain.js';
 
 export {WATER_LEVEL};
 
@@ -162,6 +163,12 @@ export function createSea(water,land={},{helsinkiHarbour=true,groundExtent=0}={}
   const sea=new THREE.Mesh(drapeGeometry(mergeGeometries(geometries),{water:true,lift:-WATER_LEVEL-.1}),material);sea.name='Sea surface';geometries.forEach(g=>g.dispose());
   sea.onBeforeRender=followSky;
   group.add(sea);
+  // Under the harbour polygons, one plane at the common water level: where the polygon triangulation leaves a
+  // gap (a sliver along a pier, a hole touching the outline) the sea bed showed as a dark trench beside the
+  // promenade. Half a metre lower than the real surface, so it only shows through those gaps.
+  const level=hasTerrain()?seaLevel():null;
+  const ext=groundExtent>0?groundExtent:terrain()?.extent||0;
+  if(level!==null&&ext>0){const under=new THREE.Mesh(new THREE.PlaneGeometry(ext*2,ext*2).rotateX(-Math.PI/2).translate(0,level-.6,0),material);under.name='Sea underlay';under.onBeforeRender=followSky;group.add(under);}
  }
  // Lakes found only in the elevation model (src/terrain.js), at their own levels.
  const lakeGeometry=createLakeGeometry();

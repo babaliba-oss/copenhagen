@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import {groundAt,waterAt,hasTerrain,terrain,footprintBase} from './terrain.js';
+import {groundAt,waterAt,hasTerrain,terrain,footprintBase,seaLevel} from './terrain.js';
 
 // Geometry that follows the ground (src/terrain.js). Flat cities skip all of this.
 
@@ -35,7 +35,7 @@ export function subdivideGeometry(source,maxEdge=4,{height=null,tolerance=.03}={
 export function drapeGeometry(geometry,{maxEdge=4,lift=0,water=false,mark=false,lines=false}={}){
  if(!hasTerrain())return geometry;
  if(lines)geometry.userData.lines=true;
- const surface=(x,z)=>{if(water){const w=waterAt(x,z);if(w!==null)return w;}return groundAt(x,z);};
+ const surface=(x,z)=>{if(water){const w=waterAt(x,z);if(w!==null)return w;const s=seaLevel(),g=groundAt(x,z);if(s!==null&&g<s)return s;return g;}return groundAt(x,z);};
  const g=maxEdge?subdivideGeometry(geometry,maxEdge,{height:lines?null:surface}):geometry,p=g.attributes.position,added=mark?new Float32Array(p.count):null;
  const hs=new Float32Array(p.count);for(let i=0;i<p.count;i++){const x=p.getX(i),z=p.getZ(i),h=surface(x,z)+lift;hs[i]=h-lift;p.setY(i,p.getY(i)+h);if(added)added[i]=h;}
  if(added)g.setAttribute('terrainY',new THREE.BufferAttribute(added,1));
@@ -110,7 +110,8 @@ export function createTerrainGround(material,{cell=10,chunk=32,size=11000,depth=
   // Under (or next to) water the ground drops 2 m below the water surface: the elevation model's ground is often
   // above the water layer in the harbour and canals, and drawing it there hid the water (the "muddy" harbour).
   const sink=(x,z)=>{let w=null;for(const [a,b] of [[0,0],[cell/2,0],[-cell/2,0],[0,cell/2],[0,-cell/2]]){const v=waterAt(x+a,z+b);if(v!=null)w=w==null?v:Math.min(w,v);}return w;};
-  for(const z of zs)for(const x of xs){const w=sink(x,z);pos.push(x,w==null?groundAt(x,z)+depth:Math.min(groundAt(x,z)+depth,w-2),z);const dx=groundAt(x+1,z)-groundAt(x-1,z),dz=groundAt(x,z+1)-groundAt(x,z-1),l=Math.hypot(dx,2,dz);nor.push(-dx/l,2/l,-dz/l);}
+  for(const z of zs)for(const x of xs){const g0=groundAt(x,z),w0=sink(x,z),w=w0!=null&&g0<w0+1?w0:null; // banks well above the water (quays) keep their height: sinking every vertex near a canal dug pits beside the streets
+   pos.push(x,w==null?g0+depth:Math.min(g0+depth,w-2),z);const dx=groundAt(x+1,z)-groundAt(x-1,z),dz=groundAt(x,z+1)-groundAt(x,z-1),l=Math.hypot(dx,2,dz);nor.push(-dx/l,2/l,-dz/l);}
   for(let j=0;j+1<zs.length;j++)for(let i=0;i+1<w;i++){const a=j*w+i,b=a+1,c=a+w,d=c+1;idx.push(a,c,b,b,c,d);}
   const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));g.setAttribute('normal',new THREE.Float32BufferAttribute(nor,3));g.setIndex(idx);g.computeBoundingSphere();g.computeBoundingBox();return g;};
  const range=(a,b,step)=>{const out=[];for(let x=a;x<b-1e-6;x+=step)out.push(x);out.push(b);return out;};

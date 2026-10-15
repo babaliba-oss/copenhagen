@@ -228,3 +228,13 @@ test('surface triangles draped just above water are dropped, quay-level ones kep
  assert.equal(g.userData.sunkenDropped,1);
  assert.deepEqual([...g.index.array],[3,4,5,6,7,8]);
 });
+
+test('dry samples at sea-bed height outside the mapped water are raised to quay height', async () => {
+ const {raiseDryHollows}=await import('../src/terrain.js');
+ const size=5,ground=new Float32Array(size*size).fill(-8),water=new Float32Array(size*size).fill(-6);
+ const f={size,cell:2,extent:4,ground,water};
+ const n=raiseDryHollows((x,z)=>x<0,{},f); // the west half is mapped water
+ assert.equal(n,15);                             // x = 0, 2, 4 are dry
+ assert.equal(ground[0],-8);                      // x=-4: water, untouched
+ assert.ok(Math.abs(ground[4]-(-4.4))<1e-6);      // x=+4: dry, raised to water+1.6
+});

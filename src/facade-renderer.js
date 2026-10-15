@@ -164,8 +164,8 @@ export function createFacade(faces,spec){
     if(door!==null){const s=door,y0=band.y0;
      // Street door: stone surround, two panelled leaves set back in it, a glazed fanlight and a step.
      for(const dx of [-.74,.74])slab(F,B,s+dx,y0+1.4,0,.18,2.8,.14,c.surround);slab(F,B,s,y0+2.86,0,1.66,.16,.18,c.cornice);
-     flat(F,B,s,y0+1.12,.02,1.3,2.24,c.door);flat(F,B,s,y0+1.12,.03,.04,2.2,linear('#1c1410'));
-     for(const dx of [-.33,.33])for(const [py,ph] of [[.62,.8],[1.62,.9]])flat(F,B,s+dx,y0+py,.035,.42,ph,c.door.clone().multiplyScalar(1.25));
+     flat(F,B,s,y0+1.12,.07,1.3,2.24,c.door);flat(F,B,s,y0+1.12,.08,.04,2.2,linear('#1c1410')); // 7 cm proud: the model's walls are not perfectly flat, and a leaf at 2 cm vanished into the brick
+     for(const dx of [-.33,.33])for(const [py,ph] of [[.62,.8],[1.62,.9]])flat(F,B,s+dx,y0+py,.085,.42,ph,c.door.clone().multiplyScalar(1.25));
      pane(F,G,s,y0+2.5,1.3,.42,c.glass);flat(F,B,s,y0+2.27,.04,1.32,.06,c.surround);
      slab(F,B,s,y0+.07,0,1.8,.14,.42,c.plinth);}
     continue;}
