@@ -28,6 +28,6 @@ export function materialiseBuilding(data,textures){
   if(source.shell&&!textured)facadeGrain(material,{stone:!!p.noFacade}); // churches and towers: dressed stone
   if(combined)litWindows(material,{attribute:'aGlass'});
   else if((values.roughness===.19&&values.metalness===.55)||(values.roughness===.3&&values.metalness===.1&&values.vertexColors))litWindows(material); // window glazing (building-detail.js) lights up at night
-  const mesh=new THREE.Mesh(geometry,material);mesh.castShadow=source.shell;mesh.receiveShadow=true;mesh.userData={box,occlusion,shell:source.shell,ratu:p.ratu,role:source.role||'detail',provisional:!!source.provisional};return mesh;
+  const mesh=new THREE.Mesh(geometry,material);mesh.castShadow=source.shell;mesh.receiveShadow=true;mesh.userData={box,occlusion,shell:source.shell,id:p.id,ratu:p.ratu,role:source.role||'detail',provisional:!!source.provisional};return mesh;
  });
 }

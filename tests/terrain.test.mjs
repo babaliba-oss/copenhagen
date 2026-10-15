@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import {encodeTerrain,decodeTerrain,setTerrain,groundAt,waterAt,lakeAt,groundPose,footprintBase,liftBuildings,hasTerrain} from '../src/terrain.js';
-import {drapeGeometry,settleObject,subdivideGeometry,createLakeGeometry,lakeSurface} from '../src/terrain-mesh.js';
+import {drapeGeometry,dropSunkenSurfaces,settleObject,subdivideGeometry,createLakeGeometry,lakeSurface} from '../src/terrain-mesh.js';
 import {makeCar,driveStep} from '../src/physics.js';
 import {drivingCameraPose} from '../src/driving-camera.js';
 import {SpatialIndex} from '../src/geo.js';
@@ -217,4 +217,14 @@ test('Tampere: no drivable street jumps at its interchanges (Rantatunneli, Sorin
  assert.ok(spikes.length<=12,`${spikes.length} spots above 12 %`);
  for(const [x,z] of [[757,-1062],[603,-1037],[624,-882],[684,308],[-227,757]])assert.ok(!spikes.some(p=>Math.hypot(p.x-x,p.z-z)<30),`interchange at ${x},${z}`);
  setTerrain(null);
+});
+
+test('surface triangles draped just above water are dropped, quay-level ones kept', () => {
+ const tri=(x,h)=>[x,0,0, x+1,0,0, x,0,1].map((v,i)=>i%3===1?h:v);
+ const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.BufferAttribute(new Float32Array([...tri(0,0),...tri(10,0),...tri(20,0)]),3));
+ g.setAttribute('terrainY',new THREE.BufferAttribute(new Float32Array([-5.2,-5.2,-5.2, -4,-4,-4, -5.2,-5.2,-5.2]),1));
+ const water=(x)=>x<15?-6.1:null; // first two triangles over water, the third on land
+ dropSunkenSurfaces(g,{water});
+ assert.equal(g.userData.sunkenDropped,1);
+ assert.deepEqual([...g.index.array],[3,4,5,6,7,8]);
 });

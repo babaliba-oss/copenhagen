@@ -137,7 +137,7 @@ import {updateWorldhoodBrand} from './worldhood-brand.js';
 import {installMapillaryAttribution} from './mapillary-attribution.js';
 import './worldhood-brand.css';
 import {decodeTerrain,setTerrain,hasTerrain,groundAt,groundPose,liftBuildings,footprintBase,flattenWaterBodies} from './terrain.js';
-import {drapeGeometry,settleObject,createTerrainGround,drawLakeMap} from './terrain-mesh.js';
+import {drapeGeometry,dropSunkenSurfaces,settleObject,createTerrainGround,drawLakeMap} from './terrain-mesh.js';
 const impacts=new ImpactSystem();impacts.onVehicleHit=(from,car,a)=>mobility?.knock(a,from,car)??null;
 const finale=new Finale({doc:document}); // shared offence log, pursuit pressure, arrest cinematic and BUSTED screen
 const locationReadout=createLocationReadout();
@@ -404,6 +404,7 @@ async function createTrees(trees=data.trees){
  const cells=new Map(treeChunks.map(c=>[c.key,c]));
  for(const mesh of detailed.children){mesh.userData.shadowLod=true;cells.get(mesh.userData.cell)?.detailed[mesh.userData.lod==='far'?'far':'near'].push(mesh);}
 }
+const FALLBACK_WALLS=['#d9b46a','#c9c2b0','#e3d6b8','#a8503a','#d8a77a','#b9c4bd','#e6dfcf','#9c4a36'];
 function createFallbackBuildings(buildings=data.buildings){
  const geoms=[];
  const models=roofIndex.tiles.flatMap(t=>t.parts),ratus=new Set(models.filter(m=>m.ratu>0).map(m=>String(m.ratu))),index=new SpatialIndex(models);
@@ -412,10 +413,16 @@ function createFallbackBuildings(buildings=data.buildings){
   if(ratus.has(String(b.ratu))||index.near(cx,cz).some(m=>{const a=m.bbox;return Math.max(0,Math.min(a[2],bb[2])-Math.max(a[0],bb[0]))*Math.max(0,Math.min(a[3],bb[3])-Math.max(a[1],bb[1]))/Math.max(1,(bb[2]-bb[0])*(bb[3]-bb[1]))>.5;}))continue;
   const shape=new THREE.Shape(b.rings[0].map(p=>new THREE.Vector2(p[0],-p[1])));
   for(const r of b.rings.slice(1))shape.holes.push(new THREE.Path(r.map(p=>new THREE.Vector2(p[0],-p[1]))));
-  const small=(b.bbox[2]-b.bbox[0])*(b.bbox[3]-b.bbox[1])<90;const h=small?3.5:15;
-  const g=new THREE.ExtrudeGeometry(shape,{depth:h,bevelEnabled:false,steps:1});g.rotateX(-Math.PI/2);g.translate(0,.1+footprintBase(b.rings),0);g.deleteAttribute('uv');geoms.push(g);
+  const small=(b.bbox[2]-b.bbox[0])*(b.bbox[3]-b.bbox[1])<90;const h=b.height>2?Math.min(60,b.height):small?3.5:15;
+  const base=.1+footprintBase(b.rings),g=new THREE.ExtrudeGeometry(shape,{depth:h,bevelEnabled:false,steps:1});g.rotateX(-Math.PI/2);g.translate(0,base,0);g.deleteAttribute('uv');
+  // Houses without a 3D model: a plausible town-house colour, a darker roof and the shader's storey-and-bay
+  // window grid (aRel = height above the base, total height), so they read as buildings, not blank boxes.
+  const k=Math.abs(Math.sin(bb[0]*12.9898+bb[1]*78.233)*43758.5453)%1,wall=new THREE.Color(FALLBACK_WALLS[Math.floor(k*FALLBACK_WALLS.length)]).convertSRGBToLinear(),roof=new THREE.Color(small?'#4a4744':'#5a3a30').convertSRGBToLinear();
+  const pos=g.attributes.position,nor=g.attributes.normal,col=new Float32Array(pos.count*3),rel=new Float32Array(pos.count*2);
+  for(let i=0;i<pos.count;i++){const c=nor.getY(i)>.5?roof:wall;col.set([c.r,c.g,c.b],i*3);rel[i*2]=pos.getY(i)-base;rel[i*2+1]=h;}
+  g.setAttribute('color',new THREE.BufferAttribute(col,3));g.setAttribute('aRel',new THREE.BufferAttribute(rel,2));geoms.push(g);
  }
- if(geoms.length){const mesh=new THREE.Mesh(mergeGeometries(geoms),new THREE.MeshStandardMaterial({color:'#c5c4b8',roughness:1}));mesh.castShadow=true;mesh.receiveShadow=true;cityModel.add(mesh);geoms.forEach(g=>g.dispose());}
+ if(geoms.length){const mesh=new THREE.Mesh(mergeGeometries(geoms),facadeGrain(new THREE.MeshStandardMaterial({vertexColors:true,roughness:.88}),{windows:true}));mesh.name='Unmodelled houses';console.info('Unmodelled houses',geoms.length);mesh.castShadow=true;mesh.receiveShadow=true;cityModel.add(mesh);geoms.forEach(g=>g.dispose());}
 }
 // Building materials: keep one already-compiled material of each shader variant alive. Disposing the last
 // one released its program, and the next tile of that kind recompiled it on the spot (a long frame, worst on
@@ -497,7 +504,7 @@ async function updatePhotos(){
 }
 function initSurfaceStreamer(){
  surfaceStreamer??=createSurfaceStreamer({concurrency:3,onError:handleTileError,load:async (t,{signal}={})=>{
-  const g=drapeGeometry(removeLegacyWater(await geometry(dataUrl(t.file))),{maxEdge:4,mark:true});
+  const g=dropSunkenSurfaces(drapeGeometry(removeLegacyWater(await geometry(dataUrl(t.file))),{maxEdge:4,mark:true}));
   if(signal?.aborted||gameIsStopped()){g.dispose();return;}
   const m=new THREE.Mesh(g,surfaceMaterial);m.receiveShadow=true;cityModel.add(m);return m;
  }});
@@ -1251,7 +1258,7 @@ async function boot(){
     inspectionCamera={eye,target};setPaused(true);
    };
    // Debug: hide/show a named detail group (e.g. 'Route street furniture', 'Granite kerbstones') to measure its render cost.
-   if(import.meta.env.DEV)window.openCityDrive.pick=(nx,ny)=>{const rc=new THREE.Raycaster();rc.setFromCamera(new THREE.Vector2(nx,ny),camera);const shown=o=>{for(let q=o;q;q=q.parent)if(!q.visible)return false;return true;};return rc.intersectObjects(scene.children,true).filter(h=>shown(h.object)).slice(0,4).map(h=>{let n=h.object.name,p=h.object.parent;while(!n&&p){n=p.name;p=p.parent;}return {name:n,id:h.object.userData?.id,role:h.object.userData?.role,mat:h.object.material?.name,inst:h.instanceId,d:+h.distance.toFixed(1),p:[+h.point.x.toFixed(1),+h.point.y.toFixed(2),+h.point.z.toFixed(1)]};});}; // debug: what is under a screen point (NDC)
+   if(import.meta.env.DEV)window.openCityDrive.pick=(nx,ny)=>{const rc=new THREE.Raycaster();rc.setFromCamera(new THREE.Vector2(nx,ny),camera);const shown=o=>{for(let q=o;q;q=q.parent)if(!q.visible)return false;return true;};return rc.intersectObjects(scene.children,true).filter(h=>shown(h.object)&&!h.object.isPoints&&!h.object.isSprite&&!h.object.isLine&&h.object.material?.visible!==false&&!(h.object.material?.transparent&&h.object.material.opacity<.05)).slice(0,5).map(h=>{let n=h.object.name,p=h.object.parent;while(!n&&p){n=p.name;p=p.parent;}const chain=[];for(let q=h.object;q;q=q.parent)chain.push(q.name||q.type);return {name:n,chain:chain.slice(0,4).join('<'),v:h.object.geometry?.attributes?.position?.count,col:h.object.material?.color?.getHexString?.(),pos:h.object.getWorldPosition(new THREE.Vector3()).toArray().map(v=>+v.toFixed(1)),type:h.object.type,keys:Object.keys(h.object.userData||{}).join(','),part:h.object.userData?.part?.id||h.object.userData?.partId,id:h.object.userData?.id,role:h.object.userData?.role,mat:h.object.material?.name,inst:h.instanceId,d:+h.distance.toFixed(1),p:[+h.point.x.toFixed(1),+h.point.y.toFixed(2),+h.point.z.toFixed(1)]};});}; // debug: what is under a screen point (NDC)
    if(import.meta.env.DEV)window.openCityDrive.ray=(eye,target)=>{const rc=new THREE.Raycaster(new THREE.Vector3(...eye),new THREE.Vector3(...target).sub(new THREE.Vector3(...eye)).normalize());const shown=o=>{for(let q=o;q;q=q.parent)if(!q.visible)return false;return true;};const ms=[];scene.traverse(o=>{if(o.isMesh&&!o.isLineSegments2&&!o.isInstancedMesh)ms.push(o);});return rc.intersectObjects(ms,false).filter(h=>shown(h.object)).slice(0,6).map(h=>{let n=h.object.name,p=h.object.parent;while(!n&&p){n=p.name;p=p.parent;}const u=h.object.userData||{};return {name:n,id:u.id,role:u.role,shell:u.shell,prov:u.provisional,mat:h.object.material?.name,trans:h.object.material?.transparent,op:h.object.material?.opacity,d:+h.distance.toFixed(2),p:h.point.toArray().map(v=>+v.toFixed(2))};});}; // debug: hits along a ray
    if(import.meta.env.DEV)window.openCityDrive.data=()=>data; // debug: loaded city data
    if(import.meta.env.DEV)window.openCityDrive.characters=()=>detailPeople; // tests: the authored characters
