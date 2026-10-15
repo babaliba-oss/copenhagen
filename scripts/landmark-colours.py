@@ -9,7 +9,12 @@ L = [(r'rundetårn|trinitatis', BRICK, COPPER), (r'vor frelsers', BRICK, '#55585
      (r'rosenborg', BRICK, COPPER), (r'holmens kirke', BRICK, COPPER), (r'petri', BRICK, COPPER), (r'helligånds', BRICK, COPPER),
      (r'nikolaj', BRICK, COPPER), (r'christians kirke', PLASTER, COPPER), (r'garnisons', '#e2cfa0', COPPER),
      (r'christiansborg slotskirke', PLASTER, COPPER), (r'christiansborg', GREY, COPPER), (r'marmorkirken|frederiks kirke', '#ddd6c8', COPPER),
-     (r'kastellet', BRICK, TILE), (r'amalienborg', '#d8cfbf', SLATE), (r'vor frue', '#ddd6c8', COPPER)]
+     (r'kastellet', BRICK, TILE), (r'amalienborg', '#d8cfbf', SLATE), (r'vor frue', '#ddd6c8', COPPER),
+     # the model's own colours are wrong for these: red-brick City Hall, Glyptotek and Central Station, the black
+     # Black Diamond, ochre Thorvaldsens Museum, cream Magasin, the grey-green glass Royal Hotel
+     (r'^københavns rådhus$', '#9a4533', COPPER), (r'glyptotek', '#923f31', COPPER), (r'hovedbanegård', '#94493a', '#5b6064'),
+     (r'sorte diamant', '#222426', '#2e3133'), (r'thorvaldsens museum', '#d8a854', '#9a4a32'), (r'magasin du nord', '#ede5d4', COPPER),
+     (r'radisson.*royal', '#6e8080', '#4d5254')]
 hexrgb = lambda h: [round(int(h[i:i + 2], 16) / 255, 3) for i in (1, 3, 5)]
 for city in ('copenhagen', 'copenhagen-1760'):
     p = f'public/cities/{city}/buildings3d-index.json'; idx = json.load(open(p)); n = 0

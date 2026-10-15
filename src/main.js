@@ -82,7 +82,6 @@ import {createMarketLife,marketGullColony,createInstancedPeople} from './market-
 import {createCopenhagenGame} from './copenhagen/game.js';
 import {createCarriage,createCarriageTraffic} from './copenhagen/carriage.js';
 import {createParkedCars} from './copenhagen/parked-cars.js';
-import {applyBuildingColours} from './copenhagen/building-colours.js';
 import {markDuplicateParts} from './building-dedupe.js';
 import {createRails} from './copenhagen/rails.js';
 import {createBoats} from './copenhagen/boats.js';
@@ -1004,7 +1003,7 @@ async function boot(){
    const furnitureData=city.furniture?json(dataUrl(city.furniture)).catch(()=>null):null; // street furniture detected in street-level photos (optional, any city)
    let mobilityData,landcoverData,tramData;[data,roofIndex,surfaceIndex,mobilityData,landcoverData,tramData,extensions]=await Promise.all([d,json(dataUrl('buildings3d-index.json')),json(dataUrl('surface-index.json')),json(dataUrl('mobility.json')),json(dataUrl('landcover.json')),json(dataUrl('trams.json')),loadExtensionIndex(json)]);
    if(city.id.startsWith('copenhagen'))tramData={...tramData,paths:[],stops:[]}; // no street trams: its trams.json holds S-train route relations (Boulevard tunnel); drawn as tram track they crossed Nørreport at street level
-   if(city.id.startsWith('copenhagen')){applyBuildingColours(roofIndex);console.info('Duplicate building copies dropped',markDuplicateParts(roofIndex).length);} // landmark colours the city model gets wrong; the model's double copies
+   if(city.id.startsWith('copenhagen'))console.info('Duplicate building copies dropped',markDuplicateParts(roofIndex).length); // the city model's double copies (building-dedupe.js)
    if(city.facades)attachFacades(roofIndex,await json(dataUrl(city.facades)).catch(()=>null)); // photo-described street fronts (optional, any city)
    if(city.estimatedFacades)estimateFacades(roofIndex,{era:city.era}); // plausible fronts for untextured official meshes (see facade-data.js)
    // Photo-matched places (squares with their tram stop, trees and landmarks; scripts/place-build.mjs): measured heights,

@@ -45,7 +45,7 @@ export function shellHeightAttribute(array,parts,start,end){
  for(const p of parts){
   const a=Math.max(start,p.start),b=Math.min(end,p.start+p.count);if(b<=a)continue;
   let lo=Infinity,hi=-Infinity;for(let v=p.start;v<p.start+p.count;v++){const y=array[v*5+1];if(y<lo)lo=y;if(y>hi)hi=y;}
-  const total=p.noFacade?0:hi-lo; // churches, towers, domes: no painted storey-and-bay window grid
+  const total=p.noFacade?-(hi-lo):hi-lo; // churches, towers, domes: negative = tall church windows instead of the storey grid
   for(let v=a;v<b;v++){out[(v-start)*2]=array[v*5+1]-lo;out[(v-start)*2+1]=total;}
  }
  return new THREE.BufferAttribute(out,2);
