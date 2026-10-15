@@ -287,7 +287,7 @@ surfaceMaterial.onBeforeCompile=shader=>{
    vec2 sl=vGround.xz/0.625,slc=floor(sl),g2=abs(fract(sl)-0.5);float seam=smoothstep(0.478,0.5,max(g2.x,g2.y))*detail;
    vec3 plaster=textureGrad(tSlabC,vGround.xz/1.9,GDX/1.9,GDY/1.9).rgb;float pl=dot(plaster,vec3(.3333));
    float sh=groundHash(slc+3.1),stain=step(0.92,groundHash(slc+8.3))*(0.6+0.4*groundNoise(vGround.xz*1.7));
-   vec3 slab=mix(diffuseColor.rgb,vec3(dot(diffuseColor.rgb,vec3(.3333))),.6)*vec3(1.03,1.0,.94); // grey concrete, not the data's blue tint
+   vec3 slab=mix(diffuseColor.rgb,vec3(dot(diffuseColor.rgb,vec3(.3333))),.85)*vec3(1.04,1.0,.93); // grey concrete, not the data's blue tint
    diffuseColor.rgb=slab*0.66*(0.97+0.06*sh)*(0.82+0.25*pl/0.75)*(1.0-stain*0.06)*(1.0-seam*0.16)*(1.0+(groundNoise(vGround.xz/6.0)-0.5)*0.08); // even, quiet slabs: strong per-slab tones read as holes
    gN=textureGrad(tSlabN,vGround.xz/1.9,GDX/1.9,GDY/1.9).xyz*2.0-1.0;gNw=0.35*texFade;grain=0.0;}
  }else if(diffuseColor.g>diffuseColor.r*1.06&&diffuseColor.g>diffuseColor.b*1.04){
