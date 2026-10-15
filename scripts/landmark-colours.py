@@ -14,7 +14,7 @@ L = [(r'rundetårn|trinitatis', BRICK, COPPER), (r'vor frelsers', BRICK, '#55585
      # Black Diamond, ochre Thorvaldsens Museum, cream Magasin, the grey-green glass Royal Hotel
      (r'^københavns rådhus$', '#9a4533', COPPER), (r'glyptotek', '#923f31', COPPER), (r'hovedbanegård', '#94493a', '#5b6064'),
      (r'sorte diamant', '#222426', '#2e3133'), (r'thorvaldsens museum', '#d8a854', '#9a4a32'), (r'magasin du nord', '#ede5d4', COPPER),
-     (r'radisson.*royal', '#6e8080', '#4d5254')]
+     (r'radisson.*royal', '#6e8080', '#4d5254'), (r'^hal [12]$', '#6f7f80', '#3d4245')]  # Torvehallerne's glass halls
 hexrgb = lambda h: [round(int(h[i:i + 2], 16) / 255, 3) for i in (1, 3, 5)]
 for city in ('copenhagen', 'copenhagen-1760'):
     p = f'public/cities/{city}/buildings3d-index.json'; idx = json.load(open(p)); n = 0
