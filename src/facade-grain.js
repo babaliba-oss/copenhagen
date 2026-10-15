@@ -64,6 +64,7 @@ float vWinLit=0.;vec3 fN=vec3(0.,0.,1.),fT=vec3(1.,0.,0.),fB=vec3(0.,1.,0.);floa
   vec2 w=vec2(along/2.7,(vRel.x-.25)/3.1);vec2 wc=floor(w),wf=fract(w);
   float fw=max(fwidth(w.x),fwidth(w.y));
   float exists=step(5.5,vRel.y)*step(2.4,vRel.x)*step(vRel.x,vRel.y-1.2);
+  exists=max(exists,step(3.2,vRel.y)*(1.-step(5.5,vRel.y))*(1.-step(3.35,vRel.x))); // one-storey kiosks, pavilions, low wings: a single row
   float open=step(.29,wf.x)*step(wf.x,.71)*step(.3,wf.y)*step(wf.y,.83)*exists;
   float frame=(step(.25,wf.x)*step(wf.x,.75)*step(.26,wf.y)*step(wf.y,.87))*exists-open;
   float sharp=1.-smoothstep(.12,.45,fw);

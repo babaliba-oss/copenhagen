@@ -83,6 +83,7 @@ import {createCopenhagenGame} from './copenhagen/game.js';
 import {createCarriage,createCarriageTraffic} from './copenhagen/carriage.js';
 import {createParkedCars} from './copenhagen/parked-cars.js';
 import {applyBuildingColours} from './copenhagen/building-colours.js';
+import {markDuplicateParts} from './building-dedupe.js';
 import {createRails} from './copenhagen/rails.js';
 import {createBoats} from './copenhagen/boats.js';
 import {createHarbourBath} from './copenhagen/harbour-bath.js';
@@ -450,7 +451,7 @@ async function buildRoof(t,at){
   for(const [file,{bitmap}] of images){const texture=new THREE.Texture(bitmap);texture.flipY=false;texture.colorSpace=THREE.SRGBColorSpace;texture.anisotropy=Math.min(8,renderer.capabilities.getMaxAnisotropy());texture.needsUpdate=true;textures.set(file,texture);}
   const cathedral=t.parts.find(p=>p.ratu===211);if(cathedral&&!cathedralModel){cathedralModel=createCathedral(a,cathedral);cityModel.add(cathedralModel);}
   applyFacadeHeights(a,t.parts);liftBuildings(a,t.parts); // terrain cities: each part stands on its lowest ground
-  const parts=t.parts.filter(p=>![211,212,213,1796,57950,STATION_KIOSK_RATU,USPENSKI.ratu].includes(p.ratu)&&!placeHidden.has(p.id)); // place landmarks and shelters are drawn by place-scene.js
+  const parts=t.parts.filter(p=>![211,212,213,1796,57950,STATION_KIOSK_RATU,USPENSKI.ratu].includes(p.ratu)&&!placeHidden.has(p.id)&&!p.duplicate); // duplicate: a second copy of the same building (building-dedupe.js) // place landmarks and shelters are drawn by place-scene.js
   // Far level: one merged shell per atlas. Near level: per-part shells until the worker's details replace them.
   const mask=createShellMask(parts.length);group.add(...createMergedShells(a,parts,textures,mask));
   // Waiting parts keep their own chase-camera fade, written into the mask (see the occlusion pass).
@@ -936,7 +937,12 @@ function frame(now){
   const updated=new Set(),decided=new Map();occlusionRay.ray.copy(ray);occlusionRay.far=Math.max(0,limit-3);
   for(const tile of loadedTiles.values())if(tile.visible)for(const mesh of tile.children){if(!mesh.visible||!mesh.userData.shell)continue;const state=mesh.userData.occlusion;if(!state||decided.get(state))continue;
    const near=!!ray.intersectBox(mesh.userData.box,hit)&&hit.distanceTo(camera.position)<limit-3;decided.set(state,near&&occlusionRay.intersectObject(mesh,false).length>0);}
-  for(const tile of loadedTiles.values())if(tile.visible&&tile.userData.level==='near'&&tile.userData.mask?.shown)for(const w of tile.userData.waiting){const was=w.occlusion.opacity;const fade=!!ray.intersectBox(w.box,hit)&&hit.distanceTo(camera.position)<limit-3;if(!fade&&was>.999)continue;advanceOcclusion(w.occlusion,fade,dt);tile.userData.mask.set(w.i,w.occlusion.opacity>.995?1:Math.max(.01,w.occlusion.opacity));}
+  // Waiting parts: the box test alone faded whole L-shaped blocks the car was only beside (it read as a
+  // building with a wall missing), so a part fades only if the camera ray really hits its walls in the merged shell.
+  for(const tile of loadedTiles.values())if(tile.visible&&tile.userData.level==='near'&&tile.userData.mask?.shown){
+   const boxed=new Set();for(const w of tile.userData.waiting)if(ray.intersectBox(w.box,hit)&&hit.distanceTo(camera.position)<limit-3)boxed.add(w);
+   const walls=new Set();if(boxed.size)for(const m of tile.children){const bid=m.geometry?.attributes?.aBid;if(!bid||!m.visible)continue;for(const h of occlusionRay.intersectObject(m,false))walls.add(Math.round(bid.getX(h.face.a)));}
+   for(const w of tile.userData.waiting){const was=w.occlusion.opacity;const fade=boxed.has(w)&&walls.has(w.i);if(!fade&&was>.999)continue;advanceOcclusion(w.occlusion,fade,dt);tile.userData.mask.set(w.i,w.occlusion.opacity>.995?1:Math.max(.01,w.occlusion.opacity));}}
   for(const tile of loadedTiles.values())if(tile.visible)for(const mesh of tile.children){if(!mesh.visible)continue;const state=mesh.userData.occlusion;if(!updated.has(state)){let fade;if(decided.has(state))fade=decided.get(state);else{const intersects=ray.intersectBox(mesh.userData.box,hit);fade=!!intersects&&hit.distanceTo(camera.position)<limit-3;}advanceOcclusion(state,fade,dt);updated.add(state);}mesh.material.opacity=state.opacity;mesh.material.depthWrite=state.opacity>.999;const fading=state.opacity<.999;if(mesh.material.transparent!==fading){mesh.material.transparent=fading;mesh.material.needsUpdate=true;}}
  }
  // Shadow box and texel snapping follow the active look's sun (weather.js re-applies the same offset below).
@@ -998,7 +1004,7 @@ async function boot(){
    const furnitureData=city.furniture?json(dataUrl(city.furniture)).catch(()=>null):null; // street furniture detected in street-level photos (optional, any city)
    let mobilityData,landcoverData,tramData;[data,roofIndex,surfaceIndex,mobilityData,landcoverData,tramData,extensions]=await Promise.all([d,json(dataUrl('buildings3d-index.json')),json(dataUrl('surface-index.json')),json(dataUrl('mobility.json')),json(dataUrl('landcover.json')),json(dataUrl('trams.json')),loadExtensionIndex(json)]);
    if(city.id.startsWith('copenhagen'))tramData={...tramData,paths:[],stops:[]}; // no street trams: its trams.json holds S-train route relations (Boulevard tunnel); drawn as tram track they crossed Nørreport at street level
-   if(city.id.startsWith('copenhagen'))applyBuildingColours(roofIndex); // landmark colours the city model gets wrong
+   if(city.id.startsWith('copenhagen')){applyBuildingColours(roofIndex);console.info('Duplicate building copies dropped',markDuplicateParts(roofIndex).length);} // landmark colours the city model gets wrong; the model's double copies
    if(city.facades)attachFacades(roofIndex,await json(dataUrl(city.facades)).catch(()=>null)); // photo-described street fronts (optional, any city)
    if(city.estimatedFacades)estimateFacades(roofIndex,{era:city.era}); // plausible fronts for untextured official meshes (see facade-data.js)
    // Photo-matched places (squares with their tram stop, trees and landmarks; scripts/place-build.mjs): measured heights,
