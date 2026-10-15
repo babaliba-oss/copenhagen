@@ -11,6 +11,7 @@ import {isPalaceRestaurantFront,createPalaceRestaurantFront} from './palace-rest
 import {isMarketHallSide,createMarketHallSides} from './market-hall-sides.js';
 import {corridorBuilding,corridorFront,createCorridorFacade,hexRGB} from './aleksanterinkatu-facades.js';
 import {createFacade,facadeMaterials} from './facade-renderer.js';
+import {creasedShellNormals} from './shell-colors.js';
 
  // Photo-assisted interpretation, not surveyed LOD3. Measured shells retain their
 // photographic materials; physical reveals supplement them, never erase them.
@@ -170,7 +171,7 @@ export function createModelledBuilding(array,part,pixels,texture=null,includeHer
  const meshes=[];
  const occlusion={opacity:1,clearTime:1};
  function mesh(g,material){if(!g)return;material.transparent=true;material.forceSinglePass=true;const m=new THREE.Mesh(g,material);m.castShadow=true;m.receiveShadow=true;m.userData.occlusion=occlusion;m.userData.box=new THREE.Box3(new THREE.Vector3(part.bbox[0]-.5,0,part.bbox[1]-.5),new THREE.Vector3(part.bbox[2]+.5,part.height+.5,part.bbox[3]+.5));meshes.push(m);}
- function shell(p,c,roughness,metalness,map=texture){if(!p.length)return;const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(p,3));g.setAttribute('color',new THREE.Float32BufferAttribute(c,3));g.setAttribute('uv',new THREE.Float32BufferAttribute(p===walls?wallUV:roofUV,2));g.computeVertexNormals();g.computeBoundingSphere();mesh(g,new THREE.MeshStandardMaterial({map,vertexColors:!map,roughness,metalness,side:THREE.DoubleSide}));meshes.at(-1).userData.shell=true;}
+ function shell(p,c,roughness,metalness,map=texture){if(!p.length)return;const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(p,3));g.setAttribute('color',new THREE.Float32BufferAttribute(c,3));g.setAttribute('uv',new THREE.Float32BufferAttribute(p===walls?wallUV:roofUV,2));creasedShellNormals(g);g.computeBoundingSphere();mesh(g,new THREE.MeshStandardMaterial({map,vertexColors:!map,roughness,metalness,side:THREE.DoubleSide}));meshes.at(-1).userData.shell=true;}
  if(part.ratu===324||clean||corridor||described)texture=null; // clean granite/copper on the measured whole station; no baked trees/shadows
  if(!texture&&walls.length&&roofs.length){ // untextured: walls and roofs in one shell mesh
   walls.push(...roofs);wallColours.push(...roofColours);wallUV.push(...roofUV);roofs.length=0;roofColours.length=0;roofUV.length=0;

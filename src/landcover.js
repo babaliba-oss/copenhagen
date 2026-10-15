@@ -12,6 +12,7 @@ export function createLandcover(data){
  const mat=new THREE.MeshStandardMaterial({color:map?'#9fa98a':'#718164',map,normalMap,normalScale:new THREE.Vector2(.6,.6),roughness:1});
  mat.onBeforeCompile=shader=>{shader.vertexShader='varying vec3 vPlanting;\n'+shader.vertexShader.replace('#include <begin_vertex>','#include <begin_vertex>\nvPlanting=position;');shader.fragmentShader='varying vec3 vPlanting;\n'+shader.fragmentShader.replace('#include <color_fragment>',`#include <color_fragment>
  diffuseColor.rgb*=0.93+0.055*sin(vPlanting.x*0.37)+0.035*cos(vPlanting.z*0.53);
+ diffuseColor.rgb=mix(diffuseColor.rgb,vec3(dot(diffuseColor.rgb,vec3(.3,.59,.11))),.3)*vec3(1.,1.,1.3); // the scan is a vivid yellow-green: tone it to a Danish lawn
  `);};
  cutLowerYard(mat);
  const byCell=new Map();geometries.forEach((p,i)=>{if(!byCell.has(cells[i]))byCell.set(cells[i],[]);byCell.get(cells[i]).push(p);});

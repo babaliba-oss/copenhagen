@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import {shellColourAttribute,shellHeightAttribute} from './shell-colors.js';
+import {shellColourAttribute,shellHeightAttribute,creasedShellNormals} from './shell-colors.js';
 import {facadeGrain} from './facade-grain.js';
 
 // Distance levels for measured building tiles, with hysteresis so a tile parked on a threshold
@@ -50,7 +50,7 @@ export function createMergedShells(array,parts,textures,mask=null){
  const index=new Map(parts.map((p,i)=>[p,i]));
  return mergedShellRanges(parts).map(r=>{
   const data=array.slice(r.start*5,r.end*5),buffer=new THREE.InterleavedBuffer(data,5),geometry=new THREE.BufferGeometry();
-  geometry.setAttribute('position',new THREE.InterleavedBufferAttribute(buffer,3,0));geometry.setAttribute('uv',new THREE.InterleavedBufferAttribute(buffer,2,3));geometry.computeVertexNormals();geometry.computeBoundingSphere();
+  geometry.setAttribute('position',new THREE.InterleavedBufferAttribute(buffer,3,0));geometry.setAttribute('uv',new THREE.InterleavedBufferAttribute(buffer,2,3));creasedShellNormals(geometry);geometry.computeBoundingSphere();
   const texture=r.texture?textures.get(r.texture)||null:null;
   if(!texture){geometry.setAttribute('color',shellColourAttribute(array,parts,r.start,r.end));geometry.setAttribute('aRel',shellHeightAttribute(array,parts,r.start,r.end));}
   const material=texture?new THREE.MeshStandardMaterial({map:texture,roughness:.86,side:THREE.DoubleSide}):facadeGrain(new THREE.MeshStandardMaterial({vertexColors:true,roughness:.86,side:THREE.DoubleSide}),{windows:true});
