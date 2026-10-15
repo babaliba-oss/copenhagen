@@ -56,10 +56,10 @@ export function analyseBuilding(array,part,pixels){
  for(let i=part.start;i<part.start+part.count;i+=3){
   const v=[0,1,2].map(j=>Array.from(array.slice((i+j)*5,(i+j)*5+5))),a=new THREE.Vector3(...v[0]),b=new THREE.Vector3(...v[1]),c=new THREE.Vector3(...v[2]),n=b.clone().sub(a).cross(c.clone().sub(a)).multiplyScalar(flip);
   const area=n.length()/2;if(area<.005)continue;n.normalize();
-  const triangle={v,n,area,samples:[sample(pixels,(v[0][3]+v[1][3]+v[2][3])/3,(v[0][4]+v[1][4]+v[2][4])/3)]};triangles.push(triangle);
+  const triangle={v,n,area,samples:[sample(pixels,(v[0][3]+v[1][3]+v[2][3])/3,(v[0][4]+v[1][4]+v[2][4])/3)]};triangle.tint=part.recolour?.get((i-part.start)/3);triangles.push(triangle);
   if(Math.abs(n.y)>.12){roof.push(triangle);continue;}
-  const d=n.x*a.x+n.z*a.z,key=`${Math.round(n.x*40)},${Math.round(n.z*40)},${Math.round(d*5)}`;
-  if(!faces.has(key))faces.set(key,{normal:n,triangles:[],samples:[],s0:Infinity,s1:-Infinity,y0:Infinity,y1:-Infinity,windows:[]});
+  const d=n.x*a.x+n.z*a.z,key=`${Math.round(n.x*40)},${Math.round(n.z*40)},${Math.round(d*5)}${triangle.tint?'|'+triangle.tint.join(','):''}`;
+  if(!faces.has(key))faces.set(key,{tint:triangle.tint,normal:n,triangles:[],samples:[],s0:Infinity,s1:-Infinity,y0:Infinity,y1:-Infinity,windows:[]});
   const face=faces.get(key);face.triangles.push(triangle);face.samples.push(...triangle.samples);
  }
  for(const face of faces.values()){
@@ -116,6 +116,7 @@ export function createModelledBuilding(array,part,pixels,texture=null,includeHer
   else if(!pixels&&!f.windows.length&&part.noFacade&&/kirke|kapel|tårn/i.test(part.name||''))f.windows=churchWindows(f); // churches and towers: tall windows, wall colour kept
   // Untextured meshes from a city's official model can carry their own wall and roof colours.
   if(!pixels&&!described&&!corridor&&!clean&&part.roofColor&&part.color)f.color=part.color;
+  if(f.tint&&!pixels&&!described&&!corridor&&!clean)f.color=f.tint; // block wall completing a named building
   triangles(f.triangles,clean?clean.wallRGB:part.ratu===324?[.65,.55,.47]:part.ratu===23?[.83,.8,.71]:f.color,walls,wallColours);
   for(const w of f.windows){const s=w.x+w.w/2,y=w.y+w.h/2,frame=.085;windows++;
    // Opaque glazing sits behind the raised reveal and frame, producing real depth.

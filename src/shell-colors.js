@@ -31,7 +31,8 @@ export function shellColourAttribute(array,parts,start,end){
   for(let v=a;v+2<b;v+=3){
    const i=v*5,ax=array[i],ay=array[i+1],az=array[i+2],bx=array[i+5],by=array[i+6],bz=array[i+7],cx=array[i+10],cy=array[i+11],cz=array[i+12];
    const ux=bx-ax,uy=by-ay,uz=bz-az,vx=cx-ax,vy=cy-ay,vz=cz-az,nx=uy*vz-uz*vy,ny=uz*vx-ux*vz,nz=ux*vy-uy*vx,l=Math.hypot(nx,ny,nz)||1;
-   const c=Math.abs(ny/l)>.35?roof:wall; // same split as the shader's wall grain and window grid (facade-grain.js): a slightly twisted wall quad stays one colour
+   const tint=Math.abs(ny/l)>.35?null:p.recolour?.get((v-p.start)/3); // block wall completing a named building (recolour.json)
+   const c=Math.abs(ny/l)>.35?roof:tint?linArr(tint):wall; // same split as the shader's wall grain and window grid (facade-grain.js): a slightly twisted wall quad stays one colour
    for(let k=0;k<3;k++)out.set(c,(v-start+k)*3);
   }
  }

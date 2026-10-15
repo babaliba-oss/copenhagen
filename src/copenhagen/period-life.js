@@ -27,7 +27,7 @@ const ANIMALS={
  pig:()=>mergeGeometries([paint(new THREE.SphereGeometry(.35,10,8).scale(1.5,.9,.9).translate(0,.45,0),'#e2a99a'),paint(new THREE.SphereGeometry(.18,8,6).translate(.55,.5,0),'#e2a99a'),paint(new THREE.CylinderGeometry(.08,.08,.08,8).rotateZ(Math.PI/2).translate(.72,.5,0),'#c98a80')])};
 const rnd=seed=>()=>{seed=(seed*16807)%2147483647;return (seed-1)/2147483646;};
 
-export function createPeriodLife({city,world,water=[],squares=[],gates=[]}){
+export function createPeriodLife({city,world,water=[],squares=[],gates=[],animalModels={}}){ // animalModels: Blender pig/hen/goose (scripts/blender/animals.py) where loaded
  const group=new THREE.Group();group.name='1760 street life';const r=rnd(1760);
  const wet=(x,z)=>water.some(w=>{const b=w.bbox;return (!b||x>=b[0]&&x<=b[2]&&z>=b[1]&&z<=b[3])&&pointInPolygon(x,z,w.rings);});
  const free=(x,z,rad=.6)=>!world.buildings.at(x,z)&&!wet(x,z)&&!world.buildings.at(x+rad,z)&&!world.buildings.at(x-rad,z)&&!world.buildings.at(x,z+rad)&&!world.buildings.at(x,z-rad);
@@ -73,7 +73,7 @@ export function createPeriodLife({city,world,water=[],squares=[],gates=[]}){
  const flocks=[];
  for(const kind of Object.keys(ANIMALS)){const fl=animals.filter(a=>a.kind===kind);if(kind==='pig')for(const sq of squares.slice(0,6))fl.push({kind:'pig',x:sq.x+(r()-.5)*24,z:sq.z+(r()-.5)*24,n:1+Math.floor(r()*2)});
   const members=[];for(const f of fl)for(let i=0;i<f.n;i++){const x=f.x+(r()-.5)*4,z=f.z+(r()-.5)*4;if(free(x,z,.3))members.push({hx:x,hz:z,x,z,a:r()*6.28,ph:r()*10});}
-  if(!members.length)continue;const im=new THREE.InstancedMesh(ANIMALS[kind](),mat,members.length);im.name=`1760 ${kind}`;im.castShadow=true;im.frustumCulled=false;group.add(im);flocks.push({im,members,kind});}
+  if(!members.length)continue;const im=new THREE.InstancedMesh(animalModels[kind]||ANIMALS[kind](),mat,members.length);im.name=`1760 ${kind}`;im.castShadow=true;im.frustumCulled=false;group.add(im);flocks.push({im,members,kind});}
  let t=0,acc=0;const EU=new THREE.Euler();
  function update(dt,player){
   t+=dt;acc+=dt;for(const b of batches)b.update(dt,player);

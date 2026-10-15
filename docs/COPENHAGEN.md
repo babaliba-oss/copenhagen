@@ -46,7 +46,7 @@ python3 scripts/lanterns-1760.py
 python3 scripts/district-styles.py copenhagen-1760
 python3 scripts/market-1760.py
 python3 scripts/landmark-colours.py                       # both eras, after the building indexes
-node scripts/building-duplicates.mjs copenhagen && node scripts/building-duplicates.mjs copenhagen-1760   # copies of the same building (compares triangles)
+node scripts/building-duplicates.mjs copenhagen && node scripts/building-duplicates.mjs copenhagen-1760   # copies of the same building, and parts sharing walls (compares triangles)
 ```
 
 `<kk data dir>` holds the City of Copenhagen registers (CC BY 4.0): `wires.gpkg`, `masts.gpkg`,
