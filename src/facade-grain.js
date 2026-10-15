@@ -35,24 +35,24 @@ float gNoise(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);return mix(mix(g
    .replace('#include <color_fragment>',`#include <color_fragment>
 float vWinLit=0.;vec3 fN=vec3(0.,0.,1.),fT=vec3(1.,0.,0.),fB=vec3(0.,1.,0.);float fNw=0.;
 {
- vec3 n=normalize(vGrainNormal);vec3 p=vGrainPos;
+ vec3 n=normalize(vGrainNormal);vec3 p=vGrainPos;vec3 PDX=dFdx(vGrainPos),PDY=dFdy(vGrainPos); // derivatives before any branch: the textures below use textureGrad
  vec2 tg=normalize(vec2(-n.z,n.x)+vec2(1e-5,0.));float along=dot(p.xz,tg);
  vec3 c=diffuseColor.rgb;
  if(abs(n.y)<.35){
   float brick=smoothstep(.04,.16,c.r-max(c.g,c.b)*1.1);
   // brick: scanned Bricks104 (2.04 x 1.02 m per tile), recoloured to this wall's colour
   vec2 bu=vec2(along/2.04,p.y/1.02);
-  vec3 brickCol=texture2D(tBrickC,bu).rgb/vec3(.406,.2535,.2)*c;
+  vec3 brickCol=textureGrad(tBrickC,bu,vec2(dot(PDX.xz,tg)/2.04,PDX.y/1.02),vec2(dot(PDY.xz,tg)/2.04,PDY.y/1.02)).rgb/vec3(.406,.2535,.2)*c;
   c=mix(c,brickCol,brick);
   fT=vec3(tg.x,0.,tg.y);fB=vec3(0.,1.,0.);
-  vec3 nb=texture2D(tBrickN,bu).xyz*2.-1.,np=texture2D(tPlasterN,vec2(along,p.y)/2.3).xyz*2.-1.;
+  vec3 nb=textureGrad(tBrickN,bu,vec2(dot(PDX.xz,tg)/2.04,PDX.y/1.02),vec2(dot(PDY.xz,tg)/2.04,PDY.y/1.02)).xyz*2.-1.,np=textureGrad(tPlasterN,vec2(along,p.y)/2.3,vec2(dot(PDX.xz,tg),PDX.y)/2.3,vec2(dot(PDY.xz,tg),PDY.y)/2.3).xyz*2.-1.;
   fN=normalize(mix(np,nb,brick));fNw=mix(.35,.8,brick)*(1.-smoothstep(.06,.3,max(fwidth(bu.x),fwidth(bu.y))*2.));
   // plaster: blotches and streaks
   float blot=gNoise(vec2(along,p.y)*.35)*.6+gNoise(vec2(along,p.y)*1.7)*.4;
   float streak=gNoise(vec2(along*2.3,p.y*.08))*(1.-smoothstep(0.,1.,fract(p.y/3.1)))*.5;
   float plaster=1.-brick;
   c*=1.+plaster*((blot-.5)*.12-streak*.06);
-  c*=mix(1.,dot(texture2D(tPlasterC,vec2(along,p.y)/2.3).rgb,vec3(.3333))/.51,.55*plaster); // scanned render
+  c*=mix(1.,dot(textureGrad(tPlasterC,vec2(along,p.y)/2.3,vec2(dot(PDX.xz,tg),PDX.y)/2.3,vec2(dot(PDY.xz,tg),PDY.y)/2.3).rgb,vec3(.3333))/.51,.55*plaster); // scanned render
 #if GRAIN_STONE
   // churches and towers: dressed stone (ashlar) courses instead of render, each block its own shade
   {vec2 sb=vec2(along/.9,p.y/.42);float sr=floor(sb.y);sb.x+=mod(sr,2.)*.5;vec2 sf=fract(sb),sc=floor(sb);
@@ -83,8 +83,8 @@ float vWinLit=0.;vec3 fN=vec3(0.,0.,1.),fT=vec3(1.,0.,0.),fB=vec3(0.,1.,0.);floa
   float copper=smoothstep(.03,.1,c.g-c.r);
   float tiled=smoothstep(.05,.15,c.r-c.g*1.25)*(1.-copper); // red/brown pitched roofs: scanned clay tiles
   vec2 ru=vec2(side,down)/2.0;
-  c=mix(c,texture2D(tRoofC,ru).rgb/vec3(.2761,.106,.0573)*c,tiled*(1.-smoothstep(.85,.97,n.y)));
-  fT=vec3(-hz.y,0.,hz.x);fB=normalize(cross(n,fT));fN=texture2D(tRoofN,ru).xyz*2.-1.;fNw=tiled*.8*(1.-smoothstep(.06,.3,max(fwidth(ru.x),fwidth(ru.y))*2.));
+  c=mix(c,textureGrad(tRoofC,ru,vec2(dot(PDX.xz,vec2(-hz.y,hz.x)),dot(PDX.xz,hz))/2.,vec2(dot(PDY.xz,vec2(-hz.y,hz.x)),dot(PDY.xz,hz))/2.).rgb/vec3(.2761,.106,.0573)*c,tiled*(1.-smoothstep(.85,.97,n.y)));
+  fT=vec3(-hz.y,0.,hz.x);fB=normalize(cross(n,fT));fN=textureGrad(tRoofN,ru,vec2(dot(PDX.xz,vec2(-hz.y,hz.x)),dot(PDX.xz,hz))/2.,vec2(dot(PDY.xz,vec2(-hz.y,hz.x)),dot(PDY.xz,hz))/2.).xyz*2.-1.;fNw=tiled*.8*(1.-smoothstep(.06,.3,max(fwidth(ru.x),fwidth(ru.y))*2.));
   c*=1.+fadeR*(tone-seam)*(1.-copper*.7)*(1.-tiled);
   c=mix(c,c*(.85+.3*gNoise(p.xz*.6)),copper);
  }
