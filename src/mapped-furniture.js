@@ -204,7 +204,7 @@ export function createMappedFurniture(layer,{player=()=>null,mobility=()=>null,c
  for(const [kind,parts] of [['bin',binParts],['barrier',barrierParts],['cone',coneParts]]){
   const list=items.filter(i=>i.k===kind);if(!list.length)continue;
   const g=models[kind]?models[kind].clone():mergeGeometries(parts());if(!models[kind])g.computeVertexNormals();
-  const k=createKnockables(list.map((it,i)=>({id:itemId(it,i),x:it.x,z:it.z,yaw:it.yaw||0})),[{geometry:g,material:painted}],KNOCKABLE[kind]);
+  const k=createKnockables(list.map((it,i)=>({id:itemId(it,i),x:it.x,z:it.z,yaw:it.yaw||0})),[{geometry:g,material:painted}],{...KNOCKABLE[kind],range:VIEW_RANGE});
   k.group.name=`Mapped ${kind}s`;group.add(k.group);knock.push(k);
  }
  const solidParts={bollard:([w,,h])=>[cyl(w*.45,w*.5,h,h/2,'#2f3436',8),cyl(w*.5,w*.5,.08,h*.82,'#c9a64a',8),cyl(w*.38,w*.45,.06,h+.03,'#2f3436',8)],'junction-box':([w,d,h])=>[box(w,h,d,0,h/2,0,'#8a9086'),box(w+.04,.05,d+.04,0,h+.02,0,'#6d736a')],
@@ -267,7 +267,7 @@ export function createMappedFurniture(layer,{player=()=>null,mobility=()=>null,c
  const counts={};for(const it of items)counts[it.k]=(counts[it.k]||0)+1;
  group.userData={source:layer?.source,licence:layer?.licence,counts,chunks:chunks.size,lights:lights.length};
  // Knockables-compatible: main.js steps and updates it with the rest (posts step through breakableSigns).
- const knockables={get bodies(){return knock.flatMap(k=>k.bodies);},step(dt,car,world){for(const k of knock)k.step(dt,car,world);},update(){for(const k of knock)k.update();update();},
+ const knockables={get bodies(){return knock.flatMap(k=>k.bodies);},step(dt,car,world){for(const k of knock)k.step(dt,car,world);},update(focus){for(const k of knock)k.update(focus);update(focus);},
   resetAll(){for(const k of knock)k.resetAll();}, // posts reset with every other breakable sign set
   snapshot(){const s=knock.map(k=>k.snapshot()),posts=[...chunks.values()].map(c=>c.signs.snapshot()),sum=(l,k)=>l.reduce((n,x)=>n+x[k],0);
    return {count:sum(s,'count'),knocked:sum(s,'knocked'),hits:sum(s,'hits'),posts:{count:sum(posts,'count'),knocked:sum(posts,'knocked'),bent:sum(posts,'bent'),broken:sum(posts,'broken')}};}};

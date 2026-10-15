@@ -4,6 +4,7 @@ import {groundAt} from './terrain.js';
 // Light street furniture (roadworks bollards) that the car knocks over instead of stopping against.
 // Each item is a small rigid body: it is kicked by the car, tumbles in the air, bounces, slides and
 // comes to rest lying on its side. Rendering uses one InstancedMesh per material.
+// The update(focus) call packs the instances in range of the player.
 const GRAVITY=9.81,CAR_HALF_WIDTH=.98,CAR_HALF_LENGTH=2.3,RESPAWN_AFTER=60,RESPAWN_CLEAR=70;
 
 function randomFor(seed){let s=seed*9301+49297;return()=>{s=(s*9301+49297)%233280;return s/233280;};}
@@ -14,7 +15,7 @@ export function carContact(car,x,z,radius){
   return Math.abs(lateral)<CAR_HALF_WIDTH+radius&&Math.abs(longitudinal)<CAR_HALF_LENGTH+radius?{lateral,longitudinal}:null;
 }
 
-export function createKnockables(items,parts,{radius=.3,height=1.1}={}){
+export function createKnockables(items,parts,{radius=.3,height=1.1,range=Infinity}={}){
   const group=new THREE.Group();group.name='Knockable street furniture';
   const meshes=parts.map(({geometry,material})=>{const m=new THREE.InstancedMesh(geometry,material,items.length);m.castShadow=true;m.receiveShadow=true;m.frustumCulled=false;group.add(m);return m;});
   const bodies=items.map((p,i)=>({id:p.id??i,home:{x:p.x,z:p.z,yaw:p.yaw},x:p.x,y:0,z:p.z,yaw:p.yaw,vx:0,vy:0,vz:0,spin:0,
@@ -71,15 +72,19 @@ export function createKnockables(items,parts,{radius=.3,height=1.1}={}){
 
   function reset(b){Object.assign(b,{x:b.home.x,z:b.home.z,yaw:b.home.yaw,y:0,vx:0,vy:0,vz:0,spin:0,tilt:0,tiltRate:0,knocked:false,resting:true,restTime:0});}
 
-  function update(){
-    for(const [i,b]of bodies.entries()){
-      if(b.playerTaken||b.disabled){matrix.makeScale(0,0,0);for(const m of meshes)m.setMatrixAt(i,matrix);continue;}
+  // Instances are packed: only items within `range` of the focus (the player) are drawn, so a city-wide set
+  // (thousands of bins) costs only the nearby few in triangles and shadow passes.
+  function update(focus){
+    let n=0;
+    for(const b of bodies){
+      if(b.playerTaken||b.disabled){if(range===Infinity){matrix.makeScale(0,0,0);for(const m of meshes)m.setMatrixAt(n,matrix);n++;}continue;} // unpacked sets keep instance i = item i (per-item colours)
+      if(focus&&range<Infinity&&Math.abs(b.x-focus.x)+Math.abs(b.z-focus.z)>range*1.3&&Math.hypot(b.x-focus.x,b.z-focus.z)>range)continue;
       qYaw.setFromAxisAngle(up,b.yaw);qTilt.setFromAxisAngle(b.axis,b.tilt).multiply(qYaw);
       // Lying bollards rest on their side, lifted by half the board thickness so they do not sink into the road.
       pos.set(b.x,b.y+Math.abs(Math.sin(b.tilt))*.05+groundAt(b.x,b.z),b.z);matrix.compose(pos,qTilt,one);
-      for(const m of meshes)m.setMatrixAt(i,matrix);
+      for(const m of meshes)m.setMatrixAt(n,matrix);n++;
     }
-    for(const m of meshes)m.instanceMatrix.needsUpdate=true;
+    for(const m of meshes){m.count=n;m.instanceMatrix.needsUpdate=true;}
   }
 
   update();

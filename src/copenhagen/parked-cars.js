@@ -2,10 +2,11 @@ import * as THREE from 'three';
 import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';
 import {groundAt} from '../terrain.js';
 
-// Parked cars along the kerbs (scripts/parked-cars.py → parked.json). Two instanced meshes per 300 m chunk:
-// the painted body (per-car colour) and the fixed parts (glass, tyres, lights). Chunks beyond view range
-// are hidden. Each car is a solid obstacle for the player.
-const CHUNK=300,RANGE=420;
+// Parked cars along the kerbs (scripts/parked-cars.py → parked.json). Per 150 m chunk, instanced meshes for
+// the painted body (per-car colour) and the fixed parts (glass, tyres, lights): the detailed Blender bodies
+// near the player, a simple low-poly car (~250 triangles instead of ~3,800) further out, nothing beyond view
+// range. Each car is a solid obstacle for the player.
+const CHUNK=150,NEAR=170,RANGE=420;
 const paint=(g,hex)=>{const n=g.index?g.toNonIndexed():g;if(n!==g)g.dispose();n.deleteAttribute('uv');const c=new THREE.Color(hex),a=new Float32Array(n.attributes.position.count*3);for(let i=0;i<a.length;i+=3)a.set([c.r,c.g,c.b],i);n.setAttribute('color',new THREE.BufferAttribute(a,3));return n;};
 // A box whose top face is pulled in (cabin taper). Forward is -Z.
 function taper(w,h,d,x,y,z,inX,inFront,inBack){
@@ -38,21 +39,24 @@ export function createParkedCars(data,{bodies=[]}={}){
  const group=new THREE.Group();group.name='Parked cars';
  const cars=data?.cars||[],paints=(data?.paints||['#ccc']).map(h=>{const c=new THREE.Color(h),l=c.r*.3+c.g*.55+c.b*.15;return l<.035?c.lerp(new THREE.Color('#4a4e55'),.55):c;}); // black and navy read as holes in shadow
  if(!cars.length)return {group,obstacles:[],update(){}};
- const models=bodies.map(({parts,spec})=>blenderCar(parts,spec)).filter(Boolean);if(!models.length)models.push({body:bodyGeometry(),fixed:fixedGeometry()});
+ const models=bodies.map(({parts,spec})=>blenderCar(parts,spec)).filter(Boolean),simple={body:bodyGeometry(),fixed:fixedGeometry()};
  const bodyMat=new THREE.MeshStandardMaterial({vertexColors:true,roughness:.35,metalness:.15}),fixedMat=new THREE.MeshStandardMaterial({vertexColors:true,roughness:.4,metalness:.2});
  const chunks=new Map();
  for(const c of cars){const k=`${Math.floor(c[0]/CHUNK)},${Math.floor(c[1]/CHUNK)}`;if(!chunks.has(k))chunks.set(k,[]);chunks.get(k).push(c);}
  const m=new THREE.Matrix4(),q=new THREE.Quaternion(),v=new THREE.Vector3(),one=new THREE.Vector3(1,1,1),UP=new THREE.Vector3(0,1,0),list=[],obstacles=[];
  let id=0;
+ const instance=(model,cs,shadow)=>{const b=new THREE.InstancedMesh(model.body,bodyMat,cs.length),f=new THREE.InstancedMesh(model.fixed,fixedMat,cs.length);b.castShadow=f.castShadow=shadow;b.receiveShadow=true;
+  cs.forEach((c,i)=>{const [x,z,yaw,p]=c;m.compose(v.set(x,groundAt(x,z),z),q.setFromAxisAngle(UP,yaw),one);b.setMatrixAt(i,m);f.setMatrixAt(i,m);b.setColorAt(i,paints[p%paints.length]);});
+  b.computeBoundingSphere();f.computeBoundingSphere();return [b,f];};
  for(const [k,all] of chunks){
-  const g=new THREE.Group();let cx=0,cz=0;
-  models.forEach((model,mi)=>{const cs=all.filter((c,i)=>Math.abs(Math.round(c[0]*7+c[1]*13))%models.length===mi);if(!cs.length)return;
-   const b=new THREE.InstancedMesh(model.body,bodyMat,cs.length),f=new THREE.InstancedMesh(model.fixed,fixedMat,cs.length);b.castShadow=f.castShadow=true;b.receiveShadow=true;
-   cs.forEach((c,i)=>{const [x,z,yaw,p]=c;m.compose(v.set(x,groundAt(x,z),z),q.setFromAxisAngle(UP,yaw),one);b.setMatrixAt(i,m);f.setMatrixAt(i,m);b.setColorAt(i,paints[p%paints.length]);cx+=x;cz+=z;
-    const co=Math.cos(yaw),si=Math.sin(yaw),ring=[[-.9,-2.15],[.9,-2.15],[.9,2.15],[-.9,2.15]].map(([a,d])=>[x+a*co+d*si,z-a*si+d*co]);
-    obstacles.push({id:`parked-car-${id++}`,name:'parked car',rings:[ring],bbox:[Math.min(...ring.map(p=>p[0])),Math.min(...ring.map(p=>p[1])),Math.max(...ring.map(p=>p[0])),Math.max(...ring.map(p=>p[1]))]});});
-   b.computeBoundingSphere();f.computeBoundingSphere();g.add(b,f);});
-  group.add(g);list.push({g,x:cx/all.length,z:cz/all.length});
+  const near=new THREE.Group(),far=new THREE.Group();near.name='Parked cars (detailed)';far.name='Parked cars (far)';let cx=0,cz=0;
+  for(const c of all){const [x,z,yaw]=c;cx+=x;cz+=z;
+   const co=Math.cos(yaw),si=Math.sin(yaw),ring=[[-.9,-2.15],[.9,-2.15],[.9,2.15],[-.9,2.15]].map(([a,d])=>[x+a*co+d*si,z-a*si+d*co]);
+   obstacles.push({id:`parked-car-${id++}`,name:'parked car',rings:[ring],bbox:[Math.min(...ring.map(p=>p[0])),Math.min(...ring.map(p=>p[1])),Math.max(...ring.map(p=>p[0])),Math.max(...ring.map(p=>p[1]))]});}
+  if(models.length)models.forEach((model,mi)=>{const cs=all.filter(c=>Math.abs(Math.round(c[0]*7+c[1]*13))%models.length===mi);if(cs.length)near.add(...instance(model,cs,true));});
+  else near.add(...instance(simple,all,true));
+  far.add(...instance(simple,all,false));far.visible=near.visible=false;
+  group.add(near,far);list.push({near,far,x:cx/all.length,z:cz/all.length});
  }
- return {group,obstacles,update(p){if(!p)return;for(const c of list)c.g.visible=Math.hypot(c.x-p.x,c.z-p.z)<RANGE;}};
+ return {group,obstacles,update(p){if(!p)return;for(const c of list){const d=Math.hypot(c.x-p.x,c.z-p.z);c.near.visible=d<NEAR;c.far.visible=d>=NEAR&&d<RANGE;}}};
 }

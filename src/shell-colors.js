@@ -31,7 +31,7 @@ export function shellColourAttribute(array,parts,start,end){
   for(let v=a;v+2<b;v+=3){
    const i=v*5,ax=array[i],ay=array[i+1],az=array[i+2],bx=array[i+5],by=array[i+6],bz=array[i+7],cx=array[i+10],cy=array[i+11],cz=array[i+12];
    const ux=bx-ax,uy=by-ay,uz=bz-az,vx=cx-ax,vy=cy-ay,vz=cz-az,nx=uy*vz-uz*vy,ny=uz*vx-ux*vz,nz=ux*vy-uy*vx,l=Math.hypot(nx,ny,nz)||1;
-   const c=Math.abs(ny/l)>.25?roof:wall;
+   const c=Math.abs(ny/l)>.35?roof:wall; // same split as the shader's wall grain and window grid (facade-grain.js): a slightly twisted wall quad stays one colour
    for(let k=0;k<3;k++)out.set(c,(v-start+k)*3);
   }
  }
@@ -45,7 +45,8 @@ export function shellHeightAttribute(array,parts,start,end){
  for(const p of parts){
   const a=Math.max(start,p.start),b=Math.min(end,p.start+p.count);if(b<=a)continue;
   let lo=Infinity,hi=-Infinity;for(let v=p.start;v<p.start+p.count;v++){const y=array[v*5+1];if(y<lo)lo=y;if(y>hi)hi=y;}
-  for(let v=a;v<b;v++){out[(v-start)*2]=array[v*5+1]-lo;out[(v-start)*2+1]=hi-lo;}
+  const total=p.noFacade?0:hi-lo; // churches, towers, domes: no painted storey-and-bay window grid
+  for(let v=a;v<b;v++){out[(v-start)*2]=array[v*5+1]-lo;out[(v-start)*2+1]=total;}
  }
  return new THREE.BufferAttribute(out,2);
 }
