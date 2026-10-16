@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import earcut from 'earcut';
-import {SpatialIndex,WORLD_EXTENT,clipLinesFor,onClipLine,playableExtent,pointInPolygon} from './geo.js';
+import {SpatialIndex,WORLD_EXTENT,clipLinesFor,onClipLine,playableExtent,pointInPolygon,inWaterPolygons} from './geo.js';
 
 // Helsinki's harbour water sits well below street level behind vertical
 // granite quay walls (Kauppatori, Pohjoisranta, Eteläranta). The height is a
@@ -15,20 +15,9 @@ const LAND_PROBES=[.6,2];
 // Fast "inside any water polygon" test: edges bucketed by 4 m z-rows, then an
 // even-odd +x ray. The municipal sea polygon has thousands of vertices, so a
 // plain point-in-polygon per quay segment would dominate loading.
-export function waterLocator(water,row=4){
- // Parity per polygon: overlapping water polygons (a canal drawn over the harbour) cancelled each other out
- // when one crossing count ran over all of them, so points in both read as dry land.
- const rows=new Map();let id=0;
- for(const {rings} of water){for(const ring of rings||[])for(let i=0,n=ring.length;i<n;i++){
-  const a=ring[i],b=ring[(i+1)%n];if(a[1]===b[1])continue;
-  const lo=Math.floor(Math.min(a[1],b[1])/row),hi=Math.floor(Math.max(a[1],b[1])/row);
-  for(let r=lo;r<=hi;r++){if(!rows.has(r))rows.set(r,[]);rows.get(r).push(a[0],a[1],b[0],b[1],id);}
- }id++;}
- return (x,z)=>{
-  const e=rows.get(Math.floor(z/row));if(!e)return false;let odd=null;
-  for(let i=0;i<e.length;i+=5){const ax=e[i],az=e[i+1],bx=e[i+2],bz=e[i+3];if((az>z)!==(bz>z)&&x<(bx-ax)*(z-az)/(bz-az)+ax){(odd??=new Map()).set(e[i+4],!odd.get(e[i+4]));}}
-  if(!odd)return false;for(const v of odd.values())if(v)return true;return false;
- };
+export function waterLocator(water){
+ // Any water polygon holds the point (overlapping polygons stay wet); the raster in geo.js answers most points at once.
+ return (x,z)=>inWaterPolygons(water,x,z);
 }
 
 const openRing=ring=>{const r=ring.filter(p=>Number.isFinite(p?.[0])&&Number.isFinite(p?.[1]));if(r.length>1&&r[0][0]===r.at(-1)[0]&&r[0][1]===r.at(-1)[1])r.pop();return r;};

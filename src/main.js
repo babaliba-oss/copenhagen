@@ -1271,6 +1271,9 @@ async function boot(){
    progress(94,'Preparing buses');buses=await createBusSystem(scene,world,car);
    // Lanes know the tram tracks and buses the junction signals; respawn traffic clear of trams and buses.
    transitQueue.splice(0).forEach(addTransit);mobility.attachTrams(tramSim);mobility.attachBuses(buses.simulation);buses.reset(car,tramSim.obstacles);mobility.externalBodies=transitBodies();mobility.reset(car);
+   // Shader programs compile now, behind the loading screen (in parallel where the GPU offers it), instead of
+   // stalling frames the first time each material comes into view while driving. Capped so a slow GPU still starts.
+   progress(98,'Warming up shaders');await Promise.race([renderer.compileAsync(scene,camera).catch(()=>{}),new Promise(r=>setTimeout(r,4000))]);
    progress(100,'Ready');
    ready=true;carGroup.visible=true;marker.visible=true;loadingScreen.ready(startPoint.name);
    if(!helsinki)$('boot-place-label').textContent=`Your starting point in ${city.name}`;
