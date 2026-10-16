@@ -23,8 +23,8 @@ export function periodRoof(array,part,{maxRise=4.2}={}){
  }
  if(flatArea<25||flatArea<roofArea*.5)return null; // pitched already (or a flat patch on a pitched roof)
  // Outline: edges used by one flat triangle only.
- const key=p=>`${Math.round(p[0]*20)},${Math.round(p[2]*20)}`,edges=new Map();
- for(const t of flat)for(let i=0;i<3;i++){const a=t[i],b=t[(i+1)%3],ka=key(a),kb=key(b),k=ka<kb?ka+'|'+kb:kb+'|'+ka;const e=edges.get(k);if(e)e.n++;else edges.set(k,{a,b,n:1});}
+ const key=p=>`${Math.round(p[0]*20)},${Math.round(p[2]*20)}`,ekey=p=>key(p)+','+Math.round(p[1]*2),edges=new Map(); // edges keyed with height: a step between two flat levels is an outline for both
+ for(const t of flat)for(let i=0;i<3;i++){const a=t[i],b=t[(i+1)%3],ka=ekey(a),kb=ekey(b),k=ka<kb?ka+'|'+kb:kb+'|'+ka;const e=edges.get(k);if(e)e.n++;else edges.set(k,{a,b,n:1});}
  const seg=[];for(const e of edges.values())if(e.n===1)seg.push([e.a[0],e.a[2],e.b[0],e.b[2]]);
  if(!seg.length)return null;
  const rise=Math.min(maxRise,Math.max(2.2,height*.42)),run=rise/SLOPE;

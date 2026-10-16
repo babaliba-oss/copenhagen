@@ -500,7 +500,7 @@ async function buildRoof(t,at){
   const parts=t.parts.filter(p=>![211,212,213,1796,57950,STATION_KIOSK_RATU,USPENSKI.ratu].includes(p.ratu)&&!placeHidden.has(p.id)&&!p.duplicate); // duplicate: a second copy of the same building (building-dedupe.js) // place landmarks and shelters are drawn by place-scene.js
   // Far level: one merged shell per atlas. Near level: per-part shells until the worker's details replace them.
   const mask=createShellMask(parts.length);group.add(...createMergedShells(a,parts,textures,mask));
-  if(city.era===1760){const roofParts=parts.filter(p=>!p.noFacade&&!/vold|bastion|batteri|skanse|krudt/i.test(p.name||''));
+  if(city.era===1760&&!/[?&]flatroofs/.test(location.search)){const roofParts=parts.filter(p=>!p.noFacade&&!/vold|bastion|batteri|skanse|krudt/i.test(p.name||''));
    roofsInWorker(a,roofParts).then(roofs=>{if(loadedTiles.get(t.file)!==group)return;const m=periodRoofMesh(roofs,facadeGrain(new THREE.MeshStandardMaterial({vertexColors:true,roughness:.85}))); // own material: the camera fade sets opacity per mesh
     if(m){Object.assign(m.userData,{shell:true,role:'detail',occlusion:{opacity:1,clearTime:1},box:m.geometry.boundingBox.clone()});freezeMesh(m);applyMeshLod(m,group.userData.level||'near',focus);group.add(m);}});} // flat roofs get period hipped roofs (period-roofs.js), computed in a worker
   // Waiting parts keep their own chase-camera fade, written into the mask (see the occlusion pass).
