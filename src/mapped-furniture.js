@@ -143,7 +143,11 @@ export function createMappedFurniture(layer,{player=()=>null,mobility=()=>null,c
  // (register span to the nearest wall on each side; a slim pole where no wall is in reach).
  const wireLamps=items.filter(it=>it.k==='wire-lamp'),wirePoles=[];
  if(wireLamps.length){
-  {const hung=[];for(const it of wireLamps){const chunk=chunkOf(it.x,it.z);if(wireLines(it,chunk.wires??=[],wirePoles,{poleAllowed,wallAt}))hung.push(it);}wireLamps.length=0;wireLamps.push(...hung);} // a shade with no wire is left out
+  {const hung=[],poled=[];for(const it of wireLamps){const chunk=chunkOf(it.x,it.z),w=chunk.wires??=[],w0=w.length,p0=wirePoles.length;if(!wireLines(it,w,wirePoles,{poleAllowed,wallAt}))continue;
+   // Open squares (Nørreport, Rådhuspladsen): the register lists a wire lamp every few metres, and with no facade
+   // in reach each one stood on its own new poles, a forest of masts. Keep one pole-hung lamp per 24 m there.
+   if(wirePoles.length>p0){if(poled.some(q=>Math.hypot(q.x-it.x,q.z-it.z)<24)){w.length=w0;wirePoles.length=p0;continue;}poled.push(it);}
+   hung.push(it);}wireLamps.length=0;wireLamps.push(...hung);} // a shade with no wire is left out
   const shade=models['wire-shade']?models['wire-shade'].clone().translate(0,WIRE_LOW+.18,0):mergeGeometries([cyl(.012,.012,.5,WIRE_LOW+.3,'#24282a',4),cyl(.06,.06,.1,WIRE_LOW+.5,'#2c3033',8),cyl(.09,.42,.24,WIRE_LOW+.32,'#2c3033',8),cyl(.3,.3,.03,WIRE_LOW+.19,'#fff3d6',8)]);
   chunkedInstances(wireLamps,shade,painted,'Wire lamp shades',it=>[it.x,it.z,it.yaw],{shadow:false});
   // Poles are already allowed where they stand and shared by wires ending within 3 m (wireLines snaps them).
