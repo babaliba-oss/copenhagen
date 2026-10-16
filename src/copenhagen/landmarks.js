@@ -99,13 +99,16 @@ const prism=(len,w,h,x,y,z,hex)=>{const sh=new THREE.Shape();sh.moveTo(-w/2,0);s
 const bx=(w,h,d,x,y,z,hex)=>paint(new THREE.BoxGeometry(w,h,d).translate(x,y,z),hex);
 // Gothic hall church with a west tower and a tall copper spire (Vor Frue before 1807). Local x = nave axis, tower at -x.
 function gothicChurch({len=64,width=27,eave=19,tower=13,towerH=50,spire=110}={}){
- const p=[bx(len,eave,width,0,eave/2,0,BRICK),prism(len,width+1,15,0,eave,0,TILE),bx(16,eave-3,width*.62,len/2+8,(eave-3)/2,0,BRICK),prism(16,width*.62+1,11,len/2+8,eave-3,0,TILE)];
- const tx=-len/2-tower/2+1;p.push(bx(tower,towerH,tower,tx,towerH/2,0,BRICK),bx(tower+.8,1.2,tower+.8,tx,towerH-.6,0,STONE));
+ const WALL='#b0664c',ROOF='#4f5a55'; // sunlit brick and a lead-grey roof: in one red the nave read as a windowless dark box
+ const p=[bx(len,eave,width,0,eave/2,0,WALL),prism(len,width+1,15,0,eave,0,ROOF),bx(16,eave-3,width*.62,len/2+8,(eave-3)/2,0,WALL),prism(16,width*.62+1,11,len/2+8,eave-3,0,ROOF)];
+ // buttresses between the window bays
+ for(let k=-2.5;k<=2.5;k+=1)for(const sz of [-1,1])p.push(bx(1.4,eave-2,1.6,k*11,(eave-2)/2,sz*(width/2+.7),WALL));
+ const tx=-len/2-tower/2+1;p.push(bx(tower,towerH,tower,tx,towerH/2,0,WALL),bx(tower+.8,1.2,tower+.8,tx,towerH-.6,0,STONE));
  p.push(paint(new THREE.ConeGeometry(tower*.48,spire-towerH,8).translate(tx,towerH+(spire-towerH)/2,0),COPPER));
  for(const [dx,dz] of [[-1,-1],[1,-1],[-1,1],[1,1]])p.push(paint(new THREE.ConeGeometry(.9,7,6).translate(tx+dx*(tower/2-.6),towerH+3.5,dz*(tower/2-.6)),COPPER));
  p.push(at(paint(new THREE.SphereGeometry(.7,10,8),GOLD),tx,spire+.4,0),bx(.12,3,.12,tx,spire+2.2,0,GOLD));
  // tall pointed windows along the nave (dark recesses)
- for(let k=-2;k<=2;k++)for(const sz of [-1,1])p.push(bx(3,9,.3,k*11,9,sz*(width/2+.1),'#2a2a2c'));
+ for(let k=-2;k<=2;k++)for(const sz of [-1,1]){p.push(bx(3,10,.3,k*11,9.5,sz*(width/2+.1),'#2a2a2c'));p.push(paint(new THREE.ConeGeometry(1.5,2.4,4).rotateY(Math.PI/4).translate(k*11,15.7,sz*(width/2+.1)),'#2a2a2c'));} // pointed heads
  return mergeGeometries(p);
 }
 // A free-standing church tower with spire (Nikolaj before the fire of 1795).
