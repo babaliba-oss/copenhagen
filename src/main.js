@@ -1,4 +1,5 @@
 import './cache-bust.js';
+import {installBootArt} from './boot-art.js';installBootArt();
 import './style.css';
 import './loading-screen.css';
 import './speedometer.css';
