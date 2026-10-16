@@ -117,6 +117,9 @@ function buildingSite(r=17,h=13){
  const p=[];const wood='#7a5a3a';
  for(let k=0;k<28;k++){const a=k/28*Math.PI*2;for(const rr of [r,r+1.6])p.push(bx(.18,h,.18,Math.cos(a)*rr,h/2,Math.sin(a)*rr,wood));}
  for(const y of [3.5,7,10.5,h-.2])for(let k=0;k<28;k++){const a=(k+.5)/28*Math.PI*2,c=2*Math.PI*(r+.8)/28;const g=new THREE.BoxGeometry(c+.2,.12,1.8);g.rotateY(-a+Math.PI/2);p.push(paint(g.translate(Math.cos(a)*(r+.8),y,Math.sin(a)*(r+.8)),wood));}
+ // the rotunda's marble walls, about half built (work stopped in 1770): outer face, inner face (mirrored so it faces in), top course
+ {const wh=6.5,o=new THREE.CylinderGeometry(r-.3,r-.3,wh,56,1,true).translate(0,wh/2,0),i=new THREE.CylinderGeometry(r-1.7,r-1.7,wh,56,1,true).translate(0,wh/2,0).scale(-1,1,1);i.computeVertexNormals();
+  const top=new THREE.RingGeometry(r-1.7,r-.3,56,1);top.rotateX(-Math.PI/2);top.translate(0,wh,0);p.push(paint(o,'#d8d2c3'),paint(i,'#cfc8b8'),paint(top,'#c9c2b2'));}
  // treadwheel crane outside the ring
  const cx=r+9;p.push(paint(new THREE.TorusGeometry(3,.18,6,20).translate(cx,3.4,0),wood),paint(new THREE.TorusGeometry(3,.18,6,20).translate(cx,3.4,1.4),wood));
  for(let k=0;k<8;k++){const a=k/8*Math.PI*2;p.push(paint(new THREE.BoxGeometry(.12,.12,1.4).translate(cx+Math.cos(a)*3,3.4+Math.sin(a)*3,.7),wood));}

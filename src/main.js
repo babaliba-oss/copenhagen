@@ -321,7 +321,12 @@ surfaceMaterial.onBeforeCompile=shader=>{
   // lawns in the surface data (pale green): scanned grass at two scales, a deeper summer green
   vec2 gu=vGround.xz/2.2;vec3 gr=mix(textureGrad(tGrassC,gu,GDX/2.2,GDY/2.2).rgb,textureGrad(tGrassC,mat2(.8,-.6,.6,.8)*vGround.xz/6.1,mat2(.8,-.6,.6,.8)*GDX/6.1,mat2(.8,-.6,.6,.8)*GDY/6.1).rgb,.4);
   gr=mix(gr,vec3(dot(gr,vec3(.3,.59,.11))),.3)*vec3(1.,1.,1.3);diffuseColor.rgb=gr*vec3(.62,.66,.5)*(1.0+(groundNoise(vGround.xz/9.0)-0.5)*0.22);gN=textureGrad(tGrassN,gu,GDX/2.2,GDY/2.2).xyz*2.0-1.0;gNw=.5*texFade;
- }else diffuseColor.rgb*=1.0+grain*0.04;
+ }else{diffuseColor.rgb*=1.0+grain*0.04;
+  #ifdef DIRT_ROADS
+  // 1760: other pale surfaces (plazas, building plots of today's data) are worn cobbles too.
+  if(dot(diffuseColor.rgb,vec3(.3333))>.45){vec2 su=vGround.xz/vec2(1.5,.75);diffuseColor.rgb=textureGrad(tSettsC,su,GDX/vec2(1.5,.75),GDY/vec2(1.5,.75)).rgb*vec3(1.0,.93,.82)*.9*(1.0+(groundNoise(vGround.xz/7.0)-0.5)*0.16);}
+  #endif
+ }
  `).replace('#include <roughnessmap_fragment>','#include <roughnessmap_fragment>\n if(gRough>=0.0)roughnessFactor=mix(roughnessFactor,clamp(gRough*1.1,0.35,1.0),0.85);\n roughnessFactor*=1.0-wetRough*0.6;')
   .replace('#include <normal_fragment_maps>','#include <normal_fragment_maps>\n if(gNw>0.0){vec3 nW=normalize(vec3(gN.x,gN.z,gN.y));normal=normalize(mix(normal,normalize((viewMatrix*vec4(nW,0.0)).xyz)*(gl_FrontFacing?1.0:-1.0),gNw));}');
 };
