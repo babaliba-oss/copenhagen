@@ -1,3 +1,4 @@
+import {WEATHER_UNIFORMS} from './weather.js';
 import * as THREE from 'three';
 import {createVehicle,animateVehicle,VEHICLE_TYPES} from './vehicles.js';
 import {registerEnvMaterial} from './environment.js';
@@ -33,15 +34,24 @@ export function createTrafficRenderer(actors,{types=VEHICLE_TYPES,paintColors=nu
    if(colored)family.entries.forEach((p,i)=>mesh.setColorAt(i,p.parts[paint].material.color));group.add(mesh);return mesh;};
   family.low=[low(s.w,s.belt-.3,s.l,(s.belt+.3)/2,0,bodyMaterial,paint>=0),low(s.w*.84,s.h-s.belt,s.rr-s.rf,(s.h+s.belt)/2,(s.rr+s.rf)/2,cabinMaterial,false)];
  }
+ // Lamps after dark: head and tail lamp glows for every car in range (one instanced batch, four per car).
+ const lampGeo=new THREE.SphereGeometry(.11,6,4),lamps=new THREE.InstancedMesh(lampGeo,new THREE.MeshBasicMaterial({color:'#ffffff',toneMapped:false}),actors.length*4);
+ lamps.name='Traffic lamps';lamps.userData.lod='lamps';lamps.frustumCulled=false;lamps.count=0;lamps.visible=false;lamps.instanceMatrix.setUsage(THREE.DynamicDrawUsage);group.add(lamps);
+ const HEAD=new THREE.Color('#fff4dc'),TAIL=new THREE.Color('#ff2a1a'),lampLocal=new THREE.Matrix4(),lampOut=new THREE.Matrix4();
+ for(let i=0;i<actors.length*4;i++)lamps.setColorAt(i,i%4<2?HEAD:TAIL);
  return {group,vehicleOf:actor=>byActor.get(actor)||null,batchCount:group.children.length,types:families.filter(f=>f.entries.length).map(f=>f.type),lod,update(dt,player){
+  let lampN=0;
   for(const {entries,batches,low}of families){let visible=0,far=0;
-  for(const {actor:a,model,parts}of entries){if(!a.edge)continue;
+  for(const {actor:a,model,parts}of entries){if(!a.edge)continue;const night=WEATHER_UNIFORMS.night.value>.5;
    const d=player?Math.hypot(a.x-player.x,a.z-player.z):0;if(d>lod.hide)continue;
    groundPose(a.x,a.z,a.heading,2.1,.85,slope);model.position.set(a.x,.12+slope.y,a.z);const delta=Math.atan2(Math.sin(a.heading-model.rotation.y),Math.cos(a.heading-model.rotation.y));model.rotation.set(slope.pitch,a.heading,slope.roll);
    if(d>lod.detail){model.updateMatrixWorld(true);for(const m of low){m.setMatrixAt(far,tmp.multiplyMatrices(model.matrixWorld,m.userData.offset));if(m.userData.paint>=0)m.setColorAt(far,parts[m.userData.paint].material.color);}far++;continue;}
    animateVehicle(model,a.speed,Math.max(-1,Math.min(1,delta*3)),dt,a.braking);model.updateMatrixWorld(true);
+   if(night&&d<lod.detail){const sp=model.userData.spec||{w:1.8,l:4.4,belt:.9};const l=sp.l||4.4,w=sp.w||1.8,y=(sp.belt||.9)-.15;
+    for(let q=0;q<4;q++){lampLocal.makeTranslation((q%2?1:-1)*(w/2-.28),y,q<2?-l/2:l/2);lamps.setMatrixAt(lampN++,lampOut.multiplyMatrices(model.matrixWorld,lampLocal));}}
    for(const m of batches){const ps=m.userData.parts,n=ps.length;for(let k=0;k<n;k++){m.setMatrixAt(visible*n+k,parts[ps[k]].matrixWorld);if(m.userData.colored)m.setColorAt(visible*n+k,parts[ps[k]].material.color);}}visible++;
   }batches.forEach(m=>{m.count=visible*m.userData.parts.length;m.visible=m.count>0;m.instanceMatrix.needsUpdate=true;if(m.instanceColor)m.instanceColor.needsUpdate=true;});
   low.forEach(m=>{m.count=far;m.visible=far>0;m.instanceMatrix.needsUpdate=true;if(m.instanceColor)m.instanceColor.needsUpdate=true;});}
+  lamps.count=lampN;lamps.visible=lampN>0;lamps.instanceMatrix.needsUpdate=true;
  }};
 }
