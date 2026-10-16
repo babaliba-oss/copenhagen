@@ -137,7 +137,7 @@ function splitByCell(source,cell){
  if(g!==source)g.dispose();
  return out;
 }
-export function createSea(water,land={},{helsinkiHarbour=true,groundExtent=0,deckColor='#4a4b4d'}={}){
+export function createSea(water,land={},{helsinkiHarbour=true,groundExtent=0,deckColor='#4a4b4d',deckTexture=null}={}){
  const group=new THREE.Group();group.name='Helsinki harbour water and quays';
  const time={value:0},geometries=[];
  for(const {rings} of water){
@@ -182,7 +182,7 @@ export function createSea(water,land={},{helsinkiHarbour=true,groundExtent=0,dec
   const shade=new THREE.Mesh(drapeGeometry(skirt,{water:true,lift:-WATER_LEVEL-.1}),new THREE.MeshBasicMaterial({color:'#ffffff',vertexColors:true,transparent:true,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-1,polygonOffsetUnits:-2}));
   shade.name='Quay shade on water';shade.renderOrder=1;group.add(shade);
  }
- {const rails=buildBridgeRailings(water,land,{ground:hasTerrain()?groundAt:()=>0});if(rails){const m=new THREE.Mesh(rails,new THREE.MeshStandardMaterial({color:'#2b2f31',roughness:.55,metalness:.4}));m.name='Bridge railings';m.castShadow=true;group.add(m);if(rails.userData.deck){const d=new THREE.Mesh(rails.userData.deck,new THREE.MeshStandardMaterial({color:deckColor,roughness:.9,side:THREE.DoubleSide}));d.name='Bridge decks';d.receiveShadow=true;group.add(d);}console.info('Bridge railings',rails.userData.runs);}}
+ {const rails=buildBridgeRailings(water,land,{ground:hasTerrain()?groundAt:()=>0});if(rails){const m=new THREE.Mesh(rails,new THREE.MeshStandardMaterial({color:'#2b2f31',roughness:.55,metalness:.4}));m.name='Bridge railings';m.castShadow=true;group.add(m);if(rails.userData.deck){const d=new THREE.Mesh(rails.userData.deck,(()=>{const m=new THREE.MeshStandardMaterial({color:deckColor,roughness:.9,side:THREE.DoubleSide});if(deckTexture&&typeof document!=='undefined'){const t=new THREE.TextureLoader().load(`/materials/${deckTexture}-color.jpg`);t.wrapS=t.wrapT=THREE.RepeatWrapping;t.colorSpace=THREE.SRGBColorSpace;m.map=t;m.color.set('#ffffff').lerp(new THREE.Color(deckColor),.25);}return m;})() /* deck in the street's own surface: scanned asphalt today, setts in 1760 */);d.name='Bridge decks';d.receiveShadow=true;group.add(d);}console.info('Bridge railings',rails.userData.runs);}}
  const groundGeometry=createGroundGeometry(water,groundSizeForExtent(groundExtent));
  const kinds={};for(const e of edges)kinds[e.kind]=(kinds[e.kind]||0)+1;
  group.userData={polygons:geometries.length,surfaceHeight:WATER_LEVEL,animated:true,quayEdges:edges.length,quayKinds:kinds,drawCalls:group.children.length};

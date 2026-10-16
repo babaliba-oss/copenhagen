@@ -214,6 +214,6 @@ export function buildBridgeRailings(water,land={},{height=1.05,ground=()=>0}={})
   const flat=r.flat(),ids=earcut(flat),y=deckY.get(d)+.035;for(const i of ids)deck.push(r[i][0],y,r[i][1]);}
  const pos=[];for(const g of parts){pos.push(...g.attributes.position.array);g.dispose();}
  const geometry=new THREE.BufferGeometry();geometry.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));geometry.computeVertexNormals();geometry.userData.runs=runs;
- if(deck.length){const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(deck,3));g.computeVertexNormals();geometry.userData.deck=g;}
+ if(deck.length){const g=new THREE.BufferGeometry(),uv=new Float32Array(deck.length/3*2);for(let i=0,j=0;i<deck.length;i+=3,j+=2){uv[j]=deck[i]/2.6;uv[j+1]=deck[i+2]/2.6;}g.setAttribute('position',new THREE.Float32BufferAttribute(deck,3));g.setAttribute('uv',new THREE.BufferAttribute(uv,2));g.computeVertexNormals();geometry.userData.deck=g;}
  return geometry;
 }

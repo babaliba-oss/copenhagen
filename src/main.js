@@ -572,7 +572,7 @@ async function ensureCityModel(){
  return cityModelPromise;
 }
 function rebuildSea(groundExtent){
- const next=createSea(data.water,data,{helsinkiHarbour:city.scenery==='helsinki',groundExtent,deckColor:city.era===1760?'#6b5e4e':'#4a4b4d'}),old=sea;tintSea(next);
+ const next=createSea(data.water,data,{helsinkiHarbour:city.scenery==='helsinki',groundExtent,deckColor:city.era===1760?'#6b5e4e':'#4a4b4d',deckTexture:city.era===1760?'setts':'asphalt'}),old=sea;tintSea(next);
  sea=next;cityModel.add(next.group);ground.geometry.dispose();ground.geometry=next.groundGeometry;
  if(!old)return;
  cityModel.remove(old.group);
@@ -1117,7 +1117,7 @@ async function boot(){
    if(setTerrain(await terrainData)){if(city.id==='copenhagen')console.info('Water bodies levelled',flattenWaterBodies());if(city.id.startsWith('copenhagen'))buildWaterMask(data.water,terrain()?.extent);{const t0=performance.now(),n=raiseDryHollows((x,z)=>inWaterPolygons(data.water,x,z));console.info('Dry hollows raised to quay height',n,Math.round(performance.now()-t0)+' ms');}surfaceMaterial.defines={...surfaceMaterial.defines,TERRAIN:''};surfaceMaterial.needsUpdate=true;ground.visible=false;cityModel.add(createTerrainGround(ground.material,city.id.startsWith('copenhagen')?{cell:10,chunk:40,wet:(x,z)=>inWaterPolygons(data.water,x,z)}:undefined));}
    if((landcoverData.polygons||landcoverData.runs||[]).length)cityModel.add(settleObject(createLandcover(landcoverData)));
    if(city.id.startsWith('copenhagen')){const lawns=(data.parks||[]).filter(p=>/Nurmikko|Kenttä/.test(p.kind)&&p.rings?.[0]?.length>3).map(p=>p.rings);if(lawns.length){const g=settleObject(createLandcover({polygons:lawns,chunk:400}),{maxEdge:6,tolerance:.18}); /* lawns lie under the surfaces: a coarser drape (1760's fields and ramparts made ~5M triangles) */g.name='Mapped lawns (under the surfaces)';g.position.y-=.22;g.updateMatrixWorld(true);cityModel.add(g);/* the coarse drape strays up to 18 cm: sunk below it, lawns no longer poke through paved squares (1760 blotches); terrain ground sits 50 cm down */}} // lawns the surface data leaves bare (Krinsen on Kongens Nytorv, park lawns)
-   sea=createSea(data.water,data,{helsinkiHarbour:helsinki,deckColor:city.era===1760?'#6b5e4e':'#4a4b4d'});tintSea(sea);cityModel.add(sea.group);ground.geometry.dispose();ground.geometry=sea.groundGeometry;
+   sea=createSea(data.water,data,{helsinkiHarbour:helsinki,deckColor:city.era===1760?'#6b5e4e':'#4a4b4d',deckTexture:city.era===1760?'setts':'asphalt'});tintSea(sea);cityModel.add(sea.group);ground.geometry.dispose();ground.geometry=sea.groundGeometry;
    // Helsinki's hand-built scenery (landmarks, harbour, street life, signs). Other cities get the generic engine only.
    async function buildHelsinkiScenery(){
    progress(30,'Loading roads and waterfront');
