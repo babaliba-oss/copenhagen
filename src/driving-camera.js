@@ -23,7 +23,10 @@ export function drivingCameraPose(car,heading,zoom=240,look=0,buildings=null){
  const ahead=3+Math.abs(look)*15;
  // Hills: the camera rides at the car's ground height, never below the slope behind it.
  const y=car.y??groundAt(car.x,car.z),px=car.x+Math.sin(heading)*distance,pz=car.z+Math.cos(heading)*distance;
- return {position:[px,Math.max(y+2.4+distance*.11,groundAt(px,pz)+1.4),pz],target:[car.x-Math.sin(heading+look)*ahead,y+1.15,car.z-Math.cos(heading+look)*ahead]};
+ // A wall right behind: the short boom rises instead, looking down over the vehicle (at 0.5 m back and 2.5 m up
+ // the lens sat inside the 1760 coach's body).
+ const lift=Math.max(0,3.6-distance)*1.7;
+ return {position:[px,Math.max(y+2.4+distance*.11+lift,groundAt(px,pz)+1.4),pz],target:[car.x-Math.sin(heading+look)*ahead,y+1.15,car.z-Math.cos(heading+look)*ahead]};
 }
 
 // ---- Drive-camera feel: speed FOV, heading lag/settle, roll, look, shake ----

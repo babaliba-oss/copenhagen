@@ -130,6 +130,6 @@ export function estimatedFacade(p,{era=null}={}){
  },p.height);
 }
 export function estimateFacades(index,{era=null}={}){
- let n=0;for(const t of index.tiles)for(const p of t.parts){if(p.texture||p.noFacade)continue;if(!p.roofColor)ensurePartColours(p);if(!p.facade&&p.height>=4&&p.height<=60){p.facade=estimatedFacade(p,{era});n++;}}
+ let n=0;for(const t of index.tiles)for(const p of t.parts){if(p.texture||p.noFacade)continue;if(!p.roofColor)ensurePartColours(p,era);if(!p.facade&&p.height>=4&&p.height<=60){p.facade=estimatedFacade(p,{era});n++;}}
  return n;
 }

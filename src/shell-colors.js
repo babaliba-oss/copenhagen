@@ -16,9 +16,12 @@ export function partColours(part){
  return {wall:lin(MODERN_WALLS[h%MODERN_WALLS.length]),roof:lin(MODERN_ROOFS[(h>>>8)%MODERN_ROOFS.length])};
 }
 // Give untextured parts colours their own colour too (so estimated façades can apply to them as well).
-export function ensurePartColours(part){
+// 1760: limewashed ochre, yellow, ox-blood, grey and white town houses under red tile (a few slate) roofs.
+const PERIOD_WALLS=['#d8b56a','#e3cf9a','#9b4a36','#c9c1ae','#e8e1cf','#b7703f','#d9c08a','#a8a294'],PERIOD_ROOFS=['#8a3b2a','#93432e','#7c3526','#4a4f52'];
+export function ensurePartColours(part,era=null){
  if(part.color&&part.roofColor)return part;
  const h=hash(part.id),hex=x=>{const o={};new THREE.Color(x).getRGB(o,THREE.SRGBColorSpace);return [o.r,o.g,o.b].map(v=>+v.toFixed(3));};
+ if(era===1760){part.color=hex(PERIOD_WALLS[h%PERIOD_WALLS.length]);part.roofColor=hex(PERIOD_ROOFS[(h>>>8)%PERIOD_ROOFS.length]);return part;}
  part.color=hex(MODERN_WALLS[h%MODERN_WALLS.length]);part.roofColor=hex(MODERN_ROOFS[(h>>>8)%MODERN_ROOFS.length]);part.modern=true;return part;
 }
 
