@@ -31,13 +31,13 @@ export function createPlayerCarRenderer(scene){
   for(const x of [-.62,.62]){const m=new THREE.Mesh(new THREE.SphereGeometry(.09,8,6),glowMat);m.position.set(x,.72,-2.18);lights.add(m);}
   lights.add(pool);}
 
- return {group:active,sync(travel,dt=0){
+ const api={headlights:true,group:active,sync(travel,dt=0){
   if(home!==travel.homeCar){for(const entry of entries.values())if(entry!==first)entry.dispose();entries.clear();home=travel.homeCar;entries.set(home,first);current=null;first.damage.update({damageVersion:-1});}
   for(const car of travel.cars)if(!entries.has(car)){const visual=car.visual||{},model=createVehicle(0,false,visual.type||'sedan');if(visual.paint)model.traverse(m=>{if(m.isMesh&&m.material.name==='paint')m.material.color.set(visual.paint);});entries.set(car,build(model,true));}
   const selected=entries.get(travel.car);
   if(current!==selected){if(current)parked.add(current.model);active.add(selected.model);active.children.splice(active.children.indexOf(selected.model),1);active.children.unshift(selected.model); /* the car model stays the first child (headlights after it) */selected.model.position.set(0,0,0);selected.model.rotation.set(0,0,0);active.userData=selected.model.userData;current=selected;}
   for(const [car,entry]of entries){entry.damage.update(car);if(entry===selected)continue;parked.add(entry.model);groundPose(car.x,car.z,car.heading,1.4,.8,slope);entry.model.position.set(car.x,.12+slope.y,car.z);entry.model.rotation.set(slope.pitch,car.heading,slope.roll,'YXZ');entry.model.visible=Math.hypot(car.x-travel.actor.x,car.z-travel.actor.z)<650;animateVehicle(entry.model,0,0,dt,false);}
-  selected.model.visible=true;lights.visible=WEATHER_UNIFORMS.night.value>.5&&travel.car===travel.homeCar;
+  selected.model.visible=true;lights.visible=api.headlights&&WEATHER_UNIFORMS.night.value>.5&&travel.car===travel.homeCar;
  },setVisible(visible){active.visible=parked.visible=visible;},
  // Swap the starter's procedural body for a Blender-made one (scripts/blender/player-car.py). Meshes are merged
  // per material name and take the starter's own materials (paint colour, env reflections); wheels stay.
@@ -55,4 +55,5 @@ export function createPlayerCarRenderer(scene){
   first.damage=createVehicleDamage(starter);const live=new Set();starter.traverse(o=>{if(o.isMesh)live.add(o.geometry);});[...merged,...before].forEach(g=>{if(!live.has(g))g.dispose();}); // damage replaced these with its own clones (the old damage's clones too)
   return true;
  }};
+ return api;
 }
