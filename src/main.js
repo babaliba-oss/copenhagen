@@ -509,8 +509,8 @@ async function buildRoof(t,at){
   Object.assign(group.userData,{textures,windows:0,tile:t,mask,waiting,pending:{array:a,parts,images:new Map([...images].map(([f,i])=>[f,i.bytes]))}});
   freezeTileGroup(group);applyTileLod(group,tileLevel(null,tileDistance(t,at)),at);loadedTiles.set(t.file,group);
   // One atlas upload per frame, then the tile itself: twenty tiles landing after a teleport no longer upload in one frame.
-  for(const texture of textures.values())uploads.push(()=>{if(loadedTiles.get(t.file)===group)renderer.initTexture(texture);});
-  uploads.push(()=>{if(loadedTiles.get(t.file)===group)cityModel.add(group);});
+  for(const texture of textures.values())uploads.push(()=>{if(loadedTiles.get(t.file)===group)renderer.initTexture(texture);},null,()=>loadedTiles.get(t.file)===group);
+  uploads.push(()=>{if(loadedTiles.get(t.file)===group)cityModel.add(group);},null,()=>loadedTiles.get(t.file)===group);
  }catch(error){
   if(loadedTiles.get(t.file)===group)loadedTiles.delete(t.file);
   cityModel.remove(group);group.children.forEach(m=>{m.geometry.dispose();disposeMaterial(m.material);});textures.forEach(t=>t.dispose());images?.forEach(({bitmap})=>bitmap.close());
@@ -537,7 +537,7 @@ async function detailTile(group){
    if(!group.userData.mask.shown)for(const m of group.children)if(m.userData.lod)applyMeshLod(m,group.userData.level,focus);};
   const tmp=new THREE.Group();tmp.add(...meshes);
   renderer.compileAsync(tmp,camera,scene).then(()=>{tmp.remove(...meshes);land();},()=>{tmp.remove(...meshes);land();});
- },()=>dist(b)); // nearest building first, across every tile in the queue
+ },()=>dist(b),()=>loadedTiles.get(t.file)===group); // nearest building first, across every tile in the queue
 }
 async function loadPhoto(t){
  if(photoTiles.has(t.file))return;
@@ -1322,7 +1322,7 @@ async function boot(){
    if(import.meta.env.DEV)window.openCityDrive.testPoliceIncident=(kind='vehicle',id='test')=>police.report(kind,id);
    if(import.meta.env.DEV){window.openCityDrive.post=post;window.openCityDrive.camera=camera;} // perf/visual inspection of the post pipeline
    if(import.meta.env.DEV){window.openCityDrive.mobility=mobility;window.openCityDrive.travel=travel;window.openCityDrive.objects=world.objects;window.openCityDrive.npcScooters=npcScooters;} // tests: stage NPC cars for crash checks
-   if(import.meta.env.DEV){window.__scene=scene;window.openCityDrive.cph=()=>cph;window.__renderer=renderer;window.openCityDrive.police=police;window.openCityDrive.tramSim=tramSim;window.openCityDrive.roadblock=roadblock;window.openCityDrive.car=()=>car;window.openCityDrive.mobileControls=mobileControls;window.openCityDrive.extensionStreamer=extensionStreamer;window.openCityDrive.streetLife=streetLife;} // tests: surge/arrest diagnostics, tram fleet A/B for frame-rate checks
+   if(import.meta.env.DEV){window.openCityDrive.queues=()=>({uploads:uploads.size});window.__scene=scene;window.openCityDrive.cph=()=>cph;window.__renderer=renderer;window.openCityDrive.police=police;window.openCityDrive.tramSim=tramSim;window.openCityDrive.roadblock=roadblock;window.openCityDrive.car=()=>car;window.openCityDrive.mobileControls=mobileControls;window.openCityDrive.extensionStreamer=extensionStreamer;window.openCityDrive.streetLife=streetLife;} // tests: surge/arrest diagnostics, tram fleet A/B for frame-rate checks
    if(import.meta.env.DEV){window.openCityDrive.birds=birds;window.openCityDrive.impacts=impacts;window.openCityDrive.crowd=crowd;window.openCityDrive.detailPeople=()=>detailPeople;} // bird flocks: snapshot(), advance()
    if(import.meta.env.DEV)window.openCityDrive.scene=scene; // perf inspection: triangle/draw breakdown by object
    // Repeatable street-level debug viewpoints; absent from production builds.

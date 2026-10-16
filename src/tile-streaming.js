@@ -34,9 +34,12 @@ export function createFrameQueue({maxJobs=2,budgetMs=2.5}={}){
  const jobs=[];let seq=0;
  const pick=()=>{let bi=0,bp=Infinity;for(let i=0;i<jobs.length;i++){const j=jobs[i],p=j.p?j.p():j.s*1e-9-1e9;if(p<bp){bp=p;bi=i;}}return jobs.splice(bi,1)[0];};
  return {
-  push(job,priority=null){jobs.push({run:job,p:priority,s:seq++});},
+  // alive(): false once the job's tile has unloaded; such jobs are dropped unrun (a queue of jobs for tiles
+  // left behind held their building data: ~200 MB after each teleport while it never drained).
+  push(job,priority=null,alive=null){jobs.push({run:job,p:priority,s:seq++,alive});},
   get size(){return jobs.length;},
-  step(){const t=performance.now();let n=0;while(jobs.length&&n<maxJobs&&(n===0||performance.now()-t<budgetMs)){pick().run();n++;}return n;}
+  step(){let w=0;for(const j of jobs)if(!j.alive||j.alive())jobs[w++]=j;jobs.length=w;
+   const t=performance.now();let n=0;while(jobs.length&&n<maxJobs&&(n===0||performance.now()-t<budgetMs)){pick().run();n++;}return n;}
  };
 }
 
