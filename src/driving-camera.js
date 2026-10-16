@@ -8,6 +8,7 @@ export function overviewCameraPose(car,heading,zoom=240,high=false){
  const y=car.y??groundAt(car.x,car.z),px=car.x+Math.sin(heading)*behind,pz=car.z+Math.cos(heading)*behind;
  return {position:[px,Math.max(y+height,groundAt(px,pz)+1.5),pz],target:[car.x-Math.sin(heading)*ahead,y+1.15,car.z-Math.cos(heading)*ahead]};
 }
+let swing=0;
 export function drivingCameraPose(car,heading,zoom=240,look=0,buildings=null){
  // Close and low, more behind the car than above it, so the street ahead reads
  // on a phone screen (arcade-style: ~8.3 m back, 3.3 m up at the default zoom 150). Zoom (36–240) still pulls it back.
@@ -20,7 +21,9 @@ export function drivingCameraPose(car,heading,zoom=240,look=0,buildings=null){
  if(buildings){const full=distance;distance=clear(heading,full);
   // Backed up against a wall: swing the boom up to 40 degrees to whichever side is open, rather than a lens
   // half a metre behind the roof.
-  if(distance<full*.6)for(const off of [.35,-.35,.7,-.7]){const d=clear(heading+off,full);if(d>distance+1.5){distance=d;heading+=off;break;}}}
+  let want=0;if(distance<full*.6)for(const off of [.35,-.35,.7,-.7]){const d=clear(heading+off,full);if(d>distance+1.5){want=off;break;}}
+  // eased, so the boom swings round instead of jumping a frame
+  swing+=(want-swing)*.18;if(Math.abs(swing)<.01&&want===0)swing=0;if(swing){heading+=swing;distance=clear(heading,full);}}
  // Turn the view, not the camera's orbit: orbiting sideways puts the lens
  // inside the roadside trees precisely when the player looks at the harbour.
  const ahead=3+Math.abs(look)*15;
