@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';
-import {buildBridgeRailings,WATER_LEVEL,extractQuayEdges,buildQuayGeometry,createGroundGeometry,groundSizeForExtent} from './quay.js';
+import {buildBridgeRailings,WATER_LEVEL,QUAY_FOOT,extractQuayEdges,buildQuayGeometry,createGroundGeometry,groundSizeForExtent} from './quay.js';
 import {ALLAS} from './waterfront-landmarks.js';
 import {drapeGeometry,createLakeGeometry} from './terrain-mesh.js';
 import {hasTerrain,seaLevel,terrain,groundAt} from './terrain.js';
@@ -178,7 +178,13 @@ export function createSea(water,land={},{helsinkiHarbour=true,groundExtent=0,dec
  if(geometry.attributes.position.count){
   // Split into 400 m cells so the quays behind the camera are frustum-culled (one city-wide mesh never is).
   const quayMaterial=new THREE.MeshStandardMaterial({vertexColors:true,roughness:.9,side:THREE.DoubleSide});
-  for(const g of splitByCell(drapeGeometry(geometry,{maxEdge:10}),700)){const quay=new THREE.Mesh(g,quayMaterial);quay.name='Granite quay walls';quay.receiveShadow=true;group.add(quay);}
+  const draped=drapeGeometry(geometry,{maxEdge:10});
+  // Terrain cities: the canal water sits metres below the street (Copenhagen ~3 m), but the wall profile is
+  // Helsinki's (foot 1.75 m down), so a dark gap opened under every quay edge, as if you could drive under the
+  // street. The foot and the waterline band follow the real water instead.
+  if(hasTerrain()){const lvl=seaLevel(),p=draped.attributes.position;for(let i=0;i<p.count;i++){const x=p.getX(i),z=p.getZ(i),local=p.getY(i)-groundAt(x,z);
+   if(local<QUAY_FOOT+.05)p.setY(i,Math.min(p.getY(i),lvl-.8));else if(Math.abs(local-(WATER_LEVEL+.22))<.03)p.setY(i,Math.min(p.getY(i),lvl+.22));}p.needsUpdate=true;draped.computeVertexNormals();}
+  for(const g of splitByCell(draped,700)){const quay=new THREE.Mesh(g,quayMaterial);quay.name='Granite quay walls';quay.receiveShadow=true;group.add(quay);}
   const shade=new THREE.Mesh(drapeGeometry(skirt,{water:true,lift:-WATER_LEVEL-.1}),new THREE.MeshBasicMaterial({color:'#ffffff',vertexColors:true,transparent:true,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-1,polygonOffsetUnits:-2}));
   shade.name='Quay shade on water';shade.renderOrder=1;group.add(shade);
  }
