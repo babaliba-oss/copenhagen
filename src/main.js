@@ -556,7 +556,7 @@ async function updatePhotos(){
 }
 function initSurfaceStreamer(){
  surfaceStreamer??=createSurfaceStreamer({concurrency:3,onError:handleTileError,load:async (t,{signal}={})=>{
-  const g=dropSunkenSurfaces(drapeGeometry(removeLegacyWater(await geometry(dataUrl(t.file))),{maxEdge:4,mark:true}),{water:(x,z)=>inWaterPolygons(data.water,x,z)?waterAt(x,z):null}); // the mapped water, not the level spread onto the banks
+  const g=dropSunkenSurfaces(drapeGeometry(removeLegacyWater(await geometry(dataUrl(t.file))),{maxEdge:4,mark:true}),{water:(x,z)=>inWaterPolygons(data.water,x,z)?waterAt(x,z):null,mapped:(x,z)=>inWaterPolygons(data.water,x,z)}); // the mapped water, not the level spread onto the banks
   if(signal?.aborted||gameIsStopped()){g.dispose();return;}
   const m=new THREE.Mesh(g,surfaceMaterial);m.receiveShadow=true;cityModel.add(m);return m;
  }});

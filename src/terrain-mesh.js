@@ -54,12 +54,14 @@ export function drapeGeometry(geometry,{maxEdge=4,lift=0,water=false,mark=false,
 // Paths mapped along a quay edge are buffered half over the water; draped on the sloping canal bed they show
 // as a pale strip just above the water with a dark gap behind the quay. Drop draped surface triangles that lie
 // entirely over water and less than `clear` metres above it (real quays stand ~1.5-2 m higher and are kept).
-export function dropSunkenSurfaces(geometry,{clear=1.2,water=waterAt}={}){
+export function dropSunkenSurfaces(geometry,{clear=1.2,water=waterAt,mapped=null}={}){ // mapped(x,z): inside the mapped water polygons; such triangles go whatever their height (paving drawn out over a canal at quay height read as pale slabs floating on the water)
  const p=geometry.attributes.position,y=geometry.attributes.terrainY,src=geometry.index?.array;if(!y)return geometry;
  const n=src?src.length:p.count,keep=[];let dropped=0;
  for(let i=0;i<n;i+=3){
   const ids=[src?.[i]??i,src?.[i+1]??i+1,src?.[i+2]??i+2];
   const sunk=ids.every(j=>{const w=water(p.getX(j),p.getZ(j));return w!==null&&y.getX(j)<w+clear;});
+  const over=!sunk&&mapped&&mapped((p.getX(ids[0])+p.getX(ids[1])+p.getX(ids[2]))/3,(p.getZ(ids[0])+p.getZ(ids[1])+p.getZ(ids[2]))/3)&&ids.filter(j=>mapped(p.getX(j),p.getZ(j))).length>=2;
+  if(over){dropped++;continue;}
   if(sunk)dropped++;else keep.push(...ids);
  }
  if(dropped){geometry.setIndex(keep);geometry.computeBoundingSphere();}
