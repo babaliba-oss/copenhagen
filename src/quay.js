@@ -190,7 +190,7 @@ export function buildBridgeRailings(water,land={},{height=1.05,ground=()=>0}={})
  const parts=[],box=(w,h,d,x,y,z,yaw)=>{const g=new THREE.BoxGeometry(w,h,d);g.rotateY(yaw);g.translate(x,y,z);parts.push(g.index?g.toNonIndexed():g);};
  const paved=new SpatialIndex(decks),otherPaving=(x,z,self)=>paved.near(x,z).some(p=>p!==self&&x>=p.bbox[0]&&x<=p.bbox[2]&&z>=p.bbox[1]&&z<=p.bbox[3]&&pointInPolygon(x,z,p.rings)); // where the deck meets the next road or footway: no railing across it
  let runs=0;const railed=new Set(),deckY=new Map();
- for(const deck of decks)for(const ring of deck.rings){const n=ring.length;let ringTop=-Infinity;for(const p of ring)ringTop=Math.max(ringTop,ground(p[0],p[1]));
+ for(const deck of decks)for(const ring of deck.rings){const n=ring.length;let ringTop=-Infinity;for(const p of ring){const g=ground(p[0],p[1]);if(Number.isFinite(g))ringTop=Math.max(ringTop,g);}
   for(let i=0;i<n;i++){const a=ring[i],b=ring[(i+1)%n],dx=b[0]-a[0],dz=b[1]-a[1],l=Math.hypot(dx,dz);if(l<1.5)continue;
    const ux=dx/l,uz=dz/l,nx=-uz,nz=ux,steps=Math.max(1,Math.round(l/1.8));let start=-1;
    // outer side: the one off the deck; a railing where that side is water and no other paving continues
@@ -200,7 +200,7 @@ export function buildBridgeRailings(water,land={},{height=1.05,ground=()=>0}={})
     if(ok&&start<0)start=k;
     else if(!ok&&start>=0){const t0=start/steps,t1=k/steps,x0=a[0]+dx*t0,z0=a[1]+dz*t0,x1=a[0]+dx*t1,z1=a[1]+dz*t1,len=Math.hypot(x1-x0,z1-z0),yaw=Math.atan2(ux,uz);
      // set in 25 cm from the deck edge
-     const cx=(x0+x1)/2,cz=(z0+z1)/2,y0=Math.max(ground(x0,z0),ground(x1,z1),ground(a[0],a[1]),ground(b[0],b[1])),y=y0<ringTop-2?ringTop:y0; // all over sunk canal bed: the deck's highest cornerdeckY.set(deck,Math.max(deckY.get(deck)??-Infinity,y));
+     const cx=(x0+x1)/2,cz=(z0+z1)/2,y0=Math.max(ground(x0,z0),ground(x1,z1),ground(a[0],a[1]),ground(b[0],b[1])),y1=y0<ringTop-2?ringTop:y0,y=Number.isFinite(y1)?y1:0; /* all over sunk canal bed: the deck's highest corner */deckY.set(deck,Math.max(deckY.get(deck)??-Infinity,y));
      box(.07,.07,len,cx,y+height,cz,yaw);box(.05,.05,len,cx,y+height*.5,cz,yaw);
      for(let p=0;p<=k-start;p++){const t=(start+p)/steps;box(.07,height,.07,a[0]+dx*t,y+height/2,a[1]+dz*t,0);}
      runs++;railed.add(deck);start=-1;}

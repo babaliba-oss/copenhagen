@@ -7,5 +7,6 @@ test('a bridge over the water gets railings on both long edges and a deck plate'
  const g=buildBridgeRailings(water,{roads:[deck]});assert.ok(g);assert.equal(g.userData.runs,2);assert.ok(g.userData.deck);
  const p=g.attributes.position.array;let minX=Infinity,maxX=-Infinity;for(let i=0;i<p.length;i+=3){minX=Math.min(minX,p[i]);maxX=Math.max(maxX,p[i]);}
  assert.ok(minX>-21&&maxX<21,'railings only where the deck is over the water');
+ assert.ok([...g.userData.deck.attributes.position.array].every(Number.isFinite),'deck plate has real heights');
 });
 test('a road on dry land gets none',()=>{assert.equal(buildBridgeRailings(water,{roads:[{kind:'Ajorata',rings:[[[30,-5],[60,-5],[60,5],[30,5]]]}]}),null);});
