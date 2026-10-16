@@ -60,11 +60,12 @@ const owned=q=>q.p.color&&q.p.roofColor&&!q.p.texture&&!drop.has(q.p.key);
 for(const B of parts){if(!bare(B)||drop.has(B.p.key))continue;const b=B.p.bbox,cand=new Set();
  for(let x=Math.floor(b[0]/C);x<=Math.floor(b[2]/C);x++)for(let z=Math.floor(b[1]/C);z<=Math.floor(b[3]/C);z++)for(const j of grid.get(x+','+z)||[]){const A=parts[j];if(A!==B&&!bare(A)&&owned(A))cand.add(A);}
  if(!cand.size)continue;const list=[];
- for(const w of wallTris(B)){const t=w.t,edge=Math.max(Math.hypot(t[0]-t[3],t[2]-t[5]),Math.hypot(t[3]-t[6],t[5]-t[8]),Math.hypot(t[6]-t[0],t[8]-t[2]),Math.abs(t[1]-t[4]),Math.abs(t[4]-t[7]));let best=null,bd=Math.max(3,edge*.5); // near: a large triangle may reach its neighbour only at an edge
+ for(const w of wallTris(B)){const t=w.t,edge=Math.max(Math.hypot(t[0]-t[3],t[2]-t[5]),Math.hypot(t[3]-t[6],t[5]-t[8]),Math.hypot(t[6]-t[0],t[8]-t[2]),Math.abs(t[1]-t[4]),Math.abs(t[4]-t[7]));let best=null,bd0=Math.max(3,edge*.5),bd=bd0*2; // near: a large triangle may reach its neighbour only at an edge
   for(const A of cand){const a=A.p.bbox;if(w.c[0]<a[0]-1||w.c[0]>a[2]+1||w.c[2]<a[1]-1||w.c[2]>a[3]+1)continue;
    for(const u of wallTris(A)){if(Math.abs(u.n[0]*w.n[0]+u.n[2]*w.n[2])<.985)continue;const t=u.t;
     if(Math.abs(u.n[0]*(w.c[0]-t[0])+u.n[1]*(w.c[1]-t[1])+u.n[2]*(w.c[2]-t[2]))>.4)continue; // same plane
-    const d=Math.sqrt(dist2(w.c[0],w.c[1],w.c[2],t));if(d<bd){bd=d;best=A;}}}
+    const inside=w.c[0]>=a[0]&&w.c[0]<=a[2]&&w.c[2]>=a[1]&&w.c[2]<=a[3],d=Math.sqrt(dist2(w.c[0],w.c[1],w.c[2],t))+(inside?0:bd0); // the part whose footprint holds the triangle wins over a coplanar neighbour
+    if(d<bd){bd=d;best=A;}}}
   if(best&&best.p.color.some((v,k)=>Math.abs(v-B.p.color?.[k])>.04)){list.push([w.i,best.p.key]);recoloured++;}}
  if(list.length){const owners=[...new Set(list.map(l=>l[1]))];recolour[B.p.key]=[owners,list.flatMap(([i,k])=>[i,owners.indexOf(k)])];}}
 fs.writeFileSync(`${dir}/recolour.json`,JSON.stringify(recolour));
