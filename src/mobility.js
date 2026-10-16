@@ -52,7 +52,8 @@ const LOOKAHEAD=45;
 // Side by side, the lower id goes first. Previously both refused to move and deadlocked forever.
 const yieldsTo=(a,b)=>{if(Math.cos(a.heading-b.heading)<.9)return true;const forward=(b.x-a.x)*-Math.sin(a.heading)+(b.z-a.z)*-Math.cos(a.heading);return forward>.3||(forward>-.3&&b.id<a.id);};
 export class Mobility {
- constructor(data,world,{cars=52,people=100,stationCars=0,corridorCars=0,corridor=null,random=Math.random}={}){
+ constructor(data,world,{cars=52,people=100,stationCars=0,corridorCars=0,corridor=null,random=Math.random,walkSpawn=200,walkRecycle=330}={}){
+  this.walkSpawn=walkSpawn;this.walkRecycle=walkRecycle; // walkers appear within walkSpawn m of the player and are recycled past walkRecycle
   this.roads=prepareGraph(data.roads);this.walks=prepareGraph(data.walks);this.signals=data.signals;this.signalControl=annotateJunctions(this.roads,data.signals||[]);annotateCrossings(this.walks,this.signalControl);this.signalAxes=this.signalControl.axes;this.world=world;this.random=random;this.time=0;this.collisions=0;this.externalObstacles=[];this.externalBodies=[];this.trams=null;this.edgeCars=new Map();this.boxCars=new Map();this.approaching=new Map();
   this.stationEdges=this.roads.edges.filter(e=>e.points.some(([x,z])=>inStationTrafficArea({x,z})));
   // Main-road pool: extra cars that live only on a busy corridor (e.g. Olympia terminal → Kauppatori), both directions.
@@ -149,7 +150,7 @@ export class Mobility {
   if(a.corridorOnly&&!this.nearCorridor(player)){a.edge=null;a.speed=0;return;}
   const graph=a.walking?this.walks:this.roads;
   // Prefer nearby routes; edge midpoint avoids choosing a remote end of a long road.
-  const nearby=(a.stationOnly?this.stationEdges:a.corridorOnly?this.corridorEdges:this.edgesNear(graph,player,a.walking?200:320)).filter(e=>{const p=e.points[Math.floor(e.points.length/2)],d=Math.hypot(p[0]-player.x,p[1]-player.z);return (!a.walking||!e.crossing)&&d<(a.walking?200:a.corridorOnly?520:320)&&e.length>(a.walking?3:10)&&!(!a.walking&&(this.obstructed?.has(e)||this.trap(e,2)));});
+  const nearby=(a.stationOnly?this.stationEdges:a.corridorOnly?this.corridorEdges:this.edgesNear(graph,player,a.walking?this.walkSpawn:320)).filter(e=>{const p=e.points[Math.floor(e.points.length/2)],d=Math.hypot(p[0]-player.x,p[1]-player.z);return (!a.walking||!e.crossing)&&d<(a.walking?200:a.corridorOnly?520:320)&&e.length>(a.walking?3:10)&&!(!a.walking&&(this.obstructed?.has(e)||this.trap(e,2)));});
   for(let trial=0;trial<80&&nearby.length;trial++){
    a.edge=nearby[Math.floor(this.random()*nearby.length)];a.s=this.random()*a.edge.length;a.plan=[];a.prevDir=undefined;
    const p=this.position(a);
@@ -353,7 +354,7 @@ export class Mobility {
     if(a.edge&&!this.corridorIds.has(a.edge.id)&&this.canRecycle(a,player))a.edge=null;
     if(!a.edge){if(this.time<(a.retryAt||0))continue;a.retryAt=this.time+.5;this.spawn(a,player);continue;}
    }
-   if(!a.edge||(Math.hypot(a.x-player.x,a.z-player.z)>(a.walking?330:500)&&(a.walking||this.canRecycle(a,player)))){this.spawn(a,player);continue;}
+   if(!a.edge||(Math.hypot(a.x-player.x,a.z-player.z)>(a.walking?this.walkRecycle:500)&&(a.walking||this.canRecycle(a,player)))){this.spawn(a,player);continue;}
    // A car that has made no progress for a long time is holding up a queue: recycle it unless it is close by.
    // Away from the player a deadlocked car is recycled rather than squeezing through another one.
    if(!a.walking&&((a.waiting||0)>STALLED_AFTER||a.deadlocked)&&Math.hypot(a.x-player.x,a.z-player.z)>60){a.deadlocked=false;this.spawn(a,player);continue;}
