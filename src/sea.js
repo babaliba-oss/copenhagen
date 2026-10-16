@@ -178,7 +178,7 @@ export function createSea(water,land={},{helsinkiHarbour=true,groundExtent=0,dec
  if(geometry.attributes.position.count){
   // Split into 400 m cells so the quays behind the camera are frustum-culled (one city-wide mesh never is).
   const quayMaterial=new THREE.MeshStandardMaterial({vertexColors:true,roughness:.9,side:THREE.DoubleSide});
-  const draped=drapeGeometry(geometry,{maxEdge:10});
+  const draped=drapeGeometry(geometry,{maxEdge:10,tolerance:.12}); // tolerance: straight runs on flat ground stay whole (557k triangles city-wide before)
   // Terrain cities: the canal water sits metres below the street (Copenhagen ~3 m), but the wall profile is
   // Helsinki's (foot 1.75 m down), so a dark gap opened under every quay edge, as if you could drive under the
   // street. The foot and the waterline band follow the real water instead.

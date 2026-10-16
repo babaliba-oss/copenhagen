@@ -233,6 +233,8 @@ function buildWaterMask(water,extent,res=2){
  if(typeof document==='undefined'||!water?.length||!extent)return;const n=Math.ceil(2*extent/res),c=document.createElement('canvas');c.width=c.height=n;
  const ctx=c.getContext('2d');ctx.fillStyle='#fff';
  // each polygon on its own (even-odd within it keeps island holes): overlapping polygons (a canal drawn over the harbour) cancelled out as one path
+ // a grey 8 m band round every shore first: low ground there is the terrain ramping down into the water
+ ctx.strokeStyle='rgb(60,60,60)';ctx.lineWidth=8/res;ctx.lineJoin='round';for(const w of water){ctx.beginPath();for(const ring of w.rings||[]){ring.forEach(([x,z],i)=>{const px=(x+extent)/res,pz=(z+extent)/res;i?ctx.lineTo(px,pz):ctx.moveTo(px,pz);});ctx.closePath();}ctx.stroke();}
  for(const w of water){ctx.beginPath();for(const ring of w.rings||[]){ring.forEach(([x,z],i)=>{const px=(x+extent)/res,pz=(z+extent)/res;i?ctx.lineTo(px,pz):ctx.moveTo(px,pz);});ctx.closePath();}ctx.fill('evenodd');}
  const t=new THREE.CanvasTexture(c);t.flipY=false;t.generateMipmaps=false;t.minFilter=t.magFilter=THREE.LinearFilter;t.colorSpace=THREE.NoColorSpace;
  WATER_MASK.uWaterMask.value=t;WATER_MASK.uWaterRect.value.set(-extent,-extent,n*res,1);WATER_MASK.uSeaY.value=seaLevel()??-1e9;
