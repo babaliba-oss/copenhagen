@@ -498,6 +498,11 @@ async function buildRoof(t,at){
    for(let i=p.start;i<p.start+p.count;i++){a[i*5]=cx+(a[i*5]-cx)*sx;a[i*5+2]=cz+(a[i*5+2]-cz)*sz;}}
   if(city.era===1760)for(const p of t.parts)if(/^volden$|bastion|skanse/i.test(p.name||''))slopeRampart(a,p); // earthworks slope (period-roofs.js)
   applyFacadeHeights(a,t.parts);liftBuildings(a,t.parts); // terrain cities: each part stands on its lowest ground
+  // Flat model roofs lying within a metre of the street are plinths and paved decks the city model folds into
+  // a block (the Knippelsbro approach): drawn, they sat on the street as a dark slab with a kerb. Collapsed away.
+  if(hasTerrain())for(const p of t.parts)for(let v=p.start;v+2<p.start+p.count;v+=3){const o=v*5,y0=a[o+1],y1=a[o+6],y2=a[o+11];if(Math.max(y0,y1,y2)-Math.min(y0,y1,y2)>.8)continue;
+   {const cx=(a[o]+a[o+5]+a[o+10])/3,cz=(a[o+2]+a[o+7]+a[o+12])/3,g=groundAt(cx,cz),y=(y0+y1+y2)/3;if(y>g+1.3||y<g-1.5)continue;} // lying near the street (a low annex sunk by the slope)
+   for(const k of [5,10]){a[o+k]=a[o];a[o+k+1]=a[o+1];a[o+k+2]=a[o+2];}}
   const parts=t.parts.filter(p=>![211,212,213,1796,57950,STATION_KIOSK_RATU,USPENSKI.ratu].includes(p.ratu)&&!placeHidden.has(p.id)&&!p.duplicate); // duplicate: a second copy of the same building (building-dedupe.js) // place landmarks and shelters are drawn by place-scene.js
   // Far level: one merged shell per atlas. Near level: per-part shells until the worker's details replace them.
   const mask=createShellMask(parts.length);group.add(...createMergedShells(a,parts,textures,mask));
