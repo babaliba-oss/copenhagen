@@ -57,10 +57,14 @@ export function drapeGeometry(geometry,{maxEdge=4,lift=0,water=false,mark=false,
 export function dropSunkenSurfaces(geometry,{clear=1.2,water=waterAt,mapped=null}={}){ // mapped(x,z): inside the mapped water polygons; such triangles go whatever their height (paving drawn out over a canal at quay height read as pale slabs floating on the water)
  const p=geometry.attributes.position,y=geometry.attributes.terrainY,src=geometry.index?.array;if(!y)return geometry;
  const n=src?src.length:p.count,keep=[];let dropped=0;
+ // per vertex once (indexed vertices are shared by up to six triangles): 0 unknown, 1 no, 2 yes
+ const wetV=new Uint8Array(p.count),mapV=new Uint8Array(p.count);
+ const sunkAt=j=>{if(!wetV[j]){const w=water(p.getX(j),p.getZ(j));wetV[j]=w!==null&&y.getX(j)<w+clear?2:1;}return wetV[j]===2;};
+ const mapAt=j=>{if(!mapV[j])mapV[j]=mapped(p.getX(j),p.getZ(j))?2:1;return mapV[j]===2;};
  for(let i=0;i<n;i+=3){
   const ids=[src?.[i]??i,src?.[i+1]??i+1,src?.[i+2]??i+2];
-  const sunk=ids.every(j=>{const w=water(p.getX(j),p.getZ(j));return w!==null&&y.getX(j)<w+clear;});
-  const over=!sunk&&mapped&&mapped((p.getX(ids[0])+p.getX(ids[1])+p.getX(ids[2]))/3,(p.getZ(ids[0])+p.getZ(ids[1])+p.getZ(ids[2]))/3)&&ids.filter(j=>mapped(p.getX(j),p.getZ(j))).length>=2;
+  const sunk=sunkAt(ids[0])&&sunkAt(ids[1])&&sunkAt(ids[2]);
+  const over=!sunk&&mapped&&(mapAt(ids[0])+mapAt(ids[1])+mapAt(ids[2]))>=2&&mapped((p.getX(ids[0])+p.getX(ids[1])+p.getX(ids[2]))/3,(p.getZ(ids[0])+p.getZ(ids[1])+p.getZ(ids[2]))/3);
   if(over){dropped++;continue;}
   if(sunk)dropped++;else keep.push(...ids);
  }

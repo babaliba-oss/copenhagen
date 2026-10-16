@@ -95,7 +95,11 @@ export function inWaterPolygons(water,x,z){
  if(!entry||entry.count!==water.length){entry={count:water.length,index:new SpatialIndex(water.filter(w=>w?.rings?.length)),raster:waterRaster(water)};waterIndexes.set(water,entry);}
  // 2 m raster: clearly wet / clearly dry cells answer at once; only cells an edge crosses run the polygon test
  // (the exact test ran per surface vertex at boot: seconds of point-in-polygon on the harbour's long rings).
- const r=entry.raster;if(r){const cx=Math.floor((x-r.x0)/r.res),cz=Math.floor((z-r.z0)/r.res);if(cx>=0&&cz>=0&&cx<r.w&&cz<r.h){const v=r.cells[cz*r.w+cx];if(v<2)return v===1;}}
+ const r=entry.raster;if(r){const cx=Math.floor((x-r.x0)/r.res),cz=Math.floor((z-r.z0)/r.res);if(cx>=0&&cz>=0&&cx<r.w&&cz<r.h){const v=r.cells[cz*r.w+cx];if(v<2)return v===1;
+  // shore cell: crossings of a ray towards +x, counted per polygon over the edges in this 4 m row only
+  const e=r.rows.get(Math.floor(z/4));if(!e)return false;let odd=null;
+  for(let i=0;i<e.length;i+=5){const az=e[i+1],bz=e[i+3];if((az>z)!==(bz>z)&&x<(e[i+2]-e[i])*(z-az)/(bz-az)+e[i]){const id=e[i+4];(odd??=new Map()).set(id,!odd.get(id));}}
+  if(!odd)return false;for(const o of odd.values())if(o)return true;return false;}}
  return !!entry.index.at(x,z);
 }
 // Cells: 0 dry, 1 inside some polygon, 2 on an edge (exact test needed). Each polygon is filled on its own
@@ -113,5 +117,7 @@ export function waterRaster(water,res=2){
  for(const poly of list)for(const ring of poly.rings)for(let i=0,j=ring.length-1;i<ring.length;j=i++){const a=ring[i],c=ring[j],l=Math.hypot(c[0]-a[0],c[1]-a[1]),n=Math.max(1,Math.ceil(l/(res*.4)));
   for(let k=0;k<=n;k++){const x=a[0]+(c[0]-a[0])*k/n,z=a[1]+(c[1]-a[1])*k/n,cx=Math.floor((x-x0)/res),cz=Math.floor((z-z0)/res);
    for(let dz=-1;dz<=1;dz++)for(let dx=-1;dx<=1;dx++){const X=cx+dx,Z=cz+dz;if(X>=0&&Z>=0&&X<w&&Z<h)cells[Z*w+X]=2;}}}
- return {x0,z0,res,w,h,cells};
+ const rows=new Map();list.forEach((poly,id)=>{for(const ring of poly.rings)for(let i=0,j=ring.length-1;i<ring.length;j=i++){const a=ring[i],c=ring[j];if(a[1]===c[1])continue;
+  for(let k=Math.floor(Math.min(a[1],c[1])/4);k<=Math.floor(Math.max(a[1],c[1])/4);k++){let l=rows.get(k);if(!l)rows.set(k,l=[]);l.push(a[0],a[1],c[0],c[1],id);}}});
+ return {x0,z0,res,w,h,cells,rows};
 }

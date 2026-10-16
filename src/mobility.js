@@ -53,7 +53,7 @@ const LOOKAHEAD=45;
 const yieldsTo=(a,b)=>{if(Math.cos(a.heading-b.heading)<.9)return true;const forward=(b.x-a.x)*-Math.sin(a.heading)+(b.z-a.z)*-Math.cos(a.heading);return forward>.3||(forward>-.3&&b.id<a.id);};
 export class Mobility {
  constructor(data,world,{cars=52,people=100,stationCars=0,corridorCars=0,corridor=null,random=Math.random,walkSpawn=200,walkRecycle=330}={}){
-  this.walkSpawn=walkSpawn;this.walkRecycle=walkRecycle; // walkers appear within walkSpawn m of the player and are recycled past walkRecycle
+  this.walkSpawn=walkSpawn;this.walkRecycle=walkRecycle;this.spawnBudget=6; // walkers appear within walkSpawn m of the player and are recycled past walkRecycle
   this.roads=prepareGraph(data.roads);this.walks=prepareGraph(data.walks);this.signals=data.signals;this.signalControl=annotateJunctions(this.roads,data.signals||[]);annotateCrossings(this.walks,this.signalControl);this.signalAxes=this.signalControl.axes;this.world=world;this.random=random;this.time=0;this.collisions=0;this.externalObstacles=[];this.externalBodies=[];this.trams=null;this.edgeCars=new Map();this.boxCars=new Map();this.approaching=new Map();
   this.stationEdges=this.roads.edges.filter(e=>e.points.some(([x,z])=>inStationTrafficArea({x,z})));
   // Main-road pool: extra cars that live only on a busy corridor (e.g. Olympia terminal → Kauppatori), both directions.
@@ -323,7 +323,7 @@ export class Mobility {
   return ![player,...this.cars,...this.externalObstacles].some(c=>c.edge!==null&&(Math.hypot(c.x-middle.x,c.z-middle.z)<(Math.abs(c.speed||0)<.5?3:5)||approachingPedestrian(middle,c)));
  }
  step(dt,player){
-  this.time+=dt;this.dt=dt;
+  this.time+=dt;this.dt=dt;let spawns=0;
   // Per step rather than per car: who is on which edge, and everything a car must not drive into.
   this.edgeCars.clear();this.boxCars.clear();this.approaching.clear();
   const add=(map,key,c)=>{const list=map.get(key);if(list)list.push(c);else map.set(key,[c]);};
@@ -354,7 +354,7 @@ export class Mobility {
     if(a.edge&&!this.corridorIds.has(a.edge.id)&&this.canRecycle(a,player))a.edge=null;
     if(!a.edge){if(this.time<(a.retryAt||0))continue;a.retryAt=this.time+.5;this.spawn(a,player);continue;}
    }
-   if(!a.edge||(Math.hypot(a.x-player.x,a.z-player.z)>(a.walking?this.walkRecycle:500)&&(a.walking||this.canRecycle(a,player)))){this.spawn(a,player);continue;}
+   if(!a.edge||(Math.hypot(a.x-player.x,a.z-player.z)>(a.walking?this.walkRecycle:500)&&(a.walking||this.canRecycle(a,player)))){if(spawns++<this.spawnBudget||!a.edge&&this.time<3)this.spawn(a,player);continue;} // a few respawns per frame: after a turn dozens went at once (a hitch)
    // A car that has made no progress for a long time is holding up a queue: recycle it unless it is close by.
    // Away from the player a deadlocked car is recycled rather than squeezing through another one.
    if(!a.walking&&((a.waiting||0)>STALLED_AFTER||a.deadlocked)&&Math.hypot(a.x-player.x,a.z-player.z)>60){a.deadlocked=false;this.spawn(a,player);continue;}
