@@ -128,7 +128,7 @@ body.clean-capture .edge-invite{display:none}
 
 /* Touch screens: the full HUD is always on (no H key), with big buttons and touch instructions. */
 #touch-aux,.boot-touch,.pause-touch{display:none}
-#pause-overlay{z-index:40}
+#pause-overlay{z-index:40;overflow-y:auto;justify-content:safe center;padding:24px 16px} /* short screens: the controls list ran off the top with the title and the resume button unreachable */
 @media(pointer:coarse){
 .boot-controls,#boot-launch .boot-enter,body.touch .controls-hint,body.touch #location-readout,body.touch .right-tools,#pause-overlay .pause-controls{display:none}
 .boot-touch,.pause-touch{display:block;font-size:14px;line-height:1.6;max-width:320px;text-align:center;margin:10px auto 0}
