@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import {createVehicle,animateVehicle} from './vehicles.js';
 import {createVehicleDamage} from './vehicle-damage.js';
 import {groundPose} from './terrain.js';
+import {WEATHER_UNIFORMS} from './weather.js';
 const slope={y:0,pitch:0,roll:0};
 import {unregisterEnvMaterial} from './environment.js';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
@@ -20,13 +21,23 @@ export function createPlayerCarRenderer(scene){
   return {model,damage,dispose(){model.removeFromParent();for(const g of privateGeometry)g.dispose();if(owned)for(const m of materials){unregisterEnvMaterial(m);m.dispose();}}};
  };
  const first=build(starter);active.add(starter);active.userData=starter.userData;
+ // Headlights after dark: two warm lamp glows and a soft beam pool on the road ahead (no real light: a scene
+ // light would recompile every material and cost every pixel). Forward is -Z in the car's frame.
+ const lights=new THREE.Group();lights.name='Headlights';lights.visible=false;active.add(lights);
+ {const c=typeof document!=='undefined'?document.createElement('canvas'):null;let tex=null;
+  if(c){c.width=64;c.height=128;const g=c.getContext('2d'),img=g.createImageData(64,128);for(let y=0;y<128;y++)for(let x=0;x<64;x++){const t=1-y/127,w=.18+.82*t,u=(x-31.5)/31.5/w,v=Math.max(0,1-u*u)*(1-t*.5)*Math.min(1,t*4+.25),k=(y*64+x)*4,b=Math.round(255*v);img.data[k]=img.data[k+1]=img.data[k+2]=b;img.data[k+3]=255;}g.putImageData(img,0,0);tex=new THREE.CanvasTexture(c); /* a beam widening and fading away from the car (canvas top = far end) */}
+  const pool=new THREE.Mesh(new THREE.PlaneGeometry(7,16).rotateX(-Math.PI/2).translate(0,.22,-10.5),new THREE.MeshBasicMaterial({color:'#fff1d6',alphaMap:tex,transparent:true,opacity:.7,depthWrite:false,blending:THREE.AdditiveBlending,polygonOffset:true,polygonOffsetFactor:-4}));pool.name='Headlight beam';
+  const glowMat=new THREE.MeshBasicMaterial({color:'#fff6e4',toneMapped:false});
+  for(const x of [-.62,.62]){const m=new THREE.Mesh(new THREE.SphereGeometry(.09,8,6),glowMat);m.position.set(x,.72,-2.18);lights.add(m);}
+  lights.add(pool);}
+
  return {group:active,sync(travel,dt=0){
   if(home!==travel.homeCar){for(const entry of entries.values())if(entry!==first)entry.dispose();entries.clear();home=travel.homeCar;entries.set(home,first);current=null;first.damage.update({damageVersion:-1});}
   for(const car of travel.cars)if(!entries.has(car)){const visual=car.visual||{},model=createVehicle(0,false,visual.type||'sedan');if(visual.paint)model.traverse(m=>{if(m.isMesh&&m.material.name==='paint')m.material.color.set(visual.paint);});entries.set(car,build(model,true));}
   const selected=entries.get(travel.car);
-  if(current!==selected){if(current)parked.add(current.model);active.add(selected.model);selected.model.position.set(0,0,0);selected.model.rotation.set(0,0,0);active.userData=selected.model.userData;current=selected;}
+  if(current!==selected){if(current)parked.add(current.model);active.add(selected.model);active.children.splice(active.children.indexOf(selected.model),1);active.children.unshift(selected.model); /* the car model stays the first child (headlights after it) */selected.model.position.set(0,0,0);selected.model.rotation.set(0,0,0);active.userData=selected.model.userData;current=selected;}
   for(const [car,entry]of entries){entry.damage.update(car);if(entry===selected)continue;parked.add(entry.model);groundPose(car.x,car.z,car.heading,1.4,.8,slope);entry.model.position.set(car.x,.12+slope.y,car.z);entry.model.rotation.set(slope.pitch,car.heading,slope.roll,'YXZ');entry.model.visible=Math.hypot(car.x-travel.actor.x,car.z-travel.actor.z)<650;animateVehicle(entry.model,0,0,dt,false);}
-  selected.model.visible=true;
+  selected.model.visible=true;lights.visible=WEATHER_UNIFORMS.night.value>.5&&travel.car===travel.homeCar;
  },setVisible(visible){active.visible=parked.visible=visible;},
  // Swap the starter's procedural body for a Blender-made one (scripts/blender/player-car.py). Meshes are merged
  // per material name and take the starter's own materials (paint colour, env reflections); wheels stay.
