@@ -51,9 +51,9 @@ export function createStreetLife(scene,mobility,{paintedMarkings=true,mappedSign
  if(!paintedMarkings){markings.forEach(g=>g.dispose());markings.length=0;}
  if(markings.length){const geometries=markings.map(g=>g.index?g.toNonIndexed():g);const m=new THREE.Mesh(drapeGeometry(mergeGeometries(geometries)),new THREE.MeshStandardMaterial({color:'#e7e3d4',roughness:1,side:THREE.DoubleSide,polygonOffset:true,polygonOffsetFactor:-1}));m.receiveShadow=true;group.add(m);new Set([...geometries,...markings]).forEach(g=>g.dispose());}
  const kerbs=[];
- // Raised granite kerbstones follow surveyed pavement boundaries adjacent to a carriageway,
+ // Raised granite kerbstones (not in 1760: they are 19th-century) follow surveyed pavement boundaries adjacent to a carriageway,
  // dropped across crossings; geometry and shader live in street-furniture.js (createGraniteKerbs).
- for(const pavement of pavements)for(const ring of pavement.rings)for(let i=1;i<ring.length;i++){
+ if(paintedMarkings)for(const pavement of pavements)for(const ring of pavement.rings)for(let i=1;i<ring.length;i++){
   const a=ring[i-1],b=ring[i],dx=b[0]-a[0],dz=b[1]-a[1],length=Math.hypot(dx,dz);if(length<.4||length>30)continue;
   // Road on exactly one side, tested every ~1.5 m (a midpoint test let pavement edges that cut across a
   // carriageway lay a kerb right over the road); each qualifying run becomes kerbstones.
@@ -64,7 +64,7 @@ export function createStreetLife(scene,mobility,{paintedMarkings=true,mappedSign
    else if(!ok&&run>=0){const p=t=>[a[0]+dx*t/n,a[1]+dz*t/n];if(k-run>=1)kerbs.push(...kerbSegments(p(run),p(k),crossingData.chains));run=-1;}
   }
  }
- const kerbGroup=kerbs.length?settleObject(createGraniteKerbs(kerbs)):null;if(kerbGroup){group.add(kerbGroup);kerbGroups.push(kerbGroup);}
+ const kerbGroup=kerbs.length&&paintedMarkings?settleObject(createGraniteKerbs(kerbs)):null;if(kerbGroup){group.add(kerbGroup);kerbGroups.push(kerbGroup);}
  const signalPosts=createBreakableSigns('Traffic signal posts');
  // One post per approach that stops at the signal (lane-model.js), showing that approach's own phase.
  for(const e of mobility.roads.edges){if(e.signal<0||e.length<4)continue;const key=`${e.signal}:${Math.round(routePoint(e,e.length-3).heading/1.6)}`;if(used.has(key))continue;
