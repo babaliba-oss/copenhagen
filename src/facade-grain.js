@@ -68,7 +68,7 @@ float vWinLit=0.;vec3 fN=vec3(0.,0.,1.),fT=vec3(1.,0.,0.),fB=vec3(0.,1.,0.);floa
   float open=step(.29,wf.x)*step(wf.x,.71)*step(.3,wf.y)*step(wf.y,.83)*exists;
   float frame=(step(.25,wf.x)*step(wf.x,.75)*step(.26,wf.y)*step(wf.y,.87))*exists-open;
   if(vRel.y<-8.){ // churches and towers (shell-colors.js stores their height negative): tall round-headed windows in 5.5 m bays
-   float H=-vRel.y,cx=(fract(along/5.5)-.5)*5.5,hw=.62,top=min(H*.72,17.),y=vRel.x,arch=top-hw+sqrt(max(0.,hw*hw-cx*cx));
+   float H=-vRel.y,cx=(fract(along/5.5)-.5)*5.5,hw=.8,top=3.4+min(H*.33,7.5),y=vRel.x,arch=top-hw+sqrt(max(0.,hw*hw-cx*cx));
    open=step(abs(cx),hw)*step(3.4,y)*step(y,arch);frame=step(abs(cx),hw+.16)*step(3.25,y)*step(y,arch+.16)-open;
    exists=step(3.,y)*step(y,top+.3);wc=vec2(floor(along/5.5),7.);
   }
