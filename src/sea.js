@@ -3,7 +3,7 @@ import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';
 import {buildBridgeRailings,WATER_LEVEL,extractQuayEdges,buildQuayGeometry,createGroundGeometry,groundSizeForExtent} from './quay.js';
 import {ALLAS} from './waterfront-landmarks.js';
 import {drapeGeometry,createLakeGeometry} from './terrain-mesh.js';
-import {hasTerrain,seaLevel,terrain} from './terrain.js';
+import {hasTerrain,seaLevel,terrain,groundAt} from './terrain.js';
 
 export {WATER_LEVEL};
 
@@ -182,7 +182,7 @@ export function createSea(water,land={},{helsinkiHarbour=true,groundExtent=0}={}
   const shade=new THREE.Mesh(drapeGeometry(skirt,{water:true,lift:-WATER_LEVEL-.1}),new THREE.MeshBasicMaterial({color:'#ffffff',vertexColors:true,transparent:true,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-1,polygonOffsetUnits:-2}));
   shade.name='Quay shade on water';shade.renderOrder=1;group.add(shade);
  }
- {const rails=buildBridgeRailings(water,land);if(rails){const m=new THREE.Mesh(drapeGeometry(rails,{maxEdge:6}),new THREE.MeshStandardMaterial({color:'#2b2f31',roughness:.55,metalness:.4}));m.name='Bridge railings';m.castShadow=true;group.add(m);if(rails.userData.deck){const d=new THREE.Mesh(drapeGeometry(rails.userData.deck,{maxEdge:4}),new THREE.MeshStandardMaterial({color:'#8f8b84',roughness:.9,side:THREE.DoubleSide}));d.name='Bridge decks';d.receiveShadow=true;group.add(d);}console.info('Bridge railings',rails.userData.runs);}}
+ {const rails=buildBridgeRailings(water,land,{ground:hasTerrain()?groundAt:()=>0});if(rails){const m=new THREE.Mesh(rails,new THREE.MeshStandardMaterial({color:'#2b2f31',roughness:.55,metalness:.4}));m.name='Bridge railings';m.castShadow=true;group.add(m);if(rails.userData.deck){const d=new THREE.Mesh(rails.userData.deck,new THREE.MeshStandardMaterial({color:'#8f8b84',roughness:.9,side:THREE.DoubleSide}));d.name='Bridge decks';d.receiveShadow=true;group.add(d);}console.info('Bridge railings',rails.userData.runs);}}
  const groundGeometry=createGroundGeometry(water,groundSizeForExtent(groundExtent));
  const kinds={};for(const e of edges)kinds[e.kind]=(kinds[e.kind]||0)+1;
  group.userData={polygons:geometries.length,surfaceHeight:WATER_LEVEL,animated:true,quayEdges:edges.length,quayKinds:kinds,drawCalls:group.children.length};
