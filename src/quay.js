@@ -179,3 +179,39 @@ export function createGroundGeometry(water,size=groundSizeForExtent()){
  const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));
  const n=new Float32Array(pos.length);for(let i=2;i<n.length;i+=3)n[i]=1;g.setAttribute('normal',new THREE.BufferAttribute(n,3));g.computeBoundingSphere();return g;
 }
+
+// Bridge railings: wherever a bridge deck (road or footway kind 'Silta') borders the water, an iron railing
+// stands on its edge (posts every 1.8 m, top and middle rails). Without it a deck over a canal read as a
+// road edge you could drive off into the water. Geometry at y=0 above the deck; drape it onto the ground.
+export function buildBridgeRailings(water,land={},{height=1.05}={}){
+ const inWater=waterLocator(water),decks=[...(land.roads||[]),...(land.pavement||[])].filter(p=>p.rings?.[0]?.length>2); // 'Silta' decks, and any paving mapped across the water (a bridge without the tag)
+ const parts=[],box=(w,h,d,x,y,z,yaw)=>{const g=new THREE.BoxGeometry(w,h,d);g.rotateY(yaw);g.translate(x,y,z);parts.push(g.index?g.toNonIndexed():g);};
+ const paved=new SpatialIndex([...(land.roads||[]),...(land.pavement||[])].filter(p=>p.rings?.[0]?.length>2&&!BRIDGE.test(`${p.kind||''} ${p.name||''}`)));
+ let runs=0;const railed=new Set();
+ for(const deck of decks)for(const ring of deck.rings){const n=ring.length;
+  for(let i=0;i<n;i++){const a=ring[i],b=ring[(i+1)%n],dx=b[0]-a[0],dz=b[1]-a[1],l=Math.hypot(dx,dz);if(l<1.5)continue;
+   const ux=dx/l,uz=dz/l,nx=-uz,nz=ux,steps=Math.max(1,Math.round(l/1.8));let start=-1;
+   // outer side: the one off the deck; a railing where that side is water and no other paving continues
+   const inRing=(x,z)=>{let c=false;for(let j=0,m=ring.length,k2=m-1;j<m;k2=j++){const p=ring[j],q=ring[k2];if((p[1]>z)!==(q[1]>z)&&x<(q[0]-p[0])*(z-p[1])/(q[1]-p[1])+p[0])c=!c;}return c;};
+   const wet=t=>{const x=a[0]+dx*t,z=a[1]+dz*t,s=inRing(x+nx*.6,z+nz*.6)?-1:1,ox=x+nx*s*1.5,oz=z+nz*s*1.5;if(!inWater(ox,oz)||paved.at(ox,oz))return false;return BRIDGE.test(`${deck.kind||''} ${deck.name||''}`)||inWater(x-nx*s*1.5,z-nz*s*1.5);};
+   for(let k=0;k<=steps;k++){const ok=k<steps&&wet((k+.5)/steps);
+    if(ok&&start<0)start=k;
+    else if(!ok&&start>=0){const t0=start/steps,t1=k/steps,x0=a[0]+dx*t0,z0=a[1]+dz*t0,x1=a[0]+dx*t1,z1=a[1]+dz*t1,len=Math.hypot(x1-x0,z1-z0),yaw=Math.atan2(ux,uz);
+     // set in 25 cm from the deck edge
+     const ox=0,oz=0,cx=(x0+x1)/2,cz=(z0+z1)/2;
+     box(.07,.07,len,cx+ox,height,cz+oz,yaw);box(.05,.05,len,cx+ox,height*.5,cz+oz,yaw);
+     for(let p=0;p<=k-start;p++){const t=(start+p)/steps;box(.07,height,.07,a[0]+dx*t,height/2,a[1]+dz*t,0);}
+     runs++;railed.add(deck);start=-1;}
+   }
+  }
+ }
+ if(!parts.length)return null;
+ // Decks of tagged bridges as plates of their own: the surface tiles drop paving that lies inside the water
+ // polygons (dropSunkenSurfaces), which left railings standing over open water.
+ const deck=[];for(const d of railed){const r=d.rings[0];
+  const flat=r.flat(),ids=earcut(flat);for(const i of ids)deck.push(r[i][0],.035,r[i][1]);}
+ const pos=[];for(const g of parts){pos.push(...g.attributes.position.array);g.dispose();}
+ const geometry=new THREE.BufferGeometry();geometry.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));geometry.computeVertexNormals();geometry.userData.runs=runs;
+ if(deck.length){const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(deck,3));g.computeVertexNormals();geometry.userData.deck=g;}
+ return geometry;
+}
