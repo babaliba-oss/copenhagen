@@ -139,14 +139,15 @@ export function createModelledBuilding(array,part,pixels,texture=null,includeHer
  for(const e of edgeMap.values())if(e.ridge){const a=new THREE.Vector3(...e.a),b=new THREE.Vector3(...e.b),length=a.distanceTo(b);if(length<1||length>100)continue;const g=new THREE.CylinderGeometry(.055,.055,length,5);g.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,1,0),b.clone().sub(a).normalize()));g.translate(...a.add(b).multiplyScalar(.5).toArray());ridges.push(g);}
  // Chimney stacks on the ridges of the city model's pitched roofs (houses up to ~30 m): two or three per house.
  const chimneys=[];
- if(part.roofColor&&part.height<30&&part.height>6){
+ const earthwork=/^volden$|bastion|skanse/i.test(part.name||''); // ramparts: no chimneys or dormers
+ if(part.roofColor&&part.height<30&&part.height>6&&!earthwork){
   const ridgesFlat=[...edgeMap.values()].filter(e=>e.ridge&&Math.abs(e.a[1]-e.b[1])<.3).map(e=>({e,l:Math.hypot(e.a[0]-e.b[0],e.a[2]-e.b[2])})).filter(r=>r.l>4).sort((a,b)=>b.l-a.l).slice(0,2);
   let k=0;for(const {e,l} of ridgesFlat)for(const f of l>14?[.22,.78]:[.5]){if(k++>=3)break;const x=e.a[0]+(e.b[0]-e.a[0])*f,y=e.a[1]+(e.b[1]-e.a[1])*f,z=e.a[2]+(e.b[2]-e.a[2])*f,yaw=Math.atan2(e.b[0]-e.a[0],e.b[2]-e.a[2]);
    const g=new THREE.BoxGeometry(.75,1.5,1.1);g.rotateY(yaw);g.translate(x,y+.45,z);chimneys.push(g);const c=new THREE.BoxGeometry(.95,.14,1.3);c.rotateY(yaw);c.translate(x,y+1.25,z);chimneys.push(c);}
  }
  // Dormers: a row of small windowed dormers on each pitched roof plane of older houses (the Copenhagen roofline).
  const dormerWalls=[],dormerRoofs=[],dormerGlass=[],dormerFrames=[];
- if(!texture&&part.roofColor&&part.height>8&&part.height<32&&!part.modern&&!(part.year>1935)){
+ if(!texture&&part.roofColor&&part.height>8&&part.height<32&&!part.modern&&!(part.year>1935)&&!earthwork){
   const planes=new Map();
   for(const t of analysis.roof){if(t.n.y<.4||t.n.y>.9)continue;const hx=t.n.x,hz=t.n.z,hl=Math.hypot(hx,hz);if(hl<.2)continue;const v0=t.v[0],d=t.n.x*v0[0]+t.n.y*v0[1]+t.n.z*v0[2];
    const key=`${Math.round(Math.atan2(hx,hz)*20)}:${Math.round(t.n.y*20)}:${Math.round(d)}`;if(!planes.has(key))planes.set(key,{n:t.n,h:[hx/hl,hz/hl],tris:[]});planes.get(key).tris.push(t);}

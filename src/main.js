@@ -33,7 +33,7 @@ import {Mobility} from './mobility.js';
 import {createStreetLife} from './street-life.js';
 import {buildTileInWorker,materialiseBuilding} from './building-loader.js';
 import {attachFacades,applyFacadeHeights,estimateFacades} from './facade-data.js';
-import {roofsInWorker,periodRoofMesh} from './period-roofs.js';
+import {roofsInWorker,periodRoofMesh,slopeRampart} from './period-roofs.js';
 import {tileLevel,applyTileLod,applyMeshLod,createMergedShells,createShellMask,freezeTileGroup,freezeMesh,applyTreeLod,createStaticShadowCuller} from './tile-lod.js';
 import {loadTileImages,aheadPoint,tilePriority,createFrameQueue,createDetailScheduler} from './tile-streaming.js';
 import {createSurfaceStreamer} from './surface-streaming.js';
@@ -496,6 +496,7 @@ async function buildRoof(t,at){
   // the depth test instead of both flickering into two-tone triangles.
   for(const p of t.parts)if(p.inset){const [x0,z0,x1,z1]=p.bbox,cx=(x0+x1)/2,cz=(z0+z1)/2,sx=Math.max(0,1-.24/Math.max(1,x1-x0)),sz=Math.max(0,1-.24/Math.max(1,z1-z0));
    for(let i=p.start;i<p.start+p.count;i++){a[i*5]=cx+(a[i*5]-cx)*sx;a[i*5+2]=cz+(a[i*5+2]-cz)*sz;}}
+  if(city.era===1760)for(const p of t.parts)if(/^volden$|bastion|skanse/i.test(p.name||''))slopeRampart(a,p); // earthworks slope (period-roofs.js)
   applyFacadeHeights(a,t.parts);liftBuildings(a,t.parts); // terrain cities: each part stands on its lowest ground
   const parts=t.parts.filter(p=>![211,212,213,1796,57950,STATION_KIOSK_RATU,USPENSKI.ratu].includes(p.ratu)&&!placeHidden.has(p.id)&&!p.duplicate); // duplicate: a second copy of the same building (building-dedupe.js) // place landmarks and shelters are drawn by place-scene.js
   // Far level: one merged shell per atlas. Near level: per-part shells until the worker's details replace them.

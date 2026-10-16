@@ -77,3 +77,26 @@ export function periodRoofMesh(roofs,material){
  const mesh=new THREE.Mesh(g,material);mesh.name='Period roofs';mesh.castShadow=true;mesh.receiveShadow=true;
  return mesh;
 }
+
+// Ramparts (Volden) come as flat-topped prisms with vertical sides: a green box. Earthworks slope, so the top
+// outline is pulled inward (about 40 degrees from the ground), dragging the walls' top edges with it. No new
+// vertices: done in place on the tile array before the shells are built.
+export function slopeRampart(array,part,{maxRun=7}={}){
+ let top=-Infinity,bottom=Infinity;
+ for(let v=part.start;v<part.start+part.count;v++){const y=array[v*5+1];if(y>top)top=y;if(y<bottom)bottom=y;}
+ const height=top-bottom;if(!(height>1.5))return 0;
+ const key=(x,z)=>`${Math.round(x*20)},${Math.round(z*20)}`,isTop=y=>y>top-.3,edges=new Map();
+ for(let v=part.start;v+2<part.start+part.count;v+=3){const o=[v*5,v*5+5,v*5+10];if(!o.every(i=>isTop(array[i+1])))continue;
+  for(let i=0;i<3;i++){const A=o[i],B=o[(i+1)%3],C=o[(i+2)%3],ka=key(array[A],array[A+2]),kb=key(array[B],array[B+2]);if(ka===kb)continue;const k=ka<kb?ka+'|'+kb:kb+'|'+ka;
+   const e=edges.get(k);if(e)e.n++;else edges.set(k,{n:1,ka,kb,a:[array[A],array[A+2]],b:[array[B],array[B+2]],c:[array[C],array[C+2]]});}}
+ const normals=new Map(); // outline vertex → inward normals of its outline edges
+ for(const e of edges.values()){if(e.n!==1)continue;const dx=e.b[0]-e.a[0],dz=e.b[1]-e.a[1],l=Math.hypot(dx,dz);if(l<1e-3)continue;let nx=-dz/l,nz=dx/l;
+  if(nx*(e.c[0]-e.a[0])+nz*(e.c[1]-e.a[1])<0){nx=-nx;nz=-nz;}
+  for(const k of [e.ka,e.kb]){let l2=normals.get(k);if(!l2)normals.set(k,l2=[]);l2.push([nx,nz,l]);}}
+ const run=Math.min(maxRun,height*1.2),shift=new Map();
+ for(const [k,ns] of normals){let x=0,z=0,minLen=Infinity;for(const [nx,nz,l] of ns){x+=nx;z+=nz;minLen=Math.min(minLen,l);}const l=Math.hypot(x,z);if(l<1e-3)continue;x/=l;z/=l;
+  const c=Math.max(.4,x*ns[0][0]+z*ns[0][1]),d=Math.min(run/c,run*2.5,minLen*.45);shift.set(k,[x*d,z*d]);}
+ let moved=0;
+ for(let v=part.start;v<part.start+part.count;v++){const i=v*5;if(!isTop(array[i+1]))continue;const s=shift.get(key(array[i],array[i+2]));if(!s)continue;array[i]+=s[0];array[i+2]+=s[1];moved++;}
+ return moved;
+}
