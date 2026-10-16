@@ -240,7 +240,7 @@ export function createMappedFurniture(layer,{player=()=>null,mobility=()=>null,c
  if(heads.length){
   glowMat=new THREE.MeshBasicMaterial({color:'#ffd9a3',toneMapped:false,fog:false});
   const c=typeof document!=='undefined'?document.createElement('canvas'):null,g=c?.getContext('2d');if(c){c.width=c.height=64;}const grad=g&&g.createRadialGradient(32,32,0,32,32,32);
-  if(grad){grad.addColorStop(0,'rgba(255,255,255,1)');grad.addColorStop(.25,'rgba(255,255,255,.6)');grad.addColorStop(.6,'rgba(255,255,255,.18)');grad.addColorStop(1,'rgba(255,255,255,0)');g.fillStyle=grad;g.fillRect(0,0,64,64);}
+  if(grad){grad.addColorStop(0,'rgb(255,255,255)');grad.addColorStop(.25,'rgb(150,150,150)');grad.addColorStop(.6,'rgb(42,42,42)');grad.addColorStop(1,'rgb(0,0,0)');g.fillStyle='#000';g.fillRect(0,0,64,64);g.fillStyle=grad;g.fillRect(0,0,64,64);} // greyscale on black: alphaMap reads the green channel, and white-with-alpha came out as a hard-edged disc
   poolMat=new THREE.MeshBasicMaterial({color:'#ffc98a',fog:true,alphaMap:c?new THREE.CanvasTexture(c):null,transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,polygonOffset:true,polygonOffsetFactor:-4,opacity:0});
   const sphere=new THREE.SphereGeometry(.2,8,6),plane=new THREE.PlaneGeometry(1,1).rotateX(-Math.PI/2);
   const R={lantern:4,lamp:12,'mast-lamp':9,'park-lamp':5.5,'wire-lamp':10},sc=new THREE.Vector3(),by=new Map();
