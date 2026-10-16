@@ -2,10 +2,10 @@
 /assets/*
   Cache-Control: public, max-age=31536000, immutable
 
-# Data URLs carry ?v=<build id> (src/cache-bust.js), so each deploy gets fresh files; still revalidate.
+# Data URLs carry ?v=<content hash> (src/cache-bust.js, vite.config.js): a changed file gets a new URL, so a week of caching is safe.
 /data/*
-  Cache-Control: public, max-age=3600, must-revalidate
+  Cache-Control: public, max-age=604800
 /cities/*
-  Cache-Control: public, max-age=3600, must-revalidate
+  Cache-Control: public, max-age=604800
 /models/*
   Cache-Control: public, max-age=86400
