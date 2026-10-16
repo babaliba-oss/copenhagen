@@ -314,7 +314,7 @@ surfaceMaterial.onBeforeCompile=shader=>{
    gN=textureGrad(tSlabN,vGround.xz/1.9,GDX/1.9,GDY/1.9).xyz*2.0-1.0;gNw=0.35*texFade;grain=0.0;
    #ifdef DIRT_ROADS
    // 1760: no concrete pavements. Walkways are small field-stone cobbles, worn pale and dusty.
-   {vec2 su=vGround.xz/vec2(1.5,.75);diffuseColor.rgb=textureGrad(tSettsC,su,GDX/vec2(1.5,.75),GDY/vec2(1.5,.75)).rgb*vec3(1.0,.96,.88)*.98*(1.0+(groundNoise(vGround.xz/7.0)-0.5)*0.16);gN=textureGrad(tSettsN,su,GDX/vec2(1.5,.75),GDY/vec2(1.5,.75)).xyz*2.0-1.0;gNw=texFade*.8;}
+   {vec2 su=vGround.xz/vec2(1.5,.75);diffuseColor.rgb=textureGrad(tSettsC,su,GDX/vec2(1.5,.75),GDY/vec2(1.5,.75)).rgb*vec3(1.0,.96,.88)*.98*(1.0+(groundNoise(vGround.xz/7.0)-0.5)*0.16);diffuseColor.rgb=mix(diffuseColor.rgb,vec3(.2,.24,.12),smoothstep(.55,.8,groundNoise(vGround.xz/37.0+5.0))*.4); /* weeds and grass on the open ground */gN=textureGrad(tSettsN,su,GDX/vec2(1.5,.75),GDY/vec2(1.5,.75)).xyz*2.0-1.0;gNw=texFade*.8;}
    #endif
   }
  }else if(diffuseColor.g>diffuseColor.r*1.06&&diffuseColor.g>diffuseColor.b*1.04){
