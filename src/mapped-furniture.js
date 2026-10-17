@@ -120,11 +120,27 @@ export function createMappedFurniture(layer,{player=()=>null,mobility=()=>null,c
   return chunks.get(key);};
  const place=(geometry,x,z,yaw,chunk,i,list)=>{geometry.applyMatrix4(m4.compose(v.set(x,groundAt(x,z),z),q.setFromAxisAngle(UP,yaw),one));chunk.signs.tag(geometry,i);list.push(geometry);};
 
- // Instanced items split into the post chunks, so they are hidden with them beyond view range.
- function chunkedInstances(list,geometry,material,name,pose,{shadow=true}={}){
-  const by=new Map();for(const it of list){const [x,z]=pose(it);const c=chunkOf(x,z);if(!by.has(c))by.set(c,[]);by.get(c).push(it);}
-  for(const [c,its] of by){const mesh=new THREE.InstancedMesh(geometry,material,its.length);mesh.name=name;mesh.castShadow=shadow;mesh.receiveShadow=true;
-   its.forEach((it,i)=>{const [x,z,yaw]=pose(it);mesh.setMatrixAt(i,m4.compose(v.set(x,groundAt(x,z),z),q.setFromAxisAngle(UP,yaw||0),one));});mesh.computeBoundingSphere();c.group.add(mesh);}
+ // Instanced items: one batch per kind for the whole city, holding only the instances near the player and
+ // refilled as the player moves (pools, refillPools below). They used to be one batch per kind per 250 m chunk:
+ // ~13 kinds x ~16 visible chunks, about 200 draw calls for benches, racks, bollards and bikes alone.
+ const pooled=new THREE.Group();pooled.name='Mapped furniture (pooled near the player)';group.add(pooled);
+ const pools=[],POOL_CELL=100;
+ function chunkedInstances(list,geometry,material,name,pose,{shadow=true,range=VIEW_RANGE+70}={}){
+  if(!list.length)return;
+  const n=list.length,mats=new Float32Array(n*16),cells=new Map();
+  list.forEach((it,i)=>{const [x,z,yaw]=pose(it);m4.compose(v.set(x,groundAt(x,z),z),q.setFromAxisAngle(UP,yaw||0),one).toArray(mats,i*16);
+   const k=Math.floor(x/POOL_CELL)*100000+Math.floor(z/POOL_CELL);let l=cells.get(k);if(!l)cells.set(k,l=[]);l.push(i);});
+  const mesh=new THREE.InstancedMesh(geometry,material,n);mesh.name=name;mesh.castShadow=shadow;mesh.receiveShadow=true;mesh.count=0;mesh.frustumCulled=false;
+  mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);pooled.add(mesh);pools.push({mesh,mats,cells,range,at:null});
+ }
+ function refillPools(p,force=false){
+  for(const pool of pools){
+   if(!force&&pool.at&&Math.hypot(pool.at[0]-p.x,pool.at[1]-p.z)<Math.min(60,pool.range*.2))continue;pool.at=[p.x,p.z];
+   const {mesh,mats,cells,range}=pool,arr=mesh.instanceMatrix.array,r2=range*range;let c=0;
+   const i0=Math.floor((p.x-range)/POOL_CELL),i1=Math.floor((p.x+range)/POOL_CELL),j0=Math.floor((p.z-range)/POOL_CELL),j1=Math.floor((p.z+range)/POOL_CELL);
+   for(let i=i0;i<=i1;i++)for(let j=j0;j<=j1;j++){const l=cells.get(i*100000+j);if(!l)continue;
+    for(const k of l){const dx=mats[k*16+12]-p.x,dz=mats[k*16+14]-p.z;if(dx*dx+dz*dz>r2)continue;arr.set(mats.subarray(k*16,k*16+16),c*16);c++;}}
+   mesh.count=c;mesh.instanceMatrix.clearUpdateRanges?.();mesh.instanceMatrix.addUpdateRange?.(0,c*16);mesh.instanceMatrix.needsUpdate=true;}
  }
  // Breakable posts.
  items.forEach((it,index)=>{const spec=POSTS[it.k];if(!spec)return;
@@ -225,7 +241,7 @@ export function createMappedFurniture(layer,{player=()=>null,mobility=()=>null,c
   const bikes=rackBikes?.length?rackBikes:['#1d1f22','#2d4f7a','#7a2a20','#3f5d45','#c9c4b8'].map(c=>mergeGeometries([T(.33,0,-.55,'#1a1a1a'),T(.33,0,.55,'#1a1a1a'),bar([0,.36,.55],[0,.82,.22],c),bar([0,.36,.55],[0,.38,.05],c),bar([0,.82,.22],[0,.38,.05],c),bar([0,.38,.05],[0,.92,-.42],c),bar([0,.82,.22],[0,.92,-.42],c),bar([0,.92,-.42],[0,.36,-.55],c),bar([-.26,1.05,-.45],[.26,1.05,-.45],'#2a2a2a'),bar([0,.92,-.42],[0,1.05,-.45],'#555'),paint(new THREE.BoxGeometry(.12,.05,.26).translate(0,.92,.24),'#222')]));
   const lists=bikes.map(()=>[]);let n=0;
   racks.forEach((it,i)=>{if((i*7919)%10<1)return;const c=Math.cos(it.yaw||0),sn=Math.sin(it.yaw||0);const slots=[-.9,-.3,.3,.9].filter((_,j)=>((i*13+j*7)%9)>2||j===1);for(const off of slots){const k=(i*31+n++)%bikes.length;lists[k].push([it.x+c*off,it.z-sn*off,(it.yaw||0)+(off>0?Math.PI:0)+((i%3)-1)*.06]);}});
-  lists.forEach((l,k)=>{if(l.length)chunkedInstances(l,bikes[k],painted,'Parked bicycles',b=>b,{shadow:false});});
+  lists.forEach((l,k)=>{if(l.length)chunkedInstances(l,bikes[k],painted,'Parked bicycles',b=>b,{shadow:false,range:230});}); // small and many: bikes stop at a shorter range
  }}
  for(const [kind,size] of Object.entries(SOLIDS)){
   const list=items.filter(i=>i.k===kind);if(!list.length)continue;
@@ -264,8 +280,8 @@ export function createMappedFurniture(layer,{player=()=>null,mobility=()=>null,c
  // Distance culling for post chunks; lenses follow the player.
  function update(){
   const p=player();updateLights(p);if(!p)return;
-  for(const c of chunks.values()){const d=Math.hypot(c.centre[0]-p.x,c.centre[1]-p.z);c.group.visible=d<VIEW_RANGE+CHUNK*.71;
-   if(c.group.visible)for(const m of c.group.children)if(m.name==='Parked bicycles')m.visible=d<100+CHUNK*.71;} // small and many: bikes stop at a shorter range
+  for(const c of chunks.values()){const d=Math.hypot(c.centre[0]-p.x,c.centre[1]-p.z);c.group.visible=d<VIEW_RANGE+CHUNK*.71;}
+  refillPools(p);
   updateLenses(p);
  }
  const counts={};for(const it of items)counts[it.k]=(counts[it.k]||0)+1;

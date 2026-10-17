@@ -138,6 +138,7 @@ import {createMobileControls} from './mobile-controls.js';
 import {updateWorldhoodBrand} from './worldhood-brand.js';
 import {installMapillaryAttribution} from './mapillary-attribution.js';
 import './worldhood-brand.css';
+import earcut from 'earcut';
 import {decodeTerrain,setTerrain,hasTerrain,groundAt,groundPose,liftBuildings,footprintBase,flattenWaterBodies,waterAt,raiseDryHollows,terrain,seaLevel} from './terrain.js';
 import {drapeGeometry,dropSunkenSurfaces,settleObject,createTerrainGround,drawLakeMap} from './terrain-mesh.js';
 const impacts=new ImpactSystem();impacts.onVehicleHit=(from,car,a)=>mobility?.knock(a,from,car)??null;
@@ -198,6 +199,9 @@ const trafficFrustum=new THREE.Frustum(),trafficProjection=new THREE.Matrix4(),t
 const trafficInView=a=>{trafficSphere.center.set(a.x,1.5+groundAt(a.x,a.z),a.z);return trafficFrustum.intersectsSphere(trafficSphere);};
 const focus=new THREE.Vector3(0,0,85);
 const renderer=new THREE.WebGLRenderer({canvas:$('world'),antialias:true,powerPreference:'high-performance'});
+// Instanced batches with nothing in them (no pedestrians on foot near the player, no trams, empty LOD levels:
+// ~50 at Nyhavn) still went through program and uniform setup every frame, in the main and shadow passes.
+{const direct=renderer.renderBufferDirect;renderer.renderBufferDirect=function(cam,sc,geometry,material,object,group){if(object.isInstancedMesh&&object.count===0)return;return direct.call(this,cam,sc,geometry,material,object,group);};}
 const fpsMeter=createFpsMeter(renderer);
 const maxPixelRatio=Math.min(devicePixelRatio,1.5),resolution=createAdaptiveResolution({max:maxPixelRatio,min:Math.min(maxPixelRatio,.75)});
 renderer.setPixelRatio(maxPixelRatio);
@@ -497,7 +501,7 @@ function createFallbackBuildings(buildings=data.buildings){
 }
 // Beyond the measured tiles (TILE_LOD.visible) the skyline used to stop: the modelled houses get a plain
 // extruded stand-in, drawn only past that distance (fragment discard nearer the camera), no shadows, flat
-// colours, merged per 400 m chunk. Built a chunk per idle slice after the drive starts. Fog runs further out
+// colours, merged per 800 m chunk. Built a chunk per idle slice after the drive starts. Fog runs further out
 // to show it.
 const FAR_START=TILE_LOD.visible-15;
 function createFarCity(buildings){
@@ -508,17 +512,30 @@ function createFarCity(buildings){
   sh.fragmentShader='uniform float uFarStart;varying vec3 vFarW;\n'+sh.fragmentShader.replace('void main() {','void main() {\nif(distance(vFarW.xz,cameraPosition.xz)<uFarStart)discard;');};
  material.customProgramCacheKey=()=>'far-city';
  const group=farCity=new THREE.Group();group.name='Far city (beyond the measured tiles)';group.visible=governor.level<4;cityModel.add(group);
- const C=400,chunks=new Map();for(const b of buildings){const bb=b.bbox,k=Math.floor((bb[0]+bb[2])/2/C)+','+Math.floor((bb[1]+bb[3])/2/C);let l=chunks.get(k);if(!l)chunks.set(k,l=[]);l.push(b);}
- const lists=[...chunks.values()];
- const build=list=>{const geoms=[];
+ const C=800,chunks=new Map();for(const b of buildings){const bb=b.bbox,k=Math.floor((bb[0]+bb[2])/2/C)+','+Math.floor((bb[1]+bb[3])/2/C);let l=chunks.get(k);if(!l)chunks.set(k,l=[]);l.push(b);}
+ const lists=[...chunks.values()]; // 800 m chunks: ~10 draws for the skyline instead of ~32 with 400 m
+ // Walls and roof written straight into typed arrays (the floor is never seen): an 800 m chunk builds in a few ms.
+ // ExtrudeGeometry plus a merge took 10-45 ms a chunk, long enough to hitch the drive from an idle callback.
+ const roofColour=new THREE.Color(city.era===1760?'#7a3a2a':'#56504a'),wallColour=new THREE.Color();
+ const build=list=>{
+  let cap=0;for(const b of list){const r=b.rings[0];if(r&&r.length>=4)cap+=r.length*9;}
+  if(!cap)return;const P=new Float32Array(cap*3),N=new Float32Array(cap*3),Q=new Float32Array(cap*3);let v=0;
+  const put=(x,y,z,nx,ny,nz,c)=>{const o=v*3;P[o]=x;P[o+1]=y;P[o+2]=z;N[o]=nx;N[o+1]=ny;N[o+2]=nz;Q[o]=c.r;Q[o+1]=c.g;Q[o+2]=c.b;v++;};
   for(const b of list){const bb=b.bbox,cx=(bb[0]+bb[2])/2,cz=(bb[1]+bb[3])/2,ring=b.rings[0];if(!ring||ring.length<4)continue;
-   const shape=new THREE.Shape(ring.map(p=>new THREE.Vector2(cx+(p[0]-cx)*.985,-(cz+(p[1]-cz)*.985)))); // a hair inside the measured walls
-   const h=Math.max(3,(b.height>2?Math.min(60,b.height):12)-.6),base=footprintBase(b.rings);
-   const g=new THREE.ExtrudeGeometry(shape,{depth:h,bevelEnabled:false,steps:1});g.rotateX(-Math.PI/2);g.translate(0,base,0);g.deleteAttribute('uv');
-   const k=Math.abs(Math.sin(bb[0]*12.9898+bb[1]*78.233)*43758.5453)%1,wall=new THREE.Color(FALLBACK_WALLS[Math.floor(k*FALLBACK_WALLS.length)]),roof=new THREE.Color(city.era===1760?'#7a3a2a':'#56504a');
-   const pos=g.attributes.position,nor=g.attributes.normal,col=new Float32Array(pos.count*3);for(let i=0;i<pos.count;i++){const c=nor.getY(i)>.5?roof:wall;col[i*3]=c.r;col[i*3+1]=c.g;col[i*3+2]=c.b;}
-   g.setAttribute('color',new THREE.BufferAttribute(col,3));geoms.push(g);}
-  if(!geoms.length)return;const m=new THREE.Mesh(mergeGeometries(geoms),material);geoms.forEach(g=>g.dispose());m.name='Far city chunk';m.matrixAutoUpdate=false;m.updateMatrix();group.add(m);};
+   let m=ring.length;if(ring[0][0]===ring[m-1][0]&&ring[0][1]===ring[m-1][1])m--;if(m<3)continue;
+   const flat=new Array(m*2);for(let i=0;i<m;i++){flat[i*2]=cx+(ring[i][0]-cx)*.985;flat[i*2+1]=cz+(ring[i][1]-cz)*.985;} // a hair inside the measured walls
+   let area=0;for(let i=0,j=m-1;i<m;j=i++)area+=flat[j*2]*flat[i*2+1]-flat[i*2]*flat[j*2+1];if(Math.abs(area)<1e-6)continue;
+   const h=Math.max(3,(b.height>2?Math.min(60,b.height):12)-.6),base=footprintBase(b.rings),top=base+h,s=area>0?1:-1;
+   const k=Math.abs(Math.sin(bb[0]*12.9898+bb[1]*78.233)*43758.5453)%1,wall=wallColour.set(FALLBACK_WALLS[Math.floor(k*FALLBACK_WALLS.length)]);
+   for(let i=0;i<m;i++){const j=(i+1)%m,ax=flat[i*2],az=flat[i*2+1],bx=flat[j*2],bz=flat[j*2+1],dx=bx-ax,dz=bz-az,l=Math.hypot(dx,dz);if(l<1e-4)continue;
+    const nx=s*dz/l,nz=-s*dx/l; // outward
+    if(s>0){put(ax,base,az,nx,0,nz,wall);put(bx,top,bz,nx,0,nz,wall);put(bx,base,bz,nx,0,nz,wall);put(ax,base,az,nx,0,nz,wall);put(ax,top,az,nx,0,nz,wall);put(bx,top,bz,nx,0,nz,wall);}
+    else{put(ax,base,az,nx,0,nz,wall);put(bx,base,bz,nx,0,nz,wall);put(bx,top,bz,nx,0,nz,wall);put(ax,base,az,nx,0,nz,wall);put(bx,top,bz,nx,0,nz,wall);put(ax,top,az,nx,0,nz,wall);}}
+   const tri=earcut(flat);
+   for(let t=0;t<tri.length;t+=3){let a=tri[t],c=tri[t+1],d=tri[t+2];const ux=flat[c*2]-flat[a*2],uz=flat[c*2+1]-flat[a*2+1],wx=flat[d*2]-flat[a*2],wz=flat[d*2+1]-flat[a*2+1];if(uz*wx-ux*wz<0){const x=c;c=d;d=x;} // facing up
+    put(flat[a*2],top,flat[a*2+1],0,1,0,roofColour);put(flat[c*2],top,flat[c*2+1],0,1,0,roofColour);put(flat[d*2],top,flat[d*2+1],0,1,0,roofColour);}}
+  if(!v)return;const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.BufferAttribute(P.slice(0,v*3),3));g.setAttribute('normal',new THREE.BufferAttribute(N.slice(0,v*3),3));g.setAttribute('color',new THREE.BufferAttribute(Q.slice(0,v*3),3));
+  g.computeBoundingSphere();g.computeBoundingBox();const m=new THREE.Mesh(g,material);m.name='Far city chunk';m.matrixAutoUpdate=false;m.updateMatrix();group.add(m);};
  const step=()=>{if(gameIsStopped())return;const t0=performance.now();while(lists.length&&performance.now()-t0<6)build(lists.pop());if(lists.length)(window.requestIdleCallback||setTimeout)(step,{timeout:200});else console.info('Far city built',group.children.length,'chunks');};
  step();
 }
@@ -982,7 +999,7 @@ function updateHUD(now){
 }
 function frame(now){
  if(gameIsStopped())return;
- requestAnimationFrame(frame);const frameMs=lastTime?now-lastTime:0;fpsMeter?.tick(frameMs);perfOverlay?.tick(frameMs,now);const steps=simulationSteps(lastTime?(now-lastTime)/1000:0),dt=steps.reduce((a,b)=>a+b,0);lastTime=now;
+ requestAnimationFrame(frame);const cpu0=perfOverlay?performance.now():0,frameMs=lastTime?now-lastTime:0;fpsMeter?.tick(frameMs);perfOverlay?.tick(frameMs,now);const steps=simulationSteps(lastTime?(now-lastTime)/1000:0),dt=steps.reduce((a,b)=>a+b,0);lastTime=now;
  mobileControls.update({started,paused,mapOpen,busted:!!police?.busted,mode:travel?.mode||'car',speed:car?.speed||0});
  if(ready)peopleInteraction.update(dt,car,nearbyPeople(),{enabled:canTalk()});
  if(ready&&marketShop){marketShop.update(paused||mapOpen?0:dt,car,{enabled:canTalk()});for(const m of marketShop.drainMessages())marketUI.say(m);}
@@ -1115,7 +1132,9 @@ function frame(now){
  if(ready&&resolution.update(frameMs,dt))renderer.setPixelRatio(resolution.scale);
  if(ready&&!captureMode&&governor.update(dt,resolution))console.info('Quality step',governor.level,'to hold the frame rate');
  look.update(dt,now/1000); // blends the active look and re-applies its sun offset after the shadow target above
+ const cpu1=perfOverlay?performance.now():0;
  if(post)post.render(scene,camera);else renderer.render(scene,camera);
+ if(perfOverlay)perfOverlay.split(cpu1-cpu0,performance.now()-cpu1); // game code vs. render submission: CPU- or GPU-bound
 }
 function resizeCamera(){camera.aspect=captureFrame.w/captureFrame.h;camera.updateProjectionMatrix();}
 requestAnimationFrame(frame);
