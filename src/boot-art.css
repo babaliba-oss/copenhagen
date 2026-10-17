@@ -2,7 +2,6 @@
 #boot-art .boot-art-layer{position:absolute;inset:0;background-size:cover;background-position:center;opacity:0;transition:opacity 1.6s;transform:scale(1.04);animation:boot-art-drift 26s ease-in-out infinite alternate}
 #boot-art .boot-art-layer.on{opacity:1}
 #boot-art::after{content:'';position:absolute;inset:0;background:linear-gradient(90deg,#0008 0,#0002 45%,#0000 70%)}
-#boot-art[data-era="1760"] .boot-art-layer{filter:sepia(.35) saturate(.85)}
 body:not(.booting) #boot-art,#boot-art.aside{opacity:0;visibility:hidden}
 @keyframes boot-art-drift{from{transform:scale(1.04) translate(0,0)}to{transform:scale(1.1) translate(-1.5%,-1%)}}
 @media (prefers-reduced-motion:reduce){#boot-art .boot-art-layer{animation:none}}
