@@ -19,4 +19,15 @@ const compactPacks={name:'compact-city-packs',apply:'build',closeBundle(){
   fs.writeFileSync(p,zlib.gzipSync(Buffer.from(JSON.stringify(city)),{level:9}));}
   else if(e.name==='mobility.json'){const m=compactMobility(JSON.parse(fs.readFileSync(p,'utf8')));if(m.packed===2)fs.writeFileSync(p,JSON.stringify(m));}}};
  walk('dist');}};
-export default defineConfig(({command})=>({define:{__BUILD_ID__:JSON.stringify(Date.now().toString(36)),__DATA_HASHES__:command==='build'?JSON.stringify(dataHashes()):'null'},plugins:[compactPacks],build:{rollupOptions:{output:{manualChunks:{three:['three']}}}}}));
+// @dgreenheck/ez-tree inlines 20 textures as base64 (about 4 MB of the main script, all decoded at start-up).
+// Production swaps them for the 512 px copies in public/ez-tree (scripts/ez-tree-textures.py); maps the game
+// never reads become a single pixel.
+const PIXEL='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
+const slimTreeTextures={name:'slim-ez-tree-textures',apply:'build',transform(code,id){
+ if(!id.includes('@dgreenheck/ez-tree'))return null;
+ const map=JSON.parse(fs.readFileSync('public/ez-tree/map.json','utf8'));let n=0;
+ const out=code.replace(/([A-Za-z_$][\w$]*) = "data:image\/[a-z]+;base64,[A-Za-z0-9+/=]+"/g,(m,name)=>{if(!(name in map))return m;n++;return `${name} = ${JSON.stringify(map[name]?'/'+map[name]:PIXEL)}`;});
+ if(n!==Object.keys(map).length)this.warn(`ez-tree textures: replaced ${n} of ${Object.keys(map).length}; rerun scripts/ez-tree-textures.py`);
+ return {code:out,map:null};
+}};
+export default defineConfig(({command})=>({define:{__BUILD_ID__:JSON.stringify(Date.now().toString(36)),__DATA_HASHES__:command==='build'?JSON.stringify(dataHashes()):'null'},plugins:[compactPacks,slimTreeTextures],build:{rollupOptions:{output:{manualChunks:{three:['three']}}}}}));
