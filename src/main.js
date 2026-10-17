@@ -35,7 +35,7 @@ import {createStreetLife} from './street-life.js';
 import {buildTileInWorker,materialiseBuilding} from './building-loader.js';
 import {attachFacades,applyFacadeHeights,estimateFacades} from './facade-data.js';
 import {roofsInWorker,periodRoofMesh,slopeRampart} from './period-roofs.js';
-import {tileLevel,applyTileLod,applyMeshLod,createMergedShells,createShellMask,freezeTileGroup,freezeMesh,applyTreeLod,createStaticShadowCuller} from './tile-lod.js';
+import {LOD as TILE_LOD,tileLevel,applyTileLod,applyMeshLod,createMergedShells,createShellMask,freezeTileGroup,freezeMesh,applyTreeLod,createStaticShadowCuller} from './tile-lod.js';
 import {loadTileImages,aheadPoint,tilePriority,createFrameQueue,createDetailScheduler} from './tile-streaming.js';
 import {createSurfaceStreamer} from './surface-streaming.js';
 import {createCathedral,createSenateSquare,loadSenateMaterials} from './cathedral.js';
@@ -214,11 +214,14 @@ const sky=createSky({renderer,scene,camera});sky.applyLighting(hemi,sun);
 const skyEnvironment=createSkyEnvironment(renderer,sky.mesh);
 // Post pipeline (AO, bloom, grade) and the time-of-day/weather looks; `look` is attached to the road surface and sea below.
 let post=null;try{post=createPostPipeline(renderer);}catch(e){console.warn('Post pipeline unavailable, rendering directly:',e);}
-// Past the lowest resolution: ambient occlusion, then bloom and a smaller shadow map, then MSAA.
+// Past the lowest resolution: ambient occlusion, then bloom and a smaller shadow map, then MSAA, then building detail range.
 const governor=createQualityGovernor([
  ()=>{if(post)post.options.ao=false;},
  ()=>{if(post)post.options.bloom=false;sun.shadow.mapSize.set(1024,1024);sun.shadow.map?.dispose();sun.shadow.map=null;},
  ()=>{if(post?.targets.scene.samples){post.targets.scene.samples=0;post.targets.scene.dispose();}},
+ // Last: detailed buildings, building shadows and the far-shell ring pulled in (dense blocks such as Nyhavn
+ // and Strøget otherwise stay heavy whatever the resolution). Tiles pick it up on their next LOD pass.
+ ()=>{Object.assign(TILE_LOD,{near:170,far:210,detail:130,shadow:90});},
 ]);
 {const q=new URLSearchParams(location.search).get('quality'),n=q==='low'?9:+q||0;for(let i=0;i<n;i++)governor.update(99,{atMin:true,smoothed:99});} // ?quality=low (or 1-3 steps)
 let look=null;
