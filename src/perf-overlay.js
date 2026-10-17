@@ -6,8 +6,8 @@ export function createPerfOverlay(renderer,{doc=document,extra=()=>({})}={}){
  const el=doc.createElement('pre');el.id='perf-overlay';
  el.style.cssText='position:fixed;left:8px;top:8px;z-index:200;margin:0;padding:8px 10px;background:rgba(10,12,14,.82);color:#cfe8d0;font:11px/1.35 ui-monospace,Menlo,monospace;pointer-events:none;white-space:pre;border-radius:6px;max-width:46vw';
  doc.body.append(el);
- // K copies the report as text (paste it into the chat instead of a screenshot)
- addEventListener('keydown',e=>{if(e.code==='KeyK'){navigator.clipboard?.writeText(el.textContent+'\n'+navigator.userAgent).then(()=>{el.style.outline='2px solid #8f8';setTimeout(()=>el.style.outline='',600);});}});
+ // F9 copies the report as text (paste it into the chat instead of a screenshot)
+ addEventListener('keydown',e=>{if(e.code==='F9'){e.preventDefault();navigator.clipboard?.writeText(el.textContent+'\n'+navigator.userAgent).then(()=>{el.style.outline='2px solid #8f8';setTimeout(()=>el.style.outline='',600);});}});
  const slow=[];let last=null,acc=0,frames=0,worst=0,shown=0;
  const heap=()=>performance.memory?Math.round(performance.memory.usedJSHeapSize/1e6):0;
  const snap=()=>({p:renderer.info.programs?.length||0,t:renderer.info.memory.textures,g:renderer.info.memory.geometries,h:heap(),c:renderer.info.render.calls,tr:renderer.info.render.triangles,...extra()});
@@ -18,7 +18,7 @@ export function createPerfOverlay(renderer,{doc=document,extra=()=>({})}={}){
    last=s;acc+=frameMs;frames++;worst=Math.max(worst,frameMs);
    if(now-shown>500){
     const fps=frames?1000/(acc/frames):0;
-    el.textContent=`${fps.toFixed(0)} fps  avg ${(acc/Math.max(1,frames)).toFixed(1)}ms  worst ${worst.toFixed(0)}ms\nheap ${s.h} MB  programs ${s.p}  textures ${s.t}  geometries ${s.g}\ndraw calls ${s.c}  triangles ${(s.tr/1e6).toFixed(2)}M  ${s.q||''}\n— slow frames (>70 ms) — press K to copy —\n${slow.join('\n')}`;
+    el.textContent=`${fps.toFixed(0)} fps  avg ${(acc/Math.max(1,frames)).toFixed(1)}ms  worst ${worst.toFixed(0)}ms\nheap ${s.h} MB  programs ${s.p}  textures ${s.t}  geometries ${s.g}\ndraw calls ${s.c}  triangles ${(s.tr/1e6).toFixed(2)}M  ${s.q||''}\n— slow frames (>70 ms) — press F9 to copy —\n${slow.join('\n')}`;
     acc=0;frames=0;worst=0;shown=now;}
   }
  };
