@@ -124,10 +124,17 @@ export class Mobility {
   if(Math.abs(a.offset-target)>.01){const eased=routePoint(a.edge,a.s,a.offset,nextDir,prevDir);if(vehicleFitsRoad(eased,this.world))return eased;a.offset=target;}
   return p;
  }
+ // What lies under a point (0 building, 1 road, 2 pavement, 3 neither), memoised on a 25 cm grid: walkers ask
+ // this for every 25 cm of every step, and three polygon lookups each was the biggest cost in a frame.
+ groundKind(x,z){
+  const w=this.world;if(this._kindOf!==w.buildings||this._kindRoads!==w.roads||this._kindPave!==w.pavement||this._kinds.size>500000){this._kinds=new Map();this._kindOf=w.buildings;this._kindRoads=w.roads;this._kindPave=w.pavement;}
+  const X=Math.round(x*4),Z=Math.round(z*4),k=(X+60000)*120000+(Z+60000);let v=this._kinds.get(k);
+  if(v===undefined){const px=X/4,pz=Z/4;v=w.buildings.at(px,pz)?0:w.roads.at(px,pz)?1:w.pavement?.at(px,pz)?2:3;this._kinds.set(k,v);}
+  return v;
+ }
  walkable(x,z,edge){
-  if(this.world.buildings.at(x,z))return false;
-  if(this.world.roads.at(x,z))return !!edge?.crossing;
-  return !!this.world.pavement?.at(x,z);
+  const v=this.groundKind(x,z);
+  return v===2||v===1&&!!edge?.crossing;
  }
  safeWalkSegment(a,p,edge){
   const distance=Math.hypot(p.x-a.x,p.z-a.z);if(distance>2)return false;
@@ -142,6 +149,12 @@ export class Mobility {
   for(let i=x0;i<=x1;i++)for(let j=z0;j<=z1;j++){const l=graph._grid.get(i+','+j);if(l)for(const e of l)out.push(e);}
   return out.sort((a,b)=>a._gi-b._gi); // graph order, so seeded spawns pick the same edges as a full scan
  }
+ // Spawn candidates are the same for every agent of a kind spawned in one frame from one spot: computed once.
+ spawnCandidates(a,player,graph,compute){
+  const key=(a.stationOnly?'s':a.corridorOnly?'c':a.walking?'w':'r')+Math.round(player.x/4)+','+Math.round(player.z/4)+','+this.time;
+  if(!this._spawnCache||this._spawnCache.time!==this.time)this._spawnCache={time:this.time,lists:new Map()};
+  let l=this._spawnCache.lists.get(key);if(!l)this._spawnCache.lists.set(key,l=compute());return l;
+ }
  nearCorridor(player){return this.corridorEdges.some(e=>{const p=e.points[Math.floor(e.points.length/2)];return Math.hypot(p[0]-player.x,p[1]-player.z)<420;});}
  spawn(a,player){
   if(a.playerTaken){a.edge=null;a.speed=0;return;}
@@ -150,7 +163,8 @@ export class Mobility {
   if(a.corridorOnly&&!this.nearCorridor(player)){a.edge=null;a.speed=0;return;}
   const graph=a.walking?this.walks:this.roads;
   // Prefer nearby routes; edge midpoint avoids choosing a remote end of a long road.
-  const nearby=(a.stationOnly?this.stationEdges:a.corridorOnly?this.corridorEdges:this.edgesNear(graph,player,a.walking?this.walkSpawn:320)).filter(e=>{const p=e.points[Math.floor(e.points.length/2)],d=Math.hypot(p[0]-player.x,p[1]-player.z);return (!a.walking||!e.crossing)&&d<(a.walking?200:a.corridorOnly?520:320)&&e.length>(a.walking?3:10)&&!(!a.walking&&(this.obstructed?.has(e)||this.trap(e,2)));});
+  const nearby=this.spawnCandidates(a,player,graph,()=>(a.stationOnly?this.stationEdges:a.corridorOnly?this.corridorEdges:this.edgesNear(graph,player,a.walking?this.walkSpawn:320)).filter(e=>{const p=e.points[Math.floor(e.points.length/2)],d=Math.hypot(p[0]-player.x,p[1]-player.z);return (!a.walking||!e.crossing)&&d<(a.walking?200:a.corridorOnly?520:320)&&e.length>(a.walking?3:10)&&!(!a.walking&&(this.obstructed?.has(e)||this.trap(e,2)));}));
+  let occupancy=null; // walkers per edge, counted once per spawn rather than once per trial
   for(let trial=0;trial<80&&nearby.length;trial++){
    a.edge=nearby[Math.floor(this.random()*nearby.length)];a.s=this.random()*a.edge.length;a.plan=[];a.prevDir=undefined;
    const p=this.position(a);
@@ -158,7 +172,7 @@ export class Mobility {
    if(!a.walking&&(this.cars.some(b=>b!==a&&b.edge&&trafficFootprintsOverlap(p,b))||this.hitsBody(carBox(p,1))||this.inConflict(a.edge,a.s)))continue;
    // Walkers spread out: at most one per 8 m of footway. Where few paths are near (a pier, a quay between
    // canals) the 300 walkers otherwise all landed on the same few edges and moved about as one clump.
-   if(a.walking){let on=0;for(const b of this.people)if(b!==a&&b.edge===a.edge)on++;if(on>=Math.max(1,a.edge.length/8))continue;}
+   if(a.walking){if(!occupancy){occupancy=new Map();for(const b of this.people)if(b!==a&&b.edge)occupancy.set(b.edge,(occupancy.get(b.edge)||0)+1);}if((occupancy.get(a.edge)||0)>=Math.max(1,a.edge.length/8))continue;}
    if(this.world.buildings.at(p.x,p.z)||(a.walking?!this.walkable(p.x,p.z,a.edge):!vehicleFitsRoad(p,this.world)))continue;
    // A long straight main road is almost always in view; corridor cars may appear there, but only in the far haze.
    const distance=Math.hypot(p.x-player.x,p.z-player.z);
