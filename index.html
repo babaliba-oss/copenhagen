@@ -4,14 +4,14 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
     <meta name="theme-color" content="#f3f0e9" />
-    <meta name="description" content="Drive, ride and walk Copenhagen in the browser: today's city from the municipal 3D model, and the city of 1760 one key away. Built on worldhood." />
-    <title>Copenhagen, today and 1760 — built on worldhood</title>
+    <meta name="description" content="Grand Tour Copenhagen: drive, ride and walk the real city in your browser, today and in 1760. Built on worldhood." />
+    <title>Grand Tour Copenhagen</title>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <meta property="og:type" content="website" />
-    <meta property="og:site_name" content="worldhood" />
-    <meta property="og:title" content="Copenhagen, today and 1760" />
-    <meta property="og:description" content="Drive, ride and walk Copenhagen in the browser. Press Y to go back to 1760." />
+    <meta property="og:site_name" content="Grand Tour Copenhagen" />
+    <meta property="og:title" content="Grand Tour Copenhagen" />
+    <meta property="og:description" content="The real city, in your browser. Drive, ride and walk Copenhagen today, then press Y for 1760." />
     <meta property="og:url" content="https://copenhagen.daniel-sfita.workers.dev/" />
     <meta property="og:image" content="https://copenhagen.daniel-sfita.workers.dev/og-copenhagen.jpg" />
     <meta property="og:image:width" content="1200" />
@@ -24,14 +24,14 @@
       <canvas id="world" tabindex="-1" aria-label="Angled 3D driving view of the city"></canvas>
       <div class="vignette"></div>
       <header class="topbar">
-        <a class="wordmark" href="/" aria-label="worldhood home"><span class="brand-icon"><img src="/favicon.svg" width="48" height="48" alt="" /></span><span class="brand-name">worldhood</span></a>
+        <a class="wordmark" href="/" aria-label="Grand Tour Copenhagen home"><span class="brand-icon"><img src="/favicon.svg" width="48" height="48" alt="" /></span><span class="brand-name">Grand Tour Copenhagen</span></a>
         <nav><button id="view-btn" class="nav-btn" title="Switch between angled follow and high camera"><span>▧</span><span id="view-label">Follow</span></button><button id="map-btn" class="nav-btn" aria-label="City map"><span>⌘</span> City map <kbd>M</kbd></button><button id="look-btn" class="nav-btn" aria-label="Time of day and weather" title="T: cycle time of day and weather"><span>☼</span><span id="look-label">Midday</span> <kbd>T</kbd></button><button id="era-btn" class="nav-btn" hidden title="Y: travel between today and 1760"><span>⌛</span><span id="era-label">1760</span> <kbd>Y</kbd></button><button id="help-btn" class="icon-btn" aria-label="Help and controls">?</button><button id="sound-btn" class="icon-btn" aria-label="Enable sound" title="Enable sound">♪<span class="mute-slash">/</span></button></nav>
       </header>
       <aside id="wanted" hidden aria-label="Police wanted level"><div id="wanted-stars"></div><div id="wanted-status"></div></aside>
       <div class="location-tag"><span class="tiny-cross">✳</span><span id="district-label">SENAATINTORI</span><span class="location-rule"></span><span class="coordinates" id="coordinates">60.169° N · 24.952° E</span></div>
       <section class="intro boot-screen" id="intro" aria-labelledby="boot-title" aria-busy="true">
-        <a class="wordmark boot-brand" href="/" aria-label="worldhood home"><span class="brand-icon"><img src="/favicon.svg" width="48" height="48" alt="" /></span><span class="brand-name">worldhood</span></a>
-        <p class="boot-tagline">check out some hoods,<br />then build your own.</p>
+        <a class="wordmark boot-brand" href="/" aria-label="Grand Tour Copenhagen home"><span class="brand-icon"><img src="/favicon.svg" width="48" height="48" alt="" /></span><span class="brand-name">Grand Tour Copenhagen</span></a>
+        <p class="boot-tagline">the real city, to drive.<br />press Y for 1760.</p>
         <div class="boot-main">
         <p class="boot-place-label"><span id="boot-place-label">Your starting point</span><span id="start-count" class="start-count" aria-hidden="true" hidden></span></p>
         <div class="start-picker"><button id="start-prev" class="start-arrow" type="button" aria-label="Previous starting point" hidden><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></button><h1 id="boot-title">Loading game</h1><button id="start-next" class="start-arrow" type="button" aria-label="Next starting point" hidden><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg></button></div>
