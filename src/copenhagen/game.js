@@ -56,7 +56,7 @@ function createRouteLine(scene,{historic=false}={}){
   for(let i=0;i<P.length-1;i++){const [ax,az]=P[i],[bx,bz]=P[i+1],[nax,naz]=side[i],[nbx,nbz]=side[i+1],ya=groundAt(ax,az)+.22,yb=groundAt(bx,bz)+.22;
    pos.push(ax+nax,ya,az+naz,bx+nbx,yb,bz+nbz,bx-nbx,yb,bz-nbz,ax+nax,ya,az+naz,bx-nbx,yb,bz-nbz,ax-nax,ya,az-naz);rd.push(C[i],C[i+1],C[i+1],C[i],C[i+1],C[i]);}
   const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));g.setAttribute('rd',new THREE.Float32BufferAttribute(rd,1));
-  mesh=new THREE.Mesh(g,mat);mesh.renderOrder=3;mesh.frustumCulled=false;scene.add(mesh);};
+  mesh=new THREE.Mesh(g,mat);mesh.renderOrder=3;mesh.frustumCulled=false;mesh.layers.set(1);scene.add(mesh);};
  // Progress: project the player onto the next few segments; returns the distance off the line.
  out.progress=(x,z)=>{if(!pts||pts.length<2)return Infinity;let best=1e9,bi=seg,bt=0;
   for(let i=Math.max(0,seg-2);i<Math.min(pts.length-1,seg+40);i++){const [ax,az]=pts[i],[bx,bz]=pts[i+1],dx=bx-ax,dz=bz-az,l2=dx*dx+dz*dz||1,t=clamp(((x-ax)*dx+(z-az)*dz)/l2,0,1),d=Math.hypot(ax+dx*t-x,az+dz*t-z);if(d<best){best=d;bi=i;bt=t;}}
@@ -71,6 +71,7 @@ function beam(scene,color,h=80){
  const g=new THREE.Group();
  const col=new THREE.Mesh(new THREE.CylinderGeometry(2.4,2.4,h,20,1,true),new THREE.MeshBasicMaterial({color,transparent:true,opacity:.18,side:THREE.DoubleSide,depthWrite:false,fog:false}));col.position.y=h/2;
  const ring=new THREE.Mesh(new THREE.TorusGeometry(4.2,.16,6,36),new THREE.MeshBasicMaterial({color,fog:false,transparent:true,opacity:.75,depthWrite:false}));ring.rotation.x=Math.PI/2;ring.position.y=.3; // a slim ground ring, not a wall around the player
+ col.layers.set(1);ring.layers.set(1); // layer 1: guides (beams, route), hidden by the trailer camera (cinematic.js)
  g.add(col,ring);g.visible=false;scene.add(g);return g;
 }
 

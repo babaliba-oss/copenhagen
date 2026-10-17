@@ -1,5 +1,5 @@
 import './cache-bust.js';
-import {installBootArt} from './boot-art.js';import {expandCity} from './city-pack.js';import {surfaceTile} from './surface-tiles.js';import {expandMobility} from './mobility-pack.js';installBootArt();
+import {installBootArt} from './boot-art.js';import {expandCity} from './city-pack.js';import {createCinematic} from './cinematic.js';import {createPerfOverlay} from './perf-overlay.js';import {surfaceTile} from './surface-tiles.js';import {expandMobility} from './mobility-pack.js';installBootArt();
 import './style.css';
 import './loading-screen.css';
 import './speedometer.css';
@@ -75,7 +75,7 @@ import {createBusSystem} from './bus-system.js';
 import {installTransit} from './extension-transit.js';
 import {createSea,removeLegacyWater} from './sea.js';
 import {PoliceSimulation} from './police.js';
-import {createPoliceRenderer} from './police-renderer.js';
+import {createPoliceRenderer} from './police-renderer.js';import {setPoliceLettering} from './police-model.js';
 import './police-alert.css';
 import {cutLowerYard} from './port-yard.js';
 import {createRouteCrossingSigns} from './route-crossing-signs.js';
@@ -191,8 +191,9 @@ function layoutFrame(){
  if(captureFrame.fixed){document.body.classList.add('framed');const st=document.body.style;st.left=captureFrame.x+'px';st.top=captureFrame.y+'px';st.width=captureFrame.w+'px';st.height=captureFrame.h+'px';}
 }
 layoutFrame();
-const camera=new THREE.PerspectiveCamera(58,captureFrame.w/captureFrame.h,.25,1500);
-let inspectionCamera=null;
+const camera=new THREE.PerspectiveCamera(58,captureFrame.w/captureFrame.h,.25,1500);camera.layers.enable(1); // layer 1: mission beams and route ribbons (hidden in ?cinematic)
+let inspectionCamera=null,cinematic=null;
+const CINEMATIC=/[?&]cinematic\b/.test(location.search);if(CINEMATIC)try{for(const e of ['h','m'])sessionStorage.setItem('cph-paper-'+e,'1');}catch{} // no newspaper over the trailer
 const trafficFrustum=new THREE.Frustum(),trafficProjection=new THREE.Matrix4(),trafficSphere=new THREE.Sphere(new THREE.Vector3(),4);
 const trafficInView=a=>{trafficSphere.center.set(a.x,1.5+groundAt(a.x,a.z),a.z);return trafficFrustum.intersectsSphere(trafficSphere);};
 const focus=new THREE.Vector3(0,0,85);
@@ -343,6 +344,7 @@ window.helsinkiLook={set:(name,opts)=>look.set(name,opts),cycle:()=>look.cycle()
 cutLowerYard(ground.material);cutLowerYard(surfaceMaterial);
 const loadedTiles=new Map(),loadingTiles=new Map();
 const uploads=createFrameQueue({maxJobs:5,budgetMs:3}),detailScheduler=createDetailScheduler(2),treeChunks=[],leafGeometries=[],shadowCuller=createStaticShadowCuller(cityModel);
+const perfOverlay=/[?&]perf\b/.test(location.search)?createPerfOverlay(renderer,{extra:()=>({q:`loading tiles ${loadingTiles.size}  upload queue ${uploads.size}`})}):null; // ?perf: stall finder (perf-overlay.js)
 const photoTiles=new Map(),photoPromises=new Map();
 const tmp=new THREE.Object3D();
 const treeFocus={value:new THREE.Vector2(1e5,1e5)};
@@ -352,7 +354,7 @@ const travelRenderer=createPlayerTravelRenderer(scene);
 const travelUI=createTravelUI({interact:interactTravel,toggleRun:()=>{if(travel?.mode==='walk')travel.sprint=!travel.sprint;},focusWorld:()=>$('world').focus()});
 const peopleUI=createPeopleInteractionUI({interact:talkToPerson,choose:replyToPerson,toggleVoice:()=>$('sound-btn').click(),focusWorld:()=>$('world').focus()});
 const marketUI=createMarketShopUI({action:marketAction,buy:buyAtStall,close:()=>{marketShop?.close();refreshMarketUI();},focusWorld:()=>$('world').focus()});
-const marker=new THREE.Mesh(new THREE.RingGeometry(3.3,3.55,48),new THREE.MeshBasicMaterial({color:'#d95e3b',transparent:true,opacity:.5,depthWrite:false}));marker.rotation.x=-Math.PI/2;marker.position.y=.15;scene.add(marker);marker.visible=false;
+const marker=new THREE.Mesh(new THREE.RingGeometry(3.3,3.55,48),new THREE.MeshBasicMaterial({color:'#d95e3b',transparent:true,opacity:.5,depthWrite:false}));marker.rotation.x=-Math.PI/2;marker.position.y=.15;scene.add(marker);marker.visible=false;marker.layers.set(1);
 const mapCache=document.createElement('canvas');mapCache.width=1800;mapCache.height=1800;
 // Map frame in local metres; widened at boot when map extensions are installed.
 let mapView={cx:0,cz:0,size:4800,playable:[]},extensions=[],city=null;
@@ -904,7 +906,7 @@ function updateHUD(now){
 }
 function frame(now){
  if(gameIsStopped())return;
- requestAnimationFrame(frame);const frameMs=lastTime?now-lastTime:0;fpsMeter?.tick(frameMs);const steps=simulationSteps(lastTime?(now-lastTime)/1000:0),dt=steps.reduce((a,b)=>a+b,0);lastTime=now;
+ requestAnimationFrame(frame);const frameMs=lastTime?now-lastTime:0;fpsMeter?.tick(frameMs);perfOverlay?.tick(frameMs,now);const steps=simulationSteps(lastTime?(now-lastTime)/1000:0),dt=steps.reduce((a,b)=>a+b,0);lastTime=now;
  mobileControls.update({started,paused,mapOpen,busted:!!police?.busted,mode:travel?.mode||'car',speed:car?.speed||0});
  if(ready)peopleInteraction.update(dt,car,nearbyPeople(),{enabled:canTalk()});
  if(ready&&marketShop){marketShop.update(paused||mapOpen?0:dt,car,{enabled:canTalk()});for(const m of marketShop.drainMessages())marketUI.say(m);}
@@ -972,6 +974,7 @@ function frame(now){
   camera.position.set(pose.position[0]+cameraShake[0]+cameraRumble[0],pose.position[1]+cameraShake[1]+cameraRumble[1],pose.position[2]+cameraShake[2]+cameraRumble[2]);camera.lookAt(...pose.target);camera.rotateZ(cameraRoll);
  }else if(started&&car){const pose=overviewCameraPose(car,heading,viewSpan,highCamera);camera.position.set(...pose.position);camera.lookAt(...pose.target);
  }else{camera.position.set(focus.x+Math.sin(heading)*behind,height,focus.z+Math.cos(heading)*behind);camera.lookAt(focus);}
+ cinematic?.update(paused?0:Math.min(.5,frameMs/1000)); // wall-clock pacing: shots keep their length on any frame rate
  if(inspectionCamera){camera.position.set(...inspectionCamera.eye);camera.lookAt(...inspectionCamera.target);}
  {const pose=roadblock?.cameraPose()||finale.cameraPose(car);if(pose){camera.position.set(...pose.position);camera.lookAt(...pose.target);}} // arrest cinematic orbit
  const wantFov=chaseCamera&&started&&!inspectionCamera?cameraFov:DRIVE_FOV.min;if(camera.fov!==wantFov){camera.fov=wantFov;camera.updateProjectionMatrix();}
@@ -1261,7 +1264,7 @@ async function boot(){
    if(city.id==='copenhagen'){const season=currentSeason();if(season){const cd=cafeData&&await cafeData;seasonal=createSeasonalDecor(season,{buildings:data.buildings,world,places:data.landmarks||[],cafes:cd?.tables||[],walks:data.pavement||[]});cityModel.add(seasonal.group);console.info('Season',season,seasonal.stats);}}
    progress(88,'Loading traffic and pedestrians');mobility=helsinki?new Mobility(correctHarbourLanes(mobilityData),world,{stationCars:16,corridorCars:HARBOUR_CORRIDOR_CARS,corridor:harbourCorridor(world.roads)}):new Mobility(mobilityData,world,city.era===1760?{cars:20,people:320,walkSpawn:130,walkRecycle:220}:city.id==='copenhagen'?{cars:72,people:300,walkSpawn:130,walkRecycle:220}:undefined /* Copenhagen: walkers kept close, so streets in view are not empty */);mobility.reset(car);angryDrivers=createAngryDrivers({vehicleOf:a=>streetLife?.traffic?.vehicleOf(a)});scene.add(angryDrivers.group);mobility.onCrash=a=>angryDrivers.trigger(a,mobility.time);streetLife=createStreetLife(scene,mobility,{paintedMarkings:city.era!==1760,mappedSignalNear:mappedSignalNear(mappedFurniture)});streetLife.update(0,car);if(city.era===1760){streetLife.traffic.group.visible=false;coaches=createCarriageTraffic(mobility.cars);scene.add(coaches.group);}world.objects.add(breakableSigns.bodies); // 1760: the traffic is coaches and horses
    trafficCars=city.era===1760?[]:mobility.cars.map(actor=>{const visual=streetLife.traffic.vehicleOf(actor);return {id:`traffic-${actor.id}`,label:visual?.type==='taxi'?'Taxi':'Car',actor,visual:{type:visual?.type||'sedan',paint:visual?.paint.getStyle()},claim(){if(actor.playerTaken||actor.edge===null||Math.abs(actor.speed)>1.2)return false;actor.playerTaken=true;actor.edge=null;actor.speed=0;return true;},release(){delete actor.playerTaken;}};});
-   police=new PoliceSimulation(mobility.roads,world);police.relaxed=city.id.startsWith('copenhagen');if(city.era===1760)police.report=()=>false;/* no motor police in 1760 */policeRenderer=createPoliceRenderer(scene,police);police.onIncident=(...incident)=>finale.incident(...incident);roadblock=createRoadblock(scene,{world,police,carModel:carGroup,playerLook:travelRenderer.look,isVisible:trafficInView,obstacles:()=>[...mobility.cars.filter(c=>c.edge),...(tramSim?.bodies||[]),...(buses?.bodies||[]),...travel.parkedBodies(),...police.obstacles],onWarning:message=>toast(message,{important:true})});
+   if(city.id.startsWith('copenhagen'))setPoliceLettering('POLITI');police=new PoliceSimulation(mobility.roads,world);police.relaxed=city.id.startsWith('copenhagen');if(city.era===1760)police.report=()=>false;/* no motor police in 1760 */policeRenderer=createPoliceRenderer(scene,police);police.onIncident=(...incident)=>finale.incident(...incident);roadblock=createRoadblock(scene,{world,police,carModel:carGroup,playerLook:travelRenderer.look,isVisible:trafficInView,obstacles:()=>[...mobility.cars.filter(c=>c.edge),...(tramSim?.bodies||[]),...(buses?.bodies||[]),...travel.parkedBodies(),...police.obstacles],onWarning:message=>toast(message,{important:true})});
    // Copenhagen has no street trams: its trams.json holds the S-train route relations, which run through the
    // Boulevard tunnel; drawn as tram track they laid rails and contact wire across Nørreport at street level.
    tramSim=new TramSimulation(tramData,world);tramSim.reset(car);tramRenderer=createTramRenderer(scene,tramSim);tramRenderer.update(car);
@@ -1281,6 +1284,8 @@ async function boot(){
    progress(98,'Warming up shaders');await Promise.race([renderer.compileAsync(scene,camera).catch(()=>{}),new Promise(r=>setTimeout(r,4000))]);
    progress(100,'Ready');
    ready=true;carGroup.visible=true;marker.visible=true;loadingScreen.ready(startPoint.name);
+   if(CINEMATIC)setTimeout(()=>{start();camera.layers.disable(1);cinematic=createCinematic({ground:groundAt,setCamera:p=>{inspectionCamera=p;},loaded:()=>!loadingTiles.size&&!uploads.size,
+    teleport:(x,z)=>{let best=null,d=Infinity;for(const n of mobility?.roads?.nodes||[]){const q=(n[0]-x)**2+(n[1]-z)**2;if(q<d){d=q;best=n;}}const [px,pz]=best||[x,z];setStart({name:'Cinematic',district:city.name,x:px,z:pz,heading:0});}});cinematic.start();if(import.meta.env.DEV)window.__cine=cinematic;},400); // ?cinematic: trailer camera (cinematic.js)
    if(!helsinki)$('boot-place-label').textContent=`Your starting point in ${city.name}`;
    startPicker=createStartPicker({starts:data.landmarks,current:startPoint,onChange:previewStart});
    if(city.id.startsWith('copenhagen'))bigMap=createBigMap({base:()=>mapCache,view:()=>mapView,landmarks:()=>data.landmarks,player:()=>car,targets:()=>cph?.minimapTargets()||[],route:()=>cph?.route?.(),onTravel:travelTo,radius:()=>RADIUS});
@@ -1345,6 +1350,7 @@ async function boot(){
     if(![x,z,heading].every(Number.isFinite)||!insidePlayable(x,z)||world.buildings.at(x,z)||(!world.roads.at(x,z)&&!world.pavement.at(x,z)))throw Error('Inspection point must be on clear mapped ground');
     setStart({name:'Street inspection',district:'Helsinki',x,z,heading});cameraLook=0;setPaused(true);
    };
+   if(import.meta.env.DEV)window.openCityDrive.teleport=(x,z,heading=0)=>{let best=null,d=Infinity;for(const n of mobility.roads.nodes){const q=(n[0]-x)**2+(n[1]-z)**2;if(q<d){d=q;best=n;}}setStart({name:'Teleport',district:city.name,x:best[0],z:best[1],heading});};
    if(import.meta.env.DEV)window.openCityDrive.inspectCamera=({eye,target})=>{
     if(![...eye,...target].every(Number.isFinite)||!insidePlayable(eye[0],eye[2]))throw Error('Invalid reference camera');
     inspectionCamera={eye,target};setPaused(true);
