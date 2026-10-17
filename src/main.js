@@ -216,13 +216,14 @@ const skyEnvironment=createSkyEnvironment(renderer,sky.mesh);
 // Post pipeline (AO, bloom, grade) and the time-of-day/weather looks; `look` is attached to the road surface and sea below.
 let post=null;try{post=createPostPipeline(renderer);}catch(e){console.warn('Post pipeline unavailable, rendering directly:',e);}
 // Past the lowest resolution: ambient occlusion, then bloom and a smaller shadow map, then MSAA, then building detail range.
+let farCity=null; // the far-city skyline group (createFarCity)
 const governor=createQualityGovernor([
  ()=>{if(post)post.options.ao=false;},
  ()=>{if(post)post.options.bloom=false;sun.shadow.mapSize.set(1024,1024);sun.shadow.map?.dispose();sun.shadow.map=null;},
  ()=>{if(post?.targets.scene.samples){post.targets.scene.samples=0;post.targets.scene.dispose();}},
  // Last: detailed buildings, building shadows and the far-shell ring pulled in (dense blocks such as Nyhavn
  // and Strøget otherwise stay heavy whatever the resolution). Tiles pick it up on their next LOD pass.
- ()=>{Object.assign(TILE_LOD,{near:170,far:210,detail:130,shadow:90});},
+ ()=>{Object.assign(TILE_LOD,{near:170,far:210,detail:130,shadow:90});if(farCity)farCity.visible=false;},
 ]);
 {const q=new URLSearchParams(location.search).get('quality'),n=q==='low'?9:+q||0;for(let i=0;i<n;i++)governor.update(99,{atMin:true,smoothed:99});} // ?quality=low (or 1-3 steps)
 let look=null;
@@ -456,12 +457,12 @@ function partOnRay(tile,w,ray,far){
  return false;
 }
 function createFallbackBuildings(buildings=data.buildings){
- const geoms=[];
+ const geoms=[],modelled=[];
  const models=roofIndex.tiles.flatMap(t=>t.parts),ratus=new Set(models.filter(m=>m.ratu>0).map(m=>String(m.ratu))),index=new SpatialIndex(models);
  for(const b of buildings){
   const bb=b.bbox,cx=(bb[0]+bb[2])/2,cz=(bb[1]+bb[3])/2;
   if(data.water&&inWaterPolygons(data.water,cx,cz))continue; // a mapped footprint on the water (houseboat, pontoon): no 15 m box in the canal
-  if(ratus.has(String(b.ratu))||index.near(cx,cz).some(m=>{const a=m.bbox;return Math.max(0,Math.min(a[2],bb[2])-Math.max(a[0],bb[0]))*Math.max(0,Math.min(a[3],bb[3])-Math.max(a[1],bb[1]))/Math.max(1,(bb[2]-bb[0])*(bb[3]-bb[1]))>.5;}))continue;
+  if(ratus.has(String(b.ratu))||index.near(cx,cz).some(m=>{const a=m.bbox;return Math.max(0,Math.min(a[2],bb[2])-Math.max(a[0],bb[0]))*Math.max(0,Math.min(a[3],bb[3])-Math.max(a[1],bb[1]))/Math.max(1,(bb[2]-bb[0])*(bb[3]-bb[1]))>.5;})){modelled.push(b);continue;}
   if(city.era===1760&&(bb[2]-bb[0])*(bb[3]-bb[1])<60)continue; // today's kiosks, metro shafts and sheds: a windowless brick drum in an 18th-century square
   const shape=new THREE.Shape(b.rings[0].map(p=>new THREE.Vector2(p[0],-p[1])));
   for(const r of b.rings.slice(1))shape.holes.push(new THREE.Path(r.map(p=>new THREE.Vector2(p[0],-p[1]))));
@@ -475,6 +476,34 @@ function createFallbackBuildings(buildings=data.buildings){
   g.setAttribute('color',new THREE.BufferAttribute(col,3));g.setAttribute('aRel',new THREE.BufferAttribute(rel,2));geoms.push(g);
  }
  if(geoms.length){const mesh=new THREE.Mesh(mergeGeometries(geoms),facadeGrain(new THREE.MeshStandardMaterial({vertexColors:true,roughness:.88}),{windows:true}));mesh.name='Unmodelled houses';console.info('Unmodelled houses',geoms.length);mesh.castShadow=true;mesh.receiveShadow=true;cityModel.add(mesh);geoms.forEach(g=>g.dispose());}
+ createFarCity(modelled);
+}
+// Beyond the measured tiles (TILE_LOD.visible) the skyline used to stop: the modelled houses get a plain
+// extruded stand-in, drawn only past that distance (fragment discard nearer the camera), no shadows, flat
+// colours, merged per 400 m chunk. Built a chunk per idle slice after the drive starts. Fog runs further out
+// to show it.
+const FAR_START=TILE_LOD.visible-15;
+function createFarCity(buildings){
+ if(!buildings.length)return;
+ const material=new THREE.MeshLambertMaterial({vertexColors:true});
+ material.onBeforeCompile=sh=>{sh.uniforms.uFarStart={value:FAR_START};
+  sh.vertexShader='varying vec3 vFarW;\n'+sh.vertexShader.replace('#include <worldpos_vertex>','#include <worldpos_vertex>\nvFarW=(modelMatrix*vec4(transformed,1.)).xyz;');
+  sh.fragmentShader='uniform float uFarStart;varying vec3 vFarW;\n'+sh.fragmentShader.replace('void main() {','void main() {\nif(distance(vFarW.xz,cameraPosition.xz)<uFarStart)discard;');};
+ material.customProgramCacheKey=()=>'far-city';
+ const group=farCity=new THREE.Group();group.name='Far city (beyond the measured tiles)';group.visible=governor.level<4;cityModel.add(group);
+ const C=400,chunks=new Map();for(const b of buildings){const bb=b.bbox,k=Math.floor((bb[0]+bb[2])/2/C)+','+Math.floor((bb[1]+bb[3])/2/C);let l=chunks.get(k);if(!l)chunks.set(k,l=[]);l.push(b);}
+ const lists=[...chunks.values()];
+ const build=list=>{const geoms=[];
+  for(const b of list){const bb=b.bbox,cx=(bb[0]+bb[2])/2,cz=(bb[1]+bb[3])/2,ring=b.rings[0];if(!ring||ring.length<4)continue;
+   const shape=new THREE.Shape(ring.map(p=>new THREE.Vector2(cx+(p[0]-cx)*.985,-(cz+(p[1]-cz)*.985)))); // a hair inside the measured walls
+   const h=Math.max(3,(b.height>2?Math.min(60,b.height):12)-.6),base=footprintBase(b.rings);
+   const g=new THREE.ExtrudeGeometry(shape,{depth:h,bevelEnabled:false,steps:1});g.rotateX(-Math.PI/2);g.translate(0,base,0);g.deleteAttribute('uv');
+   const k=Math.abs(Math.sin(bb[0]*12.9898+bb[1]*78.233)*43758.5453)%1,wall=new THREE.Color(FALLBACK_WALLS[Math.floor(k*FALLBACK_WALLS.length)]),roof=new THREE.Color(city.era===1760?'#7a3a2a':'#56504a');
+   const pos=g.attributes.position,nor=g.attributes.normal,col=new Float32Array(pos.count*3);for(let i=0;i<pos.count;i++){const c=nor.getY(i)>.5?roof:wall;col[i*3]=c.r;col[i*3+1]=c.g;col[i*3+2]=c.b;}
+   g.setAttribute('color',new THREE.BufferAttribute(col,3));geoms.push(g);}
+  if(!geoms.length)return;const m=new THREE.Mesh(mergeGeometries(geoms),material);geoms.forEach(g=>g.dispose());m.name='Far city chunk';m.matrixAutoUpdate=false;m.updateMatrix();group.add(m);};
+ const step=()=>{if(gameIsStopped())return;const t0=performance.now();while(lists.length&&performance.now()-t0<6)build(lists.pop());if(lists.length)(window.requestIdleCallback||setTimeout)(step,{timeout:200});else console.info('Far city built',group.children.length,'chunks');};
+ step();
 }
 // Building materials: keep one already-compiled material of each shader variant alive. Disposing the last
 // one released its program, and the next tile of that kind recompiled it on the spot (a long frame, worst on

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
-import {LOOKS,LOOK_ORDER,WEATHER_UNIFORMS,createLook,createRain} from '../src/weather.js';
+import {LOOKS,LOOK_ORDER,FOG_REACH,WEATHER_UNIFORMS,createLook,createRain} from '../src/weather.js';
 import {createSky,SUN_OFFSET} from '../src/sky.js';
 import {GRADE_DEFAULTS} from '../src/post.js';
 
@@ -41,7 +41,7 @@ test('look blends toward the target and drives sky, lights, fog and weather unif
  assert.ok(Math.abs(WEATHER_UNIFORMS.wetness.value-1)<.01&&Math.abs(WEATHER_UNIFORMS.rain.value-1)<.01);
  assert.ok(look.rain.visible);assert.ok(surface.roughness<.4,'wet road is glossier');
  assert.equal(scene.fog.color.getHexString(),new THREE.Color(LOOKS.rain.fog.color).getHexString());
- assert.ok(Math.abs(scene.fog.near-LOOKS.rain.fog.near)<1&&Math.abs(scene.fog.far-LOOKS.rain.fog.far)<1);
+ assert.ok(Math.abs(scene.fog.near-LOOKS.rain.fog.near*FOG_REACH[0])<1&&Math.abs(scene.fog.far-LOOKS.rain.fog.far*FOG_REACH[1])<1);
  assert.ok(Math.abs(sun.intensity-LOOKS.rain.sunIntensity)<.01&&Math.abs(hemi.intensity-LOOKS.rain.hemiIntensity)<.01);
  assert.ok(sky.uniforms.uSunDisc.value<.01&&sky.uniforms.uCoverage.value<.05);
  assert.ok(grades.at(-1).wetness>.99);

@@ -77,6 +77,8 @@ const night={
  wetness:.25,rain:0,night:1,
 };
 export const LOOKS=Object.freeze({midday,golden,whitenight,overcast,rain,night});
+// Fog reach relative to the presets above: the skyline now runs past the measured building tiles.
+export const FOG_REACH=[1.2,1.55];
 export const LOOK_ORDER=Object.freeze(['midday','golden','whitenight','night','overcast','rain']);
 
 // Rain: one draw call of short line segments falling through a box that wraps around the camera.
@@ -124,7 +126,7 @@ function materialise(p){
   sky:{zenith:color(p.sky.zenith),mid:color(p.sky.mid),horizon:color(p.sky.horizon),sunGlow:color(p.sky.sunGlow),cloudLit:color(p.sky.cloudLit),cloudShade:color(p.sky.cloudShade),coverage:p.sky.coverage,sunDisc:p.sky.sunDisc},
   sunOffset:new THREE.Vector3(...p.sunOffset),sunColor:color(p.sunColor),sunIntensity:p.sunIntensity,
   hemiSky:color(p.hemiSky),hemiGround:color(p.hemiGround),hemiIntensity:p.hemiIntensity,
-  fog:{color:color(p.fog.color),near:p.fog.near,far:p.fog.far},
+  fog:{color:color(p.fog.color),near:p.fog.near*FOG_REACH[0],far:p.fog.far*FOG_REACH[1]}, // the far city (main.js createFarCity) carries the skyline past the measured tiles
   sea:{deep:color(p.sea.deep),shore:color(p.sea.shore),sunColor:color(p.sea.sunColor)},
   grade:{...p.grade,tint:[...p.grade.tint],lift:[...p.grade.lift],hazeColor:[...p.grade.hazeColor]},
   wetness:p.wetness,rain:p.rain,night:p.night||0,
