@@ -1,5 +1,5 @@
 import './cache-bust.js';
-import {installBootArt} from './boot-art.js';installBootArt();
+import {installBootArt} from './boot-art.js';import {expandCity} from './city-pack.js';installBootArt();
 import './style.css';
 import './loading-screen.css';
 import './speedometer.css';
@@ -1054,7 +1054,7 @@ async function boot(){
    if(!helsinki&&city.projection?.startsWith('+proj'))useProjection(city.projection,city.origin);
    if(city.liveries?.tram)setTramLivery(city.liveries.tram);if(city.liveries?.bus)setBusLivery(city.liveries.bus);
    progress(8,`Loading ${city.name}`);
-   const d=unpack(dataUrl('city.pack')).then(bytes=>JSON.parse(new TextDecoder().decode(bytes)));
+   const d=unpack(dataUrl('city.pack')).then(bytes=>expandCity(JSON.parse(new TextDecoder().decode(bytes))));
    const terrainData=city.terrain?.file?unpack(dataUrl(city.terrain.file)).then(decodeTerrain).catch(e=>{console.warn('Terrain unavailable; the city stays flat:',e);return null;}):null; // ground elevation (src/terrain.js)
    const anchorData=city.id.startsWith('copenhagen')?json(dataUrl('anchors.json')).catch(()=>null):null,eraData=city.era===1760?json(dataUrl('era.json')).catch(()=>null):null;
    const boatData=city.id.startsWith('copenhagen')?json(dataUrl('boats.json')).catch(()=>null):null;

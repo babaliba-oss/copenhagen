@@ -1,5 +1,5 @@
 import {defineConfig} from 'vite';
-import fs from 'node:fs';import path from 'node:path';import crypto from 'node:crypto';
+import fs from 'node:fs';import zlib from 'node:zlib';import {compactCity} from './src/city-pack.js';import path from 'node:path';import crypto from 'node:crypto';
 // Data files are versioned by their content, not by the deploy: a deploy that only changes code no longer
 // makes every returning player download the whole city again. Key: the file for top-level data files, the
 // folder for tile folders (cities/<city>/<folder>/..., data/<folder>/...). See src/cache-bust.js.
@@ -12,4 +12,10 @@ function dataHashes(){
  for(const [k,h] of groups)out[k]=h.digest('hex').slice(0,10);
  return out;
 }
-export default defineConfig(({command})=>({define:{__BUILD_ID__:JSON.stringify(Date.now().toString(36)),__DATA_HASHES__:command==='build'?JSON.stringify(dataHashes()):'null'},build:{rollupOptions:{output:{manualChunks:{three:['three']}}}}}));
+// Deployed city.pack files are compacted (src/city-pack.js); public/ keeps the plain form for scripts and tests.
+const compactPacks={name:'compact-city-packs',apply:'build',closeBundle(){
+ const walk=d=>{if(!fs.existsSync(d))return;for(const e of fs.readdirSync(d,{withFileTypes:true})){const p=path.join(d,e.name);if(e.isDirectory())walk(p);else if(e.name==='city.pack'){
+  const raw=fs.readFileSync(p),json=raw[0]===31&&raw[1]===139?zlib.gunzipSync(raw):raw,city=compactCity(JSON.parse(json));if(city.packed!==2)continue;
+  fs.writeFileSync(p,zlib.gzipSync(Buffer.from(JSON.stringify(city)),{level:9}));}}};
+ walk('dist');}};
+export default defineConfig(({command})=>({define:{__BUILD_ID__:JSON.stringify(Date.now().toString(36)),__DATA_HASHES__:command==='build'?JSON.stringify(dataHashes()):'null'},plugins:[compactPacks],build:{rollupOptions:{output:{manualChunks:{three:['three']}}}}}));

@@ -1,3 +1,4 @@
+import {expandCity} from './city-pack.js';
 import {dataUrl} from './cities.js';
 import {registerPlayableArea,registerWaterClip,WORLD_EXTENT} from './geo.js';
 import {createSpatialStreamer} from './spatial-streaming.js';
@@ -18,7 +19,7 @@ export async function loadExtensionIndex(json){
 }
 export async function loadExtension(e,json,unpack){
   const [city,buildings,surfaces,mobility]=await Promise.all([
-   unpack(dataUrl(`${e.dir}/city.pack`)).then(b=>JSON.parse(new TextDecoder().decode(b))),
+   unpack(dataUrl(`${e.dir}/city.pack`)).then(b=>expandCity(JSON.parse(new TextDecoder().decode(b)))),
    json(dataUrl(`${e.dir}/buildings3d-index.json`)),json(dataUrl(`${e.dir}/surface-index.json`)),json(dataUrl(`${e.dir}/mobility.json`))]);
   // Water and land cover from OpenStreetMap (ODbL) ship in their own files, apart from the municipal data.
   const [water,land]=await Promise.all([e.osmWater&&json(dataUrl(`${e.dir}/${e.osmWater}`)),e.osmLandcover&&json(dataUrl(`${e.dir}/${e.osmLandcover}`))]);
