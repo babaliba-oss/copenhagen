@@ -1,5 +1,5 @@
 import './cache-bust.js';
-import {installBootArt} from './boot-art.js';import {expandCity} from './city-pack.js';installBootArt();
+import {installBootArt} from './boot-art.js';import {expandCity} from './city-pack.js';import {expandMobility} from './mobility-pack.js';installBootArt();
 import './style.css';
 import './loading-screen.css';
 import './speedometer.css';
@@ -1063,7 +1063,7 @@ async function boot(){
    const railData=city.id==='copenhagen'?json(dataUrl('rails.json')).catch(()=>null):null;
    const parkedData=city.id==='copenhagen'?json(dataUrl('parked.json')).catch(()=>null):null; // kerbside parked cars (scripts/parked-cars.py)
    const furnitureData=city.furniture?json(dataUrl(city.furniture)).catch(()=>null):null; // street furniture detected in street-level photos (optional, any city)
-   let mobilityData,landcoverData,tramData;[data,roofIndex,surfaceIndex,mobilityData,landcoverData,tramData,extensions]=await Promise.all([d,json(dataUrl('buildings3d-index.json')),json(dataUrl('surface-index.json')),json(dataUrl('mobility.json')),json(dataUrl('landcover.json')),json(dataUrl('trams.json')),loadExtensionIndex(json)]);
+   let mobilityData,landcoverData,tramData;[data,roofIndex,surfaceIndex,mobilityData,landcoverData,tramData,extensions]=await Promise.all([d,json(dataUrl('buildings3d-index.json')),json(dataUrl('surface-index.json')),json(dataUrl('mobility.json')).then(expandMobility),json(dataUrl('landcover.json')),json(dataUrl('trams.json')),loadExtensionIndex(json)]);
    if(city.id.startsWith('copenhagen'))tramData={...tramData,paths:[],stops:[]}; // no street trams: its trams.json holds S-train route relations (Boulevard tunnel); drawn as tram track they crossed Nørreport at street level
    if(city.id.startsWith('copenhagen')){const dup=new Set(await json(dataUrl('duplicates.json')).catch(()=>[]));const ins=new Set(await json(dataUrl('insets.json')).catch(()=>[]));let n=0;for(const t of roofIndex.tiles)for(const p of t.parts){const k=t.file+':'+p.start;if(dup.has(k)){p.duplicate=true;n++;}else if(ins.has(k))p.inset=true;}
   // Block walls that complete a named building take its colours (recolour.json, scripts/building-duplicates.mjs).
