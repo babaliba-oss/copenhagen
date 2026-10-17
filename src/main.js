@@ -1,5 +1,5 @@
 import './cache-bust.js';
-import {installBootArt} from './boot-art.js';import {expandCity} from './city-pack.js';import {expandMobility} from './mobility-pack.js';installBootArt();
+import {installBootArt} from './boot-art.js';import {expandCity} from './city-pack.js';import {surfaceTile} from './surface-tiles.js';import {expandMobility} from './mobility-pack.js';installBootArt();
 import './style.css';
 import './loading-screen.css';
 import './speedometer.css';
@@ -564,7 +564,7 @@ async function updatePhotos(){
 }
 function initSurfaceStreamer(){
  surfaceStreamer??=createSurfaceStreamer({concurrency:3,onError:handleTileError,load:async (t,{signal}={})=>{
-  const g=dropSunkenSurfaces(drapeGeometry(removeLegacyWater(await geometry(dataUrl(t.file))),{maxEdge:4,mark:true}),{water:(x,z)=>inWaterPolygons(data.water,x,z)?waterAt(x,z):null,mapped:(x,z)=>inWaterPolygons(data.water,x,z)}); // the mapped water, not the level spread onto the banks
+  const g=await surfaceTile(new Float32Array(await unpack(`${dataUrl(t.file)}.pack`)),data.water); // same URL geometry() used
   if(signal?.aborted||gameIsStopped()){g.dispose();return;}
   const m=new THREE.Mesh(g,surfaceMaterial);m.receiveShadow=true;cityModel.add(m);return m;
  }});

@@ -2,22 +2,10 @@ import * as THREE from 'three';
 import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';
 import {buildBridgeRailings,waterLocator,WATER_LEVEL,QUAY_FOOT,extractQuayEdges,buildQuayGeometry,createGroundGeometry,groundSizeForExtent} from './quay.js';
 import {ALLAS} from './waterfront-landmarks.js';
-import {drapeGeometry,createLakeGeometry} from './terrain-mesh.js';
+import {drapeGeometry,createLakeGeometry,removeLegacyWater} from './terrain-mesh.js';
 import {hasTerrain,seaLevel,terrain,groundAt} from './terrain.js';
 
-export {WATER_LEVEL};
-
-// Older surface packs contain a second water plane at 1 cm. Its 4 mm gap
-// from the animated sea collapses in the overhead camera's depth buffer.
-// Remove those triangles, rather than lifting the sea over the quays.
-export function removeLegacyWater(geometry){
- const p=geometry.attributes.position,source=geometry.index?.array,keep=[];
- for(let i=0,n=source?.length??p.count;i<n;i+=3){
-  const ids=[source?.[i]??i,source?.[i+1]??i+1,source?.[i+2]??i+2];
-  if(!ids.every(j=>Math.abs(p.getY(j)-.01)<.00001))keep.push(...ids);
- }
- geometry.setIndex(keep);geometry.computeBoundingSphere();return geometry;
-}
+export {WATER_LEVEL,removeLegacyWater};
 
 // Tileable ripple slopes (RG = d/dx, d/dz) from integer-frequency waves with
 // random directions and phases: isotropic, so no regular stripes appear.

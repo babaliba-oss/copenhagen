@@ -30,6 +30,18 @@ export function subdivideGeometry(source,maxEdge=4,{height=null,tolerance=.03}={
  return result;
 }
 
+// Older surface packs contain a second water plane at 1 cm. Its 4 mm gap
+// from the animated sea collapses in the overhead camera's depth buffer.
+// Remove those triangles, rather than lifting the sea over the quays.
+export function removeLegacyWater(geometry){
+ const p=geometry.attributes.position,source=geometry.index?.array,keep=[];
+ for(let i=0,n=source?.length??p.count;i<n;i+=3){
+  const ids=[source?.[i]??i,source?.[i+1]??i+1,source?.[i+2]??i+2];
+  if(!ids.every(j=>Math.abs(p.getY(j)-.01)<.00001))keep.push(...ids);
+ }
+ geometry.setIndex(keep);geometry.computeBoundingSphere();return geometry;
+}
+
 // Drapes a geometry (world-space positions) over the ground. `mark` keeps the added height in a
 // `terrainY` attribute, so shaders that read layer heights from position.y can subtract it again.
 export function drapeGeometry(geometry,{maxEdge=4,lift=0,water=false,mark=false,lines=false,tolerance=.03}={}){
