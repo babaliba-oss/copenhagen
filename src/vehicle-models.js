@@ -91,7 +91,7 @@ function build(type,detailed){
   const pivot=new THREE.Group();pivot.position.set(side*(W-.055),s.r,z);group.add(pivot);const spin=new THREE.Group();pivot.add(spin);
   const tire=new THREE.Mesh(new THREE.CylinderGeometry(s.r,s.r,.205,detailed?32:16),mats.rubber);tire.rotation.z=Math.PI/2;spin.add(tire);
   const hub=new THREE.Mesh(new THREE.CylinderGeometry(s.r*.65,s.r*.65,.214,detailed?24:12),mats.chrome);hub.rotation.z=Math.PI/2;spin.add(hub);
-  if(detailed)for(let i=0;i<5;i++){const spoke=new THREE.Mesh(new THREE.BoxGeometry(.22,.034,s.r*1.22),mats.black);spoke.rotation.x=i*Math.PI/5;spin.add(spoke);}
+  if(detailed){const gs=[];for(let i=0;i<5;i++){const g=new THREE.BoxGeometry(.22,.034,s.r*1.22).toNonIndexed();g.rotateX(i*Math.PI/5);gs.push(g);}spin.add(new THREE.Mesh(mergeGeometries(gs),mats.black));gs.forEach(g=>g.dispose());} // five spokes, one draw
   spin.children.forEach(m=>m.castShadow=true);
  }
  // Body panels hang under one pivot (after the four wheel pivots) so braking
