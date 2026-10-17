@@ -548,10 +548,17 @@ async function detailTile(group){
    const w=shells.get(b.part.start);if(w){group.userData.mask.set(w.i,0);w.landed=true;group.userData.waiting=group.userData.waiting.filter(x=>x!==w);}
    group.add(...meshes);group.userData.windows+=b.windows;
    if(!group.userData.mask.shown)for(const m of group.children)if(m.userData.lod)applyMeshLod(m,group.userData.level,focus);};
+  // compileAsync walks the whole scene for its lights on every call: once per landing building that was a full
+  // scene traversal several times a frame while a tile's buildings streamed in (the stalls when driving into new
+  // areas). Only material variants not seen before go through it now; the rest land straight away.
+  const fresh=meshes.filter(m=>{const k=variantKey(m);if(seenVariants.has(k))return false;seenVariants.add(k);return true;});
+  if(!fresh.length){land();return;}
   const tmp=new THREE.Group();tmp.add(...meshes);
   renderer.compileAsync(tmp,camera,scene).then(()=>{tmp.remove(...meshes);land();},()=>{tmp.remove(...meshes);land();});
  },()=>dist(b),()=>loadedTiles.get(t.file)===group); // nearest building first, across every tile in the queue
 }
+const seenVariants=new Set();
+const variantKey=m=>{const x=m.material;return [x.type,x.customProgramCacheKey?.()||'',x.onBeforeCompile?String(x.onBeforeCompile).length:0,!!x.map,!!x.vertexColors,!!x.transparent,x.side,!!x.alphaTest,m.castShadow,m.receiveShadow,!!m.geometry.attributes.color,!!m.geometry.attributes.uv,!!m.geometry.attributes.aGlass,!!m.geometry.attributes.aRel].join('|');};
 async function loadPhoto(t){
  if(photoTiles.has(t.file))return;
  if(photoPromises.has(t.file))return photoPromises.get(t.file);
