@@ -202,7 +202,7 @@ const fpsMeter=createFpsMeter(renderer);
 const maxPixelRatio=Math.min(devicePixelRatio,1.5),resolution=createAdaptiveResolution({max:maxPixelRatio,min:Math.min(maxPixelRatio,.75)});
 renderer.setPixelRatio(maxPixelRatio);
 renderer.setSize(captureFrame.w,captureFrame.h);
-renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFShadowMap;
+renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFShadowMap;renderer.shadowMap.autoUpdate=false; // updated from frame(): every frame when fast, every second frame when the frame budget is tight
 renderer.outputColorSpace=THREE.SRGBColorSpace;
 renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=.85;
 const hemi=new THREE.HemisphereLight('#e6eef8','#68786f',1.4);scene.add(hemi);
@@ -528,9 +528,10 @@ function createFarCity(buildings){
 const pinnedMaterials=new Map();
 function disposeMaterial(m){
  if(!m)return;if(Array.isArray(m)){m.forEach(disposeMaterial);return;}
- const key=m.type+'|'+(m.customProgramCacheKey?.()||'')+'|'+!!m.vertexColors+'|'+!!m.map+'|'+m.side+'|'+!!m.transparent;
- if(pinnedMaterials.get(key)===m)return;
- if(!pinnedMaterials.has(key)&&renderer.properties.get(m)?.currentProgram){pinnedMaterials.set(key,m);return;}
+ // pinned per compiled program (the old key missed onBeforeCompile variants: driving back into an area
+ // recompiled its shaders, a 100-300 ms stall each)
+ const prog=renderer.properties.get(m)?.currentProgram;
+ if(prog){const held=pinnedMaterials.get(prog);if(held===m)return;if(!held){pinnedMaterials.set(prog,m);return;}}
  m.dispose();
 }
 function loadRoof(t,at=focus){
@@ -569,7 +570,7 @@ async function buildRoof(t,at){
   freezeTileGroup(group);applyTileLod(group,tileLevel(null,tileDistance(t,at)),at);loadedTiles.set(t.file,group);
   // One atlas upload per frame, then the tile itself: twenty tiles landing after a teleport no longer upload in one frame.
   for(const texture of textures.values())uploads.push(()=>{if(loadedTiles.get(t.file)===group)renderer.initTexture(texture);},null,()=>loadedTiles.get(t.file)===group);
-  uploads.push(()=>{if(loadedTiles.get(t.file)===group)cityModel.add(group);},null,()=>loadedTiles.get(t.file)===group);
+  uploads.push(()=>{if(loadedTiles.get(t.file)!==group)return;const add=()=>{if(loadedTiles.get(t.file)===group)cityModel.add(group);};compileBoth(group).then(add,add);},null,()=>loadedTiles.get(t.file)===group); // shaders ready before the tile shows
  }catch(error){
   if(loadedTiles.get(t.file)===group)loadedTiles.delete(t.file);
   cityModel.remove(group);group.children.forEach(m=>{m.geometry.dispose();disposeMaterial(m.material);});textures.forEach(t=>t.dispose());images?.forEach(({bitmap})=>bitmap.close());
@@ -597,10 +598,10 @@ async function detailTile(group){
   // compileAsync walks the whole scene for its lights on every call: once per landing building that was a full
   // scene traversal several times a frame while a tile's buildings streamed in (the stalls when driving into new
   // areas). Only material variants not seen before go through it now; the rest land straight away.
-  const fresh=meshes.filter(m=>{const k=variantKey(m);if(seenVariants.has(k))return false;seenVariants.add(k);return true;});
-  if(!fresh.length){land();return;}
+  // Pre-compiled against a stand-in scene that lists only the lights: the real scene walk per building was the
+  // cost, and skipping "already seen" variants still let some through to compile on screen.
   const tmp=new THREE.Group();tmp.add(...meshes);
-  renderer.compileAsync(tmp,camera,scene).then(()=>{tmp.remove(...meshes);land();},()=>{tmp.remove(...meshes);land();});
+  compileBoth(tmp).then(()=>{tmp.remove(...meshes);land();},()=>{tmp.remove(...meshes);land();});
  },()=>dist(b),()=>loadedTiles.get(t.file)===group); // nearest building first, across every tile in the queue
 }
 // Draw calls are what costs on Windows (each one goes through ANGLE/D3D11): a busy Nyhavn frame issued
@@ -608,13 +609,23 @@ async function detailTile(group){
 // street furniture no longer draw into the shadow map, and far-city chunks wholly inside the measured tiles
 // (where their fragments are all discarded anyway) are skipped. Checked twice a second.
 const NO_SHADOW=/traffic fleet|person|cyclist|ladcykel|city b|bus|parked|boat|furniture|bench|bike|bollard|sign plate|junction|lamp|post|tram|scooter|stall|umbrella|cafe|crowd/i;
-let trimAt=0;
+let trimAt=0,shadowTick=0,keptPrograms=0;
 function trimDraws(now){
  if(now<trimAt)return;trimAt=now+500;
  scene.traverse(o=>{if(o.castShadow&&(o.isMesh||o.isInstancedMesh)){let n=o.name,p=o.parent;while(!n&&p){n=p.name;p=p.parent;}if(n&&NO_SHADOW.test(n)&&!o.userData.keepShadow)o.castShadow=false;}});
  if(farCity){const cx=camera.position.x,cz=camera.position.z;for(const m of farCity.children){const b=m.geometry.boundingBox||(m.geometry.computeBoundingBox(),m.geometry.boundingBox);
   const fx=Math.max(Math.abs(b.min.x-cx),Math.abs(b.max.x-cx)),fz=Math.max(Math.abs(b.min.z-cz),Math.abs(b.max.z-cz));m.visible=Math.hypot(fx,fz)>FAR_START;}}
 }
+// The chase camera fades buildings in its way by switching their material to transparent: a different shader.
+// Both versions are compiled when a building arrives, so the first fade no longer stalls a frame.
+async function compileBoth(obj){
+ const mats=new Set();obj.traverse(o=>{if(o.material&&!o.material.transparent&&o.userData.occlusion)mats.add(o.material);});
+ await renderer.compileAsync(obj,camera,lightScene()).catch(()=>{});
+ if(!mats.size)return;for(const m of mats){m.transparent=true;m.needsUpdate=true;}
+ try{await renderer.compileAsync(obj,camera,lightScene());}catch{}finally{for(const m of mats){m.transparent=false;m.needsUpdate=true;}}
+}
+let lightProxy=null,lightsAt=0;
+function lightScene(){const now=performance.now();if(!lightProxy||now-lightsAt>5000){const lights=[];scene.traverse(o=>{if(o.isLight)lights.push(o);});lightProxy??=Object.create(scene);const shown=o=>{for(let q=o;q;q=q.parent)if(!q.visible)return false;return true;};lightProxy.traverseVisible=cb=>{for(const l of lights)if(shown(l))cb(l);};lightsAt=now;}return lightProxy;}
 const seenVariants=new Set();
 const variantKey=m=>{const x=m.material;return [x.type,x.customProgramCacheKey?.()||'',x.onBeforeCompile?String(x.onBeforeCompile).length:0,!!x.map,!!x.vertexColors,!!x.transparent,x.side,!!x.alphaTest,m.castShadow,m.receiveShadow,!!m.geometry.attributes.color,!!m.geometry.attributes.uv,!!m.geometry.attributes.aGlass,!!m.geometry.attributes.aRel].join('|');};
 async function loadPhoto(t){
@@ -1040,6 +1051,8 @@ function frame(now){
  }else if(started&&car){const pose=overviewCameraPose(car,heading,viewSpan,highCamera);camera.position.set(...pose.position);camera.lookAt(...pose.target);
  }else{camera.position.set(focus.x+Math.sin(heading)*behind,height,focus.z+Math.cos(heading)*behind);camera.lookAt(focus);}
  trimDraws(now);
+ {const progs=renderer.info.programs;if(progs&&progs.length!==keptPrograms){for(const pr of progs)if(!pr.__kept){pr.__kept=true;pr.usedTimes++;}keptPrograms=progs.length;}} // compiled shaders are never released: a bus sign, a tile or a landmark leaving and coming back no longer recompiles (100-300 ms stall each)
+ {shadowTick=(shadowTick+1)%2;renderer.shadowMap.needsUpdate=!started||captureMode||resolution.smoothed<19||shadowTick===0;} // the shadow pass re-draws every caster: half as often when frames run long
  if(cinematic){if(paused)setPaused(false);if(!started)start();cinematic.update(Math.min(.5,frameMs/1000));} // wall-clock pacing; the trailer never waits on a pause or a start-point preview
  if(inspectionCamera){camera.position.set(...inspectionCamera.eye);camera.lookAt(...inspectionCamera.target);}
  {const pose=roadblock?.cameraPose()||finale.cameraPose(car);if(pose){camera.position.set(...pose.position);camera.lookAt(...pose.target);}} // arrest cinematic orbit
@@ -1347,7 +1360,7 @@ async function boot(){
    transitQueue.splice(0).forEach(addTransit);mobility.attachTrams(tramSim);mobility.attachBuses(buses.simulation);buses.reset(car,tramSim.obstacles);mobility.externalBodies=transitBodies();mobility.reset(car);
    // Shader programs compile now, behind the loading screen (in parallel where the GPU offers it), instead of
    // stalling frames the first time each material comes into view while driving. Capped so a slow GPU still starts.
-   progress(98,'Warming up shaders');await Promise.race([renderer.compileAsync(scene,camera).catch(()=>{}),new Promise(r=>setTimeout(r,4000))]);
+   progress(98,'Warming up shaders');{const shown=[];scene.traverse(o=>{if(!o.visible){o.visible=true;shown.push(o);}}); /* hidden things too (night lamps, rain, far versions): compiled now, not mid-drive */await Promise.race([renderer.compileAsync(scene,camera).catch(()=>{}),new Promise(r=>setTimeout(r,6000))]);for(const o of shown)o.visible=false;}
    progress(100,'Ready');
    ready=true;carGroup.visible=true;marker.visible=true;loadingScreen.ready(startPoint.name);
    if(CINEMATIC)setTimeout(()=>{start();camera.layers.disable(1);cinematic=createCinematic({ground:groundAt,setCamera:p=>{inspectionCamera=p;},loaded:()=>!loadingTiles.size&&!uploads.size,
