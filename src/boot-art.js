@@ -2,7 +2,7 @@
 // the welcome card while the city loads, slow crossfade between pictures. It steps aside once the player
 // flips through starting points (the 3D preview of the picked place shows instead) and is gone in play.
 import './boot-art.css';
-const SETS={today:['title-1','title-2','title-3','title-4'],1760:['title-4']};
+const SETS={today:['title-1','title-2','title-3','title-4'],1760:['period-1','title-4']};
 export function installBootArt(doc=document){
  if(typeof window==='undefined')return;
  const q=new URLSearchParams(location.search),city=q.get('city')||'';let era=/1760/.test(city)?'1760':'today';
