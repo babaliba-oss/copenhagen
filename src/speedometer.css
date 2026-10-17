@@ -39,3 +39,25 @@
  #app .speedometer .battery-row{font-size:8px}
 }
 @media(min-width:1600px){#app{--hud-bottom:55px}}
+/* Desktop: radar and instruments read at a glance (Daniel: "make the minimap and car HUD bigger"). */
+@media(min-width:900px){
+ #app{--hud-card-height:200px}
+ #app .minimap-card,#app .speedometer{width:230px;flex:0 0 230px;border-radius:12px}
+ #app .speedometer{grid-template-rows:1fr 15px 4px 14px;gap:4px;padding:8px 14px}
+ #app .speedometer .speed-dial{width:164px}
+ #app #speed{font-size:32px;min-width:40px}
+ #app .speed-unit{font-size:10px}
+ #drive-gear{font-size:12px}
+ #app .speedometer .battery-row{font-size:12px}
+ #app .battery-track{height:4px}
+ #app .speedometer .gear{font-size:8.5px}
+ #app .minimap-caption{font-size:10px;padding:8px}
+}
+@media(min-width:1600px){
+ #app{--hud-card-height:240px}
+ #app .minimap-card,#app .speedometer{width:280px;flex-basis:280px}
+ #app .speedometer .speed-dial{width:200px}
+ #app #speed{font-size:38px}
+ #app .speedometer .battery-row{font-size:13px}
+ #app .speedometer .gear{font-size:10px}
+}

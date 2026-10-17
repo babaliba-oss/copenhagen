@@ -27,7 +27,7 @@ import {setScooterModel} from './parked-micromobility.js';
 import {setCarriageModels} from './copenhagen/carriage.js';
 import {loadVehicleBodies} from './vehicle-bodies.js';
 import {currentSeason,createSeasonalDecor} from './copenhagen/seasons.js';
-import {inWaterPolygons} from './geo.js';
+import {inWaterPolygons,bounds} from './geo.js';
 import {vehicleBodyParts,VEHICLE_SPECS} from './vehicle-models.js';
 import {animateVehicle} from './vehicles.js';
 import {Mobility} from './mobility.js';
@@ -208,7 +208,7 @@ renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=.8
 const hemi=new THREE.HemisphereLight('#e6eef8','#68786f',1.4);scene.add(hemi);
 const sun=new THREE.DirectionalLight('#fff4e2',2.0);sun.position.set(-160,260,-120);sun.castShadow=true;
 // 400 m box, biased ahead of the car: 2048 texels give 20 cm shadows where the camera looks.
-sun.shadow.mapSize.set(2048,2048);Object.assign(sun.shadow.camera,{left:-200,right:200,top:200,bottom:-200,near:1,far:750});sun.shadow.bias=-.0002;sun.shadow.normalBias=.3;
+sun.shadow.mapSize.set(2048,2048);Object.assign(sun.shadow.camera,{left:-150,right:150,top:150,bottom:-150,near:1,far:750}); // 300 m square: fewer casters per frame, sharper shadowssun.shadow.bias=-.0002;sun.shadow.normalBias=.3;
 scene.add(sun,sun.target);
 const sky=createSky({renderer,scene,camera});sky.applyLighting(hemi,sun);
 // One sky PMREM shared by car paint/glass, chrome and tram glazing; rebuilt only when the sky changes.
@@ -223,7 +223,7 @@ const governor=createQualityGovernor([
  ()=>{if(post?.targets.scene.samples){post.targets.scene.samples=0;post.targets.scene.dispose();}},
  // Last: detailed buildings, building shadows and the far-shell ring pulled in (dense blocks such as Nyhavn
  // and Strøget otherwise stay heavy whatever the resolution). Tiles pick it up on their next LOD pass.
- ()=>{Object.assign(TILE_LOD,{near:170,far:210,detail:130,shadow:90});if(farCity)farCity.visible=false;},
+ ()=>{Object.assign(TILE_LOD,{near:170,far:210,detail:130,shadow:70});if(farCity)farCity.visible=false;},
 ]);
 {const q=new URLSearchParams(location.search).get('quality'),n=q==='low'?9:+q||0;for(let i=0;i<n;i++)governor.update(99,{atMin:true,smoothed:99});} // ?quality=low (or 1-3 steps)
 let look=null;
@@ -234,6 +234,23 @@ function tintSea(s){const u=s?.material?.uniforms;if(!u||!city?.id?.startsWith('
 // Mapped water, rasterised (2 m texels): the drawn ground is cut away inside it. With 10 m ground cells a
 // triangle from a quay vertex to a sunk canal vertex rose above the water as a pale ramp beside every quay.
 const WATER_MASK={uWaterMask:{value:null},uWaterRect:{value:new THREE.Vector4(0,0,1,0)},uSeaY:{value:-1e9}};
+// Fountains and ponds standing above the water level the terrain gives them (Gefionspringvandet on its slope
+// sat 2-5 m above the harbour level it inherited): as water polygons they cut a pit into the ground lined with
+// quay walls. Taken out of the water list and drawn as a water sheet laid on the ground instead.
+function extractPerchedPools(data){
+ const pools=[];
+ data.water=data.water.filter(w=>{const b=w.bbox||(w.bbox=bounds(w.rings));if(!w.rings?.[0]?.length||(b[2]-b[0])*(b[3]-b[1])>30000)return true;
+  let mn=Infinity;for(const p of w.rings[0])mn=Math.min(mn,groundAt(p[0],p[1]));const lvl=waterAt((b[0]+b[2])/2,(b[1]+b[3])/2)??seaLevel();
+  if(lvl!==null&&mn>lvl+1.2){pools.push(w);return false;}return true;});
+ return pools;
+}
+function createPoolSheets(pools){
+ const geoms=[];
+ for(const w of pools){const shape=new THREE.Shape(w.rings[0].map(p=>new THREE.Vector2(p[0],-p[1])));for(const r of w.rings.slice(1))shape.holes.push(new THREE.Path(r.map(p=>new THREE.Vector2(p[0],-p[1]))));
+  const g=new THREE.ShapeGeometry(shape);g.rotateX(-Math.PI/2);geoms.push(g);}
+ const merged=drapeGeometry(mergeGeometries(geoms),{maxEdge:2,lift:.12});geoms.forEach(g=>g.dispose());
+ const m=new THREE.Mesh(merged,new THREE.MeshStandardMaterial({color:'#3f6f80',roughness:.08,metalness:.1,transparent:true,opacity:.92}));m.name='Fountain and pond water';m.receiveShadow=true;return m;
+}
 function buildWaterMask(water,extent,res=2){
  if(typeof document==='undefined'||!water?.length||!extent)return;const n=Math.ceil(2*extent/res),c=document.createElement('canvas');c.width=c.height=n;
  const ctx=c.getContext('2d');ctx.fillStyle='#fff';
@@ -246,7 +263,7 @@ function buildWaterMask(water,extent,res=2){
 }
 function groundPatches(material){
  material.onBeforeCompile=shader=>{Object.assign(shader.uniforms,WATER_MASK);
-  shader.fragmentShader=shader.fragmentShader.replace('#include <clipping_planes_fragment>','#include <clipping_planes_fragment>\n if(uWaterRect.w>0.){vec2 wuv=(vGp.xz-uWaterRect.xy)/uWaterRect.z;if(all(greaterThan(wuv,vec2(0.)))&&all(lessThan(wuv,vec2(1.)))){float wm=texture2D(uWaterMask,wuv).r;if(wm>.5||wm>.04&&vGp.y<uSeaY+1.4)discard;}} /* low ground at the water edge goes too: it showed as a pale shelf in front of the quay walls */');
+  shader.fragmentShader=shader.fragmentShader.replace('#include <clipping_planes_fragment>','#include <clipping_planes_fragment>\n if(uWaterRect.w>0.){vec2 wuv=(vGp.xz-uWaterRect.xy)/uWaterRect.z;if(all(greaterThan(wuv,vec2(0.)))&&all(lessThan(wuv,vec2(1.)))){float wm=texture2D(uWaterMask,wuv).r;if(wm>.72)discard;}} /* low ground at the water edge goes too: it showed as a pale shelf in front of the quay walls */');
   shader.vertexShader=shader.vertexShader.replace('#include <common>','#include <common>\nvarying vec3 vGp;').replace('#include <project_vertex>','#include <project_vertex>\nvGp=(modelMatrix*vec4(transformed,1.)).xyz;');
   Object.assign(shader.uniforms,GROUND_TEX);
   shader.fragmentShader=shader.fragmentShader.replace('#include <common>','#include <common>\nvarying vec3 vGp;uniform sampler2D tSlabC,tSlabN,tSettsC,uWaterMask;uniform vec4 uWaterRect;uniform float uSeaY;vec3 gpNrm=vec3(0.,0.,1.);float gpNw=0.;float gpH(vec2 p){return fract(sin(dot(p,vec2(41.7,113.1)))*4371.3);}float gpN(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);return mix(mix(gpH(i),gpH(i+vec2(1,0)),f.x),mix(gpH(i+vec2(0,1)),gpH(i+vec2(1,1)),f.x),f.y);}')
@@ -345,7 +362,7 @@ window.helsinkiLook={set:(name,opts)=>look.set(name,opts),cycle:()=>look.cycle()
 cutLowerYard(ground.material);cutLowerYard(surfaceMaterial);
 const loadedTiles=new Map(),loadingTiles=new Map();
 const uploads=createFrameQueue({maxJobs:5,budgetMs:3}),detailScheduler=createDetailScheduler(2),treeChunks=[],leafGeometries=[],shadowCuller=createStaticShadowCuller(cityModel);
-const perfOverlay=/[?&]perf\b/.test(location.search)?createPerfOverlay(renderer,{extra:()=>({q:`loading tiles ${loadingTiles.size}  upload queue ${uploads.size}`})}):null; // ?perf: stall finder (perf-overlay.js)
+const perfOverlay=/[?&]perf\b/.test(location.search)?createPerfOverlay(renderer,{extra:()=>({q:`loading tiles ${loadingTiles.size}  upload queue ${uploads.size}  at ${car?Math.round(car.x)+","+Math.round(car.z):"-"}`})}):null; // ?perf: stall finder (perf-overlay.js)
 const photoTiles=new Map(),photoPromises=new Map();
 const tmp=new THREE.Object3D();
 const treeFocus={value:new THREE.Vector2(1e5,1e5)};
@@ -585,6 +602,18 @@ async function detailTile(group){
   const tmp=new THREE.Group();tmp.add(...meshes);
   renderer.compileAsync(tmp,camera,scene).then(()=>{tmp.remove(...meshes);land();},()=>{tmp.remove(...meshes);land();});
  },()=>dist(b),()=>loadedTiles.get(t.file)===group); // nearest building first, across every tile in the queue
+}
+// Draw calls are what costs on Windows (each one goes through ANGLE/D3D11): a busy Nyhavn frame issued
+// 1,600 of them, a third for the shadow map. Moving things (traffic, buses, people, cyclists, boats) and
+// street furniture no longer draw into the shadow map, and far-city chunks wholly inside the measured tiles
+// (where their fragments are all discarded anyway) are skipped. Checked twice a second.
+const NO_SHADOW=/traffic fleet|person|cyclist|ladcykel|city b|bus|parked|boat|furniture|bench|bike|bollard|sign plate|junction|lamp|post|tram|scooter|stall|umbrella|cafe|crowd/i;
+let trimAt=0;
+function trimDraws(now){
+ if(now<trimAt)return;trimAt=now+500;
+ scene.traverse(o=>{if(o.castShadow&&(o.isMesh||o.isInstancedMesh)){let n=o.name,p=o.parent;while(!n&&p){n=p.name;p=p.parent;}if(n&&NO_SHADOW.test(n)&&!o.userData.keepShadow)o.castShadow=false;}});
+ if(farCity){const cx=camera.position.x,cz=camera.position.z;for(const m of farCity.children){const b=m.geometry.boundingBox||(m.geometry.computeBoundingBox(),m.geometry.boundingBox);
+  const fx=Math.max(Math.abs(b.min.x-cx),Math.abs(b.max.x-cx)),fz=Math.max(Math.abs(b.min.z-cz),Math.abs(b.max.z-cz));m.visible=Math.hypot(fx,fz)>FAR_START;}}
 }
 const seenVariants=new Set();
 const variantKey=m=>{const x=m.material;return [x.type,x.customProgramCacheKey?.()||'',x.onBeforeCompile?String(x.onBeforeCompile).length:0,!!x.map,!!x.vertexColors,!!x.transparent,x.side,!!x.alphaTest,m.castShadow,m.receiveShadow,!!m.geometry.attributes.color,!!m.geometry.attributes.uv,!!m.geometry.attributes.aGlass,!!m.geometry.attributes.aRel].join('|');};
@@ -1010,7 +1039,8 @@ function frame(now){
   camera.position.set(pose.position[0]+cameraShake[0]+cameraRumble[0],pose.position[1]+cameraShake[1]+cameraRumble[1],pose.position[2]+cameraShake[2]+cameraRumble[2]);camera.lookAt(...pose.target);camera.rotateZ(cameraRoll);
  }else if(started&&car){const pose=overviewCameraPose(car,heading,viewSpan,highCamera);camera.position.set(...pose.position);camera.lookAt(...pose.target);
  }else{camera.position.set(focus.x+Math.sin(heading)*behind,height,focus.z+Math.cos(heading)*behind);camera.lookAt(focus);}
- cinematic?.update(paused?0:Math.min(.5,frameMs/1000)); // wall-clock pacing: shots keep their length on any frame rate
+ trimDraws(now);
+ if(cinematic){if(paused)setPaused(false);if(!started)start();cinematic.update(Math.min(.5,frameMs/1000));} // wall-clock pacing; the trailer never waits on a pause or a start-point preview
  if(inspectionCamera){camera.position.set(...inspectionCamera.eye);camera.lookAt(...inspectionCamera.target);}
  {const pose=roadblock?.cameraPose()||finale.cameraPose(car);if(pose){camera.position.set(...pose.position);camera.lookAt(...pose.target);}} // arrest cinematic orbit
  const wantFov=chaseCamera&&started&&!inspectionCamera?cameraFov:DRIVE_FOV.min;if(camera.fov!==wantFov){camera.fov=wantFov;camera.updateProjectionMatrix();}
@@ -1164,7 +1194,7 @@ async function boot(){
    // ~0.375 px per metre, as before, whatever the map frame size.
    mapCache.width=mapCache.height=Math.min(4096,Math.round(mapView.size*.375));
    // Hilly cities: everything below samples the shared height field; the flat ground plane gives way to a terrain mesh.
-   if(setTerrain(await terrainData)){if(city.id==='copenhagen')console.info('Water bodies levelled',flattenWaterBodies());if(city.id.startsWith('copenhagen'))buildWaterMask(data.water,terrain()?.extent);{const t0=performance.now(),n=raiseDryHollows((x,z)=>inWaterPolygons(data.water,x,z));console.info('Dry hollows raised to quay height',n,Math.round(performance.now()-t0)+' ms');}surfaceMaterial.defines={...surfaceMaterial.defines,TERRAIN:''};surfaceMaterial.needsUpdate=true;ground.visible=false;cityModel.add(createTerrainGround(ground.material,city.id.startsWith('copenhagen')?{cell:10,chunk:40,wet:(x,z)=>inWaterPolygons(data.water,x,z)}:undefined));}
+   if(setTerrain(await terrainData)){if(city.id==='copenhagen')console.info('Water bodies levelled',flattenWaterBodies());if(city.id.startsWith('copenhagen')){const pools=extractPerchedPools(data);if(pools.length)cityModel.add(createPoolSheets(pools));console.info('Perched pools (fountains, ponds above their water level)',pools.length);}if(city.id.startsWith('copenhagen'))buildWaterMask(data.water,terrain()?.extent);{const t0=performance.now(),n=raiseDryHollows((x,z)=>inWaterPolygons(data.water,x,z));console.info('Dry hollows raised to quay height',n,Math.round(performance.now()-t0)+' ms');}surfaceMaterial.defines={...surfaceMaterial.defines,TERRAIN:''};surfaceMaterial.needsUpdate=true;ground.visible=false;cityModel.add(createTerrainGround(ground.material,city.id.startsWith('copenhagen')?{cell:10,chunk:40,wet:(x,z)=>inWaterPolygons(data.water,x,z)}:undefined));}
    if((landcoverData.polygons||landcoverData.runs||[]).length)cityModel.add(settleObject(createLandcover(landcoverData)));
    if(city.id.startsWith('copenhagen')){const lawns=(data.parks||[]).filter(p=>/Nurmikko|Kenttä/.test(p.kind)&&p.rings?.[0]?.length>3).map(p=>p.rings);if(lawns.length){const g=settleObject(createLandcover({polygons:lawns,chunk:400}),{maxEdge:6,tolerance:.18}); /* lawns lie under the surfaces: a coarser drape (1760's fields and ramparts made ~5M triangles) */g.name='Mapped lawns (under the surfaces)';g.position.y-=.22;g.updateMatrixWorld(true);cityModel.add(g);/* the coarse drape strays up to 18 cm: sunk below it, lawns no longer poke through paved squares (1760 blotches); terrain ground sits 50 cm down */}} // lawns the surface data leaves bare (Krinsen on Kongens Nytorv, park lawns)
    sea=createSea(data.water,data,{helsinkiHarbour:helsinki,deckColor:city.era===1760?'#6b5e4e':'#4a4b4d',deckTexture:city.era===1760?'setts':'asphalt'});tintSea(sea);cityModel.add(sea.group);ground.geometry.dispose();ground.geometry=sea.groundGeometry;
@@ -1386,6 +1416,7 @@ async function boot(){
     if(![x,z,heading].every(Number.isFinite)||!insidePlayable(x,z)||world.buildings.at(x,z)||(!world.roads.at(x,z)&&!world.pavement.at(x,z)))throw Error('Inspection point must be on clear mapped ground');
     setStart({name:'Street inspection',district:'Helsinki',x,z,heading});cameraLook=0;setPaused(true);
    };
+   if(import.meta.env.DEV)window.openCityDrive.waterMask=WATER_MASK;
    if(import.meta.env.DEV)window.openCityDrive.teleport=(x,z,heading=0)=>{let best=null,d=Infinity;for(const n of mobility.roads.nodes){const q=(n[0]-x)**2+(n[1]-z)**2;if(q<d){d=q;best=n;}}setStart({name:'Teleport',district:city.name,x:best[0],z:best[1],heading});};
    if(import.meta.env.DEV)window.openCityDrive.inspectCamera=({eye,target})=>{
     if(![...eye,...target].every(Number.isFinite)||!insidePlayable(eye[0],eye[2]))throw Error('Invalid reference camera');

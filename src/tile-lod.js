@@ -8,7 +8,7 @@ import {facadeGrain} from './facade-grain.js';
 //  far    — one merged measured shell per texture atlas: same walls and roofs, no windows, no shadows
 //  hidden — beyond the fogged distance
 // Authored landmark fronts inside tiles (shell meshes with the 'detail' role) stay visible at every level.
-export const LOD={near:240,far:290,visible:550,detail:180,shadow:130};
+export const LOD={near:240,far:290,visible:550,detail:180,shadow:95}; // shadow 130 -> 95 m: building shells beyond cast no shadow (draw calls)
 
 export function tileLevel(previous,distance,bands=LOD){
  if(distance>bands.visible)return 'hidden';
