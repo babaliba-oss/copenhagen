@@ -18,7 +18,7 @@ import {createCineDrive,rigPose} from './cine-drive.js';
 export const SHOTS=[
  {name:'Nyhavn',drive:{from:[952,58],toward:[770,2]},cam:'front',dur:5},
  {name:'Nyhavn bumper',drive:{from:[935,52],toward:[770,2]},cam:'low',dur:4},
- {name:'H.C. Andersen',era:'today',at:[900,37],dur:4,orbit:{follow:'hca',c:[892.5,39.2],r:[3.4,2.7],h:[1.75,1.6],a:[-.4,.5]},look:[892.5,1.45,39.2]},
+ {name:'H.C. Andersen',era:'today',at:[900,37],dur:4,orbit:{follow:'hca',c:[892.5,39.2],r:[3.2,2.6],h:[1.75,1.6],a:[2.7,3.6]},look:[892.5,1.45,39.2]}, // in front of him (he faces the canal, north); behind him are the houses
  {name:'Kongens Nytorv',drive:{from:[612,22],toward:[712,-100]},cam:'heli',dur:5},
  {name:'Radio',era:'today',drive:{from:[760,-170],toward:[950,-600]},cam:'chase',dur:5,hud:'radio'},
  {name:'Bredgade',era:1760,drive:{from:[760,-170],toward:[950,-600]},cam:'chase',dur:4},
@@ -31,14 +31,14 @@ export const SHOTS=[
  {name:'Gammel Strand',drive:{from:[220,262],toward:[100,285]},cam:'wheel',dur:4},
  {name:'Nissefar',at:[207,-584],dur:4,orbit:{follow:'nisse',c:[207.6,-584.5],r:[3,2.3],h:[1.1,.85],a:[2.6,3.6]},look:[207.6,.55,-584.5]},
  {name:'Kongens Nytorv west',drive:{from:[560,-95],toward:[598,30]},cam:'top',dur:4},
- {name:'Andersen statue',era:'today',at:[-427,520],dur:4,orbit:{c:[-427.1,520.1],r:[4.6,3.6],h:[2.3,2],a:[1.95,2.85]},look:[-427.1,1.75,520.1]}, // he faces south-east (landmarks.js rot -.725, the model faces -Z)
+ {name:'Andersen statue',era:'today',at:[-427,520],dur:4,orbit:{c:[-427.1,520.1],r:[4.6,3.6],h:[2.3,2],a:[-1.25,-.3]},look:[-427.1,1.75,520.1]}, // from the boulevard he looks out over (landmarks.js rot -.725); City Hall's wall is behind him
  {name:'Rådhuspladsen',era:'today',drive:{from:[-286,664],toward:[-83,843]},cam:'heli',dur:4},
- {name:'Strøget',at:[130,140],dur:4,eye:[[152,1.7,172],[134,1.7,152]],target:[[110,1.5,122],[100,1.5,118]]},
- {name:'Harbour',at:[1060,330],dur:5,eye:[[1000,5,250],[1062,4,312]],target:[[1150,3,450],[1182,3,482]]},
+ {name:'Strøget',at:[130,140],dur:4,eye:[[146,1.8,134],[134,1.8,137]],target:[[100,1.6,149],[90,1.6,149]]}, // down the street from Amagertorv (the old path ran through the houses)
+ {name:'Harbour',at:[1100,175],dur:5,eye:[[1110,4,160],[1150,4,190]],target:[[1230,3,280],[1250,3,300]]}, // low over the water (heights from the surface)
  {name:'The city from above',at:[300,200],dur:6,eye:[[320,140,320],[470,270,470]],target:[[120,0,120],[60,0,60]]},
  {name:'Halloween',era:'today',sky:'night',season:'halloween',drive:{from:[952,58],toward:[770,2]},cam:'side',dur:5},
  {name:'Christmas',era:'today',sky:'night',season:'christmas',at:[604,6],dur:5,orbit:{c:[603.9,5.5],r:[36,27],h:[15,9],a:[.4,1.2]},look:[603.9,5,5.5]},
- {name:'Christmas on Strøget',era:'today',sky:'night',season:'christmas',at:[130,140],dur:4,eye:[[152,1.7,172],[134,1.7,152]],target:[[110,2.5,122],[100,2.5,118]]},
+ {name:'Christmas on Strøget',era:'today',sky:'night',season:'christmas',at:[150,132],dur:4,eye:[[176,1.7,127],[160,1.7,130]],target:[[126,2.6,138],[118,2.6,141]]},
 ];
 const ease=t=>t<.5?2*t*t:1-Math.pow(-2*t+2,2)/2;
 const mix=(a,b,t)=>a+(b-a)*t;
@@ -46,8 +46,12 @@ const lerp3=(a,b,t)=>[mix(a[0],b[0],t),mix(a[1],b[1],t),mix(a[2],b[2],t)];
 // Keep the lens out of the houses: walk from the subject out to the eye, stop short of the first wall in the way and back
 // in until the lens has `room` metres of air around it (never nearer the subject than `min`). solid(x,z,y): inside a building.
 const RING=[[1,0],[-1,0],[0,1],[0,-1],[.7,.7],[-.7,.7],[.7,-.7],[-.7,-.7]];
-export function clearEye(eye,focus,solid,{room=1,min=2}={}){
+export function clearEye(eye,focus,solid,{room=1,min=2,los=true}={}){
  if(!solid)return eye;
+ if(!los){ // only the lens: out of any wall it is in or brushing, towards the subject (a view over the roofs may look past houses)
+  const roomy=p=>!solid(p[0],p[2],p[1])&&!RING.some(([a,b])=>solid(p[0]+a*room,p[2]+b*room,p[1]));if(roomy(eye))return eye;
+  const dx=focus[0]-eye[0],dy=focus[1]-eye[1],dz=focus[2]-eye[2],L=Math.hypot(dx,dy,dz);
+  for(let d=.25;d<L-min;d+=.25){const p=[eye[0]+dx*d/L,eye[1]+dy*d/L,eye[2]+dz*d/L];if(roomy(p))return p;}return eye;}
  const dx=eye[0]-focus[0],dy=eye[1]-focus[1],dz=eye[2]-focus[2],L=Math.hypot(dx,dy,dz);if(L<=min)return eye;
  const at=t=>[focus[0]+dx*t,focus[1]+dy*t,focus[2]+dz*t],n=Math.ceil(L/.25);let tmax=1;
  for(let i=1;i<=n;i++){const p=at(i/n);if(solid(p[0],p[2],p[1])){tmax=Math.max(0,i/n-room/L);break;}}
@@ -68,7 +72,7 @@ export function pickShots(era,search='',list=SHOTS){
 // ground(x,z): terrain height; roads(): the road graph; teleport(x,z,heading): start the player's car there (a new
 // start: traffic and streaming follow); place(x,z,heading,speed): move it there this frame (while it drives); setCamera({eye,target}|null); loaded(): tiles in; clear(x,z): no building there (a side camera
 // goes to the open side of the street).
-export function createCinematic({doc=document,ground,teleport,place=null,roads=()=>null,cars=()=>null,clear=()=>true,solid=null,setCamera,loaded,era=null,shots=SHOTS,speed=null,onEnd=()=>{},setSky=null,setSeason=null,hud=null,find=()=>null,wait=[2.5,14]}){
+export function createCinematic({doc=document,ground,teleport,place=null,roads=()=>null,cars=()=>null,clear=()=>true,solid=null,setCamera,loaded,era=null,shots=SHOTS,speed=null,onEnd=()=>{},setSky=null,setSeason=null,hud=null,find=()=>null,wait=[2.5,14],clearRoute=null}){
  const style=doc.createElement('style');
  style.textContent='body.cinematic *{visibility:hidden!important;cursor:none!important}body.cinematic canvas#world,body.cinematic #cine-fade{visibility:visible!important}body.cinematic.cine-radio #radio-now,body.cinematic.cine-radio #radio-now *,body.cinematic.cine-quest #cph-banner,body.cinematic.cine-quest #cph-banner *,body.cinematic.cine-quest #cph-saga,body.cinematic.cine-quest #cph-saga *{visibility:visible!important}#cine-fade{position:fixed;inset:0;background:#000;z-index:100;opacity:1;transition:opacity .35s;pointer-events:none}';
  doc.head.append(style);doc.body.classList.add('cinematic');
@@ -86,7 +90,7 @@ export function createCinematic({doc=document,ground,teleport,place=null,roads=(
   if(s.orbit){const o=s.orbit,c=(o.follow&&find(o.follow))||o.c,a=mix(o.a[0],o.a[1],e),r=mix(o.r[0],o.r[1],e),x=c[0]+Math.sin(a)*r,z=c[1]+Math.cos(a)*r;
    const lx=o.follow?c[0]:s.look[0],lz=o.follow?c[1]:s.look[2],target=[lx,ground(lx,lz)+s.look[1],lz];return {eye:clearEye([x,ground(x,z)+mix(o.h[0],o.h[1],e),z],target,solid),target};}
   const E=lerp3(s.eye[0],s.eye[1],e),T=lerp3(s.target[0],s.target[1],e),target=[T[0],ground(T[0],T[2])+T[1],T[2]];
-  return {eye:clearEye([E[0],ground(E[0],E[2])+E[1],E[2]],target,solid),target};};
+  return {eye:clearEye([E[0],ground(E[0],E[2])+E[1],E[2]],target,solid,{los:false}),target};};
  const show=(p,snap,dt=0)=>{if(!p)return;if(snap||!sm.eye){sm.eye=[...p.eye];sm.target=[...p.target];}
   else{const k=1-Math.exp(-dt*9);for(let j=0;j<3;j++){sm.eye[j]+=(p.eye[j]-sm.eye[j])*k;sm.target[j]+=(p.target[j]-sm.target[j])*k;}}
   setCamera({eye:[...sm.eye],target:[...sm.target]});};
@@ -101,8 +105,9 @@ export function createCinematic({doc=document,ground,teleport,place=null,roads=(
   if(drive){car=drive.pose();side=s.side??(s.cam==='side'||s.cam==='pass'||s.cam==='wheel'?openSide(s):1);
    if(s.cam==='pass'){const probe=drives(s);let p=probe.pose();for(let k=0;k<Math.round(s.dur*30*.5);k++)p=probe.step(1/30);
     const rx=Math.cos(p.heading),rz=-Math.sin(p.heading);eye0=clearEye([p.x+rx*6*side,Math.max(ground(p.x+rx*6*side,p.z+rz*6*side),ground(p.x,p.z)-.4)+1.5,p.z+rz*6*side],[p.x,ground(p.x,p.z)+1.1,p.z],solid);}
-   teleport(car.x,car.z,car.heading);}
-  else teleport(...((s.orbit?.follow&&find(s.orbit.follow))||s.at||[s.orbit?.c?.[0]??0,s.orbit?.c?.[1]??0]));
+   teleport(car.x,car.z,car.heading);
+   if(clearRoute){const probe=drives(s);clearRoute(probe.route(-3,(s.drive.speed??pace)*s.dur+25,1.5).map(p=>[p.x,p.z]));}} // nothing parked in the car's lane
+  else{clearRoute?.([]);teleport(...((s.orbit?.follow&&find(s.orbit.follow))||s.at||[s.orbit?.c?.[0]??0,s.orbit?.c?.[1]??0]));}
   show(pose(s,0),true);};
  return {
   get shot(){return shots[i]?.name||null;},get phase(){return phase;},get driving(){return phase!=='done'&&!!drive;},

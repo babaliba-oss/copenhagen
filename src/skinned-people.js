@@ -9,7 +9,8 @@ import {smoothHeading} from './person-model.js';
 // scratch tools so the rest pose is the T-pose and the Root bone stands on the ground between the feet, facing +Z).
 // The men (M_*) and the women (W_*) are two rigs: the same 62 bone names, but the women's bones are turned differently, so
 // each rig has its own copy of the clips (anims.glb.gz for M_*, anims_w.glb.gz for W_*: Walk, Run, Idle, Wave, Interact,
-// Death...). Clips play in place (Root is never animated). Everyone further away, and anyone fallen, talking or out of the
+// Death...). R_* are Daniel's cool-man and the 1760 costumes on the cool-man's own (Mixamo) skeleton, with the same clips
+// retargeted onto it (anims_r.glb.gz; scripts/people/rpm_build.py and costume_build.py). Clips play in place (Root is never animated). Everyone further away, and anyone fallen, talking or out of the
 // walking set, keeps the instanced procedural figure (person-model.js); the crowd skips whoever is drawn here (the
 // returned set), so nobody is drawn twice.
 const loader=new GLTFLoader();
@@ -21,14 +22,14 @@ async function glb(url){
 const HEAD=1.87; // body height of the characters (the King's crown and the Punk's mohawk stand above it)
 export async function loadPeopleModels(base,names){
  try{
-  const women=names.some(n=>n.startsWith('W_')),men=names.some(n=>!n.startsWith('W_'));
-  const [animM,animW,...chars]=await Promise.all([men?glb(`${base}anims.glb.gz`):null,women?glb(`${base}anims_w.glb.gz`):null,...names.map(n=>glb(`${base}${n}.glb.gz`).catch(e=>{console.warn('Rigged person not loaded',n,e?.message||e);return null;}))]);
-  const clipSet=g=>{const c={};for(const a of g?.animations||[])c[a.name]=a;return c;},clipsM=clipSet(animM),clipsW=clipSet(animW);
+  const rig=n=>n.startsWith('W_')?'w':n.startsWith('R_')?'r':'m',has=r=>names.some(n=>rig(n)===r);
+  const [animM,animW,animR,...chars]=await Promise.all([has('m')?glb(`${base}anims.glb.gz`):null,has('w')?glb(`${base}anims_w.glb.gz`):null,has('r')?glb(`${base}anims_r.glb.gz`):null,...names.map(n=>glb(`${base}${n}.glb.gz`).catch(e=>{console.warn('Rigged person not loaded',n,e?.message||e);return null;}))]);
+  const clipSet=g=>{const c={};for(const a of g?.animations||[])c[a.name]=a;return c;},clips={m:clipSet(animM),w:clipSet(animW),r:clipSet(animR)};
   const material=new THREE.MeshStandardMaterial({vertexColors:true,roughness:.82,metalness:0});
   const models=[];chars.forEach((g,i)=>{if(!g)return;let skinned=null;g.scene.traverse(o=>{if(o.isSkinnedMesh&&!skinned)skinned=o;});if(!skinned)return;
-   const clips=names[i].startsWith('W_')?clipsW:clipsM;if(!clips.Walk||!clips.Idle)return;
+   const set=clips[rig(names[i])];if(!set.Walk||!set.Idle)return;const clipsOf=set;
    g.scene.traverse(o=>{if(o.isMesh){o.material=material;o.castShadow=true;o.receiveShadow=false;o.frustumCulled=false;}});
-   const box=new THREE.Box3().setFromObject(g.scene);models.push({name:names[i],scene:g.scene,clips,height:Math.min(HEAD,Math.max(.5,box.max.y-box.min.y))});});
+   const box=new THREE.Box3().setFromObject(g.scene);models.push({name:names[i],scene:g.scene,clips:clipsOf,height:Math.min(HEAD,Math.max(.5,box.max.y-box.min.y))});});
   return models.length?{models,material}:null;
  }catch(e){console.warn('Rigged people not loaded, the procedural crowd stays:',e?.message||e);return null;}
 }

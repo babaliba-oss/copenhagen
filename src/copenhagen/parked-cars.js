@@ -55,13 +55,17 @@ export function createParkedCars(data,{bodies=[]}={}){
   if(coloured)mesh.instanceColor=new THREE.InstancedBufferAttribute(new Float32Array(n*3),3).setUsage(THREE.DynamicDrawUsage);group.add(mesh);return mesh;};
  const near=(models.length?models:[simple]).map(model=>[pool(model.body,bodyMat,'Parked cars (detailed)',true),pool(model.fixed,fixedMat,'Parked cars (detailed)',false)]);
  const far=[pool(simple.body,bodyMat,'Parked cars (far)',true),pool(simple.fixed,fixedMat,'Parked cars (far)',false)];
- const batches=[...near.flat(),...far];let at=null;
+ const batches=[...near.flat(),...far];let at=null;const hidden=new Set(); // ?cinematic hides the few parked where the trailer car's lane runs (hideAlong)
  function put(mesh,i,colour){const k=mesh.count++;mesh.instanceMatrix.array.set(poses.subarray(i*16,i*16+16),k*16);if(colour)colour.toArray(mesh.instanceColor.array,k*3);}
- return {group,obstacles,update(p){if(!p)return;if(at&&Math.hypot(at[0]-p.x,at[1]-p.z)<12)return;at=[p.x,p.z];
+ // points: [[x,z],...] along a route; every car within r of one is hidden (and no longer an obstacle). Without points, all come back.
+ const hideAlong=(points=[],r=1.7)=>{for(const c of hidden)obstacles[c].disabled=false;hidden.clear();
+  for(const [x,z] of points){const i=Math.floor(x/CHUNK),j=Math.floor(z/CHUNK);for(let di=-1;di<=1;di++)for(let dj=-1;dj<=1;dj++)for(const c of cells.get((i+di)*100000+j+dj)||[])if(!hidden.has(c)&&Math.hypot(poses[c*16+12]-x,poses[c*16+14]-z)<r+1.2){hidden.add(c);obstacles[c].disabled=true;}}
+  at=null;return hidden.size;};
+ return {group,obstacles,hideAlong,update(p){if(!p)return;if(at&&Math.hypot(at[0]-p.x,at[1]-p.z)<12)return;at=[p.x,p.z];
   for(const b of batches)b.count=0;
   const i0=Math.floor((p.x-RANGE)/CHUNK),i1=Math.floor((p.x+RANGE)/CHUNK),j0=Math.floor((p.z-RANGE)/CHUNK),j1=Math.floor((p.z+RANGE)/CHUNK);
   for(let i=i0;i<=i1;i++)for(let j=j0;j<=j1;j++)for(const c of cells.get(i*100000+j)||[]){const dx=poses[c*16+12]-p.x,dz=poses[c*16+14]-p.z,d=Math.hypot(dx,dz);if(d>=RANGE)continue;
-   const paint=paints[cars[c][3]%paints.length],[body,fixed]=d<NEAR?near[style[c]]:far;put(body,c,paint);put(fixed,c,null);}
+   if(hidden.has(c))continue;const paint=paints[cars[c][3]%paints.length],[body,fixed]=d<NEAR?near[style[c]]:far;put(body,c,paint);put(fixed,c,null);}
   for(const b of batches){b.instanceMatrix.clearUpdateRanges();b.instanceMatrix.addUpdateRange(0,b.count*16);b.instanceMatrix.needsUpdate=true;if(b.instanceColor){b.instanceColor.clearUpdateRanges();b.instanceColor.addUpdateRange(0,b.count*3);b.instanceColor.needsUpdate=true;}}
  }};
 }
