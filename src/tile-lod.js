@@ -2,6 +2,20 @@ import * as THREE from 'three';
 import {shellColourAttribute,shellHeightAttribute,creasedShellNormals} from './shell-colors.js';
 import {facadeGrain} from './facade-grain.js';
 
+// Creased normals of a tile's merged shell ranges, worked out in a worker (shell-normals-worker.js); resolves to
+// null when there is no worker, and createMergedShells then computes them itself.
+let normalsWorker=null,normalsFailed=false,normalsId=0;const normalJobs=new Map();
+export function shellNormals(array,ranges){
+ if(typeof Worker==='undefined'||normalsFailed||!ranges.length)return Promise.resolve(null);
+ if(!normalsWorker){
+  try{normalsWorker=new Worker(new URL('./shell-normals-worker.js',import.meta.url),{type:'module'});}catch{normalsFailed=true;return Promise.resolve(null);}
+  normalsWorker.onmessage=({data})=>{const job=normalJobs.get(data.id);if(!job)return;normalJobs.delete(data.id);job(data.error?null:data.normals);};
+  normalsWorker.onerror=e=>{normalsFailed=true;for(const job of normalJobs.values())job(null);normalJobs.clear();e.preventDefault?.();};
+ }
+ const id=++normalsId,copy=array.slice(); // the tile array itself goes on to the building worker later
+ return new Promise(resolve=>{normalJobs.set(id,resolve);normalsWorker.postMessage({id,array:copy,ranges},[copy.buffer]);});
+}
+
 // Distance levels for measured building tiles, with hysteresis so a tile parked on a threshold
 // never flickers between representations:
 //  near   — worker-detailed meshes (photo shells, reveals, windows); per-part measured shells until they land
@@ -46,11 +60,12 @@ function maskShader(material,uniforms,{fragment=true}={}){
  material.customProgramCacheKey=()=>(prevKey?prevKey.call(material):'')+'|shell-mask';
  return material;
 }
-export function createMergedShells(array,parts,textures,mask=null){
+// normals: optional per-range creased normals in mergedShellRanges order (shellNormals, computed in a worker).
+export function createMergedShells(array,parts,textures,mask=null,normals=null){
  const index=new Map(parts.map((p,i)=>[p,i]));
- return mergedShellRanges(parts).map(r=>{
+ return mergedShellRanges(parts).map((r,ri)=>{
   const data=array.slice(r.start*5,r.end*5),buffer=new THREE.InterleavedBuffer(data,5),geometry=new THREE.BufferGeometry();
-  geometry.setAttribute('position',new THREE.InterleavedBufferAttribute(buffer,3,0));geometry.setAttribute('uv',new THREE.InterleavedBufferAttribute(buffer,2,3));creasedShellNormals(geometry);geometry.computeBoundingSphere();
+  geometry.setAttribute('position',new THREE.InterleavedBufferAttribute(buffer,3,0));geometry.setAttribute('uv',new THREE.InterleavedBufferAttribute(buffer,2,3));if(normals?.[ri]?.length===(r.end-r.start)*3)geometry.setAttribute('normal',new THREE.BufferAttribute(normals[ri],3));else creasedShellNormals(geometry);geometry.computeBoundingSphere();
   const texture=r.texture?textures.get(r.texture)||null:null;
   if(!texture){geometry.setAttribute('color',shellColourAttribute(array,parts,r.start,r.end));geometry.setAttribute('aRel',shellHeightAttribute(array,parts,r.start,r.end));}
   const material=texture?new THREE.MeshStandardMaterial({map:texture,roughness:.86,side:THREE.DoubleSide}):facadeGrain(new THREE.MeshStandardMaterial({vertexColors:true,roughness:.86,side:THREE.DoubleSide}),{windows:true});

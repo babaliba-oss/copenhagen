@@ -172,7 +172,7 @@ export function createSea(water,land={},{helsinkiHarbour=true,groundExtent=0,dec
   // street. The foot and the waterline band follow the real water instead.
   if(hasTerrain()){const lvl=seaLevel(),p=draped.attributes.position;for(let i=0;i<p.count;i++){const x=p.getX(i),z=p.getZ(i),local=p.getY(i)-groundAt(x,z);
    if(local<QUAY_FOOT+.05)p.setY(i,Math.min(p.getY(i),lvl-.8));else if(Math.abs(local-(WATER_LEVEL+.22))<.03)p.setY(i,Math.min(p.getY(i),lvl+.22));}p.needsUpdate=true;draped.computeVertexNormals();}
-  for(const g of splitByCell(draped,700)){const quay=new THREE.Mesh(g,quayMaterial);quay.name='Granite quay walls';quay.receiveShadow=true;group.add(quay);}
+  for(const g of splitByCell(draped,1400)){const quay=new THREE.Mesh(g,quayMaterial);quay.name='Granite quay walls';quay.receiveShadow=true;group.add(quay);}
   const shade=new THREE.Mesh(drapeGeometry(skirt,{water:true,lift:-WATER_LEVEL-.1}),new THREE.MeshBasicMaterial({color:'#ffffff',vertexColors:true,transparent:true,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-1,polygonOffsetUnits:-2}));
   shade.name='Quay shade on water';shade.renderOrder=1;group.add(shade);
  }

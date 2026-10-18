@@ -1,20 +1,25 @@
-import {carSamples} from './physics.js';
 import {routePoint} from './mobility.js';
 
 // Adjacent road polygons do not always meet exactly; a hair-thin unmapped sliver with road on both sides
 // of it is still road (the same tolerance buses use). Cars used to stop for good at such a seam.
 const SEAM=.4;
 const roadAt=(world,x,z)=>!!world.roads.at(x,z)||(world.roads.at(x+SEAM,z)&&world.roads.at(x-SEAM,z))||(world.roads.at(x,z+SEAM)&&world.roads.at(x,z-SEAM));
+// The footprint points of physics.js carSamples, tested one by one without building the list (called for
+// every car every step: the lists were a good part of the per-frame garbage).
+const FOOTPRINT=[0,0,-.9,-2.15,.9,-2.15,-.9,2.15,.9,2.15,0,-2.3,0,2.3,-1,0,1,0];
 export function vehicleFitsRoad(p,world){
  if(!world.trafficForbidden)return !!world.roads.at(p.x,p.z)&&!world.buildings.at(p.x,p.z);
- return carSamples(p).every(([x,z])=>roadAt(world,x,z)&&!world.trafficForbidden.at(x,z)&&!world.buildings.at(x,z));
+ const s=Math.sin(p.heading),c=Math.cos(p.heading);
+ for(let i=0;i<FOOTPRINT.length;i+=2){const lx=FOOTPRINT[i],lz=FOOTPRINT[i+1],x=p.x+lx*c+lz*s,z=p.z-lx*s+lz*c;if(!roadAt(world,x,z)||world.trafficForbidden.at(x,z)||world.buildings.at(x,z))return false;}
+ return true;
 }
+const along={x:0,z:0,heading:0};
 export function safeVehicleSegment(a,b,world){
  if(!vehicleFitsRoad(b,world))return false;
  if(!world.trafficForbidden)return true;
  const distance=Math.hypot(b.x-a.x,b.z-a.z),turn=Math.atan2(Math.sin(b.heading-a.heading),Math.cos(b.heading-a.heading));
  const n=Math.max(1,Math.ceil(distance/.5),Math.ceil(Math.abs(turn)/.15));
- for(let i=1;i<n;i++){const t=i/n;if(!vehicleFitsRoad({x:a.x+(b.x-a.x)*t,z:a.z+(b.z-a.z)*t,heading:a.heading+turn*t},world))return false;}
+ for(let i=1;i<n;i++){const t=i/n;along.x=a.x+(b.x-a.x)*t;along.z=a.z+(b.z-a.z)*t;along.heading=a.heading+turn*t;if(!vehicleFitsRoad(along,world))return false;}
  return true;
 }
 // Separating-axis test for the conservative vehicle footprints. This covers

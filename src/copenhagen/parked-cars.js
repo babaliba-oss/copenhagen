@@ -2,10 +2,10 @@ import * as THREE from 'three';
 import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';
 import {groundAt} from '../terrain.js';
 
-// Parked cars along the kerbs (scripts/parked-cars.py → parked.json). Per 150 m chunk, instanced meshes for
-// the painted body (per-car colour) and the fixed parts (glass, tyres, lights): the detailed Blender bodies
-// near the player, a simple low-poly car (~250 triangles instead of ~3,800) further out, nothing beyond view
-// range. Each car is a solid obstacle for the player.
+// Parked cars along the kerbs (scripts/parked-cars.py → parked.json). Instanced meshes for the painted body
+// (per-car colour) and the fixed parts (glass, tyres, lights): the detailed Blender bodies near the player, a
+// simple low-poly car (~250 triangles instead of ~3,800) further out, nothing beyond view range. The batches are
+// city-wide pools refilled with the cars in range (CHUNK is the lookup grid). Each car is a solid obstacle.
 const CHUNK=150,NEAR=170,RANGE=420;
 const paint=(g,hex)=>{const n=g.index?g.toNonIndexed():g;if(n!==g)g.dispose();n.deleteAttribute('uv');const c=new THREE.Color(hex),a=new Float32Array(n.attributes.position.count*3);for(let i=0;i<a.length;i+=3)a.set([c.r,c.g,c.b],i);n.setAttribute('color',new THREE.BufferAttribute(a,3));return n;};
 // A box whose top face is pulled in (cabin taper). Forward is -Z.
@@ -41,22 +41,27 @@ export function createParkedCars(data,{bodies=[]}={}){
  if(!cars.length)return {group,obstacles:[],update(){}};
  const models=bodies.map(({parts,spec})=>blenderCar(parts,spec)).filter(Boolean),simple={body:bodyGeometry(),fixed:fixedGeometry()};
  const bodyMat=new THREE.MeshStandardMaterial({vertexColors:true,roughness:.35,metalness:.15}),fixedMat=new THREE.MeshStandardMaterial({vertexColors:true,roughness:.4,metalness:.2});
- const chunks=new Map();
- for(const c of cars){const k=`${Math.floor(c[0]/CHUNK)},${Math.floor(c[1]/CHUNK)}`;if(!chunks.has(k))chunks.set(k,[]);chunks.get(k).push(c);}
- const m=new THREE.Matrix4(),q=new THREE.Quaternion(),v=new THREE.Vector3(),one=new THREE.Vector3(1,1,1),UP=new THREE.Vector3(0,1,0),list=[],obstacles=[];
- let id=0;
- const instance=(model,cs,shadow)=>{const b=new THREE.InstancedMesh(model.body,bodyMat,cs.length),f=new THREE.InstancedMesh(model.fixed,fixedMat,cs.length);b.castShadow=f.castShadow=shadow;b.receiveShadow=true;
-  cs.forEach((c,i)=>{const [x,z,yaw,p]=c;m.compose(v.set(x,groundAt(x,z),z),q.setFromAxisAngle(UP,yaw),one);b.setMatrixAt(i,m);f.setMatrixAt(i,m);b.setColorAt(i,paints[p%paints.length]);});
-  b.computeBoundingSphere();f.computeBoundingSphere();return [b,f];};
- for(const [k,all] of chunks){
-  const near=new THREE.Group(),far=new THREE.Group();near.name='Parked cars (detailed)';far.name='Parked cars (far)';let cx=0,cz=0;
-  for(const c of all){const [x,z,yaw]=c;cx+=x;cz+=z;
-   const co=Math.cos(yaw),si=Math.sin(yaw),ring=[[-.9,-2.15],[.9,-2.15],[.9,2.15],[-.9,2.15]].map(([a,d])=>[x+a*co+d*si,z-a*si+d*co]);
-   obstacles.push({id:`parked-car-${id++}`,name:'parked car',rings:[ring],bbox:[Math.min(...ring.map(p=>p[0])),Math.min(...ring.map(p=>p[1])),Math.max(...ring.map(p=>p[0])),Math.max(...ring.map(p=>p[1]))]});}
-  if(models.length)models.forEach((model,mi)=>{const cs=all.filter(c=>Math.abs(Math.round(c[0]*7+c[1]*13))%models.length===mi);if(cs.length)near.add(...instance(model,cs,true));});
-  else near.add(...instance(simple,all,true));
-  far.add(...instance(simple,all,false));far.visible=near.visible=false;
-  group.add(near,far);list.push({near,far,x:cx/all.length,z:cz/all.length});
- }
- return {group,obstacles,update(p){if(!p)return;for(const c of list){const d=Math.hypot(c.x-p.x,c.z-p.z);c.near.visible=d<NEAR;c.far.visible=d>=NEAR&&d<RANGE;}}};
+ // Every car's pose, paint and body style, once; the drawn batches are pools refilled with the cars in range as the
+ // player moves: two batches per body style near, two for the low-poly cars further out (it was that many per
+ // 150 m chunk, 20-40 draw calls along a street of parked cars).
+ const n=cars.length,poses=new Float32Array(n*16),style=new Uint8Array(n),cells=new Map(),obstacles=[];
+ const m=new THREE.Matrix4(),q=new THREE.Quaternion(),v=new THREE.Vector3(),one=new THREE.Vector3(1,1,1),UP=new THREE.Vector3(0,1,0);
+ cars.forEach((c,i)=>{const [x,z,yaw]=c;m.compose(v.set(x,groundAt(x,z),z),q.setFromAxisAngle(UP,yaw),one).toArray(poses,i*16);
+  style[i]=models.length?Math.abs(Math.round(x*7+z*13))%models.length:0;
+  const k=Math.floor(x/CHUNK)*100000+Math.floor(z/CHUNK);let l=cells.get(k);if(!l)cells.set(k,l=[]);l.push(i);
+  const co=Math.cos(yaw),si=Math.sin(yaw),ring=[[-.9,-2.15],[.9,-2.15],[.9,2.15],[-.9,2.15]].map(([a,d])=>[x+a*co+d*si,z-a*si+d*co]);
+  obstacles.push({id:`parked-car-${i}`,name:'parked car',rings:[ring],bbox:[Math.min(...ring.map(p=>p[0])),Math.min(...ring.map(p=>p[1])),Math.max(...ring.map(p=>p[0])),Math.max(...ring.map(p=>p[1]))]});});
+ const pool=(geometry,material,name,coloured)=>{const mesh=new THREE.InstancedMesh(geometry,material,n);mesh.name=name;mesh.count=0;mesh.frustumCulled=false;mesh.castShadow=false;mesh.receiveShadow=true;mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  if(coloured)mesh.instanceColor=new THREE.InstancedBufferAttribute(new Float32Array(n*3),3).setUsage(THREE.DynamicDrawUsage);group.add(mesh);return mesh;};
+ const near=(models.length?models:[simple]).map(model=>[pool(model.body,bodyMat,'Parked cars (detailed)',true),pool(model.fixed,fixedMat,'Parked cars (detailed)',false)]);
+ const far=[pool(simple.body,bodyMat,'Parked cars (far)',true),pool(simple.fixed,fixedMat,'Parked cars (far)',false)];
+ const batches=[...near.flat(),...far];let at=null;
+ function put(mesh,i,colour){const k=mesh.count++;mesh.instanceMatrix.array.set(poses.subarray(i*16,i*16+16),k*16);if(colour)colour.toArray(mesh.instanceColor.array,k*3);}
+ return {group,obstacles,update(p){if(!p)return;if(at&&Math.hypot(at[0]-p.x,at[1]-p.z)<12)return;at=[p.x,p.z];
+  for(const b of batches)b.count=0;
+  const i0=Math.floor((p.x-RANGE)/CHUNK),i1=Math.floor((p.x+RANGE)/CHUNK),j0=Math.floor((p.z-RANGE)/CHUNK),j1=Math.floor((p.z+RANGE)/CHUNK);
+  for(let i=i0;i<=i1;i++)for(let j=j0;j<=j1;j++)for(const c of cells.get(i*100000+j)||[]){const dx=poses[c*16+12]-p.x,dz=poses[c*16+14]-p.z,d=Math.hypot(dx,dz);if(d>=RANGE)continue;
+   const paint=paints[cars[c][3]%paints.length],[body,fixed]=d<NEAR?near[style[c]]:far;put(body,c,paint);put(fixed,c,null);}
+  for(const b of batches){b.instanceMatrix.clearUpdateRanges();b.instanceMatrix.addUpdateRange(0,b.count*16);b.instanceMatrix.needsUpdate=true;if(b.instanceColor){b.instanceColor.clearUpdateRanges();b.instanceColor.addUpdateRange(0,b.count*3);b.instanceColor.needsUpdate=true;}}
+ }};
 }

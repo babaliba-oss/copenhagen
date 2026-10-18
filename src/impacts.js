@@ -108,16 +108,16 @@ export function stepKnockdown(actor,dt,world=null){
 
 export class ImpactSystem{
  constructor(){this.time=0;this.contacts=new Map();this.actors=new Set();this.events=0;this.world=null;this.hits=[];}
- reset(){for(const a of this.actors){if(a.knockdown?.phase==='gesture')a.pose=a.knockdown.prevPose;delete a.knockdown;delete a.impactCooldown;}this.actors.clear();this.contacts.clear();this.events=0;this.time=0;this.hits=[];}
+ reset(){for(const a of this.actors){if(a.knockdown?.phase==='gesture')a.pose=a.knockdown.prevPose;a.knockdown=undefined;a.impactCooldown=undefined;}this.actors.clear();this.contacts.clear();this.events=0;this.time=0;this.hits=[];}
  step(dt,world=this.world){
   this.time+=dt;
   for(const a of this.actors){
    if(a.knockdown){
-    if(a.knockdown.body){if(!stepKnockdown(a,dt,world)){delete a.knockdown;a.impactCooldown=this.time+2;}continue;}
+    if(a.knockdown.body){if(!stepKnockdown(a,dt,world)){a.knockdown=undefined;a.impactCooldown=this.time+2;}continue;}
     a.knockdown.elapsed+=dt;a.speed=0;a.running=false;
-    if(a.knockdown.elapsed>=a.knockdown.duration){delete a.knockdown;a.impactCooldown=this.time+2;}
+    if(a.knockdown.elapsed>=a.knockdown.duration){a.knockdown=undefined;a.impactCooldown=this.time+2;}
    }else if(this.time>=a.impactCooldown){
-    delete a.impactCooldown;this.actors.delete(a);
+    a.impactCooldown=undefined;this.actors.delete(a);
    }
   }
   for(const [id,t]of this.contacts)if(this.time-t>3)this.contacts.delete(id);

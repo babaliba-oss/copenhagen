@@ -81,7 +81,8 @@ export class SpatialIndex {
   near(x,z){return this.cells.get(cellKey(Math.floor(x/this.size),Math.floor(z/this.size)))||NONE;}
   at(x,z){
     // Hot path: called thousands of times per frame by physics, traffic and pedestrians.
-    for(const p of this.near(x,z)){if(p.disabled)continue;const b=p.bbox;if(x>=b[0]&&x<=b[2]&&z>=b[1]&&z<=b[3]&&pointInPolygon(x,z,p.rings))return p;}
+    const list=this.near(x,z); // indexed: for-of allocated an iterator result per polygon tested
+    for(let i=0;i<list.length;i++){const p=list[i];if(p.disabled)continue;const b=p.bbox;if(x>=b[0]&&x<=b[2]&&z>=b[1]&&z<=b[3]&&pointInPolygon(x,z,p.rings))return p;}
     return undefined;
   }
 }
