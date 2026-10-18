@@ -103,7 +103,7 @@
    "maintainers": [
     "Daniel Sfita"
    ],
-   "attribution": "Map data © OpenStreetMap contributors, ODbL 1.0 (openstreetmap.org/copyright). Street furniture positions from Mapillary map features (mapillary.com), under Mapillary Terms of Use (mapillary.com/terms). Building heights from OSM tags or estimated by building type. Elevation: Mapterhorn terrain tiles (mapterhorn.com); see mapterhorn.com/attribution for the sources and licences of your area. Buildings: København 3D bymodel © Københavns Kommune 2013, CC BY 4.0. Street trees, street lights, bike racks and bollards: City of Copenhagen open data (CC BY 4.0). Façade colours and details described from Mapillary street-level photos (mapillary.com), CC BY-SA 4.0. 3D models (simplified and recoloured): Frederik V statue, \"Equestrian Statue in Copenhagen\" by alexabhisak (made with Meshy), CC BY 4.0, sketchfab.com/3d-models/6575a75ae76f42e5909f93e8fa718445; HDMS Gorm by martyn169, CC BY 4.0, sketchfab.com/3d-models/18abc857c9bf474090ddb1ec772a05db.",
+   "attribution": "Map data © OpenStreetMap contributors, ODbL 1.0 (openstreetmap.org/copyright). Street furniture positions from Mapillary map features (mapillary.com), under Mapillary Terms of Use (mapillary.com/terms). Building heights from OSM tags or estimated by building type. Elevation: Mapterhorn terrain tiles (mapterhorn.com); see mapterhorn.com/attribution for the sources and licences of your area. Buildings: København 3D bymodel © Københavns Kommune 2013, CC BY 4.0. Street trees, street lights, bike racks and bollards: City of Copenhagen open data (CC BY 4.0). Façade colours and details described from Mapillary street-level photos (mapillary.com), CC BY-SA 4.0. 3D models (simplified and recoloured): Frederik V statue, \"Equestrian Statue in Copenhagen\" by alexabhisak (made with Meshy), CC BY 4.0, sketchfab.com/3d-models/6575a75ae76f42e5909f93e8fa718445; HDMS Gorm by martyn169, CC BY 4.0, sketchfab.com/3d-models/18abc857c9bf474090ddb1ec772a05db; H.C. Andersen statue by rigsters, CC BY 4.0, sketchfab.com/3d-models/74f1cba24216401b9d843111ebae3737.",
    "fetchedAt": "2026-10-12",
    "counts": {
     "official": {},
@@ -184,7 +184,7 @@
     "note": "Movia city buses: yellow all over."
    },
    "era": 1760,
-   "attribution": "Map data © OpenStreetMap contributors, ODbL 1.0 (openstreetmap.org/copyright). Building heights from OSM tags or estimated by building type. Elevation: Mapterhorn terrain tiles (mapterhorn.com); see mapterhorn.com/attribution for the sources and licences of your area. Buildings: København 3D bymodel © Københavns Kommune 2013, CC BY 4.0.",
+   "attribution": "Map data © OpenStreetMap contributors, ODbL 1.0 (openstreetmap.org/copyright). Building heights from OSM tags or estimated by building type. Elevation: Mapterhorn terrain tiles (mapterhorn.com); see mapterhorn.com/attribution for the sources and licences of your area. Buildings: København 3D bymodel © Københavns Kommune 2013, CC BY 4.0. 3D models (simplified and recoloured): cannon, \"Pirate Cannon\" by maxwellmccurry, CC BY 4.0, sketchfab.com/3d-models/3c84e18c6b24408fa55156a72bf68b57; \"Merchant Schooner 3\" by agt14032013, CC BY 4.0, sketchfab.com/3d-models/4be7f7564de947a0ad3fb57a54292c3b; \"Swedish royal schooner yacht Amphion\" by Museovirasto (Finnish Heritage Agency), CC BY 4.0, sketchfab.com/3d-models/751174e48b764e829410cd323144833c.",
    "fetchedAt": "2026-10-13",
    "counts": {
     "official": {},
