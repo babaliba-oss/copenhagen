@@ -117,6 +117,23 @@ Notes:
   and generative Danish folk tunes (fiddle over accordion oom-pah-pah; a cittern in 1760) as background music (U).
 - `big-map.js`: the full-screen map (M) with click-to-travel.
 
+### Rigged people (src/skinned-people.js)
+
+The ten walkers nearest the camera (within 24 m) and the player on foot are low-poly characters by Quaternius (CC0),
+one skinned mesh each with the material colours in its vertex colours; everyone further away, and anyone with a pose
+(phone, chat, bike), a fall, a suitcase or in a conversation, stays the procedural instanced figure (person-model.js).
+Riding, falling and carrying, the player is the procedural figure too. `?procedural` turns the rigged ones off.
+- Files: `public/models/people/<name>.glb.gz` (gzipped GLB, unzipped in the browser: Cloudflare serves .glb uncompressed).
+  Today uses nine characters (1.3 MB), 1760 `M_Farmer`, `W_Medieval` and now and then `M_King`; the player is
+  `M_Casual_Hoodie` today, `M_Farmer` in 1760 (main.js, where the street life is created).
+- Two rigs: the men (M_*) and the women (W_*) share bone names, but the women's bones are turned differently, so each
+  has its own copy of the 9 clips (Walk, Run, Idle, Idle_Neutral, Wave, Interact, Punch_Right, HitRecieve, Death):
+  `anims.glb.gz` for M_*, `anims_w.glb.gz` for W_* (retargeted, feet planted). Clips play in place (Root never moves).
+- Rebuild from the Quaternius sources (the grand-theft-ladcykel assets: M_*.glb, W_*.glb, anims_h.glb):
+  `python3 scripts/people/ppl_build.py scripts/people <assets> <out>` (numpy only), check with `ppl_verify.py`, then
+  `gzip -9 -n` each output into public/models/people. The rest pose is rebuilt as the true T-pose (the sources store an
+  animation frame), Root on the ground between the feet, facing +Z; hand-held weapons go to `<out>/props` (not used).
+
 ## Performance knobs
 
 - `?quality=low` (or `?quality=1..3`) starts with the quality governor's steps applied: AO off, then bloom off
