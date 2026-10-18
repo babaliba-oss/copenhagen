@@ -513,9 +513,11 @@ function createFallbackBuildings(buildings=data.buildings){
 const FAR_START=TILE_LOD.visible-15;
 function createFarCity(buildings){
  if(!buildings.length)return;
- const material=new THREE.MeshLambertMaterial({vertexColors:true});
+ const material=new THREE.MeshLambertMaterial({vertexColors:true,flatShading:true}); // flat: face normals from derivatives, no normal attribute
+ // aFar = building centre (x, z) and radius: a building wholly inside FAR_START is dropped in the vertex shader, so
+ // the stand-ins near the camera (in view whenever their chunk is) no longer rasterise only to be discarded.
  material.onBeforeCompile=sh=>{sh.uniforms.uFarStart={value:FAR_START};
-  sh.vertexShader='varying vec3 vFarW;\n'+sh.vertexShader.replace('#include <worldpos_vertex>','#include <worldpos_vertex>\nvFarW=(modelMatrix*vec4(transformed,1.)).xyz;');
+  sh.vertexShader='varying vec3 vFarW;attribute vec3 aFar;uniform float uFarStart;\n'+sh.vertexShader.replace('#include <worldpos_vertex>','#include <worldpos_vertex>\nvFarW=(modelMatrix*vec4(transformed,1.)).xyz;if(distance(aFar.xy,cameraPosition.xz)+aFar.z<uFarStart)gl_Position=vec4(0.,0.,2.,1.);');
   sh.fragmentShader='uniform float uFarStart;varying vec3 vFarW;\n'+sh.fragmentShader.replace('void main() {','void main() {\nif(distance(vFarW.xz,cameraPosition.xz)<uFarStart)discard;');};
  material.customProgramCacheKey=()=>'far-city';
  const group=farCity=new THREE.Group();group.name='Far city (beyond the measured tiles)';group.visible=governor.level<4;cityModel.add(group);
@@ -526,10 +528,10 @@ function createFarCity(buildings){
  const roofColour=new THREE.Color(city.era===1760?'#7a3a2a':'#56504a'),wallColour=new THREE.Color();
  const build=list=>{
   let cap=0;for(const b of list){const r=b.rings[0];if(r&&r.length>=4)cap+=r.length*9;}
-  if(!cap)return;const P=new Float32Array(cap*3),N=new Float32Array(cap*3),Q=new Float32Array(cap*3);let v=0;
-  const put=(x,y,z,nx,ny,nz,c)=>{const o=v*3;P[o]=x;P[o+1]=y;P[o+2]=z;N[o]=nx;N[o+1]=ny;N[o+2]=nz;Q[o]=c.r;Q[o+1]=c.g;Q[o+2]=c.b;v++;};
+  if(!cap)return;const P=new Float32Array(cap*3),F=new Float32Array(cap*3),Q=new Uint8Array(cap*3);let v=0,fx=0,fz=0,fr=0;
+  const put=(x,y,z,nx,ny,nz,c)=>{const o=v*3;P[o]=x;P[o+1]=y;P[o+2]=z;F[o]=fx;F[o+1]=fz;F[o+2]=fr;Q[o]=c.r*255+.5;Q[o+1]=c.g*255+.5;Q[o+2]=c.b*255+.5;v++;};
   for(const b of list){const bb=b.bbox,cx=(bb[0]+bb[2])/2,cz=(bb[1]+bb[3])/2,ring=b.rings[0];if(!ring||ring.length<4)continue;
-   let m=ring.length;if(ring[0][0]===ring[m-1][0]&&ring[0][1]===ring[m-1][1])m--;if(m<3)continue;
+   fx=cx;fz=cz;fr=Math.hypot(bb[2]-bb[0],bb[3]-bb[1])/2+1;let m=ring.length;if(ring[0][0]===ring[m-1][0]&&ring[0][1]===ring[m-1][1])m--;if(m<3)continue;
    const flat=new Array(m*2);for(let i=0;i<m;i++){flat[i*2]=cx+(ring[i][0]-cx)*.985;flat[i*2+1]=cz+(ring[i][1]-cz)*.985;} // a hair inside the measured walls
    let area=0;for(let i=0,j=m-1;i<m;j=i++)area+=flat[j*2]*flat[i*2+1]-flat[i*2]*flat[j*2+1];if(Math.abs(area)<1e-6)continue;
    const h=Math.max(3,(b.height>2?Math.min(60,b.height):12)-.6),base=footprintBase(b.rings),top=base+h,s=area>0?1:-1;
@@ -541,7 +543,7 @@ function createFarCity(buildings){
    const tri=earcut(flat);
    for(let t=0;t<tri.length;t+=3){let a=tri[t],c=tri[t+1],d=tri[t+2];const ux=flat[c*2]-flat[a*2],uz=flat[c*2+1]-flat[a*2+1],wx=flat[d*2]-flat[a*2],wz=flat[d*2+1]-flat[a*2+1];if(uz*wx-ux*wz<0){const x=c;c=d;d=x;} // facing up
     put(flat[a*2],top,flat[a*2+1],0,1,0,roofColour);put(flat[c*2],top,flat[c*2+1],0,1,0,roofColour);put(flat[d*2],top,flat[d*2+1],0,1,0,roofColour);}}
-  if(!v)return;const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.BufferAttribute(P.slice(0,v*3),3));g.setAttribute('normal',new THREE.BufferAttribute(N.slice(0,v*3),3));g.setAttribute('color',new THREE.BufferAttribute(Q.slice(0,v*3),3));
+  if(!v)return;const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.BufferAttribute(P.slice(0,v*3),3));g.setAttribute('aFar',new THREE.BufferAttribute(F.slice(0,v*3),3));g.setAttribute('color',new THREE.BufferAttribute(Q.slice(0,v*3),3,true));
   g.computeBoundingSphere();g.computeBoundingBox();const m=new THREE.Mesh(g,material);m.name='Far city chunk';m.matrixAutoUpdate=false;m.updateMatrix();group.add(m);};
  const step=()=>{if(gameIsStopped())return;const t0=performance.now();while(lists.length&&performance.now()-t0<6)build(lists.pop());if(lists.length)(window.requestIdleCallback||setTimeout)(step,{timeout:200});else console.info('Far city built',group.children.length,'chunks');};
  step();
@@ -1087,7 +1089,7 @@ function frame(now){
  }else{camera.position.set(focus.x+Math.sin(heading)*behind,height,focus.z+Math.cos(heading)*behind);camera.lookAt(focus);}
  trimDraws(now);
  {const progs=renderer.info.programs;if(progs&&progs.length!==keptPrograms){for(const pr of progs)if(!pr.__kept){pr.__kept=true;pr.usedTimes++;}keptPrograms=progs.length;}} // compiled shaders are never released: a bus sign, a tile or a landmark leaving and coming back no longer recompiles (100-300 ms stall each)
- {shadowTick=(shadowTick+1)%2;renderer.shadowMap.needsUpdate=!started||captureMode||resolution.smoothed<19||shadowTick===0;} // the shadow pass re-draws every caster: half as often when frames run long
+ {shadowTick=(shadowTick+1)%2;renderer.shadowMap.needsUpdate=!started||captureMode||resolution.smoothed<40||shadowTick===0;} // every frame (alternating heavy and light frames paced unevenly: 1 then 2 vsyncs); every second frame only below ~25 fps
  if(cinematic){if(paused)setPaused(false);if(!started)start();cinematic.update(Math.min(.5,frameMs/1000));} // wall-clock pacing; the trailer never waits on a pause or a start-point preview
  if(inspectionCamera){camera.position.set(...inspectionCamera.eye);camera.lookAt(...inspectionCamera.target);}
  {const pose=roadblock?.cameraPose()||finale.cameraPose(car);if(pose){camera.position.set(...pose.position);camera.lookAt(...pose.target);}} // arrest cinematic orbit
@@ -1468,6 +1470,7 @@ async function boot(){
     setStart({name:'Street inspection',district:'Helsinki',x,z,heading});cameraLook=0;setPaused(true);
    };
    if(import.meta.env.DEV)window.openCityDrive.waterMask=WATER_MASK;
+   if(import.meta.env.DEV)window.openCityDrive.tileLod=(bands={})=>{Object.assign(TILE_LOD,bands);for(const g of loadedTiles.values())applyTileLod(g,g.userData.level||'near',focus);return {...TILE_LOD};}; // tune LOD bands live
    if(import.meta.env.DEV)window.openCityDrive.teleport=(x,z,heading=0)=>{let best=null,d=Infinity;for(const n of mobility.roads.nodes){const q=(n[0]-x)**2+(n[1]-z)**2;if(q<d){d=q;best=n;}}setStart({name:'Teleport',district:city.name,x:best[0],z:best[1],heading});};
    if(import.meta.env.DEV)window.openCityDrive.inspectCamera=({eye,target})=>{
     if(![...eye,...target].every(Number.isFinite)||!insidePlayable(eye[0],eye[2]))throw Error('Invalid reference camera');
