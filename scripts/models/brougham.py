@@ -15,7 +15,7 @@ m = s.geometry[gn].copy(); m.apply_transform(T)
 S, ZC, ZOFF = 1.25, -0.203, 0.34
 def game(p): return np.stack([-(p[:, 2] - ZC) * S, (p[:, 1] + 0.01) * S, p[:, 0] * S + ZOFF], 1)
 P = game(np.asarray(m.vertices)); N = np.asarray(m.vertex_normals); N = np.stack([-N[:, 2], N[:, 1], N[:, 0]], 1)
-UV = np.asarray(m.visual.uv, np.float32).copy()
+UV = np.asarray(m.visual.uv, np.float32).copy(); UV[:, 1] = 1 - UV[:, 1]  # trimesh keeps v up; glTF (and three with flipY=false) wants v down
 F = np.asarray(m.faces, np.uint32)
 # Wheels are their own connected parts (rim, spokes, hub, caps), centred on an axle: mark them per vertex (_WHEEL = index,
 # -1 for the body) so the springs and steps beside a wheel never turn with it.

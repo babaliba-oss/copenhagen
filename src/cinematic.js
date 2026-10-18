@@ -31,7 +31,7 @@ export const SHOTS=[
  {name:'Gammel Strand',drive:{from:[220,262],toward:[100,285]},cam:'wheel',dur:4},
  {name:'Nissefar',at:[207,-584],dur:4,orbit:{follow:'nisse',c:[207.6,-584.5],r:[3,2.3],h:[1.1,.85],a:[2.6,3.6]},look:[207.6,.55,-584.5]},
  {name:'Kongens Nytorv west',drive:{from:[560,-95],toward:[598,30]},cam:'top',dur:4},
- {name:'Andersen statue',era:'today',at:[-427,520],dur:4,orbit:{c:[-427.1,520.1],r:[4.4,3.4],h:[1.9,1.5],a:[-1.3,-.2]},look:[-427.1,1.2,520.1]},
+ {name:'Andersen statue',era:'today',at:[-427,520],dur:4,orbit:{c:[-427.1,520.1],r:[4.6,3.6],h:[2.3,2],a:[1.95,2.85]},look:[-427.1,1.75,520.1]}, // he faces south-east (landmarks.js rot -.725, the model faces -Z)
  {name:'Rådhuspladsen',era:'today',drive:{from:[-286,664],toward:[-83,843]},cam:'heli',dur:4},
  {name:'Strøget',at:[130,140],dur:4,eye:[[152,1.7,172],[134,1.7,152]],target:[[110,1.5,122],[100,1.5,118]]},
  {name:'Harbour',at:[1060,330],dur:5,eye:[[1000,5,250],[1062,4,312]],target:[[1150,3,450],[1182,3,482]]},
@@ -68,7 +68,7 @@ export function pickShots(era,search='',list=SHOTS){
 // ground(x,z): terrain height; roads(): the road graph; teleport(x,z,heading): start the player's car there (a new
 // start: traffic and streaming follow); place(x,z,heading,speed): move it there this frame (while it drives); setCamera({eye,target}|null); loaded(): tiles in; clear(x,z): no building there (a side camera
 // goes to the open side of the street).
-export function createCinematic({doc=document,ground,teleport,place=null,roads=()=>null,cars=()=>null,clear=()=>true,solid=null,setCamera,loaded,era=null,shots=SHOTS,speed=null,onEnd=()=>{},setSky=null,setSeason=null,hud=null,find=()=>null}){
+export function createCinematic({doc=document,ground,teleport,place=null,roads=()=>null,cars=()=>null,clear=()=>true,solid=null,setCamera,loaded,era=null,shots=SHOTS,speed=null,onEnd=()=>{},setSky=null,setSeason=null,hud=null,find=()=>null,wait=[2.5,14]}){
  const style=doc.createElement('style');
  style.textContent='body.cinematic *{visibility:hidden!important;cursor:none!important}body.cinematic canvas#world,body.cinematic #cine-fade{visibility:visible!important}body.cinematic.cine-radio #radio-now,body.cinematic.cine-radio #radio-now *,body.cinematic.cine-quest #cph-banner,body.cinematic.cine-quest #cph-banner *,body.cinematic.cine-quest #cph-saga,body.cinematic.cine-quest #cph-saga *{visibility:visible!important}#cine-fade{position:fixed;inset:0;background:#000;z-index:100;opacity:1;transition:opacity .35s;pointer-events:none}';
  doc.head.append(style);doc.body.classList.add('cinematic');
@@ -114,7 +114,7 @@ export function createCinematic({doc=document,ground,teleport,place=null,roads=(
   hold(n,u=.5){if(!(n>=0&&n<shots.length))return;i=n-1;next();const s=shots[n];if(drive){for(let k=0;k<Math.round(s.dur*30*u);k++)car=drive.step(1/30);place?.(car.x,car.z,car.heading,0);}phase='hold';fade.style.opacity='0';show(pose(s,u),true);if(s.hud){hudOn=s.hud;doc.body.classList.add('cine-'+s.hud);hud?.(s.hud,true,s);}},
   update(dt){
    if(phase==='done'||i<0)return;const s=shots[i];if(phase==='hold'){show(pose(s,.5),true);return;}
-   if(phase==='wait'){waited+=dt;show(pose(s,0),true);if(waited>2.5&&(loaded()||waited>14)){phase='play';fade.style.opacity='0';if(s.hud){hudOn=s.hud;doc.body.classList.add('cine-'+s.hud);hud?.(s.hud,true,s);}}return;}
+   if(phase==='wait'){waited+=dt;show(pose(s,0),true);if(waited>wait[0]&&(loaded()||waited>wait[1])){phase='play';fade.style.opacity='0';if(s.hud){hudOn=s.hud;doc.body.classList.add('cine-'+s.hud);hud?.(s.hud,true,s);}}return;}
    t+=dt;const u=Math.min(1,t/s.dur);
    if(drive){car=drive.step(dt,cars());place?.(car.x,car.z,car.heading,drive.speed);}
    show(pose(s,u),false,dt);
