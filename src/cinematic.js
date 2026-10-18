@@ -100,7 +100,7 @@ export function createCinematic({doc=document,ground,teleport,place=null,roads=(
   return right>=left?1:-1;};
  let hudOn=null;const hudOff=()=>{if(!hudOn)return;doc.body.classList.remove('cine-'+hudOn);hud?.(hudOn,false);hudOn=null;};
  const next=()=>{hudOff();i++;if(i>=shots.length){phase='done';fade.style.opacity='1';setCamera(null);setSky?.('golden');onEnd();return;}
-  const s=shots[i];setSky?.(s.sky||'golden');if(s.season!==undefined)setSeason?.(s.season);phase='wait';t=0;waited=0;fade.style.opacity='1';drive=null;car=null;eye0=null;sm.eye=null;
+  const s=shots[i];setSky?.(s.sky||'golden');setSeason?.(s.season||null); /* the date's own season stays out of the other shots: in October every golden-hour street had pumpkins, and the Halloween shot was nothing new */phase='wait';t=0;waited=0;fade.style.opacity='1';drive=null;car=null;eye0=null;sm.eye=null;
   if(s.drive&&roads())drive=drives(s);
   if(drive){car=drive.pose();side=s.side??(s.cam==='side'||s.cam==='pass'||s.cam==='wheel'?openSide(s):1);
    if(s.cam==='pass'){const probe=drives(s);let p=probe.pose();for(let k=0;k<Math.round(s.dur*30*.5);k++)p=probe.step(1/30);

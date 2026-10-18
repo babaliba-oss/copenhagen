@@ -239,6 +239,29 @@ test('dry samples at sea-bed height outside the mapped water are raised to quay 
  assert.ok(Math.abs(ground[4]-(-4.4))<1e-6);      // x=+4: dry, raised to water+1.6
 });
 
+test('a pond level spread above a flat square does not lift single samples out of the square', async () => {
+ const {raiseDryHollows}=await import('../src/terrain.js');
+ // flat square at 0.4 above a harbour (sea level -6, the south rows); a pond in the middle column whose level (0.5)
+ // the model spread over the samples beside it
+ const size=15,ground=new Float32Array(size*size).fill(.4),water=new Float32Array(size*size).fill(NaN);
+ for(let j=0;j<=8;j++)for(let i=6;i<=8;i++)water[j*size+i]=.5;
+ for(let j=10;j<size;j++)for(let i=0;i<size;i++){water[j*size+i]=-6;ground[j*size+i]=-8;}
+ const n=raiseDryHollows((x,z)=>z>=9||Math.abs(x)<1&&z<=3,{shelf:false},{size,cell:3,extent:21,ground,water});
+ assert.equal(n,0);
+ for(let j=0;j<10;j++)for(let i=0;i<size;i++)assert.ok(Math.abs(ground[j*size+i]-.4)<1e-6,`the square stays flat (${i},${j}: ${ground[j*size+i]})`);
+});
+
+test('a bank deeper than maxRaise is raised by maxRaise, not left as a cliff, and never above the ground behind it', async () => {
+ const {levelBanks}=await import('../src/terrain.js');
+ const size=24,cell=3,extent=36,ground=new Float32Array(size*size),water=new Float32Array(size*size).fill(NaN);
+ // water west of x=0; a long even slope rising 0.7 m per cell inland (a rampart), no flat land within reach
+ for(let j=0;j<size;j++)for(let i=0;i<size;i++){const x=-extent+i*cell,k=j*size+i;water[k]=x<15?-1:NaN;ground[k]=x<0?-3:x/cell*.7;}
+ levelBanks((x,z)=>x<0,{shelf:false},{size,cell,extent,ground,water});
+ const row=[];for(let i=0;i<size;i++){const x=-extent+i*cell;if(x>=0)row.push(ground[12*size+i]);}
+ for(let i=1;i<row.length;i++)assert.ok(row[i]>=row[i-1]-1e-6,`no ridge: ${row.map(v=>v.toFixed(2)).join(' ')}`);
+ for(let i=1;i<row.length;i++)assert.ok(row[i]-row[i-1]<=.7+1e-6,`no cliff steeper than the slope: ${row.map(v=>v.toFixed(2)).join(' ')}`);
+});
+
 test('the first water sample beside a quay takes the quay height (no slope into the canal)', async () => {
  const {raiseDryHollows}=await import('../src/terrain.js');
  const size=5,ground=new Float32Array(size*size),water=new Float32Array(size*size).fill(-6);

@@ -54,6 +54,16 @@ test('each era gets its own shots, and ?shots= picks some by name or index',()=>
  assert.ok(today.findIndex(s=>s.season==='christmas')>today.findIndex(s=>s.name==='The city from above'),'Christmas comes last: the snow stays');
 });
 
+test('only the seasonal shots carry a season: the others switch the date\'s decorations off',async()=>{
+ const {createCinematic}=await import('../src/cinematic.js');
+ const el=()=>({style:{},classList:{add(){},remove(){}},append(){}}),doc={createElement:el,head:el(),body:el()},calls=[];
+ const still={eye:[[0,2,0],[1,2,0]],target:[[9,1,0],[9,1,1]],dur:1};
+ const c=createCinematic({doc,ground:()=>0,teleport(){},setCamera(){},loaded:()=>true,wait:[0,0],setSeason:n=>calls.push(n),
+  shots:[{name:'a',...still},{name:'b',season:'halloween',...still},{name:'c',...still}]});
+ c.start();for(let k=0;k<200&&c.phase!=='done';k++)c.update(.05);
+ assert.deepEqual(calls,[null,'halloween',null]);
+});
+
 test('the camera stays out of houses: it stops short of a wall between it and the subject, with room around the lens',async()=>{
  const {clearEye}=await import('../src/cinematic.js');
  const wall=(x,z,y)=>x>=5&&x<=8&&y<20; // a house from x=5 to 8
