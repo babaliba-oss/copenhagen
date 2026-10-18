@@ -22,7 +22,9 @@ export function shellNormals(array,ranges){
 //  far    — one merged measured shell per texture atlas: same walls and roofs, no windows, no shadows
 //  hidden — beyond the fogged distance
 // Authored landmark fronts inside tiles (shell meshes with the 'detail' role) stay visible at every level.
-export const LOD={near:240,far:290,visible:550,detail:180,shadow:95}; // shadow 130 -> 95 m: building shells beyond cast no shadow (draw calls)
+export const LOD={near:240,far:290,visible:550,detail:180,shadow:95,building:140}; // shadow 130 -> 95 m: building shells beyond cast no shadow (draw calls)
+// building: a landed detailed building further than this (plus 20 m of hysteresis on the way out) hands back to its
+// tile's merged shell, one draw for the whole tile: near tiles drew every detailed building out to ~290 m.
 
 export function tileLevel(previous,distance,bands=LOD){
  if(distance>bands.visible)return 'hidden';
@@ -83,7 +85,8 @@ export function createMergedShells(array,parts,textures,mask=null,normals=null){
 export function applyTileLod(group,level,focus,bands=LOD){
  group.userData.level=level;group.visible=level!=='hidden';
  if(!group.visible)return level;
- for(const mesh of group.children)applyMeshLod(mesh,level,focus,bands);
+ for(const mesh of group.children)if(!mesh.userData.lod)applyMeshLod(mesh,level,focus,bands);
+ for(const mesh of group.children)if(mesh.userData.lod)applyMeshLod(mesh,level,focus,bands); // after the buildings: they decide which parts the merged shell shows
  return level;
 }
 // One mesh at its tile's level (newly landed detail does not need the whole tile walked again).
@@ -99,8 +102,12 @@ export function applyMeshLod(mesh,level,focus,bands=LOD){
   mesh.castShadow=waiting&&!u.castByTile&&u.tileBox.distanceToPoint(focus)<bands.shadow;return;}
  const d=u.box.distanceToPoint(focus);
  if(u.source){mesh.visible=level==='near';mesh.castShadow=mesh.visible&&!u.castByTile&&d<bands.shadow;return;}
+ // A landed building (part index and tile mask set by main.js) beyond bands.building is drawn by the merged shell:
+ // its own meshes hide and its part is unmasked. The decision lives on the building's shared occlusion state.
+ const o=u.occlusion;let detailed=true;
+ if(u.mask&&u.part!==undefined&&o){const want=level==='near'&&d<bands.building+(o.detailed===false?0:20);if(o.detailed!==want){o.detailed=want;if(mesh.parent)u.mask.set(u.part,want?0:1);}detailed=want;}
  const hero=!!u.shell&&u.role==='detail';
- mesh.visible=level==='near'?!!(u.shell||u.provisional||d<bands.detail):hero;
+ mesh.visible=level==='near'?detailed&&!!(u.shell||u.provisional||d<bands.detail):hero;
  mesh.castShadow=!!u.shell&&!u.castByTile&&level==='near'&&mesh.visible&&d<bands.shadow;
 }
 

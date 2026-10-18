@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
-import {LOD,tileLevel,mergedShellRanges,createMergedShells,applyTileLod,applyTreeLod,treeLeafDetail,createStaticShadowCuller,freezeTileGroup} from '../src/tile-lod.js';
+import {LOD,tileLevel,mergedShellRanges,createMergedShells,applyTileLod,applyTreeLod,treeLeafDetail,createStaticShadowCuller,freezeTileGroup,createShellMask} from '../src/tile-lod.js';
 import {createSourceShell,materialiseBuilding} from '../src/building-loader.js';
 import {tilePriority,aheadPoint,createFrameQueue,createDetailScheduler} from '../src/tile-streaming.js';
 
@@ -136,4 +136,17 @@ test('meshes whose tile shadow casters cast for them never cast themselves; cast
  applyTileLod(group,'near',focus);
  assert.ok(group.children.filter(m=>m!==caster).every(m=>!m.castShadow),'nothing but the caster casts');
  assert.equal(caster.visible,false);assert.equal(caster.castShadow,true);
+});
+
+test('landed buildings beyond LOD.building hand back to the merged shell, with hysteresis',()=>{
+ const textures=new Map([['a.jpg',new THREE.Texture()]]),parts=[part(0,6,'a.jpg','p0'),part(6,6,'a.jpg','p1')],mask=createShellMask(parts.length),group=new THREE.Group();
+ group.add(...createMergedShells(array,parts,textures,mask));
+ const building={part:parts[0],windows:0,meshes:[{attributes:{position:{array:new Float32Array(9),itemSize:3,normalized:false}},shell:true,role:'facade',material:{color:0xffffff,roughness:.8,metalness:0,side:2,vertexColors:false,textured:true}}]};
+ const meshes=materialiseBuilding(building,textures);for(const m of meshes){m.userData.part=0;m.userData.mask=mask;}group.add(...meshes);mask.set(0,0);mask.set(1,0); // both parts landed
+ const lod=group.children.find(m=>m.userData.lod),at=x=>new THREE.Vector3(10+x,0,5); // x metres east of the part's box
+ applyTileLod(group,'near',at(20));assert.ok(meshes[0].visible);assert.equal(mask.get(0),0);assert.equal(lod.visible,false,'everything detailed: no merged shell');
+ applyTileLod(group,'near',at(LOD.building+10));assert.ok(meshes[0].visible,'inside the hysteresis band it stays detailed');
+ applyTileLod(group,'near',at(LOD.building+30));assert.equal(meshes[0].visible,false);assert.equal(mask.get(0),1);assert.ok(lod.visible,'the merged shell draws it now');
+ applyTileLod(group,'near',at(LOD.building+10));assert.equal(meshes[0].visible,false,'and does not flick back inside the band');
+ applyTileLod(group,'near',at(LOD.building-10));assert.ok(meshes[0].visible);assert.equal(mask.get(0),0);assert.equal(lod.visible,false);
 });

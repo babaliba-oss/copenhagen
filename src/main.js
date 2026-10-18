@@ -234,7 +234,7 @@ const governor=createQualityGovernor([
  ()=>{if(post?.targets.scene.samples){post.targets.scene.samples=0;post.targets.scene.dispose();}},
  // Last: detailed buildings, building shadows and the far-shell ring pulled in (dense blocks such as Nyhavn
  // and Strøget otherwise stay heavy whatever the resolution). Tiles pick it up on their next LOD pass.
- ()=>{Object.assign(TILE_LOD,{near:170,far:210,detail:130,shadow:70});if(farCity)farCity.visible=false;},
+ ()=>{Object.assign(TILE_LOD,{near:170,far:210,detail:130,shadow:70,building:100});if(farCity)farCity.visible=false;},
 ]);
 {const q=new URLSearchParams(location.search).get('quality'),n=q==='low'?9:+q||0;for(let i=0;i<n;i++)governor.update(99,{atMin:true,smoothed:99});} // ?quality=low (or 1-3 steps)
 let look=null;
@@ -622,13 +622,14 @@ async function detailTile(group){
  const shells=new Map(group.userData.waiting.map(w=>[w.start,w])); // ids repeat within a tile; vertex starts do not
  for(const b of buildings)uploads.push(()=>{
   if(loadedTiles.get(t.file)!==group)return;
-  const meshes=materialiseBuilding(b,textures);for(const m of meshes){m.userData.castByTile=true;freezeMesh(m);applyMeshLod(m,group.userData.level,focus);} // the tile's shadow casters cast for them
+  const w=shells.get(b.part.start),meshes=materialiseBuilding(b,textures);
+  for(const m of meshes){m.userData.castByTile=true;if(w){m.userData.part=w.i;m.userData.mask=group.userData.mask;}freezeMesh(m);applyMeshLod(m,group.userData.level,focus);} // the tile's shadow casters cast for them; far ones stay with the merged shell (LOD.building)
   // Shaders compile in the background first (parallel compile where the GPU offers it); a variant never seen
   // before no longer stalls a frame, the building just lands a moment later.
   const land=()=>{if(loadedTiles.get(t.file)!==group){for(const m of meshes){m.geometry.dispose();disposeMaterial(m.material);}return;}
-   const w=shells.get(b.part.start);if(w){group.userData.mask.set(w.i,0);w.landed=true;group.userData.waiting=group.userData.waiting.filter(x=>x!==w);}
+   if(w){group.userData.mask.set(w.i,meshes[0]?.userData.occlusion?.detailed===false?1:0);w.landed=true;group.userData.waiting=group.userData.waiting.filter(x=>x!==w);}
    group.add(...meshes);group.userData.windows+=b.windows;
-   if(!group.userData.mask.shown)for(const m of group.children)if(m.userData.lod)applyMeshLod(m,group.userData.level,focus);};
+   for(const m of group.children)if(m.userData.lod)applyMeshLod(m,group.userData.level,focus);};
   // compileAsync walks the whole scene for its lights on every call: once per landing building that was a full
   // scene traversal several times a frame while a tile's buildings streamed in (the stalls when driving into new
   // areas). Only material variants not seen before go through it now; the rest land straight away.
