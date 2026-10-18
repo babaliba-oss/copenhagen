@@ -80,7 +80,7 @@ export function createCinematic({doc=document,ground,teleport,place=null,roads=(
  const pace=speed??(era===1760?7:14); // m/s: town traffic today, a coach and pair at a brisk trot in 1760
  const size=era===1760?{front:3.4,half:1}:{front:2.4,half:1}; // the car's nose (a coach's horses) ahead of its centre, and its half width
  const drives=s=>createCineDrive(roads(),{from:s.drive.from,toward:s.drive.toward,speed:s.drive.speed??pace,...size});
- let i=-1,phase='wait',t=0,waited=0,drive=null,car=null,side=1,eye0=null;const sm={eye:null,target:null};
+ let i=-1,phase='wait',t=0,waited=0,drive=null,car=null,side=1,eye0=null,holdU=.5;const sm={eye:null,target:null};
  const fromRig=(s,u)=>{const r=rigPose(s.cam,car,u,{side});const g=ground(car.x,car.z);
   const eye=s.cam==='pass'&&eye0?eye0:[r.eye[0],Math.max(ground(r.eye[0],r.eye[2]),g-.4)+r.eye[1],r.eye[2]];
   return {eye:s.cam==='pass'?eye:clearEye(eye,[car.x,g+1.1,car.z],solid),target:[r.target[0],g+r.target[1],r.target[2]]};};
@@ -116,9 +116,9 @@ export function createCinematic({doc=document,ground,teleport,place=null,roads=(
   start(){next();},
   // checking shots: park on shot n at fraction u (the car placed where it would be)
   get shots(){return shots.map(s=>s.name);},
-  hold(n,u=.5){if(!(n>=0&&n<shots.length))return;i=n-1;next();const s=shots[n];if(drive){for(let k=0;k<Math.round(s.dur*30*u);k++)car=drive.step(1/30);place?.(car.x,car.z,car.heading,0);}phase='hold';fade.style.opacity='0';show(pose(s,u),true);if(s.hud){hudOn=s.hud;doc.body.classList.add('cine-'+s.hud);hud?.(s.hud,true,s);}},
+  hold(n,u=.5){if(!(n>=0&&n<shots.length))return;i=n-1;next();const s=shots[n];if(drive){for(let k=0;k<Math.round(s.dur*30*u);k++)car=drive.step(1/30);place?.(car.x,car.z,car.heading,0);}phase='hold';holdU=u;fade.style.opacity='0';show(pose(s,u),true);if(s.hud){hudOn=s.hud;doc.body.classList.add('cine-'+s.hud);hud?.(s.hud,true,s);}},
   update(dt){
-   if(phase==='done'||i<0)return;const s=shots[i];if(phase==='hold'){show(pose(s,.5),true);return;}
+   if(phase==='done'||i<0)return;const s=shots[i];if(phase==='hold'){show(pose(s,holdU),true);return;}
    if(phase==='wait'){waited+=dt;show(pose(s,0),true);if(waited>wait[0]&&(loaded()||waited>wait[1])){phase='play';fade.style.opacity='0';if(s.hud){hudOn=s.hud;doc.body.classList.add('cine-'+s.hud);hud?.(s.hud,true,s);}}return;}
    t+=dt;const u=Math.min(1,t/s.dur);
    if(drive){car=drive.step(dt,cars());place?.(car.x,car.z,car.heading,drive.speed);}

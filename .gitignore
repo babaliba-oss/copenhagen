@@ -18,3 +18,5 @@ docs/RELEASE_REVIEW.md
 # Blender working files: rebuild with scripts/build-senate-assets.py (they record local paths)
 *.blend
 *.blend1
+
+__pycache__/

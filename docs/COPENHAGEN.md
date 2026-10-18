@@ -91,7 +91,12 @@ partly covered one (a courtyard or back lot taken in) to the part you see. House
 (`kind: 'model'`, the roof plan 0.3 m in from the eaves, minus the carriageway), so Nyboder's rows and thousands of back houses
 are no longer drive-through. Checks: `scripts/collider-sweep.mjs <city>` (walls you hit but cannot see, houses you can drive
 through) and `scripts/bridge-sweep.mjs <city> [--fix]` (bridge decks drawn over water with no ground under them; the game
-raises the ground under every drawn deck, terrain.js `raiseBridgeDecks`).
+raises the ground under every drawn deck, terrain.js `raiseBridgeDecks`) and `scripts/ground-crease-sweep.mjs <city>
+[--raw]` (steps and spikes in the ground under streets and pavements, which showed as crumpled paving). The ground fixes
+at load (terrain.js) never lift a sample above the dry ground around it (`raiseDryHollows`: a pond or canal level spread
+over a square had lifted single samples 2 m out of Højbro Plads and Gråbrødretorv), and a bank deeper than `maxRaise` is
+raised by that much with nothing ending above the ground one step inland (`levelBanks`: no cliff where the raise
+stopped, no ridge on the ramparts).
 
 `<kk data dir>` holds the City of Copenhagen registers (CC BY 4.0): `wires.gpkg`, `masts.gpkg`,
 `streettrees.json`, `furniture_p.json`, `bikeracks.json` and `save.json` (WFS `k101:fredede_bygninger_save`).
@@ -155,8 +160,8 @@ one skinned mesh each with the material colours in its vertex colours; everyone 
 (phone, chat, bike), a fall, a suitcase or in a conversation, stays the procedural instanced figure (person-model.js).
 Riding, falling and carrying, the player is the procedural figure too. `?procedural` turns the rigged ones off.
 - Files: `public/models/people/<name>.glb.gz` (gzipped GLB, unzipped in the browser: Cloudflare serves .glb uncompressed).
-  Today uses nine characters (1.3 MB), 1760 `M_Farmer`, `W_Medieval` and now and then `M_King`; the player is
-  `M_Casual_Hoodie` today, `M_Farmer` in 1760 (main.js, where the street life is created).
+  Today uses ten characters (with Daniel's cool-man), 1760 `W_Medieval` for the women and Daniel's costumes for every man
+  (below); the player is `M_Casual_Hoodie` today and `R_Coat_Blue` in 1760 (main.js, where the street life is created).
 - Two rigs: the men (M_*) and the women (W_*) share bone names, but the women's bones are turned differently, so each
   has its own copy of the 9 clips (Walk, Run, Idle, Idle_Neutral, Wave, Interact, Punch_Right, HitRecieve, Death):
   `anims.glb.gz` for M_*, `anims_w.glb.gz` for W_* (retargeted, feet planted). Clips play in place (Root never moves).
@@ -168,7 +173,12 @@ Riding, falling and carrying, the player is the procedural figure too. `?procedu
   Quaternius bind applied to the avatar's bind turned into the same T-pose; the spine keeps the avatar's own rest).
   Build: `python3 scripts/people/rpm_build.py scripts/people <dhana.gltf> <anims.glb unzipped> <out>` (R_CoolMan + anims_r),
   then `costume_build.py scripts/people <dhana.gltf> <costume .glb (FBX2glTF) or scene.usdc> <textures dir> <R_name> <out>
-  [collar=1.30 neckz=-0.065 for the red coat] [coat=#hex]`, gzip -9 -n into public/models/people. Another Ready Player Me
+  [collar=1.30 neckz=-0.065 for the red coat] [coat= vest= drawers= hose= shoes= cravat=#hex] [hat=top] [hair=keep]
+  [detail=2.5]`, gzip -9 -n into public/models/people. `R_Coat_Blue` (the 1760 player), `R_Coat_Brown`, `R_Coat_Green` are
+  the red coat recoloured (blue with a buff waistcoat: `coat=#26365e vest=#cdbf98`; brown: `coat=#5b4330 vest=#8a7a5c
+  drawers=#4a3a2c`; green: `coat=#33473a vest=#d8d0bc`). `R_HCA` is H.C. Andersen at Nyhavn (main.js draws him rigged in
+  place of his generic figure): the red coat in black with dark trousers, a white cravat, a top hat and his own hair
+  (`coat=#17181f vest=#3b3430 drawers=#1b1b21 hose=#1b1b21 shoes=#141414 cravat=#ece9e2 hat=top hair=keep detail=2.5`). Another Ready Player Me
   avatar (same skeleton) can go through rpm_build.py the same way. Mix: `TODAY_MIX` / `PERIOD_MIX` in main.js.
 - Rebuild from the Quaternius sources (the grand-theft-ladcykel assets: M_*.glb, W_*.glb, anims_h.glb):
   `python3 scripts/people/ppl_build.py scripts/people <assets> <out>` (numpy only), check with `ppl_verify.py`, then

@@ -34,6 +34,20 @@ export async function loadPeopleModels(base,names){
  }catch(e){console.warn('Rigged people not loaded, the procedural crowd stays:',e?.message||e);return null;}
 }
 const RUN=2.6,IDLE=.15,FADE=.25;
+// One rigged figure standing in for a single character (H.C. Andersen): its own scene (no clone), Idle when it stands,
+// Walk or Run when it moves. update(dt, actor) follows the actor's position, heading and speed.
+export function createRiggedFigure(model,{height=1.8}={}){
+ const root=model.scene,mixer=new THREE.AnimationMixer(root),actions={},gait={};let state=null;
+ for(const k of ['Walk','Run','Idle'])if(model.clips[k])actions[k]=mixer.clipAction(model.clips[k]);
+ const k=height/model.height;root.scale.setScalar(k);root.name=`Rigged ${model.name}`;
+ return {root,update(dt,a){
+  if(!a||!Number.isFinite(a.x)){root.visible=false;return;}root.visible=true;
+  root.position.set(a.x,(a.groundY??.13)+groundAt(a.x,a.z),a.z);root.rotation.set(0,smoothHeading(gait,(a.heading||0)+Math.PI,dt),0);
+  const speed=Math.abs(a.speed||0),next=a.running||speed>RUN?'Run':speed>IDLE&&a.walking!==false?'Walk':'Idle';
+  if(next!==state&&actions[next]){actions[next].reset().setEffectiveWeight(1).play();if(state&&actions[state])actions[state].crossFadeTo(actions[next],FADE,false);state=next;}
+  const act=actions[state];if(act)act.timeScale=state==='Walk'?THREE.MathUtils.clamp(speed/(1.25*k),.55,1.7):state==='Run'?THREE.MathUtils.clamp(speed/(3.4*k),.7,1.6):1;
+  mixer.update(dt);}};
+}
 export function createSkinnedCrowd(lib,{max=10,range=24,pick=a=>a.id??0}={}){
  const group=new THREE.Group();group.name='Rigged pedestrians (nearest)';
  const pools=lib.models.map(()=>[]),slots=new Map(),drawn=new Set(),order=[];let total=0;

@@ -3,6 +3,7 @@
 # the costume, whose skin weights come from the avatar's nearest body/clothes vertex with the arms first lowered to the
 # costume's pose (then brought back to the avatar's bind pose by inverse skinning). Hair powdered, a tricorne on top.
 #   python3 scripts/people/costume_build.py scripts/people <dhana.gltf> <costume.glb> <costume textures dir> <name> <out dir> [coat=#hex]
+#   [vest= drawers= hose= shoes= cravat=#hex] [detail=2] [hat=top] [hair=keep]  (R_HCA: the red coat in black with dark trousers, a top hat, his own hair)
 import sys, os, json, numpy as np, trimesh
 sys.path.insert(0, sys.argv[1]); import ppl_glb as G
 _argv = sys.argv; sys.argv = [_argv[0], _argv[1], '/tmp/', '/tmp/']; import ppl_build as PB; sys.argv = _argv
@@ -85,12 +86,13 @@ else:
     T, gn = sc.graph[node]; g = sc.geometry[gn].copy(); g.apply_transform(T)
     name = next((k for k in TEX if node.startswith(k) or gn.startswith(k)), None)
     col = sample(f'{TEXDIR}/{TEX[name]}', g.visual.uv) if name else np.full((len(g.vertices), 3), .3)
-    if name == 'coat1' and 'coat' in opts:  # recolour the coat (keeps the texture's light and shade)
-        tint = lin(np.array([int(opts['coat'][i:i + 2], 16) for i in (1, 3, 5)]) / 255); lum = col.mean(1, keepdims=True); col = np.clip(lum / max(lum.mean(), 1e-3) * tint, 0, 1)
+    RECOLOUR = {'coat1': 'coat', 'decor_1': 'coat', 'Vest_karl': 'vest', 'Karl_decor_vest': 'vest', 'Drawers_karl': 'drawers', 'Man_hose_19th_century001': 'hose', 'Farn_shoe_R001': 'shoes', 'Farn_shoe_L001': 'shoes', 'Kravat_and_cuffs_and_hairband': 'cravat'}
+    if RECOLOUR.get(name) in opts:  # recolour a part (keeps the texture's light and shade): coat=#hex vest= drawers= hose= shoes=
+        hx = opts[RECOLOUR[name]]; tint = lin(np.array([int(hx[i:i + 2], 16) for i in (1, 3, 5)]) / 255); lum = col.mean(1, keepdims=True); col = np.clip(lum / max(lum.mean(), 1e-3) * tint, 0, 1)
     v0, f0 = np.asarray(g.vertices, np.float64), np.asarray(g.faces)
     if name == 'Kravat_and_cuffs_and_hairband':  # keep the cravat; the thin lace cuffs and the hair ribbon only turn into spikes when simplified
         keepf = (v0[f0][:, :, 1].mean(1) > .98) & (v0[f0][:, :, 2].mean(1) > -.05); f0 = f0[keepf]
-    v, f, c = decimate(v0, f0, col, BUDGET.get(name, 500))
+    v, f, c = decimate(v0, f0, col, int(BUDGET.get(name, 500) * float(opts.get('detail', 1))))  # detail=2: twice the triangles (one-off characters seen up close)
     parts.append((name or gn, v, f, c))
 CV = np.vstack([p[1] for p in parts]); offs = np.cumsum([0] + [len(p[1]) for p in parts])
 CF = np.vstack([p[2] + o for p, o in zip(parts, offs[:-1])]); CC = np.vstack([p[3] for p in parts])
@@ -168,17 +170,24 @@ for pr in prims:
     m = pr['mat']
     if 'Outfit' in m or 'Glasses' in m: continue
     c = pr['c'].copy()
-    if 'Hair' in m: c = np.clip(c * .25 + np.array([.62, .6, .56]), 0, 1)
+    if 'Hair' in m and opts.get('hair') != 'keep': c = np.clip(c * .25 + np.array([.62, .6, .56]), 0, 1)  # powdered (hair=keep: his own)
     keep.append(dict(pr, c=c))
 # tricorne, rigid on the head
 head = Bw['Head'][:3, 3]; hair_top = max(p['q'][:, 1].max() for p in prims if 'Hair' in p['mat'])
 hat = []
-crown = trimesh.creation.cylinder(radius=.1, height=.1, sections=14); crown.apply_translation([0, hair_top - .03, head[2] - .01]); hat.append(crown)
-for k in range(3):
+if opts.get('hat') == 'top':  # a tall black top hat (H.C. Andersen, 1830s-60s): slightly flared crown, narrow brim
+    upright = trimesh.transformations.rotation_matrix(-np.pi / 2, [1, 0, 0])  # trimesh builds cylinders along z
+    hz = head[2] - .012
+    for r, h, y in ((.1, .17, hair_top + .035), (.155, .012, hair_top - .046), (.102, .03, hair_top - .03)):  # crown, brim, band
+        cy = trimesh.creation.cylinder(radius=r, height=h, sections=20); cy.apply_transform(upright); cy.apply_translation([0, y, hz])
+        if h > .1: v = cy.vertices; v[:, [0, 2]] = (v[:, [0, 2]] - [0, hz]) * (1 + .09 * (v[:, 1:2] - (y - h / 2)) / h) + [0, hz]  # the crown flares a little upwards
+        hat.append(cy)
+for k in range(3 if opts.get('hat') != 'top' else 0):
     a = k * 2 * np.pi / 3
     e = trimesh.creation.box(extents=[.3, .085, .02]); e.apply_translation([0, .02, .115]); e.apply_transform(trimesh.transformations.rotation_matrix(-.35, [1, 0, 0]))
     e.apply_transform(trimesh.transformations.rotation_matrix(a, [0, 1, 0])); e.apply_translation([0, hair_top - .08, head[2] - .01]); hat.append(e)
-brim = trimesh.creation.cylinder(radius=.18, height=.014, sections=3); brim.apply_transform(trimesh.transformations.rotation_matrix(np.pi / 2, [0, 1, 0])); brim.apply_translation([0, hair_top - .08, head[2] - .01]); hat.append(brim)
+if opts.get('hat') != 'top':
+    brim = trimesh.creation.cylinder(radius=.18, height=.014, sections=3); brim.apply_transform(trimesh.transformations.rotation_matrix(np.pi / 2, [0, 1, 0])); brim.apply_translation([0, hair_top - .08, head[2] - .01]); hat.append(brim)
 hv = np.vstack([h.vertices for h in hat]); hf = np.vstack([h.faces + o for h, o in zip(hat, np.cumsum([0] + [len(h.vertices) for h in hat])[:-1])])
 hn = trimesh.Trimesh(hv, hf, process=False).vertex_normals
 keep.append(dict(mat='Hat', q=hv, n=np.asarray(hn), c=np.tile(lin(np.array([20, 18, 17]) / 255), (len(hv), 1)), idx=hf.reshape(-1),
