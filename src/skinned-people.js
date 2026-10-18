@@ -48,7 +48,7 @@ export function createSkinnedCrowd(lib,{max=10,range=24,pick=a=>a.id??0}={}){
   update(dt,viewer,actors,looks=[]){
    drawn.clear();if(!viewer||!actors?.length){for(const [a,s] of slots)release(a,s);return drawn;}
    order.length=0;
-   for(let i=0;i<actors.length;i++){const a=actors[i];if(!a.edge||a.knockdown||a.conversation||a.playerTaken||a.pose||a.suitcase)continue; // a pose (phone, chat, bike...) or a suitcase: the procedural figure draws itconst d=Math.hypot(a.x-viewer.x,a.z-viewer.z);if(d<range)order.push([d,i]);}
+   for(let i=0;i<actors.length;i++){const a=actors[i];if(!a.edge||a.knockdown||a.conversation||a.playerTaken||a.pose||a.suitcase)continue; /* a pose (phone, chat, bike...) or a suitcase: the procedural figure draws it */const d=Math.hypot(a.x-viewer.x,a.z-viewer.z);if(d<range)order.push([d,i]);}
    order.sort((p,q)=>p[0]-q[0]);if(order.length>max)order.length=max;
    const keep=new Set(order.map(([,i])=>actors[i]));
    for(const [a,s] of slots)if(!keep.has(a))release(a,s);
