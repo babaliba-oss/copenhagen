@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {existsSync,readFileSync} from 'node:fs';
 import {gunzipSync} from 'node:zlib';
 import {startSurfaces,startClear,laneStart} from '../src/start-placement.js';
+import {SpatialIndex} from '../src/geo.js';
 
 // A 7 m two-way street running north (−z), 3 m pavement each side, an island splitting it at the far end.
 const box=(x0,z0,x1,z1,kind,name)=>({kind,name,rings:[[[x0,z0],[x1,z0],[x1,z1],[x0,z1],[x0,z0]]]});
@@ -28,6 +29,20 @@ test('a start beside the pavement moves into the right-hand lane, facing the tra
  const r=laneStart({x:0,z:-60,heading:Math.PI},[{...north,lane:.35}],surfaces);
  assert.equal(r.heading,0);assert.ok(startClear(r,surfaces));
  assert.equal(laneStart({x:500,z:500,heading:0},[north],surfaces),null,'nothing nearby');
+});
+
+test('R recovers the car onto the nearest clear lane spot: past a building on the lane, off a parked car, within reach',()=>{
+ // A house built out over the northbound lane (z −70…−50): the car goes just past it, where its body and the 8 m ahead are clear.
+ const house=new SpatialIndex([box(.2,-70,3.4,-50,'Rakennus')]),walled={drive:surfaces.drive,blocked:{at:(x,z)=>surfaces.blocked.at(x,z)||house.at(x,z)}};
+ const p=laneStart({x:3.2,z:-60,heading:0},[north,south],walled,{step:1});
+ assert.ok(Math.abs(p.x-1.45)<1e-6&&p.heading===0&&p.z<=-72.9&&p.z>-75,`${p.x},${p.z},${p.heading}`);assert.ok(startClear(p,walled));
+ // Something standing in the lane (main.js: furniture, traffic) is ruled out by accept.
+ const q=laneStart({x:3.2,z:-60,heading:0},[north,south],surfaces,{step:1,accept:s=>Math.hypot(s.x-1.45,s.z+60)>=6});
+ assert.ok(Math.abs(q.x-1.45)<1e-6&&Math.abs(q.z+60)>=6&&Math.abs(q.z+60)<7,`${q.x},${q.z}`);
+ // Reach is distance: the only lane 45 m away runs the other way and still counts (turning round is a penalty, not a limit).
+ const r=laneStart({x:45,z:-60,heading:Math.PI},[{...north,lane:.35}],surfaces);
+ assert.ok(r&&r.heading===0&&Math.abs(r.x-.35)<1e-6,`${r?.x},${r?.heading}`);
+ assert.equal(laneStart({x:70,z:-60,heading:0},[north],surfaces),null,'nothing within 60 m: main.js falls back to the starting point');
 });
 
 const json=f=>JSON.parse(readFileSync(f)),unpack=f=>JSON.parse(gunzipSync(readFileSync(f))),INDEX='public/data/extensions/index.json';

@@ -93,7 +93,8 @@ Notes:
 - `characters.js` / `data.js`: authored characters and their dialogue, for both eras.
 - `carriage.js`: the 1760 coach (player) and NPC coaches (the horses' legs swing with each coach's pace; traffic
   spaces them by their 6.6 m length, `COACH_HALF_LENGTH`, not as cars).
-- `radio.js`: the car radio (L, Shift+L back): stations from `radio-stations.json` stream public-domain / CC0 / CC BY
+- `radio.js`: the car radio (L, Shift+L back, or click/tap the now-playing card at the top right; the last station is
+  remembered, station 1 on the first drive): stations from `radio-stations.json` stream public-domain / CC0 / CC BY
   recordings from the library that hosts them; each station loops on its own clock like a broadcast.
 - `landmarks.js`: Vor Frelsers stair, Børsen spire, Tivoli rides, statues, flags, 1760 windmills.
 - `parked-cars.js`, `boats.js`, `rails.js`, `trains.js`, `city-cyclists.js`, `cafes.js`: street life.

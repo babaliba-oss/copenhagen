@@ -3,7 +3,6 @@
 #travel-controls button{pointer-events:auto;background:#203932e8;color:#fff9ef;border:1px solid #ffffff45;border-radius:8px;padding:9px 12px;min-height:38px;font-family:inherit;font-size:12px;font-weight:600;box-shadow:0 2px 8px #0002}
 #travel-controls button:focus-visible{outline:3px solid #ffda82;outline-offset:3px}
 #travel-hint{font-size:12px;text-shadow:0 1px 4px #000,0 1px 4px #000;background:#203932bd;border-radius:5px;padding:6px 8px}
-body:not([data-travel=car]) .speedometer .battery-row,body:not([data-travel=car]) .speedometer .battery-track{visibility:hidden}
 @media(pointer:coarse){#travel-controls{left:12px;transform:none;align-items:flex-start;text-align:left;top:calc(105px + env(safe-area-inset-top,0px));bottom:auto;max-width:175px}#travel-controls button{min-height:44px}}
 @media(pointer:coarse) and (max-height:500px){#travel-controls{top:78px;left:12px}}
 @media(max-width:700px) and (pointer:fine){#travel-controls{bottom:150px}}

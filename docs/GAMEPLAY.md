@@ -16,7 +16,7 @@ meshes.
 | People and conversations | `src/people-interaction.js`, `src/conversation-dialogue.js`, `src/conversation-voice.js`, `src/people-interaction-ui.js` | Authored branches, visit memory, captions and optional installed speech voices |
 | Market stalls | `src/market-shop.js`, `src/market-shop-renderer.js`, `src/market-shop-ui.js` | Talk to sellers, choose from each stall's menu, buy and carry items |
 | Food and gull encounters | `src/gull-encounter.js`, `src/birds.js`, `src/bird-flight-clearance.js` | Nearby gulls gather, swoop toward ice cream and feed on a dropped cone |
-| Car physics | `src/physics.js`, `src/vehicles.js`, `src/vehicle-damage.js`, `src/battery.js` | Arcade model; `driveStep()` is pure and tested at 10/20/60 FPS |
+| Car physics | `src/physics.js`, `src/vehicles.js`, `src/vehicle-damage.js` | Arcade model; `driveStep()` is pure and tested at 10/20/60 FPS. No battery: the car never runs out |
 | Camera | `src/driving-camera.js` | Pure pose function shared with tests |
 | Road feel | `src/road-surface.js` | Cobblestone rumble from mapped sett polygons |
 | Traffic | `src/mobility.js`, `src/traffic-driving.js`, `src/traffic-renderer.js`, `src/crash-physics.js`, `src/angry-drivers.js` | Cars follow the city's lane network and signals |

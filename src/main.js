@@ -20,7 +20,9 @@ import {selectCity,useCity,pickStart,startUrl,dataUrl,registerCities,CITIES} fro
 import {createStartPicker,pickerStep} from './start-picker.js';
 import {createAdaptiveResolution} from './adaptive-quality.js';
 import {createQualityGovernor} from './quality-governor.js';
-import {makeCar,driveStep,simulationSteps,PLAYER_MAX_SPEED,displayedSpeedKmh} from './physics.js';
+import {makeCar,driveStep,simulationSteps,settleOnGround,PLAYER_MAX_SPEED,displayedSpeedKmh} from './physics.js';
+import {startSurfaces,laneStart} from './start-placement.js';
+import {boxesOverlap,carBox} from './lane-model.js';
 import {loadColouredModels,loadColouredParts,bakeColoured,loadColouredModel} from './coloured-models.js';
 import {setLadcykelBox} from './player-ride-models.js';
 import {setScooterModel} from './parked-micromobility.js';
@@ -130,7 +132,7 @@ import {Finale} from './finale.js';
 import {createRoadblock} from './roadblock.js';
 import {createMappedFurniture} from './mapped-furniture.js';
 import {createCycleMarks} from './cycle-marks.js';
-import {createRadio} from './copenhagen/radio.js';
+import {createRadio,storedStation,storeStation} from './copenhagen/radio.js';
 import {createPlace} from './place-scene.js';
 import {createSpeciesTrees} from './tree-species.js';
 import {createTreeTrunks} from './tree-trunks.js';
@@ -929,6 +931,24 @@ function setBusted(active){
  if(active){gullEncounter.reset();birds?.clearEncounter();paused=false;$('pause-overlay').hidden=true;roadblock?.startArrest(car);finale.arrest({car,police,knockables});}else{roadblock?.clearArrest();$('busted-overlay').classList.remove('live');finale.dismiss();$('world').focus();}
 }
 function reset(){if(!ready)return;setBusted(false);setStart(startPoint);toast('Back on the road.');}
+// R while driving (and the touch menu's reset): the car goes back on the road right here, GTA style, not to the start.
+// The nearest lane spot within 60 m, the lane facing the car's own way preferred (start-placement.js laneStart, as
+// the starting points are placed: body on the carriageway clear of kerbs and islands, room ahead, off junctions), also
+// clear of buildings, kiosks, parked cars, water, street furniture and traffic; there the car stands upright, stopped
+// and repaired. With no such spot in reach it is the old reset to the starting point, which R still is on foot or a ride.
+let laneSurfaces=null,laneSurfaceCount=-1;
+function recoverCar(){
+ if(!ready)return;if(travel?.mode!=='car'||!mobility){reset();return;}
+ const count=data.roads.length+data.pavement.length;if(count!==laneSurfaceCount){laneSurfaces=startSurfaces(data.roads,data.pavement);laneSurfaceCount=count;} // map extensions add streets as they stream in
+ const solid=(x,z)=>laneSurfaces.blocked.at(x,z)||world.buildings.at(x,z)||!world.roads.at(x,z)&&inWaterPolygons(world.water,x,z);
+ const bodies=[...travelObstacles(),...travel.parkedBodies()].map(v=>({x:v.x,z:v.z,heading:v.heading||0,hl:v.hl??v.halfLength??2.36,hw:v.hw??v.halfWidth??.98}));
+ const p=laneStart({x:car.x,z:car.z,heading:car.heading},mobility.roads.edges,{drive:laneSurfaces.drive,blocked:{at:solid}},{reach:60,step:2,tries:400,accept:q=>!world.objects?.overlap(q)&&!bodies.some(b=>boxesOverlap(carBox(q,.6),b))}); // a few ms; capped so a dense block never stalls a frame
+ if(!p){reset();return;}
+ cameraTransition={elapsed:0,position:camera.position.clone(),target:camera.position.clone().addScaledVector(camera.getWorldDirection(new THREE.Vector3()),6)}; // a short glide, not a cut
+ Object.assign(car,{x:p.x,z:p.z,heading:p.heading,speed:0,steer:0});settleOnGround(car);repairCar();
+ cameraHeading=driveCamera.heading=car.heading;driveCamera.shake=0;driveCamera.lastSpeed=0;
+ toast(city?.era===1760?'Coach recovered.':'Car recovered.');
+}
 // BUSTED screen: Continue (Enter/Esc) respawns on the spot — wanted cleared, car repaired, police gone and
 // any tram boxing the car in removed; Restart (R) is a clean restart at the chosen starting point.
 function repairCar(){if(!car)return;car.flat=0;car.damage=0;car.damageZones={front:0,rear:0,left:0,right:0};car.damageVersion=(car.damageVersion||0)+1;impacts.reset();}
@@ -971,7 +991,7 @@ window.addEventListener('keydown',e=>{
  if(mapOpen)return;
  if(cph&&started&&cph.key(e.code)){e.preventDefault();return;}
  if(e.code==='KeyY'&&started&&city?.id?.startsWith('copenhagen')){e.preventDefault();eraJump();return;}
- if(e.code==='KeyL'&&started&&radio){e.preventDefault();radio.next(e.shiftKey?-1:1);if(!sound)toast('Turn the sound on to hear the radio');return;} // car radio: next station (Shift: back)
+ if(e.code==='KeyL'&&started&&radio){e.preventDefault();tuneRadio(e.shiftKey?-1:1);return;} // car radio: next station (Shift: back)
  if(e.code==='KeyF'||e.code==='Enter'&&started){e.preventDefault();if(!paused)interactTravel();return;}
  if(e.code==='KeyG'){e.preventDefault();if(!talkToPerson())toast(fpsMeter.toggle()?'FPS meter on (P or G to hide)':'FPS meter off');return;}
  if(e.code==='KeyP'){e.preventDefault();toast(fpsMeter.toggle()?'FPS meter on (P to hide)':'FPS meter off');return;}
@@ -981,7 +1001,7 @@ window.addEventListener('keydown',e=>{
  if(e.code==='KeyU'&&soundscape?.music){const on=soundscape.music();try{localStorage.setItem('cph-music',on?'1':'0');}catch{}toast(on?'Music on (U)':'Music off (U)');return;}
  if(e.code==='KeyN'&&cph?.photo){e.preventDefault();const d=camera.getWorldDirection(new THREE.Vector3());cph.photo({dir:[d.x,d.z],snap:snapPhoto});return;}
  if(e.code==='KeyM'){showDialog('map-dialog');return;}
- if(e.code==='KeyR'){reset();return;}
+ if(e.code==='KeyR'){recoverCar();return;}
  if(e.code==='KeyC'){cycleCamera();return;}
  if(e.code==='KeyT'){look.cycle();toast(look.label);return;}
  if(e.code==='KeyH'){
@@ -1004,6 +1024,11 @@ $('world').addEventListener('wheel',e=>{e.preventDefault();zoom(Math.sign(e.delt
 $('sound-btn').addEventListener('click',async()=>{sound=!sound;peopleInteraction?.setVoiceEnabled(sound);if(sound&&!audioContext){audioContext=new AudioContext();oscillator=audioContext.createOscillator();gain=audioContext.createGain();oscillator.type='triangle';gain.gain.value=0;oscillator.connect(gain);gain.connect(audioContext.destination);oscillator.start();}if(sound&&!soundscape&&city?.id?.startsWith('copenhagen'))soundscape=createSoundscape(audioContext,{era:city.era});try{localStorage.setItem('cph-sound',sound?'1':'0');}catch{}if(sound)await audioContext.resume().catch(()=>{}); /* a refused resume only means silence, never a stopped game */$('sound-btn').setAttribute('aria-label',sound?'Mute sound':'Enable sound');$('sound-btn').title=sound?'Mute sound':'Enable sound';$('sound-btn').querySelector('.mute-slash').hidden=sound;});
 // After a HUD action, the next movement/interaction key belongs to the game.
 for(const id of ['view-btn','look-btn','sound-btn','zoom-in','zoom-out'])$(id).addEventListener('click',focusWorldControls);
+// Car radio: L (Shift+L back), the top-bar button, or a click or tap on the now-playing card (on touch screens the only way).
+// Every change, Radio off included, is remembered for the next drive.
+function tuneRadio(step=1){if(!radio)return;radio.next(step);storeStation(radio.station);if(!sound)toast('Turn the sound on to hear the radio');}
+function flashRadio(){const c=$('radio-now');c.classList.remove('flash');void c.offsetWidth;c.classList.add('flash');} // restarts the card's glow
+for(const id of ['radio-btn','radio-now'])$(id).addEventListener('click',()=>{tuneRadio();focusWorldControls();});
 
 mobileControls=createMobileControls({
  keys,
@@ -1012,7 +1037,7 @@ mobileControls=createMobileControls({
  actions:{
   map:()=>showDialog('map-dialog'),camera:cycleCamera,
   weather:()=>{look.cycle();toast(look.label);},sound:()=>$('sound-btn').click(),
-  help:()=>showDialog('help-dialog'),reset,sources:()=>showDialog('sources-dialog'),
+  help:()=>showDialog('help-dialog'),reset:recoverCar,sources:()=>showDialog('sources-dialog'),
  },
  notify:toast,
 });
@@ -1031,8 +1056,7 @@ function updateHUD(now){
  const driving=travel?.mode==='car';
  const speed=displayedSpeedKmh(car.speed);$('speed').title='Game-style indicated speed: 70% of world speed';$('gear').textContent=city?.era===1760?(car.speed<-.2?'BACKING UP':speed>1?'ON THE ROAD':'HORSES AT REST'):car.speed<-.2?'REVERSE':speed>1?'DRIVING':'PARKED & READY';$('distance').textContent=(car.distance/1000).toFixed(2);
  const road=world.roads.at(car.x,car.z),pave=world.pavement.at(car.x,car.z);$('street').textContent=road?.name||pave?.name||'Off the beaten path';
- if(car.damage>.02)$('gear').textContent=`DAMAGE ${Math.round(car.damage*100)}% · R TO RESET`;
- if(city?.era===1760){}else if(car.battery===0)$('gear').textContent='R TO RECHARGE';else if(car.battery<=.2)$('gear').textContent='LOW BATTERY · R TO RECHARGE';
+ if(car.damage>.02)$('gear').textContent=`DAMAGE ${Math.round(car.damage*100)}% · R TO RECOVER`;
  if(!driving){$('gear').textContent=TRAVEL_MODES[travel.mode].label.toUpperCase();$('speed').title='Speed in kilometres per hour';}
  {const coach=city?.era===1760&&driving,g=$('coach-gait');if(g){if(g.hidden===coach)g.hidden=!coach;if(coach){const k=speed>60?4:speed>45?3:speed>25?2:speed>1?1:0,pace=['At rest','Walk','Trot','Canter','Gallop'][k];if($('coach-pace').textContent!==pace){$('coach-pace').textContent=pace;g.querySelectorAll('.coach-gait-shoes i').forEach((e,i)=>e.classList.toggle('on',i<k));}}}} // 1760: the horses' pace instead of a speedometer
  let nearest=data.landmarks[0],best=Infinity;for(const l of data.landmarks){const d=Math.hypot(l.x-car.x,l.z-car.z);if(d<best){best=d;nearest=l;}}$('district-label').textContent=nearest.district.toUpperCase();
@@ -1083,7 +1107,7 @@ function frame(now){
   }
   knockables?.update(car);streetLife.update(dt,car);tramRenderer.update(car);cyclistRenderer.update(car);npcScooterRenderer.update(car,dt);policeRenderer.update(dt);roadblock?.update(dt,car);
   if(police.message){toast(police.message);police.message=null;}
-  if(cph&&car)cph.update(dt,car,travel.mode,{running:started});if(carriage&&car){carriage.userData.update(car.speed||0,dt);car.battery=1;}coaches?.update(groundAt,dt);parkedCars?.update(car);seasonal?.update(dt,car);boats?.update(dt,car);harbourBath?.update(dt,car);landmarks?.update(dt);trains?.update(dt);cafeGuests?.update(dt,car);periodLife?.update(dt,car);
+  if(cph&&car)cph.update(dt,car,travel.mode,{running:started});if(carriage&&car)carriage.userData.update(car.speed||0,dt);coaches?.update(groundAt,dt);parkedCars?.update(car);seasonal?.update(dt,car);boats?.update(dt,car);harbourBath?.update(dt,car);landmarks?.update(dt);trains?.update(dt);cafeGuests?.update(dt,car);periodLife?.update(dt,car);
  }else if(ready&&police?.busted){policeRenderer.update(dt);roadblock?.update(dt,car);if(finale.cinematicStep(dt,roadblock?.playing)){$('busted-overlay').classList.toggle('live',!!roadblock?.active);$('busted-overlay').hidden=false;$('busted-continue').focus();}} // arrest cinematic: strobes keep flashing, then the end screen
  if(car){
    speedometer.update(car,dt,{mode:travel.mode});
@@ -1167,9 +1191,12 @@ function frame(now){
  uploads.step(); // rationed GPU uploads for streamed tiles
  if(ready)speciesTrees?.update(focus,{high:camera.position.y-groundAt(focus.x,focus.z)>22}); // every frame (cheap until the focus moves 8 m): waiting for tile loads made near trees pop in late
  if(now-lastTile>1200&&ready&&!switchingStart){surfaceStreamer?.update(car,{radius:1000,aheadSeconds:12});if(started)surfaceStreamer?.evictFar(car,1700,m=>{if(m){cityModel.remove(m);surfaceMeshes.delete(m);m.geometry.dispose();}}); /* street surfaces far behind are unloaded (they reload on return): memory stayed growing with exploration */extensionStreamer?.update(car);updateTiles().catch(handleTileError);lastTile=now;}
+ // The radio plays while you drive today's car with the sound on, and its now-playing card is on screen exactly then.
+ const radioOn=!!radio&&sound&&started&&!paused&&!mapOpen&&travel?.mode==='car'&&city?.id==='copenhagen';
+ {const c=$('radio-now');if(c.hidden===radioOn){c.hidden=!radioOn;if(radioOn)flashRadio();}}
  // Sound never stops the game: an audio error (a browser's Web Audio quirk) is logged once and that frame's sound skipped.
  try{
- radio?.update(dt,{on:sound&&started&&!paused&&!mapOpen&&travel?.mode==='car'&&city?.id==='copenhagen'}); // plays while you drive today's car
+ radio?.update(dt,{on:radioOn}); // getting in announces the station: the card shows what is on
  if(soundscape)soundscape.update(dt,{enabled:sound&&started&&!paused&&!mapOpen,speed:car?.speed||0,mode:travel?.mode,throttle:keys.has('KeyW')||keys.has('ArrowUp')?1:0,musicOff:!!radio?.playing});
  if(gain){gain.gain.setTargetAtTime(sound&&started&&travel?.mode==='car'&&!paused&&!mapOpen&&!soundscape?.013:0,audioContext.currentTime,.12);oscillator.frequency.setTargetAtTime(42+Math.abs(car?.speed||0)*5,audioContext.currentTime,.1);}
  policeRenderer?.audio(audioContext,sound&&started&&!paused&&!mapOpen&&(!police?.busted||!finale.ended));
@@ -1367,9 +1394,12 @@ async function boot(){
     if(st.people.length){const cx=st.people.reduce((a,p)=>a+p.x,0)/st.people.length,cz=st.people.reduce((a,p)=>a+p.z,0)/st.people.length;cafeGuests=createInstancedPeople(st.people,{name:'Market people',center:{x:cx,z:cz},seed:1760});cityModel.add(cafeGuests.group);}}}
    {const rd=railData&&await railData;if(rd){cityModel.add(createRails(rd).group);trains=createTrains(rd);cityModel.add(trains.group);}}
    {const cm=cycleMarkData&&await cycleMarkData;if(cm?.marks?.length)cityModel.add(createCycleMarks(cm.marks));}
-   {radio?.dispose();radio=null;const rd=radioData&&await radioData;if(rd?.stations?.length){let hide=0;const label=()=>{const s=radio.station?radio.stations[radio.station-1]:null;$('radio-label').textContent=s?s.name:'Radio off';};
-    radio=createRadio({stations:rd.stations,banner:(name,sub)=>{const el=$('radio-banner');$('radio-station').textContent=name;$('radio-track').textContent=sub||'';el.hidden=false;el.classList.add('show');clearTimeout(hide);hide=setTimeout(()=>el.classList.remove('show'),3800);label();}});
-    const b=$('radio-btn');b.hidden=false;label();if(!b.dataset.wired){b.dataset.wired='1';b.addEventListener('click',()=>{if(radio){radio.next();if(!sound)toast('Turn the sound on to hear the radio');}});}}else $('radio-btn').hidden=true;}
+   {radio?.dispose();radio=null;const rd=radioData&&await radioData;if(rd?.stations?.length){let shown='';const label=()=>{const s=radio.station?radio.stations[radio.station-1]:null;$('radio-label').textContent=s?s.name:'Radio off';};
+    // The now-playing card (on screen while the radio is on: frame loop) and the top-bar label. A long CC BY credit is
+    // clamped to two lines on the card, so all of it is in the tooltip too. A new station name makes the card glow.
+    const paint=(name,sub='')=>{$('radio-station').textContent=name;const t=$('radio-track');t.textContent=sub;t.title=sub;$('radio-now').classList.toggle('off',!radio.station);label();if(name!==shown){shown=name;flashRadio();}};
+    radio=createRadio({stations:rd.stations,initial:storedStation(),banner:paint}); // the station of your last drive (0 = off); station 1 the first time, GTA style
+    $('radio-btn').hidden=false;paint(radio.station?radio.stations[radio.station-1].name:'Radio off');}else $('radio-btn').hidden=true;}
    {const pd=parkedData&&await parkedData;if(pd){if(vehicleBodies)await vehicleBodies;parkedCars=createParkedCars(pd,{bodies:['hatchback','sedan','estate','crossover'].map(t=>({parts:vehicleBodyParts(t),spec:VEHICLE_SPECS[t]})).filter(b=>b.parts)});cityModel.add(parkedCars.group);streetObstacles.push(...parkedCars.obstacles);}}
    const mapped=furnitureData&&await furnitureData;let mappedFurniture=null;
    if(mapped?.items)for(const pl of places)mapped.items=mapped.items.filter(i=>!(pl.dropFurniture||[]).some(([x,z,r])=>Math.hypot(i.x-x,i.z-z)<r)); // replaced by the place's own lamps and masts

@@ -1,4 +1,4 @@
-/* Compact EV instrument cluster; original SVG geometry, no image assets. */
+/* Compact instrument cluster (no battery: the car never runs out); original SVG geometry, no image assets. */
 #app .speedometer{width:184px;flex:0 0 184px;margin-left:8px;padding:9px 12px 11px;background:#102321ed;color:#f4f3e9;border:1px solid #afc4b83a;border-radius:18px;text-align:center;box-shadow:0 10px 32px #10252124}
 #app .speedometer .speed-dial{display:block;position:relative;width:100%;height:auto;aspect-ratio:240/190}
 .speed-dial svg{width:100%;height:100%;display:block;overflow:visible}
@@ -9,14 +9,8 @@
 #app #speed{font-size:29px;font-weight:550;line-height:1;letter-spacing:-1.4px;min-width:45px;text-align:right}
 #app .speed-unit{font-size:8px;letter-spacing:1px;color:#99b0a1}
 #drive-gear{position:absolute;top:39%;left:0;right:0;font:600 10px Manrope,sans-serif;color:#d8e5d9}
-.battery-row{display:flex;align-items:center;justify-content:space-between;font-size:10px;color:#b4c8b8;margin-top:0;gap:8px}
-.battery-row>span:first-child{display:flex;align-items:center;gap:6px}.battery-icon{width:19px;height:11px;border:1px solid currentColor;border-radius:2px;position:relative;display:inline-block}.battery-icon:before{content:'';position:absolute;inset:2px;background:currentColor}.battery-icon:after{content:'';position:absolute;right:-3px;top:3px;width:2px;height:3px;background:currentColor}
-#battery-value{font-variant-numeric:tabular-nums;font-weight:600;color:#eff3e9}
-#app .battery-track{height:4px;border-radius:3px;background:#bacbbe24;margin:9px 0 12px;overflow:hidden}#battery-fill{display:block;height:100%;width:100%;background:#9bcbb3;transition:width .3s linear,background .3s}
 #app .speedometer .gear{display:block;font-size:8px;letter-spacing:.65px;line-height:1.5;color:#99b0a1}
-.speedometer.low-battery .battery-row,.speedometer.low-battery #battery-value{color:#f1b15e}.speedometer.low-battery #battery-fill{background:#f1b15e}.speedometer.empty-battery #battery-value{color:#f18b60}
-@media(max-width:700px){#app .speedometer{width:140px;flex-basis:140px;padding:8px 10px 10px;border-radius:12px;margin-left:auto}#app #speed{font-size:24px;min-width:32px}#app .speed-unit{font-size:6px}#drive-gear{font-size:8px}.battery-row{font-size:9px}#app .speedometer .gear{font-size:6px}#app .battery-track{margin:7px 0 8px}.dashboard .journey{display:none}}
-@media(prefers-reduced-motion:reduce){#battery-fill{transition:none}}
+@media(max-width:700px){#app .speedometer{width:140px;flex-basis:140px;padding:8px 10px 10px;border-radius:12px;margin-left:auto}#app #speed{font-size:24px;min-width:32px}#app .speed-unit{font-size:6px}#drive-gear{font-size:8px}#app .speedometer .gear{font-size:6px}.dashboard .journey{display:none}}
 /* Matched radar/instrument footprint: preserve the world, not a dashboard wall. */
 #app{--hud-bottom:48px;--hud-card-height:146px}
 #app .dashboard{bottom:var(--hud-bottom)}
@@ -24,32 +18,27 @@
    Both zoom buttons must remain above the instruments, including browser zoom. */
 #app .right-tools{top:auto;bottom:calc(var(--hud-bottom) + var(--hud-card-height) + 12px)}
 #app .minimap-card,#app .speedometer{width:160px;flex:0 0 160px;height:var(--hud-card-height);border-radius:10px}
-#app .speedometer{display:grid;grid-template-rows:1fr 12px 3px 12px;gap:3px;padding:6px 10px}
+#app .speedometer{display:grid;grid-template-rows:1fr 12px;gap:3px;padding:6px 10px}
 #app .speedometer .speed-dial{width:116px;justify-self:center;align-self:center}
 #app #speed{font-size:23px;min-width:28px;letter-spacing:-1px}
-#app .speedometer .battery-row{font-size:9px}
-#app .battery-track{height:3px;margin:0}
 #app .speedometer .gear{font-size:6px;align-self:center}
 @media(max-width:700px){
  #app{--hud-bottom:40px;--hud-card-height:126px}
  #app .minimap-card,#app .speedometer{width:132px;flex-basis:132px}
- #app .speedometer{padding:5px 8px;grid-template-rows:1fr 10px 3px 10px;gap:2px}
+ #app .speedometer{padding:5px 8px;grid-template-rows:1fr 10px;gap:2px}
  #app .speedometer .speed-dial{width:98px}
  #app #speed{font-size:21px}
- #app .speedometer .battery-row{font-size:8px}
 }
 @media(min-width:1600px){#app{--hud-bottom:55px}}
 /* Desktop: radar and instruments read at a glance (Daniel: "make the minimap and car HUD bigger"). */
 @media(min-width:900px){
  #app{--hud-card-height:200px}
  #app .minimap-card,#app .speedometer{width:230px;flex:0 0 230px;border-radius:12px}
- #app .speedometer{grid-template-rows:1fr 15px 4px 14px;gap:4px;padding:8px 14px}
+ #app .speedometer{grid-template-rows:1fr 14px;gap:4px;padding:8px 14px}
  #app .speedometer .speed-dial{width:164px}
  #app #speed{font-size:32px;min-width:40px}
  #app .speed-unit{font-size:10px}
  #drive-gear{font-size:12px}
- #app .speedometer .battery-row{font-size:12px}
- #app .battery-track{height:4px}
  #app .speedometer .gear{font-size:8.5px}
  #app .minimap-caption{font-size:10px;padding:8px}
 }
@@ -58,6 +47,5 @@
  #app .minimap-card,#app .speedometer{width:280px;flex-basis:280px}
  #app .speedometer .speed-dial{width:200px}
  #app #speed{font-size:38px}
- #app .speedometer .battery-row{font-size:13px}
  #app .speedometer .gear{font-size:10px}
 }

@@ -48,9 +48,11 @@ body:not(.driving) #cph-hud,body.busted #cph-hud,body.clean-capture #cph-hud{vis
 #era-card p{margin:0;font-size:14px;letter-spacing:.06em;color:#d8c9a8}
 #era-card p:first-child{text-transform:uppercase;font-size:11px;letter-spacing:.2em}
 .nav-btn{white-space:nowrap}
-/* 1760: a coach has no battery */
-body.era-1760 .battery-row,body.era-1760 #battery-gauge{visibility:hidden}
-/* 1760: no speedometer either; the coach shows the horses' pace */
+/* 1760: no dashboard card at all. A coach has no speedometer, and a dark box reading "HORSES AT REST" with the damage
+   line over it looked broken. main.js still keeps the coach's pace readout (#coach-gait) current inside it, and its
+   styling below is kept, so it can come back. */
+body.era-1760 #app .speedometer{display:none!important}
+/* the coach shows the horses' pace instead of a speedometer */
 body.era-1760 #app .speedometer .speed-dial{display:none}
 body.era-1760 #app .speedometer{background:#2b2116ed;border-color:#d8b77a40}
 body.era-1760 .coach-gait{display:grid;gap:6px;justify-items:center;padding:10px 0 4px}
@@ -126,10 +128,39 @@ body.mobile-controls-ready.era-1760 #app .speedometer .coach-gait{padding:12px 0
 body.mobile-controls-ready.era-1760 #app .speedometer :is(.coach-gait-title,.coach-gait-shoes){display:none}
 body.mobile-controls-ready.era-1760 #app .speedometer .coach-gait-pace{font-size:15px}
 
-/* Car radio (src/copenhagen/radio.js): the station name flashes up top centre when you tune, GTA style */
-#radio-banner{position:fixed;top:86px;left:50%;transform:translate(-50%,-8px);z-index:6;pointer-events:none;text-align:center;opacity:0;transition:opacity .35s,transform .35s}
-#radio-banner.show{opacity:1;transform:translate(-50%,0)}
-#radio-banner b{display:block;font:800 26px/1.1 system-ui,sans-serif;letter-spacing:.06em;text-transform:uppercase;color:#ffe9a8;text-shadow:0 2px 0 #3a2a10,0 0 14px rgba(0,0,0,.55)}
-#radio-banner span{display:block;margin-top:4px;font:600 13px/1.3 system-ui,sans-serif;color:#f4f1e8;text-shadow:0 1px 3px rgba(0,0,0,.8);max-width:min(80vw,560px);margin-inline:auto}
-.era-1760 #radio-btn,.era-1760 #radio-banner{display:none!important}
-@media(max-width:700px){#radio-banner{top:70px}#radio-banner b{font-size:19px}#radio-btn #radio-label{display:none}}
+/* Car radio (src/copenhagen/radio.js): a "now playing" card at the top right, on screen exactly while the radio is on
+   (today's car, sound on: main.js frame loop), so you see there is a radio and how to tune it. Click or tap it for the
+   next station. Under the police stars when they show: #wanted is the element just before it and about 49 px tall
+   (4 px padding, 24 px stars, 5 px gap, 12 px status line). A long CC BY credit gets two lines, all of it in the tooltip. */
+#radio-now{position:absolute;top:94px;right:38px;z-index:25;display:flex;align-items:flex-start;gap:10px;width:min(320px,calc(100% - 76px));padding:9px 14px 10px 11px;border:1px solid #afc4b83a;border-radius:12px;background:#102321e6;color:#eef3ea;box-shadow:0 0 0 0 #ffe9a800,0 8px 26px #10252130;text-align:left;font:500 12px/1.35 'DM Sans',sans-serif;transform-origin:100% 0;transition:top .25s ease,background .2s}
+#radio-now[hidden]{display:none}
+@media(hover:hover){#radio-now:hover{background:#173430f0}} /* touch: no hover tint left behind after a tap */
+#wanted:not([hidden])+#radio-now{top:152px}
+body.clean-capture.driving #radio-now{top:24px}
+body.clean-capture.driving #wanted:not([hidden])+#radio-now{top:82px}
+.radio-now-icon{font-size:20px;line-height:1;margin-top:1px}
+.radio-now-body{display:grid;gap:2px;min-width:0}
+#radio-station{overflow:hidden;font:800 13px/1.25 Manrope,sans-serif;letter-spacing:.08em;text-transform:uppercase;white-space:nowrap;text-overflow:ellipsis;color:#ffe9a8}
+#radio-now.off #radio-station{color:#d3ddd6}
+#radio-track{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;overflow:hidden;overflow-wrap:anywhere;color:#dde7e0}
+#radio-track:empty{display:none}
+.radio-now-hint{margin-top:3px;font-size:10.5px;line-height:1.6;color:#9db3a6}
+#radio-now kbd{min-width:0;padding:1px 4px;font:700 9.5px/1.2 Manrope,sans-serif;color:#f4f3e9;border-color:#e8efe64d;background:#ffffff14;vertical-align:1px}
+/* Hint: keys on a keyboard, "tap" on a touch screen; "tune in" while the radio is off. */
+#radio-now .rh-touch,#radio-now.off .rh-on,#radio-now:not(.off) .rh-off{display:none}
+/* A new station, or the card coming up: a short glow */
+#radio-now.flash{animation:radio-flash .8s ease-out}
+@keyframes radio-flash{from{transform:scale(1.05);border-color:#ffe9a8;box-shadow:0 0 0 4px #ffe9a866,0 8px 26px #10252130}}
+.era-1760 #radio-btn,.era-1760 #radio-now{display:none!important}
+body.busted #radio-now,body.arrest-cinematic #radio-now{visibility:hidden}
+@media(max-width:700px){#radio-now{top:116px;right:12px;width:min(300px,calc(100% - 24px))}#wanted:not([hidden])+#radio-now{top:174px}#radio-btn #radio-label{display:none}}
+/* Touch screens hide the top bar (and its radio button), so the card is how you tune: placed like the stars (mobile-controls.css). */
+@media(pointer:coarse){
+ #radio-now .rh-key{display:none}#radio-now .rh-touch{display:inline}
+ body.mobile-controls-ready #radio-now{top:calc(var(--mobile-top) + 53px);right:var(--mobile-right);width:min(250px,calc(100% - 24px));min-height:44px;padding:8px 11px 8px 9px;gap:8px;font-size:11px}
+ body.mobile-controls-ready #wanted:not([hidden])+#radio-now{top:calc(var(--mobile-top) + 105px)}
+ body.mobile-controls-ready #radio-station{font-size:12px}
+ body.mobile-controls-ready .radio-now-icon{font-size:17px}
+}
+@media(pointer:coarse) and (max-height:500px){body.mobile-controls-ready #radio-now{top:calc(var(--mobile-top) + 52px)}body.mobile-controls-ready #wanted:not([hidden])+#radio-now{top:calc(var(--mobile-top) + 104px)}}
+@media(prefers-reduced-motion:reduce){#radio-now.flash{animation:none}}

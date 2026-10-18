@@ -36,7 +36,7 @@ async function drive(kind,{it,start},check){
  await page.keyboard.down('w');await page.waitForTimeout(2600);await page.keyboard.up('w');await page.waitForTimeout(700);
  const after=await page.evaluate(({it})=>{const s=window.openCityDrive.getState(),m=window.openCityDrive.mappedFurniture,car=window.openCityDrive.car();
   let post=null;for(const c of m.chunks.values())for(const b of c.signs.bodies)if(Math.hypot(b.x-it.x,b.z-it.z)<.05)post={state:b.state,knocked:b.knocked};
-  return {knockables:s.knockables,post,car:{x:car.x,z:car.z,speed:car.speed},distance:Math.hypot(car.x-it.x,car.z-it.z),flags:{paused:s.paused,started:s.started,busted:s.police?.busted,map:s.mapOpen,battery:car.battery}};},{it});
+  return {knockables:s.knockables,post,car:{x:car.x,z:car.z,speed:car.speed},distance:Math.hypot(car.x-it.x,car.z-it.z),flags:{paused:s.paused,started:s.started,busted:s.police?.busted,map:s.mapOpen}};},{it});
  const ok=check(before,after);results.push({kind,at:[it.x,it.z],ok,post:after.post,hits:after.knockables.hits-before.hits,carToObject:+after.distance.toFixed(2),flags:after.flags});
  // Look back at the object from beside the run-up.
  if(shots){const a=(it.yaw||0)+.9;await page.evaluate(v=>{window.openCityDrive.inspectCamera(v);document.getElementById('pause-overlay').hidden=true;},{eye:[it.x+Math.sin(a)*8,3.2,it.z+Math.cos(a)*8],target:[it.x,1.2,it.z]});

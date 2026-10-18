@@ -33,7 +33,7 @@ Live status is on each issue: open, claimed (someone commented), or closed (buil
 | Drive a tram or bus on the real line | [#12](https://github.com/worldhood/worldhood/issues/12) | L | `src/tram-simulation.js`, `src/bus-simulation.js` |
 | Bikes and scooters: expand the existing rides | [#13](https://github.com/worldhood/worldhood/issues/13) (basic version built) | M | `src/parked-micromobility.js` |
 | Ferry to Suomenlinna | [#14](https://github.com/worldhood/worldhood/issues/14) | L | harbour ferry in `src/harbour.js` |
-| EV charging stations | [#15](https://github.com/worldhood/worldhood/issues/15) | S | `src/battery.js` + OSM `amenity=charging_station` |
+| EV charging stations | [#15](https://github.com/worldhood/worldhood/issues/15) | S | a charge model (this fork removed the battery) + OSM `amenity=charging_station` |
 | Day and night with lights | [#16](https://github.com/worldhood/worldhood/issues/16) | M | `src/sky.js`, OSM `highway=street_lamp` |
 | Hills from real elevation | [#17](https://github.com/worldhood/worldhood/issues/17) | L | city builder + physics |
 | City events | [#18](https://github.com/worldhood/worldhood/issues/18) | M | street life modules |
@@ -106,7 +106,7 @@ when switched with **T**. Other shaders can read `WEATHER_UNIFORMS.wetness` and 
 - **Hop on a city bike or e-scooter (M).** Ride a scooter from a parked cluster or a bike from a
   real city-bike station; both are already placed in the world.
 - **Ferry to Suomenlinna (L).** Board at Kauppatori.
-- **EV charging (S).** The battery already drains; add chargers from OpenStreetMap.
+- **EV charging (S).** Needs a charge model first (the battery was removed so the car never runs out); then add chargers from OpenStreetMap.
 
 ## World and play
 
