@@ -33,9 +33,10 @@ import {animateVehicle} from './vehicles.js';
 import {Mobility} from './mobility.js';
 import {createStreetLife} from './street-life.js';
 import {buildTileInWorker,materialiseBuilding} from './building-loader.js';
+import {createBuildingBatches} from './building-batches.js';
 import {attachFacades,applyFacadeHeights,estimateFacades} from './facade-data.js';
 import {roofsInWorker,periodRoofMesh,slopeRampart} from './period-roofs.js';
-import {LOD as TILE_LOD,tileLevel,applyTileLod,applyMeshLod,createMergedShells,createShellMask,shellNormals,mergedShellRanges,freezeTileGroup,freezeMesh,applyTreeLod,createStaticShadowCuller} from './tile-lod.js';
+import {LOD as TILE_LOD,tileLevel,applyTileLod,applyMeshLod,applyPartLod,createMergedShells,createShellMask,shellNormals,mergedShellRanges,freezeTileGroup,freezeMesh,applyTreeLod,createStaticShadowCuller} from './tile-lod.js';
 import {loadTileImages,aheadPoint,tilePriority,createFrameQueue,createDetailScheduler} from './tile-streaming.js';
 import {createSurfaceStreamer} from './surface-streaming.js';
 import {createCathedral,createSenateSquare,loadSenateMaterials} from './cathedral.js';
@@ -626,24 +627,36 @@ async function detailTile(group){
  // Nearest buildings land first; each lands on its own (no walk over the whole tile).
  const dist=b=>{const q=b.part.bbox;return Math.hypot((q[0]+q[2])/2-focus.x,(q[1]+q[3])/2-focus.z);};
  const shells=new Map(group.userData.waiting.map(w=>[w.start,w])); // ids repeat within a tile; vertex starts do not
+ // The tile's detailed buildings draw as a few batches (building-batches.js): allocated now, filled as buildings land.
+ const batches=createBuildingBatches(buildings,textures,b=>shells.get(b.part.start)?.i??-1);batches.parts=[];
+ if(batches.meshes.length){const tmp=new THREE.Group();tmp.add(...batches.meshes);await compileBatches(tmp,batches.meshes);tmp.remove(...batches.meshes);
+  if(loadedTiles.get(t.file)!==group){for(const m of batches.meshes){m.geometry.dispose();disposeMaterial(m.material);}return;}
+  for(const m of batches.meshes)freezeMesh(m);batches.setNear(group.userData.level==='near');group.add(...batches.meshes);}
+ group.userData.batches=batches;
  for(const b of buildings)uploads.push(()=>{
   if(loadedTiles.get(t.file)!==group)return;
-  const w=shells.get(b.part.start),meshes=materialiseBuilding(b,textures);
-  for(const m of meshes){m.userData.castByTile=true;if(w){m.userData.part=w.i;m.userData.mask=group.userData.mask;}freezeMesh(m);applyMeshLod(m,group.userData.level,focus);} // the tile's shadow casters cast for them; far ones stay with the merged shell (LOD.building)
-  // Shaders compile in the background first (parallel compile where the GPU offers it); a variant never seen
-  // before no longer stalls a frame, the building just lands a moment later.
+  const w=shells.get(b.part.start),p=b.part;batches.land(b);
+  const part=w?{i:w.i,w,box:new THREE.Box3(new THREE.Vector3(p.bbox[0]-.5,0,p.bbox[1]-.5),new THREE.Vector3(p.bbox[2]+.5,p.height+.5,p.bbox[3]+.5)),occlusion:{opacity:1,clearTime:1}}:null;
+  // What the batches do not take (shop signs, authored hero fronts) is still its own mesh, sharing the part's state.
+  const own=b.meshes.filter(m=>!batches.batched(m)),meshes=own.length?materialiseBuilding({...b,meshes:own},textures):[];
+  for(const m of meshes){m.userData.castByTile=true;if(part){m.userData.part=part.i;m.userData.mask=group.userData.mask;m.userData.occlusion=part.occlusion;}freezeMesh(m);applyMeshLod(m,group.userData.level,focus);} // the tile's shadow casters cast for them
   const land=()=>{if(loadedTiles.get(t.file)!==group){for(const m of meshes){m.geometry.dispose();disposeMaterial(m.material);}return;}
-   if(w){group.userData.mask.set(w.i,meshes[0]?.userData.occlusion?.detailed===false?1:0);w.landed=true;group.userData.waiting=group.userData.waiting.filter(x=>x!==w);}
-   group.add(...meshes);group.userData.windows+=b.windows;
+   if(part){batches.parts.push(part);applyPartLod(batches,part,group.userData.level||'near',focus,group.userData.mask);}
+   if(w){w.landed=true;group.userData.waiting=group.userData.waiting.filter(x=>x!==w);}
+   if(meshes.length)group.add(...meshes);group.userData.windows+=b.windows;
    for(const m of group.children)if(m.userData.lod)applyMeshLod(m,group.userData.level,focus);};
-  // compileAsync walks the whole scene for its lights on every call: once per landing building that was a full
-  // scene traversal several times a frame while a tile's buildings streamed in (the stalls when driving into new
-  // areas). Only material variants not seen before go through it now; the rest land straight away.
-  // Pre-compiled against a stand-in scene that lists only the lights: the real scene walk per building was the
-  // cost, and skipping "already seen" variants still let some through to compile on screen.
+  // Own meshes compile in the background first (stand-in scene listing only the lights; both fade variants).
+  if(!meshes.length){land();return;}
   const tmp=new THREE.Group();tmp.add(...meshes);
   compileBoth(tmp).then(()=>{tmp.remove(...meshes);land();},()=>{tmp.remove(...meshes);land();});
  },()=>dist(b),()=>loadedTiles.get(t.file)===group); // nearest building first, across every tile in the queue
+}
+// Detail batches compile before they join the tile: the opaque variant and the dithering one the chase-camera fade
+// switches to (building-batches.js), so neither stalls a frame later.
+async function compileBatches(obj,meshes){
+ await renderer.compileAsync(obj,camera,lightScene()).catch(()=>{});
+ for(const m of meshes){m.material.userData.dither=true;m.material.needsUpdate=true;}
+ try{await renderer.compileAsync(obj,camera,lightScene());}catch{}finally{for(const m of meshes){m.material.userData.dither=false;m.material.needsUpdate=true;}}
 }
 // Draw calls are what costs on Windows (each one goes through ANGLE/D3D11): a busy Nyhavn frame issued
 // 1,600 of them, a third for the shadow map. Moving things (traffic, buses, people, cyclists, boats) and
@@ -1134,7 +1147,12 @@ function frame(now){
    const boxed=new Set();for(const w of tile.userData.waiting)if(ray.intersectBox(w.box,hit)&&hit.distanceTo(camera.position)<limit-3)boxed.add(w);
    const walls=new Set();for(const w of boxed)if(partOnRay(tile,w,ray,limit-3))walls.add(w); // only the boxed parts' own triangles
    for(const w of tile.userData.waiting){const was=w.occlusion.opacity;const fade=!noFade&&walls.has(w);if(!fade&&was>.999)continue;advanceOcclusion(w.occlusion,fade,dt);tile.userData.mask.set(w.i,w.occlusion.opacity>.995?1:Math.max(.01,w.occlusion.opacity));}}
-  for(const tile of loadedTiles.values())if(tile.visible)for(const mesh of tile.children){if(!mesh.visible)continue;const state=mesh.userData.occlusion;if(!updated.has(state)){let fade;if(decided.has(state))fade=decided.get(state);else{const intersects=!noFade&&ray.intersectBox(mesh.userData.box,hit);fade=!!intersects&&hit.distanceTo(camera.position)<limit-3;}advanceOcclusion(state,fade,dt);updated.add(state);}mesh.material.opacity=state.opacity;mesh.material.depthWrite=state.opacity>.999;const fading=state.opacity<.999;if(mesh.material.transparent!==fading){mesh.material.transparent=fading;mesh.material.needsUpdate=true;}}
+  // Detail batches: a part fades through its per-part value (and the tile's batches switch to the dithering variant).
+  if(!noFade)for(const tile of loadedTiles.values()){const b=tile.userData.batches;if(!tile.visible||!b?.parts.length)continue;let fading=false;
+   for(const p of b.parts){if(!p.occlusion.detailed)continue;const fade=!!ray.intersectBox(p.box,hit)&&hit.distanceTo(camera.position)<limit-3&&partOnRay(tile,p.w,ray,limit-3);
+    if(!fade&&p.occlusion.opacity>.999)continue;advanceOcclusion(p.occlusion,fade,dt);b.set(p.i,p.occlusion.opacity>.995?1:Math.max(.01,p.occlusion.opacity));if(p.occlusion.opacity<.995)fading=true;}
+   b.dither(fading);}
+  for(const tile of loadedTiles.values())if(tile.visible)for(const mesh of tile.children){if(!mesh.visible||mesh.userData.batch)continue;const state=mesh.userData.occlusion;if(!updated.has(state)){let fade;if(decided.has(state))fade=decided.get(state);else{const intersects=!noFade&&ray.intersectBox(mesh.userData.box,hit);fade=!!intersects&&hit.distanceTo(camera.position)<limit-3;}advanceOcclusion(state,fade,dt);updated.add(state);}mesh.material.opacity=state.opacity;mesh.material.depthWrite=state.opacity>.999;const fading=state.opacity<.999;if(mesh.material.transparent!==fading){mesh.material.transparent=fading;mesh.material.needsUpdate=true;}}
  }
  // Shadow box and texel snapping follow the active look's sun (weather.js re-applies the same offset below).
  {const sunOffset=look?look.current.sunOffset:new THREE.Vector3(-160,260,160),sf=shadowFrame(sunOffset);

@@ -86,6 +86,7 @@ export function createMergedShells(array,parts,textures,mask=null,normals=null){
 export function applyTileLod(group,level,focus,bands=LOD){
  group.userData.level=level;group.visible=level!=='hidden';
  if(!group.visible)return level;
+ const batches=group.userData.batches;if(batches){batches.setNear(level==='near');for(const p of batches.parts)applyPartLod(batches,p,level,focus,group.userData.mask,bands);}
  for(const mesh of group.children)if(!mesh.userData.lod)applyMeshLod(mesh,level,focus,bands);
  for(const mesh of group.children)if(mesh.userData.lod)applyMeshLod(mesh,level,focus,bands); // after the buildings: they decide which parts the merged shell shows
  return level;
@@ -93,9 +94,17 @@ export function applyTileLod(group,level,focus,bands=LOD){
 // One mesh at its tile's level (newly landed detail does not need the whole tile walked again).
 // castByTile: the tile's shadow casters (merged measured shells drawn only into the shadow map, main.js) cast for
 // this mesh, so it never casts itself. shadowCaster: one of those casters; main.js shows it during the shadow pass.
+// One landed building in its tile's detail batches (building-batches.js): shown while near and within bands.building
+// (20 m of hysteresis on the way out, on the building's shared occlusion state), else handed back to the merged
+// shell; a camera fade dims it through the same per-part value.
+export function applyPartLod(batches,part,level,focus,mask,bands=LOD){
+ const o=part.occlusion,d=part.box.distanceToPoint(focus),want=level==='near'&&d<bands.building+(o.detailed===false?0:20);
+ if(o.detailed!==want){o.detailed=want;mask?.set(part.i,want?0:1);}
+ batches.set(part.i,want?(o.opacity>.995?1:Math.max(.01,o.opacity)):0);
+}
 export function applyMeshLod(mesh,level,focus,bands=LOD){
  const u=mesh.userData;
- if(u.shadowCaster)return;
+ if(u.shadowCaster||u.batch)return;
  if(u.lod){
   // Masked shells also stand in at the near level for buildings whose detail has not landed yet.
   const waiting=!!u.maskOn&&level==='near'&&(u.mask?.shown??1)>0;
