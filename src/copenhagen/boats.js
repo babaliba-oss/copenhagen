@@ -46,7 +46,7 @@ const ship=()=>mergeGeometries([...hull(7,3.6,30,'#3b2a1c','#a8875c',.9,'#c19a45
 const tour=()=>mergeGeometries([...hull(4.6,1.2,17,'#1f3f63','#d9d6cc',.1),box(4.2,.12,13.5,0,1.9,.6,'#e9e7e0'),...[-5,-2.5,0,2.5,5].map(z=>box(4.25,.65,.06,0,1.55,z+.6,'#c9d6dd')),box(4.3,.06,14,0,1.25,.6,'#2b4a6e')]);
 // Havnebussen: a long low harbour bus, yellow hull, glazed cabin with a blue band, flat roof.
 const havnebus=()=>mergeGeometries([...hull(5.2,1.3,22,'#e2b33c','#5f6a70',.15),box(4.4,1.9,15,0,2.1,1.2,'#f2f0ea'),box(4.46,.9,14.4,0,2.35,1.2,'#25313a'),box(4.5,.22,15.2,0,1.32,1.2,'#1f4f8a'),box(4.6,.14,15.6,0,3.1,1.2,'#e9e7e0'),box(1.6,.9,2.2,0,3.6,4.8,'#f2f0ea')]);
-const BUILD={sail,motor,wooden,ship,tour};
+const BUILD={sail,motor,wooden,ship,tour,schooner:ship,amphion:ship}; // schooner, amphion: scanned 18th-century hulls (models) where loaded, else the period ship
 
 // The mooring data packs boats closer than their own length (a forest of masts along the quays): keep one per
 // 1.4 boat lengths, measured by the larger of the two hulls.
@@ -79,6 +79,10 @@ export function createBoats(data,{waterY=-1.2,era=null,models={},wet=undefined}=
  // left boats metres above the water. Each boat sits on the water under it.
  const level=(x,z)=>{const w=waterAt(x,z);return (w==null?waterY:w-.1);};
  const boats=floatMoorings(thinMoorings((data?.boats||[]).filter(b=>era===1760||!inHarbourBath(b[0],b[1]))),wet),mat=new THREE.MeshStandardMaterial({vertexColors:true,roughness:.6,metalness:.05});
+ // 1760's harbour gets the merchant schooner and the royal schooner yacht Amphion (CC BY agt14032013 / Museovirasto) among its
+ // ships where the models loaded: picked by position, so a mooring keeps its ship between visits.
+ if(era===1760)for(const b of boats){if(b[3]!=='ship'&&!(b[3]==='wooden'&&b[4]>1.05))continue;const h=Math.abs(Math.sin(b[0]*12.9898+b[1]*78.233)*43758.5453)%1;
+  if(models.amphion&&b[3]==='ship'&&h<.18)b[3]='amphion';else if(models.schooner&&(b[3]==='ship'?h<.6:h<.35))b[3]='schooner';}
  // Chunked by 300 m and kind: chunks frustum-cull, hide past 1 km, and only those near the player bob.
  const chunks=new Map(),geos={...models}; // Blender models (scripts/blender/boats.py) where loaded
  for(const bt of boats){if(!BUILD[bt[3]])continue;const k=`${Math.floor(bt[0]/300)},${Math.floor(bt[1]/300)}`;if(!chunks.has(k))chunks.set(k,{list:{},x:0,z:0,n:0});const c=chunks.get(k);(c.list[bt[3]]??=[]).push(bt);c.x+=bt[0];c.z+=bt[1];c.n++;}
