@@ -1429,11 +1429,16 @@ async function boot(){
       for(const [a,b] of [[0,0],[10,0],[-10,0],[0,10],[0,-10]])for(const p of lanes.near(x+a,z+b)){if(seen.has(p))continue;seen.add(p);if(p.bbox[0]>x+8||p.bbox[2]<x-8||p.bbox[1]>z+8||p.bbox[3]<z-8)continue;
        for(const r of p.rings)for(let i=0;i<r.length;i++){const [ax,az]=r[i],[bx,bz]=r[(i+1)%r.length],dx=bx-ax,dz=bz-az,l=dx*dx+dz*dz;if(!l)continue;const t=Math.max(0,Math.min(1,((x-ax)*dx+(z-az)*dz)/l)),px=ax+dx*t,pz=az+dz*t,q=Math.hypot(x-px,z-pz);if(q<d){d=q;best={x:px,z:pz,d:q};}}}
       return best;};
-     let moved=0,turned=0,dropped=0;mapped.items=mapped.items.filter(it=>{if(it.k!=='bench')return true;const e=kerb(it.x,it.z);if(!e||e.d>7)return true;
+     // away from the streets (parks, squares) a bench with no heading faces the footway it stands on or beside
+     const edgeOf=(index,x,z,r)=>{let best=null,d=r;for(const [a,b] of [[0,0],[10,0],[-10,0],[0,10],[0,-10]])for(const p of index.near(x+a,z+b)){if(p.bbox[0]>x+r||p.bbox[2]<x-r||p.bbox[1]>z+r||p.bbox[3]<z-r)continue;
+       for(const ring of p.rings)for(let i=0;i<ring.length;i++){const [ax,az]=ring[i],[bx,bz]=ring[(i+1)%ring.length],dx=bx-ax,dz=bz-az,l=dx*dx+dz*dz;if(!l)continue;const t=Math.max(0,Math.min(1,((x-ax)*dx+(z-az)*dz)/l)),px=ax+dx*t,pz=az+dz*t,q=Math.hypot(x-px,z-pz);if(q<d){d=q;best={x:px,z:pz,d:q};}}}
+      return best;};
+     let moved=0,turned=0,dropped=0,parked=0;mapped.items=mapped.items.filter(it=>{if(it.k!=='bench')return true;const e=kerb(it.x,it.z);
+      if(!e||e.d>7){if(it.yaw)return true;const w=edgeOf(walk,it.x,it.z,6);if(w&&w.d>.05){const on=!!walk.at(it.x,it.z),sx=(it.x-w.x)/w.d,sz=(it.z-w.z)/w.d;it.yaw=on?Math.atan2(sx,sz):Math.atan2(-sx,-sz);parked++;}return true;}
       const inside=!!lanes.at(it.x,it.z);let ux=it.x-e.x,uz=it.z-e.z;const l=Math.hypot(ux,uz);if(l<.01)return false;ux/=l;uz/=l;if(inside){ux=-ux;uz=-uz;} // (ux,uz): from the kerb into the pavement
       if(inside||e.d<.9){const x=e.x+ux*.9,z=e.z+uz*.9;if(lanes.at(x,z)||houses.at(x,z)){dropped++;return false;}it.x=x;it.z=z;moved++;}
       it.yaw=Math.atan2(-ux,-uz);turned++;return true;}); // the seat faces +Z in the bench model: towards the street
-     console.info(`Street furniture: benches set along the kerb ${turned} (moved off the carriageway ${moved}, dropped ${dropped})`);}
+     console.info(`Street furniture: benches set along the kerb ${turned} (moved off the carriageway ${moved}, dropped ${dropped}), park benches turned to their footway ${parked}`);}
     {const b=mapped.items.length;mapped.items=mapped.items.filter(it=>!([[0,0],[2.5,0],[-2.5,0],[0,2.5],[0,-2.5]].every(([a,b])=>inWaterPolygons(data.water,it.x+a,it.z+b))&&!lanes.at(it.x,it.z)&&!walk.at(it.x,it.z))); /* well out on the water, not the quay-edge lamps and bollards */console.info(`Street furniture: ${b-mapped.items.length} items standing in the water dropped`);} // signs and poles mapped on the water (bridge ends, survey drift)
     // Sign clutter: photo detections give blank blue 'generic plates' (no readable type) and the same sign seen
     // from several photos. Keep posts with a real face, one per face within 5 m, and at most 3 posts in 8 m.
@@ -1465,6 +1470,11 @@ async function boot(){
    for(const p of detailPeople){if(!p.script||!world.buildings.at(p.x,p.z))continue;let best=null;
     for(let r=1;r<=30&&!best;r+=1)for(let k=0;k<24;k++){const a=k*Math.PI/12,x=p.x+Math.cos(a)*r,z=p.z+Math.sin(a)*r;if(!world.buildings.at(x,z)&&!world.roads.at(x,z)&&!inWaterPolygons(world.water,x,z)&&[[.8,0],[-.8,0],[0,.8],[0,-.8]].every(([dx,dz])=>!world.buildings.at(x+dx,z+dz))){best=[x,z];break;}}
     if(best){p.x=p.homeX=best[0];p.z=p.homeZ=best[1];}}
+   // 1760: guns on the bastions (scripts/cannons-1760.mjs places them on the rampart tops; cannon model CC BY, see the sources),
+   // loaded after the city like the warship.
+   if(city.era===1760){const here=city;Promise.all([json(dataUrl('cannons.json')).catch(()=>null),loadColouredModel('/models/props/cannon.glb')]).then(([list,g])=>{if(!list?.length||!g||city!==here){g?.dispose();return;}
+    const im=new THREE.InstancedMesh(g,new THREE.MeshStandardMaterial({vertexColors:true,roughness:.6,metalness:.3}),list.length),m=new THREE.Matrix4(),q=new THREE.Quaternion(),v=new THREE.Vector3(),one=new THREE.Vector3(1,1,1),UP=new THREE.Vector3(0,1,0);
+    list.forEach(([x,y,z,yaw],i)=>im.setMatrixAt(i,m.compose(v.set(x,y,z),q.setFromAxisAngle(UP,yaw),one)));im.name='Rampart cannons';im.castShadow=true;im.receiveShadow=true;im.computeBoundingSphere();cityModel.add(im);}).catch(e=>console.warn('Cannons:',e.message));}
    if(city.era===1760){const gateNames=/Vesterport|Nørreport|Østerport/,lm=data.landmarks||[];periodLife=createPeriodLife({city,world,animalModels:await loadColouredModels('/models/animals/',['pig','hen','goose']),water:data.water,squares:lm.filter(l=>!gateNames.test(l.name)&&l.name!=='Little Mermaid'),gates:lm.filter(l=>gateNames.test(l.name))});cityModel.add(periodLife.group);console.info('1760 life',periodLife.group.userData);}
    else if(city.id==='copenhagen'){periodLife=createSquareCrowds({world,water:data.water,places:data.landmarks||[]});cityModel.add(periodLife.group);const cc=createCycleCrossings({pavement:data.pavement,world});cityModel.add(cc);console.info('Blue cycle crossings',cc.userData.crossings);}
    world.cameraBuildings=new SpatialIndex(data.buildings);world.sightBuildings=world.cameraBuildings; // mapped buildings only: the camera boom and the police surge's line of sight ignore street furniture
