@@ -48,7 +48,7 @@ export function pickShots(era,search='',list=SHOTS){
 // ground(x,z): terrain height; roads(): the road graph; teleport(x,z,heading): start the player's car there (a new
 // start: traffic and streaming follow); place(x,z,heading,speed): move it there this frame (while it drives); setCamera({eye,target}|null); loaded(): tiles in; clear(x,z): no building there (a side camera
 // goes to the open side of the street).
-export function createCinematic({doc=document,ground,teleport,place=null,roads=()=>null,clear=()=>true,setCamera,loaded,era=null,shots=SHOTS,speed=null,onEnd=()=>{}}){
+export function createCinematic({doc=document,ground,teleport,place=null,roads=()=>null,cars=()=>null,clear=()=>true,setCamera,loaded,era=null,shots=SHOTS,speed=null,onEnd=()=>{}}){
  const style=doc.createElement('style');
  style.textContent='body.cinematic *{visibility:hidden!important;cursor:none!important}body.cinematic canvas#world,body.cinematic #cine-fade{visibility:visible!important}#cine-fade{position:fixed;inset:0;background:#000;z-index:100;opacity:1;transition:opacity .35s;pointer-events:none}';
  doc.head.append(style);doc.body.classList.add('cinematic');
@@ -93,7 +93,7 @@ export function createCinematic({doc=document,ground,teleport,place=null,roads=(
    if(phase==='done'||i<0)return;const s=shots[i];if(phase==='hold'){show(pose(s,.5),true);return;}
    if(phase==='wait'){waited+=dt;show(pose(s,0),true);if(waited>2.5&&(loaded()||waited>14)){phase='play';fade.style.opacity='0';}return;}
    t+=dt;const u=Math.min(1,t/s.dur);
-   if(drive){car=drive.step(dt);place?.(car.x,car.z,car.heading,drive.speed);}
+   if(drive){car=drive.step(dt,cars());place?.(car.x,car.z,car.heading,drive.speed);}
    show(pose(s,u),false,dt);
    if(t>s.dur-.35)fade.style.opacity='1';
    if(u>=1)next();

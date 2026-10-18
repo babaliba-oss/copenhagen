@@ -20,6 +20,13 @@ export function placeOnRoads(roads,[x,z],toward=null){
  return best;
 }
 
+// The car ahead in the hero's lane (within 2.2 m sideways, heading the same way, up to 60 m): {gap, speed} or null.
+export function leadCar(p,cars){
+ let best=null;const fx=-Math.sin(p.heading),fz=-Math.cos(p.heading);
+ for(const c of cars||[]){if(!c||c.edge===null||!Number.isFinite(c.x))continue;const dx=c.x-p.x,dz=c.z-p.z,along=dx*fx+dz*fz;if(along<=0||along>60)continue;
+  if(Math.abs(dx*fz-dz*fx)>2.2||Math.cos((c.heading||0)-p.heading)<.7)continue;if(!best||along<best.gap)best={gap:along,speed:Math.abs(c.speed||0)};}
+ return best;
+}
 export function createCineDrive(roads,{from,toward=null,speed=12,turnSpeed=.45}={}){
  const start=placeOnRoads(roads,from,toward);if(!start)return null;
  let edge=start.edge,s=start.s,v=speed,distance=0;const visited=new Set([edge.id]);
@@ -32,10 +39,12 @@ export function createCineDrive(roads,{from,toward=null,speed=12,turnSpeed=.45}=
  const pose=()=>routePoint(edge,s,edge.lane??0,next?startDir(next):undefined);
  return {
   get edge(){return edge;},get distance(){return distance;},get speed(){return v;},pose,
-  step(dt){
-   // ease towards the speed the next turn allows (sharp corners at walking pace, straight on at full speed)
+  step(dt,cars=null){
+   // ease towards the speed the next turn allows (sharp corners at walking pace, straight on at full speed), and
+   // never into the car ahead: follow it at a 12 m gap (the hero is placed, not simulated, and would drive through it)
    const toEnd=edge.length-s,turn=next?angle(endDir(edge),startDir(next)):0;
-   const target=toEnd<18&&turn>.5?Math.max(speed*turnSpeed,speed*(1-turn/Math.PI)):speed;
+   let target=toEnd<18&&turn>.5?Math.max(speed*turnSpeed,speed*(1-turn/Math.PI)):speed;
+   const lead=cars?leadCar(pose(),cars):null;if(lead)target=Math.min(target,Math.max(0,lead.speed+(lead.gap-12)*.6));
    v+=(target-v)*Math.min(1,dt*2.2);
    s+=v*dt;distance+=v*dt;
    while(s>edge.length){const n=next||choose(edge);if(!n){s=edge.length;v=0;break;}s-=edge.length;edge=n;visited.add(edge.id);next=choose(edge);}

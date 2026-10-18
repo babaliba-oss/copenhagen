@@ -50,3 +50,12 @@ test('each era gets its own shots, and ?shots= picks some by name or index',()=>
  assert.deepEqual(pickShots(1760,'?shots=0').map(s=>s.name),[old[0].name]);
  assert.ok(SHOTS.filter(s=>s.drive).length>=8,'mostly driving shots');
 });
+
+test('the hero car follows a slower car ahead in its lane instead of driving through it',async()=>{
+ const {leadCar}=await import('../src/cine-drive.js');
+ const roads=cross(),d=createCineDrive(roads,{from:[-90,0],toward:[100,0],speed:14});
+ const slow={x:-60,z:1.6,heading:d.pose().heading,speed:5,edge:{}};
+ for(let i=0;i<150;i++){slow.x+=slow.speed/30;d.step(1/30,[slow]);}
+ const gap=slow.x-d.pose().x;assert.ok(gap>6,`kept back: gap ${gap.toFixed(1)} m`);assert.ok(Math.abs(d.speed-5)<1.5,`matched its speed: ${d.speed.toFixed(1)}`);
+ assert.equal(leadCar(d.pose(),[{x:d.pose().x+20,z:-1.6,heading:d.pose().heading+Math.PI,speed:9,edge:{}}]),null,'oncoming traffic in the other lane is not a lead');
+});
