@@ -138,7 +138,7 @@ export function createSky({scene, camera} = {}) {
   mesh.updateMatrix(); mesh.matrixWorld.copy(mesh.matrix);
   // Slight parallax so the cloud layer is not glued to the camera when driving.
   uniforms.uDrift.value.set(e[12] * 1.2e-4, e[14] * 1.2e-4);
-  uniforms.uTime.value = ((typeof performance !== 'undefined' ? performance.now() : 0) - start) / 1000 % 100000;
+  uniforms.uTime.value = ((globalThis.__skyClock ? globalThis.__skyClock() : typeof performance !== 'undefined' ? performance.now() : 0) - start) / 1000 % 100000; // __skyClock: the trailer capture's clock (main.js ?fixed)
  };
  if (scene) {
   scene.add(mesh);

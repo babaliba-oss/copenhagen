@@ -1,5 +1,5 @@
 import './cache-bust.js';
-import {installBootArt} from './boot-art.js';import {expandCity} from './city-pack.js';import {createCinematic} from './cinematic.js';import {createPerfOverlay} from './perf-overlay.js';import {surfaceTile} from './surface-tiles.js';import {expandMobility} from './mobility-pack.js';installBootArt();
+import {installBootArt} from './boot-art.js';import {expandCity} from './city-pack.js';import {createCinematic,pickShots} from './cinematic.js';import {createPerfOverlay} from './perf-overlay.js';import {surfaceTile} from './surface-tiles.js';import {expandMobility} from './mobility-pack.js';installBootArt();
 import './style.css';
 import './loading-screen.css';
 import './speedometer.css';
@@ -200,7 +200,7 @@ function layoutFrame(){
 layoutFrame();
 const camera=new THREE.PerspectiveCamera(58,captureFrame.w/captureFrame.h,.25,1500);camera.layers.enable(1); // layer 1: mission beams and route ribbons (hidden in ?cinematic)
 let inspectionCamera=null,cinematic=null;
-const CINEMATIC=/[?&]cinematic\b/.test(location.search);if(CINEMATIC)try{for(const e of ['h','m'])sessionStorage.setItem('cph-paper-'+e,'1');}catch{} // no newspaper over the trailer
+const CINEMATIC=/[?&]cinematic\b/.test(location.search),FIXED=CINEMATIC?+(new URLSearchParams(location.search).get('fixed'))||0:0;let fixedNow=0,fixedCall=false,frameNow=0; /* ?cinematic&fixed=30: a capture script steps each shot frame by frame (1/30 s a frame) at full quality */if(CINEMATIC)try{for(const e of ['h','m'])sessionStorage.setItem('cph-paper-'+e,'1');}catch{} // no newspaper over the trailer
 const trafficFrustum=new THREE.Frustum(),trafficProjection=new THREE.Matrix4(),trafficSphere=new THREE.Sphere(new THREE.Vector3(),4);
 const trafficInView=a=>{trafficSphere.center.set(a.x,1.5+groundAt(a.x,a.z),a.z);return trafficFrustum.intersectsSphere(trafficSphere);};
 const focus=new THREE.Vector3(0,0,85);
@@ -218,6 +218,7 @@ const renderer=new THREE.WebGLRenderer({canvas:$('world'),antialias:true,powerPr
 const fpsMeter=createFpsMeter(renderer);
 const maxPixelRatio=Math.min(devicePixelRatio,1.5),resolution=createAdaptiveResolution({max:maxPixelRatio,min:Math.min(maxPixelRatio,.75)});
 renderer.setPixelRatio(maxPixelRatio);
+if(FIXED){captureMode=true;resolution.lock(1);renderer.setPixelRatio(1);globalThis.__skyClock=()=>frameNow;} /* frame-by-frame capture: full quality at the window's size, clouds on the trailer's clock */
 renderer.setSize(captureFrame.w,captureFrame.h);
 renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFShadowMap;renderer.shadowMap.autoUpdate=false; // updated from frame(): every frame when fast, every second frame when the frame budget is tight
 renderer.outputColorSpace=THREE.SRGBColorSpace;
@@ -917,7 +918,7 @@ function setStart(l){mobileControls?.release();peopleInteraction?.reset(world);m
 function handleTileError(e){console.error(e);if(!document.body.classList.contains('booting'))toast('Some scenery could not load. Nearby streets will retry.');} // not over the welcome card
 const touchScreen=matchMedia('(pointer:coarse)').matches; // phones and tablets: no keyboard, so the HUD and touch buttons stay on
 if(touchScreen){document.body.classList.remove('clean-capture');document.body.classList.add('touch');}
-function start(){if(!ready)return;if(previewing){startAfterPreview=true;return;}if(!sound&&city?.id?.startsWith('copenhagen')){let on=true;try{on=localStorage.getItem('cph-sound')!=='0';}catch{}if(on)$('sound-btn').click();}started=true;setTimeout(()=>prefetchOtherEra(),20000);paused=false;document.body.classList.add('driving');loadingScreen.enter();carGroup.visible=true;marker.visible=false;toast(touchScreen?'Slide to steer · Hold Go to move · Menu for the map and settings':'WASD or arrow keys to drive · Space to handbrake');$('world').focus();}
+function start(){if(!ready)return;if(previewing){startAfterPreview=true;return;}if(!sound&&!CINEMATIC&&city?.id?.startsWith('copenhagen')){let on=true;try{on=localStorage.getItem('cph-sound')!=='0';}catch{}if(on)$('sound-btn').click();}started=true;setTimeout(()=>prefetchOtherEra(),20000);paused=false;document.body.classList.add('driving');loadingScreen.enter();carGroup.visible=true;marker.visible=false;toast(touchScreen?'Slide to steer · Hold Go to move · Menu for the map and settings':'WASD or arrow keys to drive · Space to handbrake');$('world').focus();}
 function focusWorldControls(){if(started&&!paused&&!mapOpen&&!police?.busted&&!gameIsStopped())$('world').focus({preventScroll:true});}
 let bigMap=null;
 async function travelTo(l){ /* big map: jump to a named place */
@@ -1074,7 +1075,8 @@ function updateHUD(now){
 }
 function frame(now){
  if(gameIsStopped())return;
- requestAnimationFrame(frame);const cpu0=performance.now(),frameMs=lastTime?now-lastTime:0;fpsMeter?.tick(frameMs);perfOverlay?.tick(frameMs,now);const steps=simulationSteps(lastTime?(now-lastTime)/1000:0),dt=steps.reduce((a,b)=>a+b,0);lastTime=now;
+ if(!fixedCall){requestAnimationFrame(frame);if(FIXED){fixedNow=now;if(cinematic?.phase==='play')return;}} /* ?fixed: while a shot plays, only the capture script advances the world */frameNow=now;
+ const cpu0=performance.now(),frameMs=fixedCall?1000/FIXED:lastTime?now-lastTime:0;fpsMeter?.tick(frameMs);perfOverlay?.tick(frameMs,now);const steps=fixedCall?[1/FIXED]:simulationSteps(lastTime?(now-lastTime)/1000:0),dt=steps.reduce((a,b)=>a+b,0);if(!fixedCall)lastTime=now;
  mobileControls.update({started,paused,mapOpen,busted:!!police?.busted,mode:travel?.mode||'car',speed:car?.speed||0});
  if(ready)peopleInteraction.update(dt,car,nearbyPeople(),{enabled:canTalk()});
  if(ready&&marketShop){marketShop.update(paused||mapOpen?0:dt,car,{enabled:canTalk()});for(const m of marketShop.drainMessages())marketUI.say(m);}
@@ -1083,7 +1085,8 @@ function frame(now){
   mobility.visibilityTest=trafficInView;if(buses)buses.simulation.visibilityTest=trafficInView;
   for(const step of steps){
    impacts.step(step,world);crowd?.step(step);let before=null;const driving=travel.mode==='car',parked=travel.parked();
-   if(started){
+   if(started&&cinematic?.driving)before={...car}; /* the trailer's car drives itself (cinematic.js) and hits nothing */
+   else if(started){
     const previous=before={...car},r=driving?driveStep(car,keys,step,world):travel.step(keys,step,travelObstacles());
     if(r.crashed){car=travel.actor;playerCars.sync(travel);if(now-lastToast>1500){toast(r.crashed>5?'Ouch. That was a hard fall.':'You came off. Press Enter to get back on.');lastToast=now;}}
     police.observeDriving(previous,car,step,{driving});
@@ -1149,7 +1152,7 @@ function frame(now){
  if(inspectionCamera){camera.position.set(...inspectionCamera.eye);camera.lookAt(...inspectionCamera.target);}
  {const pose=roadblock?.cameraPose()||finale.cameraPose(car);if(pose){camera.position.set(...pose.position);camera.lookAt(...pose.target);}} // arrest cinematic orbit
  const wantFov=chaseCamera&&started&&!inspectionCamera?cameraFov:DRIVE_FOV.min;if(camera.fov!==wantFov){camera.fov=wantFov;camera.updateProjectionMatrix();}
- playerCars.setVisible(!inspectionCamera);
+ playerCars.setVisible(!inspectionCamera||!!cinematic?.driving);if(CINEMATIC)marker.visible=false;
   travelRenderer.update(travel,started&&!paused&&!mapOpen?dt:0,{visible:!inspectionCamera,actorVisible:!police?.busted,hold:marketShop?.holdPose()??null});
   if(ready&&!paused&&!mapOpen&&!police?.busted){
    const birdStep=Math.min(.1,dt); // keep encounter pressure and bird motion on the same clock at low frame rates
@@ -1216,8 +1219,8 @@ function frame(now){
  marketScene?.update(now/1000,car);
  stationStreetLife?.update(car,ready&&!paused&&!mapOpen?dt:0);
  // Resize before drawing: changing the pixel ratio clears the canvas, which flashed a blank frame when done after.
- if(ready&&resolution.update(frameMs,dt,lastCpuMs))renderer.setPixelRatio(resolution.scale); // last frame's CPU time: CPU-bound frames keep their resolution
- if(ready&&!captureMode&&governor.update(dt,resolution))console.info('Quality step',governor.level,'to hold the frame rate');
+ if(ready&&!FIXED&&resolution.update(frameMs,dt,lastCpuMs))renderer.setPixelRatio(resolution.scale); // last frame's CPU time: CPU-bound frames keep their resolution
+ if(ready&&!captureMode&&!FIXED&&governor.update(dt,resolution))console.info('Quality step',governor.level,'to hold the frame rate');
  look.update(dt,now/1000); // blends the active look and re-applies its sun offset after the shadow target above
  flushPeople(scene); // every crowd's instances into the shared person batches (person-model.js)
  const cpu1=performance.now();
@@ -1512,8 +1515,10 @@ async function boot(){
    progress(98,'Warming up shaders');{const shown=[];scene.traverse(o=>{if(!o.visible){o.visible=true;shown.push(o);}}); /* hidden things too (night lamps, rain, far versions): compiled now, not mid-drive */await Promise.race([renderer.compileAsync(scene,camera).catch(()=>{}),new Promise(r=>setTimeout(r,6000))]);for(const o of shown)o.visible=false;}
    progress(100,'Ready');
    ready=true;carGroup.visible=true;marker.visible=true;loadingScreen.ready(startPoint.name);
-   if(CINEMATIC)setTimeout(()=>{start();camera.layers.disable(1);cinematic=createCinematic({ground:groundAt,setCamera:p=>{inspectionCamera=p;},loaded:()=>!loadingTiles.size&&!uploads.size,
-    teleport:(x,z)=>{let best=null,d=Infinity;for(const n of mobility?.roads?.nodes||[]){const q=(n[0]-x)**2+(n[1]-z)**2;if(q<d){d=q;best=n;}}const [px,pz]=best||[x,z];setStart({name:'Cinematic',district:city.name,x:px,z:pz,heading:0});}});cinematic.start();if(import.meta.env.DEV)window.__cine=cinematic;},400); // ?cinematic: trailer camera (cinematic.js)
+   if(CINEMATIC)setTimeout(()=>{start();camera.layers.disable(1);let steerFrom=null;cinematic=createCinematic({ground:groundAt,setCamera:p=>{inspectionCamera=p;},loaded:()=>!loadingTiles.size&&!uploads.size,era:city.era,shots:pickShots(city.era,location.search),roads:()=>mobility?.roads,clear:(x,z)=>!world?.buildings?.at(x,z),
+    teleport:(x,z,heading)=>{if(heading===undefined){let best=null,d=Infinity;for(const n of mobility?.roads?.nodes||[]){const q=(n[0]-x)**2+(n[1]-z)**2;if(q<d){d=q;best=n;}}if(best)[x,z]=best;}setStart({name:'Cinematic',district:city.name,x,z,heading:heading??0});steerFrom=null;},
+    place:(x,z,heading,speed)=>{const turn=steerFrom===null?0:Math.atan2(Math.sin(heading-steerFrom),Math.cos(heading-steerFrom));steerFrom=heading;car.steer+=(Math.max(-1,Math.min(1,turn*12))-car.steer)*.25;car.distance=(car.distance||0)+Math.hypot(x-car.x,z-car.z);car.x=x;car.z=z;car.heading=heading;car.speed=speed;}});
+    cinematic.start();window.__cine=cinematic;if(FIXED)window.__cineFrame=(n=1)=>{for(let k=0;k<n;k++){fixedNow+=1000/FIXED;fixedCall=true;try{frame(fixedNow);}finally{fixedCall=false;}}return cinematic.debug;};},400); /* ?cinematic: trailer shots (cinematic.js); ?fixed=30: window.__cineFrame() steps them for a frame-by-frame capture */
    if(!helsinki)$('boot-place-label').textContent=`Your starting point in ${city.name}`;
    startPicker=createStartPicker({starts:data.landmarks,current:startPoint,onChange:previewStart});
    if(city.id.startsWith('copenhagen'))bigMap=createBigMap({base:()=>mapCache,view:()=>mapView,landmarks:()=>data.landmarks,player:()=>car,targets:()=>cph?.minimapTargets()||[],route:()=>cph?.route?.(),onTravel:travelTo,radius:()=>RADIUS});
