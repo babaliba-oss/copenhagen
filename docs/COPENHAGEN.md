@@ -160,6 +160,16 @@ Riding, falling and carrying, the player is the procedural figure too. `?procedu
 - Two rigs: the men (M_*) and the women (W_*) share bone names, but the women's bones are turned differently, so each
   has its own copy of the 9 clips (Walk, Run, Idle, Idle_Neutral, Wave, Interact, Punch_Right, HitRecieve, Death):
   `anims.glb.gz` for M_*, `anims_w.glb.gz` for W_* (retargeted, feet planted). Clips play in place (Root never moves).
+- R_* (Daniel's models): `R_CoolMan` today (cool-man.zip, a Ready Player Me avatar on a Mixamo skeleton) and in 1760
+  `R_Coat_Red`, `R_Domostroj`, `R_Mysli` (his three 18th-century costumes dressed on the cool-man's skeleton: the
+  avatar's head and hands with powdered hair and a tricorne, the costume's skin weights from the nearest avatar vertex with
+  the arms first lowered to the costume's pose, inner clothes taking the weights of the coat over them so they do not poke
+  through). Clips: the Quaternius set retargeted onto that skeleton (`anims_r.glb.gz`: world rotation deltas from the
+  Quaternius bind applied to the avatar's bind turned into the same T-pose; the spine keeps the avatar's own rest).
+  Build: `python3 scripts/people/rpm_build.py scripts/people <dhana.gltf> <anims.glb unzipped> <out>` (R_CoolMan + anims_r),
+  then `costume_build.py scripts/people <dhana.gltf> <costume .glb (FBX2glTF) or scene.usdc> <textures dir> <R_name> <out>
+  [collar=1.30 neckz=-0.065 for the red coat] [coat=#hex]`, gzip -9 -n into public/models/people. Another Ready Player Me
+  avatar (same skeleton) can go through rpm_build.py the same way. Mix: `TODAY_MIX` / `PERIOD_MIX` in main.js.
 - Rebuild from the Quaternius sources (the grand-theft-ladcykel assets: M_*.glb, W_*.glb, anims_h.glb):
   `python3 scripts/people/ppl_build.py scripts/people <assets> <out>` (numpy only), check with `ppl_verify.py`, then
   `gzip -9 -n` each output into public/models/people. The rest pose is rebuilt as the true T-pose (the sources store an
