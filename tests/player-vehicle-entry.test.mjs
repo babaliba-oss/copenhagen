@@ -12,13 +12,13 @@ const source=(x=0,z=0,id='parked',obstacle=rect(x-1,z-2,2,4))=>createParkedCarSo
 function beside(travel,s,x=2.2){assert.equal(travel.interact().ok,true);Object.assign(travel.actor,{x:s.actor.x+x,z:s.actor.z});}
 
 test('a stopped nearby car can be taken, parked and reused without cloning it again or moving the starter car',()=>{
- const s=source(),w=world([s.obstacle]),home=makeCar(-20,0),travel=new PlayerTravel(home,w,{cars:()=>[s]});home.battery=.41;
+ const s=source(),w=world([s.obstacle]),home=makeCar(-20,0),travel=new PlayerTravel(home,w,{cars:()=>[s]});home.damage=.41;
  beside(travel,s);travel.actor.distance=73;s.actor.speed=5;assert.equal(travel.interact(s.id).ok,false,'a moving car cannot be taken');s.actor.speed=0;
  assert.equal(travel.interact(s.id).ok,true);assert.equal(travel.mode,'car');assert.equal(s.actor.playerTaken,true);assert.equal(s.actor.edge,null);assert.equal(s.obstacle.disabled,true);
- assert.equal(travel.car.visual,s.visual);assert.equal(travel.car.distance,73);assert.equal(travel.cars.length,2);assert.equal(home.x,-20);assert.equal(home.battery,.41);
- const taken=travel.car;taken.x=40;taken.z=-10;taken.battery=.62;
+ assert.equal(travel.car.visual,s.visual);assert.equal(travel.car.distance,73);assert.equal(travel.cars.length,2);assert.equal(home.x,-20);assert.equal(home.damage,.41);
+ const taken=travel.car;taken.x=40;taken.z=-10;taken.damage=.62;
  assert.equal(travel.interact().ok,true);assert.equal(travel.mode,'walk');assert.ok(travel.parked().includes(taken));
- assert.equal(travel.interact(s.id).ok,true);assert.equal(travel.car,taken);assert.equal(travel.cars.length,2);assert.equal(taken.battery,.62);
+ assert.equal(travel.interact(s.id).ok,true);assert.equal(travel.car,taken);assert.equal(travel.cars.length,2);assert.equal(taken.damage,.62);
 });
 
 test('car entry ignores only its own obstacle, still checks a real intervening wall, and ignores disabled old car colliders',()=>{

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {createRadio,stationPosition,RADIO_OFF} from '../src/copenhagen/radio.js';
+import {createRadio,stationPosition,storedStation,storeStation,RADIO_OFF,RADIO_KEY} from '../src/copenhagen/radio.js';
 
 const fakeAudio=()=>{const l={};return {src:'',volume:0,paused:true,readyState:4,duration:300,currentTime:0,
  addEventListener(k,f){(l[k]||=[]).push(f);},fire(k){(l[k]||[]).forEach(f=>f());},load(){},play(){this.paused=false;return Promise.resolve();},pause(){this.paused=true;}};};
@@ -36,4 +36,31 @@ test('a track that ends hands over to the next one; three failures in a row mean
  audio.fire('ended');assert.equal(audio.src,'b.mp3');
  audio.fire('error');audio.fire('error');audio.fire('error');
  assert.equal(shown.at(-1)[1],'No signal');assert.equal(radio.playing,false);
+ radio.update(.1,{on:false});radio.update(.1,{on:true});assert.deepEqual(shown.at(-1),['Radio Folk','No signal'],'getting back in during the outage says so');
+ t=50;radio.update(.1,{on:false});radio.update(.1,{on:true});assert.equal(audio.src,'a.mp3','after it, the station tunes in again');assert.deepEqual(shown.at(-1),['Radio Folk','A']);
+});
+
+test('the radio starts on the station it was left on and comes on with it, card and all, when you drive',()=>{
+ let t=0;const audio=fakeAudio(),shown=[];
+ const radio=createRadio({stations,audio,clock:()=>t,random:()=>0,initial:2,banner:(a,b)=>shown.push([a,b])});
+ assert.equal(radio.station,2);assert.equal(shown.length,0,'nothing is announced on foot');assert.equal(audio.src,'','or loaded');
+ radio.update(.1,{on:true});assert.equal(audio.src,'c.mp3');assert.deepEqual(shown.at(-1),['Jazz','C'],'getting in announces the station and the track');
+ radio.update(.1,{on:true});assert.equal(shown.length,1,'once, not every frame');
+ radio.update(.1,{on:false});radio.update(.1,{on:true});assert.equal(shown.length,2,'and again on the next drive');
+ audio.fire('ended');assert.deepEqual(shown.at(-1),['Jazz','C'],'a one-track station loops');
+ t=100;radio.update(.1,{on:false});radio.next(-1);assert.deepEqual(shown.at(-1),['Radio Folk','A'],'tuned on foot: where the broadcast is now');
+ assert.equal(createRadio({stations,audio:fakeAudio()}).station,RADIO_OFF,'off unless told otherwise');
+ assert.equal(createRadio({stations,audio:fakeAudio(),initial:9}).station,2,'a station past the end is clamped');
+ const off=createRadio({stations,audio:fakeAudio(),initial:RADIO_OFF,banner:(a,b)=>shown.push([a,b])});
+ off.update(.1,{on:true});assert.deepEqual(shown.at(-1),['Radio off',''],'Radio off still brings up the card');assert.equal(off.playing,false);
+});
+
+test('the chosen station is remembered (0 = off); nothing stored means station 1; blocked storage only forgets',()=>{
+ const memory=()=>{const m=new Map();return {getItem:k=>m.has(k)?m.get(k):null,setItem:(k,v)=>m.set(k,String(v))};};
+ const s=memory();assert.equal(storedStation(s),1,'the first drive tunes in, GTA style');
+ storeStation(0,s);assert.equal(storedStation(s),0,'switched off stays off');
+ storeStation(3,s);assert.equal(storedStation(s),3);
+ s.setItem(RADIO_KEY,'jazz');assert.equal(storedStation(s),1,'anything else is ignored');
+ const blocked={getItem(){throw new Error('SecurityError');},setItem(){throw new Error('QuotaExceededError');}};
+ assert.equal(storedStation(blocked),1);assert.doesNotThrow(()=>storeStation(2,blocked));
 });

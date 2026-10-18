@@ -51,8 +51,7 @@ export function rollingMix(kind,speed){
  };
 }
 
-// Electric drivetrain: the player car is an EV (battery gauge, "R to
-// recharge"), so instead of a combustion RPM we map wheel speed to motor hum
+// Electric drivetrain: the player car is an EV, so instead of a combustion RPM we map wheel speed to motor hum
 // and inverter/reduction-gear whine, and throttle/regen to load. Below ~30 km/h
 // EVs emit a pedestrian warning tone (AVAS); we add a gentle one.
 export function engineModel(speed,{throttle=false,reverse=false,brake=false}={},powered=true){

@@ -51,7 +51,7 @@ Use Node.js 22 or newer. Open the URL Vite prints in a modern browser with WebGL
 | Shift (hold) | Run while on foot |
 | G | Talk to a nearby person or market seller / end a conversation |
 | E (near a stall) | Open its menu, or use the item in your hand |
-| R | Back to your starting point |
+| R | Recover the car: back on the nearest lane, repaired (on foot: back to your starting point) |
 | M | City map and starting points |
 | C | Drive / Follow / High camera |
 | Q / E (hold) | Look left / right |

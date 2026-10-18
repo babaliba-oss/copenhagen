@@ -2,7 +2,7 @@
 body.booting :is(.topbar,.location-tag,.dashboard,.right-tools,.landmark-label,#wanted,#location-readout,#touch-controls,#touch-aux,.vignette){visibility:hidden;pointer-events:none}
 
 /* Type system for the card. Two faces, one scale, one spacing rhythm:
-   display  Spectral  — wordmark, tagline, place name (28 / 28 / 20)
+   display  Spectral  — wordmark, tagline (second line 20), place name (28 / 28 / 20)
    ui       DM Sans   — eyebrow, button, hints, disclosure, footer (12 / 14 / 16)
    Only the eyebrow uses capitals and tracking. Spacing steps: 8 / 12 / 16 / 24 / 32. */
 #intro.boot-screen{
@@ -22,6 +22,10 @@ body.booting :is(.topbar,.location-tag,.dashboard,.right-tools,.landmark-label,#
 #intro.boot-screen .boot-brand .brand-icon{width:40px;height:40px}
 #intro.boot-screen .boot-brand .brand-name{display:block}
 #intro.boot-screen .boot-tagline{margin:0 0 var(--s-32);font:500 var(--t-28)/32px var(--display);letter-spacing:-.025em;color:inherit}
+/* Its second line, smaller and lighter: the way to 1760. Touch screens have no Y key, so they are pointed at the ⌛ button. */
+#intro.boot-screen .boot-era{display:block;margin-top:var(--s-8);font:400 var(--t-20)/28px var(--display);letter-spacing:-.015em;color:var(--muted)}
+#intro.boot-screen .boot-era-touch{display:none}
+@media(pointer:coarse){#intro.boot-screen .boot-era-key{display:none}#intro.boot-screen .boot-era-touch{display:block}}
 #intro.boot-screen #boot-title{margin:0 0 var(--s-16);font:600 var(--t-20)/28px var(--display);letter-spacing:-.015em;color:inherit}
 
 /* UI: DM Sans */
@@ -113,6 +117,7 @@ body.game-failed #intro{z-index:1000;pointer-events:auto}
  #intro.boot-screen{--pad:24px;left:max(16px,env(safe-area-inset-left));bottom:max(16px,env(safe-area-inset-bottom));width:min(600px,calc(100% - 32px));max-height:calc(100dvh - 32px);padding:var(--s-24);display:grid;grid-template-columns:1fr 1fr;grid-template-rows:auto auto 1fr;column-gap:var(--s-32);align-items:start}
  #intro.boot-screen>.boot-brand{grid-column:1;grid-row:1;margin-bottom:var(--s-16)}
  #intro.boot-screen>.boot-tagline{grid-column:1;grid-row:2;margin:0;font-size:24px;line-height:28px}
+ #intro.boot-screen .boot-era{margin-top:var(--s-4);font-size:var(--t-16);line-height:24px}
  #intro.boot-screen>.boot-footer{grid-column:1;grid-row:3;align-self:end;margin-top:var(--s-16);border-top:0;padding-top:0}
  /* The four links fit one row in the narrow column (44 px tall on touch) when spaced instead of dotted. */
  #intro .boot-links{gap:0 var(--s-12)}

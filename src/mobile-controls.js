@@ -52,8 +52,7 @@ export function createMobileControls({keys,canPlay=()=>true,onMenuChange=()=>{},
  on(doc,'visibilitychange',()=>{if(doc.hidden)release();});
 
  function refreshMenu(){
-  const battery=doc.getElementById('battery-value')?.textContent||'100%';
-  doc.getElementById('mobile-menu-status').textContent=state.mode==='car'?`Car · Battery ${battery}`:state.mode==='walk'?'Exploring on foot':state.mode==='bike'?'Exploring by bike':'Exploring by scooter';
+  doc.getElementById('mobile-menu-status').textContent=state.mode==='car'?'Exploring by car':state.mode==='walk'?'Exploring on foot':state.mode==='bike'?'Exploring by bike':'Exploring by scooter';
   doc.getElementById('mobile-camera-value').textContent=doc.getElementById('view-label')?.textContent||'Drive';
   doc.getElementById('mobile-weather-value').textContent=doc.getElementById('look-label')?.textContent||'Midday';
   doc.getElementById('mobile-sound-value').textContent=doc.getElementById('sound-btn')?.getAttribute('aria-label')==='Mute sound'?'On':'Off';

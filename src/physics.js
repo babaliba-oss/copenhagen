@@ -1,5 +1,4 @@
 import { insidePlayable, pointInPolygon, segmentDistance, inWaterPolygons } from './geo.js';
-import {consumeBattery} from './battery.js';
 import {groundPose,lakeAt} from './terrain.js';
 export const GRAVITY=9.81;
 export const PLAYER_MAX_SPEED=140/3.6;
@@ -16,7 +15,8 @@ export function simulationSteps(elapsed){
 // After a spike strip (src/roadblock.js): `car.flat` 1 = shredded tyres. The
 // car sheds speed hard down to a rim-scraping crawl, has little drive and wobbles.
 export const FLAT_TYRES={speed:3.2,drag:11,power:.3,wobble:.35};
-export function makeCar(x,z,heading=0){return settleOnGround({x,z,heading,speed:0,steer:0,distance:0,battery:1});}
+// No battery: the car never runs out (the city is for exploring, not for range anxiety).
+export function makeCar(x,z,heading=0){return settleOnGround({x,z,heading,speed:0,steer:0,distance:0});}
 // Height, pitch and roll from the ground under the wheels (all 0 in a flat city).
 export function settleOnGround(car){const p=groundPose(car.x,car.z,car.heading,1.4,.8);car.y=p.y;car.pitch=p.pitch;car.roll=p.roll;return car;}
 export function carSamples(car,x=car.x,z=car.z) {
@@ -47,9 +47,9 @@ export function canExitBuildings(from,to,buildings){
 }
 export function driveStep(car,keys,dt,world) {
  const collisionBuildings=world.collisionBuildings||world.buildings;
- const powered=(car.battery??1)>0,distanceBefore=car.distance;
- const throttle=(keys.has('KeyW')||keys.has('ArrowUp'))&&(powered||car.speed<-.5);
- const reverse=(keys.has('KeyS')||keys.has('ArrowDown'))&&(powered||car.speed>.5);
+ const distanceBefore=car.distance;
+ const throttle=keys.has('KeyW')||keys.has('ArrowUp');
+ const reverse=keys.has('KeyS')||keys.has('ArrowDown');
  const left=keys.has('KeyA')||keys.has('ArrowLeft'),right=keys.has('KeyD')||keys.has('ArrowRight'),brake=keys.has('Space');
  const onRoad=Boolean(world.roads.at(car.x,car.z));
  const targetSteer=left||right?(left?1:0)-(right?1:0):keys.tilt||0; /* keys.tilt: analog steering from a tilted phone, -1…1, left positive */car.steer+=(targetSteer-car.steer)*Math.min(1,dt*10);
@@ -83,7 +83,6 @@ export function driveStep(car,keys,dt,world) {
    if(samples.some(([x,z])=>!world.roads.at(x,z)&&!world.pavement.at(x,z)&&(inWaterPolygons(world.water,x,z)||lakeAt(x,z)!==null))){collision='water';break;}
    car.distance+=Math.hypot(nx-car.x,nz-car.z);car.x=nx;car.z=nz;
  }
- car.battery=consumeBattery(car.battery??1,car.distance-distanceBefore,car.speed);
  if(collision){if(car.distance===distanceBefore)car.heading=oldHeading;car.speed=0;}
  settleOnGround(car);
  return {collision,onRoad};
