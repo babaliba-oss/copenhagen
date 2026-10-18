@@ -124,12 +124,17 @@ export function settleObject(root,{maxEdge=4,skip=null,tolerance=.03}={}){
 export function createTerrainGround(material,{cell=10,chunk=32,size=11000,depth=-.5,wet=null}={}){
  const f=terrain(),group=new THREE.Group();group.name='Terrain ground';if(!f)return group;
  const E=Math.floor(f.extent/cell)*cell,n=Math.round(2*E/cell);
+ const shore=wet?shoreVertices(f,wet,cell,E,n):null;
  const grid=(xs,zs)=>{const pos=[],nor=[],idx=[],w=xs.length;
   // Under (or next to) water the ground drops 2 m below the water surface: the elevation model's ground is often
   // above the water layer in the harbour and canals, and drawing it there hid the water (the "muddy" harbour).
   const sink=(x,z)=>{let w=null;for(const [a,b] of [[0,0],[cell/2,0],[-cell/2,0],[0,cell/2],[0,-cell/2]]){const v=waterAt(x+a,z+b);if(v!=null)w=w==null?v:Math.min(w,v);}return w;};
-  for(const z of zs)for(const x of xs){const g0=groundAt(x,z),w0=sink(x,z),w=w0!=null&&(g0<w0+1||wet?.(x,z))?w0:null; // banks well above the water (quays) keep their height: sinking every vertex near a canal dug pits beside the streets
-   pos.push(x,w==null?g0+depth:Math.min(g0+depth,w-2),z);const dx=groundAt(x+1,z)-groundAt(x-1,z),dz=groundAt(x,z+1)-groundAt(x,z-1),l=Math.hypot(dx,2,dz);nor.push(-dx/l,2/l,-dz/l);}
+  for(const z of zs)for(const x of xs){const g0=groundAt(x,z),s=shore?.(x,z);
+   if(s!==undefined){if(s===null)pos.push(x,g0+depth,z);else pos.push(x,s+depth,z);} /* masked ground (see shoreVertices) */
+   else{const w0=sink(x,z),w=w0!=null&&(g0<w0+1||wet?.(x,z))?w0:null; /* banks well above the water (quays) keep their height: sinking every vertex near a canal dug pits beside the streets */
+    pos.push(x,w==null?g0+depth:Math.min(g0+depth,w-2),z);}
+   if(typeof s==='number'){nor.push(0,1,0);continue;} /* a shore vertex lies level with the land beside it */
+   const dx=groundAt(x+1,z)-groundAt(x-1,z),dz=groundAt(x,z+1)-groundAt(x,z-1),l=Math.hypot(dx,2,dz);nor.push(-dx/l,2/l,-dz/l);}
   for(let j=0;j+1<zs.length;j++)for(let i=0;i+1<w;i++){const a=j*w+i,b=a+1,c=a+w,d=c+1;idx.push(a,c,b,b,c,d);}
   const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));g.setAttribute('normal',new THREE.Float32BufferAttribute(nor,3));g.setIndex(idx);g.computeBoundingSphere();g.computeBoundingBox();return g;};
  const range=(a,b,step)=>{const out=[];for(let x=a;x<b-1e-6;x+=step)out.push(x);out.push(b);return out;};
@@ -141,6 +146,32 @@ export function createTerrainGround(material,{cell=10,chunk=32,size=11000,depth=
  for(const [xs,zs] of [[[...side,...mid.slice(1),...far.slice(1)],side],[[...side,...mid.slice(1),...far.slice(1)],far],[side,mid],[far,mid]]){const m=new THREE.Mesh(grid(xs,zs),material);m.receiveShadow=true;m.name='Terrain skirt';group.add(m);}
  group.userData={cell,chunks:group.children.length};
  return group;
+}
+
+// Ground the material cuts away over the mapped water (wet(x,z): inside the water polygons; main.js masks them):
+// it no longer has to sink under the water, which made every 10 m triangle from a quay vertex to a vertex out in
+// the canal a ramp across the quay, ending in a jagged cut at the water. Per vertex of the (n+1)² grid at `cell`
+// spacing from -E: null on dry land (keeps its height); for a vertex in the water with dry land among its eight
+// neighbours, the raw height of the nearest dry sample of the height field (the quay or bank it continues, so its
+// triangles stay level to the water's edge); undefined for vertices well out in the water and off the grid (they sink).
+export function shoreVertices(f,wet,cell,E,n){
+ const N=n+1,inside=new Uint8Array(N*N);
+ for(let j=0;j<N;j++)for(let i=0;i<N;i++)inside[j*N+i]=wet(-E+i*cell,-E+j*cell)?1:0;
+ const F=f.size,fc=f.cell,fe=f.extent,seen=new Uint8Array(F*F); // field samples: 0 unknown, 1 water, 2 dry
+ const dry=k=>{if(!seen[k])seen[k]=wet(-fe+(k%F)*fc,-fe+((k/F)|0)*fc)?1:2;return seen[k]===2;};
+ const land=(x,z)=>{const ci=Math.round((x+fe)/fc),cj=Math.round((z+fe)/fc);let best=Infinity,h=null;
+  for(let r=0;r<=6&&best>(r-.5)*fc;r++)for(let j=cj-r;j<=cj+r;j++)for(let i=ci-r;i<=ci+r;i++){
+   if(Math.max(Math.abs(i-ci),Math.abs(j-cj))!==r||i<0||j<0||i>=F||j>=F)continue;const k=j*F+i;if(!dry(k))continue;
+   const d=Math.hypot(-fe+i*fc-x,-fe+j*fc-z);if(d<best){best=d;h=f.ground[k];}}
+  return h;};
+ return (x,z)=>{
+  const i=Math.round((x+E)/cell),j=Math.round((z+E)/cell);
+  if(i<0||j<0||i>=N||j>=N||Math.abs(-E+i*cell-x)>1e-6||Math.abs(-E+j*cell-z)>1e-6)return undefined;
+  if(!inside[j*N+i])return null;
+  let edge=false;for(let dj=-1;dj<=1&&!edge;dj++)for(let di=-1;di<=1;di++){const ii=i+di,jj=j+dj;if(ii>=0&&jj>=0&&ii<N&&jj<N&&!inside[jj*N+ii]){edge=true;break;}}
+  if(!edge)return undefined;
+  const h=land(x,z);return h===null?undefined:h;
+ };
 }
 
 // Open water from the elevation model's `lake` layer. Each lake's level spreads up to `reach` cells onto the

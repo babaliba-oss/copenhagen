@@ -253,12 +253,15 @@ test('a bank blurred into a slope is levelled to the land behind it; land farthe
  const size=20,cell=3,extent=30,ground=new Float32Array(size*size),water=new Float32Array(size*size).fill(NaN);
  // lake west of x=0 at 0.8; the bank rises 1.0 -> 1.8 over four cells, then flat land at 1.8; a 6 m hill far east
  for(let j=0;j<size;j++)for(let i=0;i<size;i++){const x=-extent+i*cell,k=j*size+i;water[k]=x<12?.8:NaN;ground[k]=x<0?-.5:x<12?1+x/12*.8:x<45?1.8:6;}
- const n=levelBanks((x,z)=>x<0,{},{size,cell,extent,ground,water});
+ const plain=ground.slice(),n=levelBanks((x,z)=>x<0,{},{size,cell,extent,ground,water});
  assert.ok(n>0);
  const at=x=>ground[10*size+Math.round((x+extent)/cell)];
  for(const x of [0,3,6,9])assert.ok(Math.abs(at(x)-1.8)<1e-6,`bank at x=${x} is level with the land (${at(x)})`);
- assert.equal(at(-3),-.5);   // the lake bed is untouched
+ assert.ok(Math.abs(at(-3)-1.8)<1e-6,'the quay shelf: the water cell the shoreline crosses is level with the quay');
+ assert.equal(at(-6),-.5);   // the lake bed further out is untouched
  assert.ok(Math.abs(at(27)-1.8)<1e-6);   // land behind stays where it was
+ levelBanks((x,z)=>x<0,{shelf:false},{size,cell,extent,ground:plain,water});
+ assert.equal(plain[10*size+Math.round((-3+extent)/cell)],-.5,'without the shelf the bed stays');
 });
 
 test('water at street height (a moat the elevation model never saw) is sunk below its banks; a real basin is left alone', async () => {

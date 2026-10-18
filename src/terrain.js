@@ -140,7 +140,11 @@ export function raiseDryHollows(isWet,{lift=1.6,below=1.2,shelf=true}={},f=field
 // and creased. Dry ground within `reach` metres of the mapped water is raised to the level of the land just behind
 // it (the median of dry samples just beyond `reach`, never more than `maxRaise` up); the quay wall then takes the
 // drop at the water's edge. Returns the number of samples raised.
-export function levelBanks(isWet,{reach=12,maxRaise=1.4}={},f=field){
+// The quay shelf: afterwards every water sample beside dry land (8 neighbours) takes the height of that land, so each
+// grid cell the shoreline crosses is level and groundAt along the water's edge is the quay's height. The blurred
+// bank used to start inside those cells: the walls' coping and the paving and ground running up to the edge sagged
+// and wobbled towards the water (the drop now happens a cell further out, under the water).
+export function levelBanks(isWet,{reach=12,maxRaise=1.4,shelf=true}={},f=field){
  if(!f?.water)return 0;const n=f.size,g=f.ground,w=f.water,cell=f.cell,R=Math.max(1,Math.round(reach/cell));
  const wet=new Uint8Array(n*n);for(let k=0;k<n*n;k++)if(!Number.isNaN(w[k]))wet[k]=isWet(-f.extent+(k%n)*cell,-f.extent+((k/n)|0)*cell)?1:2;
  // distance (in cells, Chebyshev) from the mapped water, up to R+3
@@ -154,7 +158,13 @@ export function levelBanks(isWet,{reach=12,maxRaise=1.4}={},f=field){
   if(vals.length<3)continue;vals.sort((a,b)=>a-b);const behind=vals[vals.length>>1];
   if(behind>g[k]+.08&&behind-g[k]<=maxRaise)set.push(k,behind);}
  for(let x=0;x<set.length;x+=2)g[set[x]]=set[x+1];
- return set.length/2;
+ let raised=set.length/2;
+ if(shelf){const up=[];
+  for(let j=0;j<n;j++)for(let i=0;i<n;i++){const k=j*n+i;if(wet[k]!==1)continue;let top=-Infinity;
+   for(let dj=-1;dj<=1;dj++)for(let di=-1;di<=1;di++){const ii=i+di,jj=j+dj;if((di||dj)&&ii>=0&&jj>=0&&ii<n&&jj<n&&wet[jj*n+ii]!==1&&g[jj*n+ii]>top)top=g[jj*n+ii];}
+   if(top>g[k])up.push(k,top);}
+  for(let x=0;x<up.length;x+=2)g[up[x]]=up[x+1];raised+=up.length/2;}
+ return raised;
 }
 // Water the elevation model never saw (1760's moat, dug where today's city stands on flat ground): its level came out
 // at street height, so the causeways and the moat were one surface and the waves showed through the road. A water
