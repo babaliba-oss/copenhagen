@@ -8,6 +8,7 @@ import {loadOneMesh} from './gait.js';
 import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';
 import proj4 from 'proj4';
 import {groundAt} from '../terrain.js';
+import {SpatialIndex,bounds,inWaterPolygons} from '../geo.js';
 import {JOBS,JOBS_1760,SAGAS,CHARACTERS} from './data.js';
 import {connectCharacters} from './characters.js';
 import './copenhagen.css';
@@ -116,7 +117,14 @@ export function createCopenhagenGame({scene,city,mobilityData,cityData,toast,sou
  // ---- world markers ----
  // ---- hidden nisser: 22 small house-nisse figures tucked away around the city (GTA hidden packages) ----
  const NISSE_SPOTS=[[55.6797,12.5935],[55.6855,12.5805],[55.6857,12.5772],[55.6871,12.5731],[55.6918,12.5945],[55.6925,12.5988],[55.6866,12.5985],[55.6840,12.5926],[55.6851,12.5893],[55.6765,12.5785],[55.6776,12.5786],[55.6813,12.5760],[55.6837,12.5700],[55.6810,12.5665],[55.6760,12.5690],[55.6738,12.5985],[55.6728,12.5947],[55.6705,12.5760],[55.6880,12.5640],[55.6735,12.5820],[55.6818,12.6000],[55.6770,12.5885]];
- const nisser=NISSE_SPOTS.map((at,i)=>{const p=ll(at),n=walk.nearest(p[0],p[1]),q=n>=0&&dist(walk.nodes[n],p)<60?walk.nodes[n]:p;return {i,p:[q[0]+.9,q[1]+.6]};});
+ // Each stands by the footpath node nearest its spot whose corner is on a pavement, clear of roads, houses and water: the
+ // nearest node was often a crossing, which stood 8 of the 22 in the road (one in a house, two in the 1760 water).
+ const nisser=(()=>{const spots=NISSE_SPOTS.map(ll),near=list=>new SpatialIndex((list||[]).filter(q=>q.rings?.length&&(q.bbox??=bounds(q.rings))&&spots.some(([x,z])=>x>q.bbox[0]-70&&x<q.bbox[2]+70&&z>q.bbox[1]-70&&z<q.bbox[3]+70)));
+  const road=near(cityData?.roads),pave=near(cityData?.pavement),house=near(cityData?.buildings),clear=(x,z)=>!road.at(x,z)&&!house.at(x,z)&&!inWaterPolygons(cityData?.water,x,z);
+  const OFF=[[.9,.6],[-.9,-.6],[1.5,0],[-1.5,0],[0,1.5],[0,-1.5],[1.1,-1.1],[-1.1,1.1]];
+  return spots.map((p,i)=>{let best=null,score=Infinity;for(const reach of [60,150,400]){for(const q of walk.nodes){const d=dist(q,p);if(d>reach)continue;
+    for(let k=0;k<OFF.length;k++){const x=q[0]+OFF[k][0],z=q[1]+OFF[k][1];if(!clear(x,z))continue;const sc=d+(pave.at(x,z)?0:25)+k*.2;if(sc<score){score=sc;best=[x,z];}break;}}if(best)break;}
+   if(!best){const n=walk.nearest(p[0],p[1]),q=n>=0&&dist(walk.nodes[n],p)<60?walk.nodes[n]:p;best=[q[0]+.9,q[1]+.6];}return {i,p:best};});})();
  const nisseGeo=(()=>{const parts=[new THREE.ConeGeometry(.17,.42,10).translate(0,.62,0),new THREE.SphereGeometry(.13,10,8).translate(0,.4,0),new THREE.CylinderGeometry(.14,.18,.34,10).translate(0,.17,0),new THREE.SphereGeometry(.035,6,5).translate(0,.84,0)];
   const cols=['#c8202a','#e9e3d4','#5a6b8a','#f2f2f2'],out=[];parts.forEach((g,k)=>{const n=g.toNonIndexed();const c=new THREE.Color(cols[k]),a=new Float32Array(n.attributes.position.count*3);for(let i=0;i<a.length;i+=3)a.set([c.r,c.g,c.b],i);n.setAttribute('color',new THREE.BufferAttribute(a,3));n.deleteAttribute('uv');out.push(n);});return mergeGeometries(out).scale(1.6,1.6,1.6);})();
  const nisseMesh=new THREE.InstancedMesh(nisseGeo,new THREE.MeshStandardMaterial({vertexColors:true,roughness:.6,emissive:'#3a1210'}),nisser.length);nisseMesh.castShadow=true;nisseMesh.frustumCulled=false;nisseMesh.name='Hidden nisser';scene.add(nisseMesh);
