@@ -24,8 +24,8 @@ export const SHOTS=[
  {name:'Bredgade',era:1760,drive:{from:[760,-170],toward:[950,-600]},cam:'chase',dur:4},
  {name:'Amalienborg',at:[990,-488],dur:5,orbit:{c:[1072,-430],r:[150,118],h:[58,44],a:[2.25,2.85]},look:[1072,6,-430]},
  {name:'Holmens Kanal',drive:{from:[600,100],toward:[640,260]},cam:'side',dur:4},
- {name:'Saga',era:'today',drive:{from:[1030,85],toward:[860,30]},cam:'chase',dur:5,hud:'quest',saga:'hca'},
- {name:'Saga',era:1760,drive:{from:[610,330],toward:[500,470]},cam:'chase',dur:5,hud:'quest',saga:'eye'},
+ {name:'Saga',era:'today',drive:{from:[985,40],toward:[800,0]},cam:'chase',dur:5,hud:'quest',saga:'hca'}, // up Toldbodgade and into Nyhavn, towards the red beam at Nyhavn 20 (the old route drove away from it: 160 -> 190 m)
+ {name:'Saga',era:1760,drive:{from:[560,360],toward:[480,480]},cam:'chase',dur:5,hud:'quest',saga:'eye'}, // south towards Børsen: its red beam ahead and to the right (the old route kept it off screen to the left)
  {name:'Knippelsbro',drive:{from:[650,520],toward:[800,660]},cam:'low',dur:4},
  {name:'Christianshavn canal',drive:{from:[1063,669],toward:[853,896]},cam:'pass',dur:4},
  {name:'Gammel Strand',drive:{from:[220,262],toward:[100,285]},cam:'wheel',dur:4},
