@@ -179,8 +179,25 @@ def avatar_prims(keep=lambda mat: True):
             Jr = acc(j, bufs, at['JOINTS_0']).astype(np.int64); Wt = acc(j, bufs, at['WEIGHTS_0']).astype(np.float64)
             out.append(dict(mat=mname, q=pos, n=nrm, c=col, idx=acc(j, bufs, p['indices'])[:, 0].astype(np.int64), J=Jr, W=Wt))
     return out
-prims = avatar_prims()
-for pr in prims: print('  avatar part', pr['mat'], len(pr['q']))
+# fewer triangles: each part decimated to a budget, skin weights and colours from the nearest original vertex
+BUDGETS = {'Skin': 1800, 'Hair': 1100, 'Outfit_Top': 2200, 'Outfit_Footwear': 700, 'Outfit_Bottom': 900, 'Glasses': 260, 'Body': 600, 'Teeth': 60, 'Eye': 120}
+def decimate_skinned(pr, budget):
+    import trimesh, fast_simplification
+    from scipy.spatial import cKDTree
+    f = pr['idx'].reshape(-1, 3)
+    if len(f) <= budget: return pr
+    w = trimesh.Trimesh(pr['q'], f, process=False); w.merge_vertices(merge_tex=True, merge_norm=True)
+    v2, f2 = fast_simplification.simplify(w.vertices.astype(np.float32), w.faces.astype(np.int64), target_reduction=1 - budget / len(w.faces))
+    near = cKDTree(pr['q']).query(v2)[1]; v2 = np.asarray(v2, np.float64)
+    n2 = np.asarray(trimesh.Trimesh(v2, f2, process=False).vertex_normals)
+    return dict(pr, q=v2, n=n2, c=pr['c'][near], idx=np.asarray(f2).reshape(-1), J=pr['J'][near], W=pr['W'][near])
+def slim(prims):
+    out = []
+    for pr in prims:
+        b = next((v for k, v in BUDGETS.items() if k in pr['mat']), None); out.append(decimate_skinned(pr, b) if b else pr)
+    return out
+prims = slim(avatar_prims())
+for pr in prims: print('  avatar part', pr['mat'], len(pr['q']), len(pr['idx']) // 3)
 Pm, Nm, Cm, Jm, Wm, Im = PB.merge([dict(p, J=p['J'].astype(np.uint8) if p['J'].max() < 256 else p['J']) for p in prims], [np.eye(4)] * len(prims))
 write_char('R_CoolMan', Pm, Nm, Cm, Jm, Wm, Im, 'Character: cool-man (Daniel)')
 np.save(OUT + 'rpm_bind.npy', {'names': names, 'Bw': Bw, 'parent': parent, 'order': order}, allow_pickle=True)

@@ -25,7 +25,7 @@ lin = R.lin
 TEX = {'Drawers_karl': 'Karlik_Breeches_KARL_BaseColor.jpg', 'Vest_karl': 'Karlik_Vest_KARL_BaseColor.jpg', 'Karl_decor_vest': 'Karlik_Vest_KARL_BaseColor.jpg',
        'coat1': 'Karlik_Coat_KARL_BaseColor-min.jpg', 'decor_1': 'Karlik_Coat_KARL_BaseColor-min.jpg', 'Kravat_and_cuffs_and_hairband': 'Karlik_Fular_cuffs_hairband_KARL_BaseColor.jpg',
        'Farn_shoe_R001': 'Karlik_Farn_shoes_BaseColor-min.jpg', 'Farn_shoe_L001': 'Karlik_Farn_shoes_BaseColor-min.jpg', 'Man_hose_19th_century001': 'Karlik_Hose_KARL_BaseColor-min.jpg'}
-BUDGET = {'coat1': 5000, 'Vest_karl': 1000, 'Drawers_karl': 1000, 'Kravat_and_cuffs_and_hairband': 1000, 'Man_hose_19th_century001': 600, 'Farn_shoe_R001': 700, 'Farn_shoe_L001': 700, 'decor_1': 200, 'Karl_decor_vest': 100}
+BUDGET = {'coat1': 3800, 'Vest_karl': 700, 'Drawers_karl': 700, 'Kravat_and_cuffs_and_hairband': 700, 'Man_hose_19th_century001': 450, 'Farn_shoe_R001': 500, 'Farn_shoe_L001': 500, 'decor_1': 160, 'Karl_decor_vest': 80}
 imgs = {}
 def sample(path, uv):
     if path not in imgs: imgs[path] = np.asarray(Image.open(path).convert('RGB').resize((1024, 1024), Image.LANCZOS), np.float32) / 255
@@ -33,7 +33,10 @@ def sample(path, uv):
 def decimate(v, f, c, budget):
     if len(f) <= budget: return v, f, c
     w = trimesh.Trimesh(v, f, process=False); w.merge_vertices(merge_tex=True, merge_norm=True)
-    v2, f2 = fast_simplification.simplify(w.vertices.astype(np.float32), w.faces.astype(np.int64), target_reduction=1 - budget / len(w.faces))
+    v2, f2 = w.vertices.astype(np.float32), w.faces.astype(np.int64)
+    for k in range(4):  # thin, disconnected cloth stops short of the target: more passes, more aggressive
+        if len(f2) <= budget * 1.15: break
+        v2, f2 = fast_simplification.simplify(v2, f2, target_reduction=1 - budget / len(f2), agg=7 + 3 * k)
     return np.asarray(v2, np.float64), np.asarray(f2), c[cKDTree(v).query(v2)[1]]
 parts = []
 def usd_parts(path):  # Sketchfab USDZ (unzipped scene.usdc + 0/<material>_baseColor.jpg), centimetres, Y up
@@ -73,8 +76,9 @@ if COSTUME.endswith(('.usdc', '.usda', '.usd')):
     area = lambda v, f: float(np.linalg.norm(np.cross(v[f[:, 1]] - v[f[:, 0]], v[f[:, 2]] - v[f[:, 0]]), axis=1).sum() / 2)
     areas = [area(v, f) for _, v, f, _ in raw]; total = sum(areas)
     for (name, v, f, c), ar in zip(raw, areas):  # the triangle budget follows the surface (the trousers under the coat had most of the triangles)
-        v, f, c = decimate(v, f, c, max(200, int(11000 * ar / total)))
-        parts.append((name, v, f, c))
+        if 'decor' in name.lower(): continue  # embroidery and cords: thousands of tiny pieces that cannot be simplified
+        v2, f2, c2 = decimate(v, f, c, max(160, int(7500 * ar / total)))
+        print('  part %-40s %6d -> %6d tris (area %.2f m2)' % (name[:40], len(f), len(f2), ar)); parts.append((name, v2, f2, c2))
 else:
   sc = trimesh.load(COSTUME, force='scene')
   for node in sc.graph.nodes_geometry:
@@ -109,7 +113,7 @@ CV = np.stack([(CV[:, 0] - cx) * S + neck[0], CV[:, 1] * S, (CV[:, 2] - cz) * S 
 print('costume scale %.3f, height %.2f' % (S, CV[:, 1].max() - CV[:, 1].min()))
 
 # the avatar posed with its arms down like the costume's (rotate each upper arm about the forward axis)
-prims = R.avatar_prims()
+prims = R.slim(R.avatar_prims())
 def skin_mats(pose_world):  # per-joint skinning matrices for a posed skeleton
     return np.array([pose_world[n] @ IBM[k] for k, n in enumerate(names)])
 def lbs(v, J, W, M):
