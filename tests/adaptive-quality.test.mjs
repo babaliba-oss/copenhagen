@@ -45,3 +45,18 @@ test('quality governor drops extras one at a time only while the lowest resoluti
  for(let i=0;i<300;i++)g.update(1/60,{atMin:true,smoothed:40});assert.deepEqual(done,['ao']);
  for(let i=0;i<3000;i++)g.update(1/60,{atMin:true,smoothed:40});assert.deepEqual(done,['ao','bloom','msaa']);assert.equal(g.level,3);
 });
+
+test('a CPU-bound frame rate keeps its resolution (fewer pixels would not help)',()=>{
+ const q=createAdaptiveResolution({max:1.5,min:.75});
+ for(let t=0;t<10;t+=1/30)q.update(33.3,1/30,31);
+ assert.equal(q.scale,1.5,'33 ms frames that are 31 ms of CPU work do not shrink the canvas');assert.equal(q.cpuBound,true);
+ for(let t=0;t<10;t+=1/30)q.update(33.3,1/30,8);
+ assert.ok(q.scale<1.5,'the same frame time with the CPU mostly idle (GPU-bound) does');
+});
+
+test('quality governor steps down CPU-bound frames too, starting with the draw-call step',()=>{
+ const done=[];const g=createQualityGovernor([()=>done.push('ao'),()=>done.push('bloom'),()=>done.push('msaa'),()=>done.push('lod')],{cpuStep:3});
+ for(let i=0;i<300;i++)g.update(1/60,{atMin:false,smoothed:40,cpuBound:true});assert.deepEqual(done,['lod']);assert.equal(g.has(3),true);
+ for(let i=0;i<3000;i++)g.update(1/60,{atMin:false,smoothed:40,cpuBound:true});assert.deepEqual(done,['lod'],'GPU extras stay while the CPU is the limit');
+ for(let i=0;i<3000;i++)g.update(1/60,{atMin:true,smoothed:40});assert.deepEqual(done,['lod','ao','bloom','msaa']);assert.equal(g.level,4);
+});

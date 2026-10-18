@@ -236,7 +236,7 @@ const governor=createQualityGovernor([
  // Last: detailed buildings, building shadows and the far-shell ring pulled in (dense blocks such as Nyhavn
  // and Strøget otherwise stay heavy whatever the resolution). Tiles pick it up on their next LOD pass.
  ()=>{Object.assign(TILE_LOD,{near:170,far:210,detail:130,shadow:70,building:100});if(farCity)farCity.visible=false;},
-]);
+],{cpuStep:3}); // CPU-bound (draw calls): the LOD step first
 {const q=new URLSearchParams(location.search).get('quality'),n=q==='low'?9:+q||0;for(let i=0;i<n;i++)governor.update(99,{atMin:true,smoothed:99});} // ?quality=low (or 1-3 steps)
 let look=null;
 const ground=new THREE.Mesh(new THREE.PlaneGeometry(11000,11000),groundPatches(new THREE.MeshStandardMaterial({color:'#94988b',roughness:1})));ground.rotation.x=-Math.PI/2;ground.position.y=-.5;ground.receiveShadow=true;cityModel.add(ground);
@@ -521,7 +521,7 @@ function createFarCity(buildings){
   sh.vertexShader='varying vec3 vFarW;attribute vec3 aFar;uniform float uFarStart;\n'+sh.vertexShader.replace('#include <worldpos_vertex>','#include <worldpos_vertex>\nvFarW=(modelMatrix*vec4(transformed,1.)).xyz;if(distance(aFar.xy,cameraPosition.xz)+aFar.z<uFarStart)gl_Position=vec4(0.,0.,2.,1.);');
   sh.fragmentShader='uniform float uFarStart;varying vec3 vFarW;\n'+sh.fragmentShader.replace('void main() {','void main() {\nif(distance(vFarW.xz,cameraPosition.xz)<uFarStart)discard;');};
  material.customProgramCacheKey=()=>'far-city';
- const group=farCity=new THREE.Group();group.name='Far city (beyond the measured tiles)';group.visible=governor.level<4;cityModel.add(group);
+ const group=farCity=new THREE.Group();group.name='Far city (beyond the measured tiles)';group.visible=!governor.has(3);cityModel.add(group);
  const C=800,chunks=new Map();for(const b of buildings){const bb=b.bbox,k=Math.floor((bb[0]+bb[2])/2/C)+','+Math.floor((bb[1]+bb[3])/2/C);let l=chunks.get(k);if(!l)chunks.set(k,l=[]);l.push(b);}
  const lists=[...chunks.values()]; // 800 m chunks: ~10 draws for the skyline instead of ~32 with 400 m
  // Walls and roof written straight into typed arrays (the floor is never seen): an 800 m chunk builds in a few ms.
@@ -663,7 +663,7 @@ async function compileBatches(obj,meshes){
 // street furniture no longer draw into the shadow map, and far-city chunks wholly inside the measured tiles
 // (where their fragments are all discarded anyway) are skipped. Checked twice a second.
 const NO_SHADOW=/traffic fleet|person|cyclist|ladcykel|city b|bus|parked|boat|furniture|bench|bike|bollard|sign plate|junction|lamp|post|tram|scooter|stall|umbrella|cafe|crowd/i;
-let trimAt=0,shadowTick=0,keptPrograms=0;
+let trimAt=0,shadowTick=0,keptPrograms=0,lastCpuMs=0;
 // Street surfaces stay loaded out to 1-1.7 km, but past ~1 km (two thirds into the fog, behind the buildings from
 // street level) a tile no longer earns its draw call: 40+ surface draws at Rådhuspladsen, about half of them out there.
 const surfaceMeshes=new Set(),SURFACE_RANGE=1000;
@@ -1040,7 +1040,7 @@ function updateHUD(now){
 }
 function frame(now){
  if(gameIsStopped())return;
- requestAnimationFrame(frame);const cpu0=perfOverlay?performance.now():0,frameMs=lastTime?now-lastTime:0;fpsMeter?.tick(frameMs);perfOverlay?.tick(frameMs,now);const steps=simulationSteps(lastTime?(now-lastTime)/1000:0),dt=steps.reduce((a,b)=>a+b,0);lastTime=now;
+ requestAnimationFrame(frame);const cpu0=performance.now(),frameMs=lastTime?now-lastTime:0;fpsMeter?.tick(frameMs);perfOverlay?.tick(frameMs,now);const steps=simulationSteps(lastTime?(now-lastTime)/1000:0),dt=steps.reduce((a,b)=>a+b,0);lastTime=now;
  mobileControls.update({started,paused,mapOpen,busted:!!police?.busted,mode:travel?.mode||'car',speed:car?.speed||0});
  if(ready)peopleInteraction.update(dt,car,nearbyPeople(),{enabled:canTalk()});
  if(ready&&marketShop){marketShop.update(paused||mapOpen?0:dt,car,{enabled:canTalk()});for(const m of marketShop.drainMessages())marketUI.say(m);}
@@ -1175,13 +1175,14 @@ function frame(now){
  marketScene?.update(now/1000,car);
  stationStreetLife?.update(car,ready&&!paused&&!mapOpen?dt:0);
  // Resize before drawing: changing the pixel ratio clears the canvas, which flashed a blank frame when done after.
- if(ready&&resolution.update(frameMs,dt))renderer.setPixelRatio(resolution.scale);
+ if(ready&&resolution.update(frameMs,dt,lastCpuMs))renderer.setPixelRatio(resolution.scale); // last frame's CPU time: CPU-bound frames keep their resolution
  if(ready&&!captureMode&&governor.update(dt,resolution))console.info('Quality step',governor.level,'to hold the frame rate');
  look.update(dt,now/1000); // blends the active look and re-applies its sun offset after the shadow target above
  flushPeople(scene); // every crowd's instances into the shared person batches (person-model.js)
- const cpu1=perfOverlay?performance.now():0;
+ const cpu1=performance.now();
  if(post)post.render(scene,camera);else renderer.render(scene,camera);
- if(perfOverlay)perfOverlay.split(cpu1-cpu0,performance.now()-cpu1); // game code vs. render submission: CPU- or GPU-bound
+ const cpu2=performance.now();lastCpuMs=cpu2-cpu0;
+ if(perfOverlay)perfOverlay.split(cpu1-cpu0,cpu2-cpu1); // game code vs. render submission: CPU- or GPU-bound
 }
 function resizeCamera(){camera.aspect=captureFrame.w/captureFrame.h;camera.updateProjectionMatrix();}
 requestAnimationFrame(frame);
