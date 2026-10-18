@@ -1432,7 +1432,10 @@ async function boot(){
     const guests=[];(cd.tables||[]).forEach(([x,z,yaw],i)=>{if(i%4===3)return;for(const k of i%3===2?[0]:i%5===0?[0,1,2]:[0,2]){const a=k*Math.PI/2+.4,lx=Math.cos(a)*.8,lz=Math.sin(a)*.8,c=Math.cos(yaw),sn=Math.sin(yaw),gx=x+lx*c+lz*sn,gz=z-lx*sn+lz*c;
      guests.push({x:gx,z:gz,heading:Math.atan2(gx-x,gz-z),pose:'cycle',bike:SEAT,seated:true,walking:false,talkable:true});}});
     if(guests.length){const cx=guests.reduce((s,g)=>s+g.x,0)/guests.length,cz=guests.reduce((s,g)=>s+g.z,0)/guests.length;cafeGuests=createInstancedPeople(guests,{name:'Café guests',center:{x:cx,z:cz},seed:501});cityModel.add(cafeGuests.group);}}}
-   {const sd=stallData&&await stallData;if(sd){const st=createStalls(sd);cityModel.add(st.group);streetObstacles.push(...st.obstacles);
+   {const sd=stallData&&await stallData;if(sd){const lanes=new Map(),C=20; // the road graph's lane lines on a 20 m grid: a stall within 4.6 m of one stands where coaches drive
+     for(const e of mobilityData?.roads?.edges||[])for(let k=1;k<e.points.length;k++){const [ax,az]=e.points[k-1],[bx,bz]=e.points[k],L=Math.hypot(bx-ax,bz-az);for(let t=0;t<=L;t+=3){const x=ax+(bx-ax)*t/Math.max(L,1e-6),z=az+(bz-az)*t/Math.max(L,1e-6),key=Math.floor(x/C)+','+Math.floor(z/C);(lanes.get(key)||lanes.set(key,[]).get(key)).push([x,z]);}}
+     const onLane=(x,z)=>{for(let i=-1;i<=1;i++)for(let j=-1;j<=1;j++)for(const [px,pz] of lanes.get((Math.floor(x/C)+i)+','+(Math.floor(z/C)+j))||[])if(Math.hypot(px-x,pz-z)<4.6)return true;return false;}; /* lane offset 1.6 + coach half width 1 + stall half size 1.3 + a little */
+     const st=createStalls(sd,{skip:onLane});cityModel.add(st.group);streetObstacles.push(...st.obstacles);
     if(st.people.length){const cx=st.people.reduce((a,p)=>a+p.x,0)/st.people.length,cz=st.people.reduce((a,p)=>a+p.z,0)/st.people.length;cafeGuests=createInstancedPeople(st.people,{name:'Market people',center:{x:cx,z:cz},seed:1760});cityModel.add(cafeGuests.group);}}}
    {const rd=railData&&await railData;if(rd){cityModel.add(createRails(rd).group);trains=createTrains(rd);cityModel.add(trains.group);}}
    {const cm=cycleMarkData&&await cycleMarkData;if(cm?.marks?.length)cityModel.add(createCycleMarks(cm.marks));}

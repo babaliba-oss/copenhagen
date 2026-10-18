@@ -6,8 +6,9 @@ import {groundAt} from '../terrain.js';
 // awning on poles, with barrels and baskets. Awning colours vary per stall.
 const paint=(g,hex)=>{const n=g.index?g.toNonIndexed():g;if(n!==g)g.dispose();for(const k of Object.keys(n.attributes))if(k!=='position'&&k!=='normal')n.deleteAttribute(k);const c=new THREE.Color(hex),a=new Float32Array(n.attributes.position.count*3);for(let i=0;i<a.length;i+=3)a.set([c.r,c.g,c.b],i);n.setAttribute('color',new THREE.BufferAttribute(a,3));return n;};
 const box=(w,h,d,x,y,z,hex)=>paint(new THREE.BoxGeometry(w,h,d).translate(x,y,z),hex);
-export function createStalls(data){
- const group=new THREE.Group();group.name='Market stalls';const list=data?.stalls||[];if(!list.length)return {group,obstacles:[],people:[]};
+// skip(x,z): leave out a stall there (main.js: one standing on a traffic lane across a square, where coaches drive).
+export function createStalls(data,{skip=()=>false}={}){
+ const group=new THREE.Group();group.name='Market stalls';const list=(data?.stalls||[]).filter(([x,z])=>!skip(x,z));if(!list.length)return {group,obstacles:[],people:[]};
  const base=mergeGeometries([box(2.4,.08,1.1,0,.85,0,'#8a6b45'),...[[-1.1,-.45],[1.1,-.45],[-1.1,.45],[1.1,.45]].map(([x,z])=>box(.07,.85,.07,x,.42,z,'#5b4630')),
   ...[[-1.25,-.65],[1.25,-.65],[-1.25,.75],[1.25,.75]].map(([x,z])=>box(.06,2.3,.06,x,1.15,z,'#5b4630')),
   paint(new THREE.CylinderGeometry(.28,.24,.6,8).translate(-.7,.3,1.0),'#6b4a2e'),paint(new THREE.CylinderGeometry(.28,.24,.6,8).translate(-.1,.3,1.05),'#6b4a2e'),
