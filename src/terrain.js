@@ -96,10 +96,13 @@ export function groundPose(x,z,heading,halfLength=2.2,halfWidth=.9,out={y:0,pitc
  return out;
 }
 // Building tiles ([x,y,z,u,v] per vertex, parts with start/count): each part stands on the lowest ground
-// under its own vertices, so the downhill side never floats; the uphill side runs into the slope.
+// under its own vertices, so the downhill side never floats; the uphill side runs into the slope. Parts marked `abs`
+// carry surveyed heights on this terrain and stay where they are.
 export function liftBuildings(array,parts){
  if(field===null)return;
- for(const p of parts){let low=Infinity;for(let i=p.start;i<p.start+p.count;i++){const h=groundAt(array[i*5],array[i*5+2]);if(h<low)low=h;}
+ for(const p of parts){
+  if(p.abs){let lo=Infinity;for(let i=p.start;i<p.start+p.count;i++){const y=array[i*5+1];if(y<lo)lo=y;}p.base=lo;continue;} // surveyed heights on this terrain already (scripts/kk-buildings.py)
+  let low=Infinity;for(let i=p.start;i<p.start+p.count;i++){const h=groundAt(array[i*5],array[i*5+2]);if(h<low)low=h;}
   if(!Number.isFinite(low))continue;p.base=low;for(let i=p.start;i<p.start+p.count;i++)array[i*5+1]+=low;}
 }
 // Open water found only in the elevation model (src/terrain.js `lake` layer): its level at x,z, else null.
@@ -131,6 +134,48 @@ export function raiseDryHollows(isWet,{lift=1.6,below=1.2,shelf=true}={},f=field
    for(const q of [k-1,k+1,k-n,k+n])if(at(q)===2&&g[q]>top)top=g[q];if(top>g[k])set.push(k,top);}
   for(let x=0;x<set.length;x+=2)g[set[x]]=set[x+1];raised+=set.length/2;}
  return raised;
+}
+// Banks: the elevation model is blurred over a few metres, so a quay or lake edge (a stone wall in the city)
+// became a slope running 10-15 m inland, and the pavements and paths along the water were draped over it tilted
+// and creased. Dry ground within `reach` metres of the mapped water is raised to the level of the land just behind
+// it (the median of dry samples just beyond `reach`, never more than `maxRaise` up); the quay wall then takes the
+// drop at the water's edge. Returns the number of samples raised.
+export function levelBanks(isWet,{reach=12,maxRaise=1.4}={},f=field){
+ if(!f?.water)return 0;const n=f.size,g=f.ground,w=f.water,cell=f.cell,R=Math.max(1,Math.round(reach/cell));
+ const wet=new Uint8Array(n*n);for(let k=0;k<n*n;k++)if(!Number.isNaN(w[k]))wet[k]=isWet(-f.extent+(k%n)*cell,-f.extent+((k/n)|0)*cell)?1:2;
+ // distance (in cells, Chebyshev) from the mapped water, up to R+3
+ const D=R+3,dist=new Uint8Array(n*n).fill(255),queue=[];for(let k=0;k<n*n;k++)if(wet[k]===1){dist[k]=0;queue.push(k);}
+ for(let h=0;h<queue.length;h++){const k=queue[h],d=dist[k];if(d>=D)continue;const r=(k/n)|0,c=k-r*n;
+  for(let dr=-1;dr<=1;dr++)for(let dc=-1;dc<=1;dc++){const rr=r+dr,cc=c+dc;if(rr<0||cc<0||rr>=n||cc>=n)continue;const q=rr*n+cc;if(dist[q]>d+1){dist[q]=d+1;queue.push(q);}}}
+ const set=[],vals=[];
+ for(let j=0;j<n;j++)for(let i=0;i<n;i++){const k=j*n+i,d=dist[k];if(d===0||d>R)continue;
+  vals.length=0;const r0=Math.max(0,j-D),r1=Math.min(n-1,j+D),c0=Math.max(0,i-D),c1=Math.min(n-1,i+D);
+  for(let r=r0;r<=r1;r++)for(let c=c0;c<=c1;c++){const q=r*n+c,dq=dist[q];if(dq>R&&dq<=R+3)vals.push(g[q]);}
+  if(vals.length<3)continue;vals.sort((a,b)=>a-b);const behind=vals[vals.length>>1];
+  if(behind>g[k]+.08&&behind-g[k]<=maxRaise)set.push(k,behind);}
+ for(let x=0;x<set.length;x+=2)g[set[x]]=set[x+1];
+ return set.length/2;
+}
+// Water the elevation model never saw (1760's moat, dug where today's city stands on flat ground): its level came out
+// at street height, so the causeways and the moat were one surface and the waves showed through the road. A water
+// body whose level is within `clearance` of the dry ground around it is sunk `depth` below that ground, with its bed
+// below the water; the quay walls then stand at its edges. Returns the number of water bodies sunk.
+export function sinkShallowWater(isWet,{depth=1.8,bed=1.3,clearance=1}={},f=field){
+ if(!f?.water)return 0;const n=f.size,w=f.water,g=f.ground,cell=f.cell,label=new Int32Array(n*n).fill(-1),stack=[];let sunk=0;
+ const wet=new Uint8Array(n*n);for(let k=0;k<n*n;k++)if(!Number.isNaN(w[k]))wet[k]=isWet(-f.extent+(k%n)*cell,-f.extent+((k/n)|0)*cell)?1:2;
+ for(let s=0;s<n*n;s++){if(wet[s]!==1||label[s]>=0)continue;
+  const cells=[];label[s]=s;stack.push(s);
+  while(stack.length){const k=stack.pop();cells.push(k);const r=(k/n)|0,c=k-r*n;
+   const visit=q=>{if(label[q]<0&&wet[q]===1){label[q]=s;stack.push(q);}};if(c>0)visit(k-1);if(c<n-1)visit(k+1);if(r>0)visit(k-n);if(r<n-1)visit(k+n);}
+  const shore=[];for(const k of cells){const r=(k/n)|0,c=k-r*n;for(const q of [c>0?k-1:-1,c<n-1?k+1:-1,r>0?k-n:-1,r<n-1?k+n:-1])if(q>=0&&wet[q]!==1)shore.push(g[q]);}
+  if(shore.length<4)continue;shore.sort((a,b)=>a-b);const land=shore[shore.length>>1];
+  const level=cells.reduce((m,k)=>Math.max(m,w[k]),-Infinity);
+  if(level<land-clearance)continue; // a real basin: its level sits well below the banks already
+  const to=land-depth;for(const k of cells){w[k]=Math.min(w[k],to);g[k]=Math.min(g[k],to-bed);}
+  // the level spread onto the banks around it comes down too (the water surface is drawn from it near the edge)
+  for(const k of cells){const r=(k/n)|0,c=k-r*n;for(let dr=-2;dr<=2;dr++)for(let dc=-2;dc<=2;dc++){const rr=r+dr,cc=c+dc;if(rr<0||cc<0||rr>=n||cc>=n)continue;const q=rr*n+cc;if(wet[q]===2&&w[q]>to)w[q]=to;}}
+  sunk++;}
+ return sunk;
 }
 export function flattenWaterBodies(f=field){
  if(!f?.water)return 0;const w=f.water,n=f.size,label=new Int32Array(n*n).fill(-1),stack=[];let regions=0;

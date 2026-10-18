@@ -1,0 +1,661 @@
+{
+"source": "Recordings in the public domain or under CC0 / CC BY / CC BY-SA, streamed from the Internet Archive (and one from Wikimedia Commons); compiled and checked 2026-10-18. Each track lists its licence and source page for attribution.",
+"stations": [
+{
+"id": "folk",
+"name": "Hygge Folk",
+"genre": "Nordic folk and fiddle tunes",
+"tracks": [
+{
+"title": "Danish Dance of Greeting (trad., rec. 1912)",
+"artist": "Prince's Band",
+"url": "https://archive.org/download/loc-jukebox-648076-danish-dance-of-greeting/jukebox-648076_danish-dance-of-greeting.mp3",
+"licence": "Public Domain (PDM 1.0)",
+"licenceUrl": "https://creativecommons.org/publicdomain/mark/1.0/",
+"source": "https://archive.org/details/loc-jukebox-648076-danish-dance-of-greeting",
+"seconds": 189
+},
+{
+"title": "The Holiday",
+"artist": "So I'm An Islander (Søren Nissen Jørgensen)",
+"url": "https://archive.org/download/TheHoliday/02%20The%20Holiday.mp3",
+"licence": "CC BY-SA 3.0",
+"licenceUrl": "https://creativecommons.org/licenses/by-sa/3.0/",
+"source": "https://archive.org/details/TheHoliday",
+"seconds": 353
+},
+{
+"title": "Dala hambo (rec. 1919)",
+"artist": "Lager & Olson (accordion duet)",
+"url": "https://archive.org/download/loc-jukebox-34286-dala-hambo/jukebox-34286_dala-hambo.mp3",
+"licence": "Public Domain (PDM 1.0)",
+"licenceUrl": "https://creativecommons.org/publicdomain/mark/1.0/",
+"source": "https://archive.org/details/loc-jukebox-34286-dala-hambo",
+"seconds": 179
+},
+{
+"title": "Aarhus Tappenstreg (C. C. Møller, rec. 1918)",
+"artist": "Oscar's Orkester",
+"url": "https://archive.org/download/loc-jukebox-28872-aarhus-tappenstreg-marsch/jukebox-28872_aarhus-tappenstreg-marsch.mp3",
+"licence": "Public Domain (PDM 1.0)",
+"licenceUrl": "https://creativecommons.org/publicdomain/mark/1.0/",
+"source": "https://archive.org/details/loc-jukebox-28872-aarhus-tappenstreg-marsch",
+"seconds": 154
+},
+{
+"title": "Karjala (Karelia)",
+"artist": "Valkyrend Variete",
+"url": "https://archive.org/download/Karjala/Valkyrend_Variete_-_Karjala.mp3",
+"licence": "CC BY-SA 3.0",
+"licenceUrl": "https://creativecommons.org/licenses/by-sa/3.0/",
+"source": "https://archive.org/details/Karjala",
+"seconds": 231
+},
+{
+"title": "Värmlandsvisan (trad., rec. 1918)",
+"artist": "William Oscar (violin)",
+"url": "https://archive.org/download/loc-jukebox-28954-v-rmlandsvisan/jukebox-28954_v-rmlandsvisan.mp3",
+"licence": "Public Domain (PDM 1.0)",
+"licenceUrl": "https://creativecommons.org/publicdomain/mark/1.0/",
+"source": "https://archive.org/details/loc-jukebox-28954-v-rmlandsvisan",
+"seconds": 149
+},
+{
+"title": "Scandinavian Selections (Ole Bull, Halfdan Kjerulf; rec. 1920)",
+"artist": "Scandinavian Concert Trio",
+"url": "https://archive.org/download/loc-jukebox-35971-scandinavian-selections/jukebox-35971_scandinavian-selections.mp3",
+"licence": "Public Domain (PDM 1.0)",
+"licenceUrl": "https://creativecommons.org/publicdomain/mark/1.0/",
+"source": "https://archive.org/details/loc-jukebox-35971-scandinavian-selections",
+"seconds": 197
+},
+{
+"title": "Om Bach Æ Larij (Behind the Barn)",
+"artist": "So I'm An Islander (Søren Nissen Jørgensen)",
+"url": "https://archive.org/download/OmBachAELarijBehindTheBarn/06%20Om%20Bach%20%C3%86%20Larij%20%28Behind%20The%20Barn%29.mp3",
+"licence": "CC BY-SA 3.0",
+"licenceUrl": "https://creativecommons.org/licenses/by-sa/3.0/",
+"source": "https://archive.org/details/OmBachAELarijBehindTheBarn",
+"seconds": 361
+},
+{
+"title": "Schottis från Axvalla hed (rec. 1919)",
+"artist": "Lager & Olson (accordion duet)",
+"url": "https://archive.org/download/loc-jukebox-33970-schottis-fr-n-axvalla-hed/jukebox-33970_schottis-fr-n-axvalla-hed.mp3",
+"licence": "Public Domain (PDM 1.0)",
+"licenceUrl": "https://creativecommons.org/publicdomain/mark/1.0/",
+"source": "https://archive.org/details/loc-jukebox-33970-schottis-fr-n-axvalla-hed",
+"seconds": 181
+},
+{
+"title": "Sæterjentens søndag (Ole Bull, rec. 1919)",
+"artist": "A. E. Uhe (violin) & J. M. Coopersmith (organ)",
+"url": "https://archive.org/download/loc-jukebox-30707-saetergjentens-sondag/jukebox-30707_saetergjentens-sondag.mp3",
+"licence": "Public Domain (PDM 1.0)",
+"licenceUrl": "https://creativecommons.org/publicdomain/mark/1.0/",
+"source": "https://archive.org/details/loc-jukebox-30707-saetergjentens-sondag",
+"seconds": 172
+},
+{
+"title": "Vapaus (Freedom)",
+"artist": "Valkyrend Variete",
+"url": "https://archive.org/download/Vapaus/Valkyrend_Variete_-_Vapaus_freedom.mp3",
+"licence": "CC BY-SA 3.0",
+"licenceUrl": "https://creativecommons.org/licenses/by-sa/3.0/",
+"source": "https://archive.org/details/Vapaus",
+"seconds": 204
+},
+{
+"title": "Vaggvisa / Vuggevise (Emil Hartmann, rec. 1918)",
+"artist": "William Oscar (violin)",
+"url": "https://archive.org/download/loc-jukebox-28955-vaggvisa/jukebox-28955_vaggvisa.mp3",
+"licence": "Public Domain (PDM 1.0)",
+"licenceUrl": "https://creativecommons.org/publicdomain/mark/1.0/",
+"source": "https://archive.org/details/loc-jukebox-28955-vaggvisa",
+"seconds": 154
+},
+{
+"title": "Potpourri: Norske melodier (trad., rec. 1921)",
+"artist": "Arne Arnesen (violin)",
+"url": "https://archive.org/download/loc-jukebox-43783-potpouri-norske-melodier/jukebox-43783_potpouri-norske-melodier.mp3",
+"licence": "Public Domain (PDM 1.0)",
+"licenceUrl": "https://creativecommons.org/publicdomain/mark/1.0/",
+"source": "https://archive.org/details/loc-jukebox-43783-potpouri-norske-melodier",
+"seconds": 184
+},
+{
+"title": "I'll Return to This Place",
+"artist": "So I'm An Islander (Søren Nissen Jørgensen)",
+"url": "https://archive.org/download/13IllReturnToThisPlace/13%20I%27ll%20Return%20To%20This%20Place.mp3",
+"licence": "CC BY-SA 3.0",
+"licenceUrl": "https://creativecommons.org/licenses/by-sa/3.0/",
+"source": "https://archive.org/details/13IllReturnToThisPlace",
+"seconds": 215
+}
+]
+},
+{
+"id": "klassisk",
+"name": "Kanal Klassisk",
+"genre": "Lumbye, Nielsen, Grieg and friends",
+"tracks": [
+{
+"title": "H. C. Lumbye: Traumbilder (rec. 1914)",
+"artist": "Prince's Orchestra",
+"url": "https://archive.org/download/loc-jukebox-647362-traumbilder/jukebox-647362_traumbilder.mp3",
+"licence": "Public Domain (PDM 1.0)",
+"licenceUrl": "https://creativecommons.org/publicdomain/mark/1.0/",
+"source": "https://archive.org/details/loc-jukebox-647362-traumbilder",
+"seconds": 211
+},
+{
+"title": "Grieg: Peer Gynt Suite No. 1 – Morning Mood",
+"artist": "Czech National Symphony Orchestra (Musopen)",
+"url": "https://archive.org/download/MusopenCollectionAsFlac/Greig_PeerGynt/EdvardGrieg-PeerGyntSuiteNo.1Op.46-01-Morning.mp3",
+"licence": "Public Domain (PDM 1.0)",
+"licenceUrl": "https://creativecommons.org/publicdomain/mark/1.0/",
+"source": "https://archive.org/details/MusopenCollectionAsFlac",
+"seconds": 229
+},
+{
+"title": "Mozart: The Marriage of Figaro – Overture",
+"artist": "Czech National Symphony Orchestra (Musopen)",
+"url": "https://archive.org/download/MusopenCollectionAsFlac/Mozart_MarriageOfFigaro/WolfgangAmadeusMozart-MarriageOfFigaro.mp3",
+"licence": "Public Domain (PDM 1.0)",
+"licenceUrl": "https://creativecommons.org/publicdomain/mark/1.0/",
+"source": "https://archive.org/details/MusopenCollectionAsFlac",
+"seconds": 241
+},
+{
+"title": "Syv Baune Brænne (Seven Beacons Burning)",
+"artist": "So I'm An Islander (Søren Nissen Jørgensen)",
+"url": "https://archive.org/download/SyvBauneBraenneSevenBeaconsBurning/02%20Syv%20Baune%20Br%C3%A6nne%20%28Seven%20Beacons%20Burning%29.mp3",
+"licence": "CC BY-SA 3.0",
+"licenceUrl": "https://creativecommons.org/licenses/by-sa/3.0/",
+"source": "https://archive.org/details/SyvBauneBraenneSevenBeaconsBurning",
+"seconds": 313
+},
+{
+"title": "Chopin: Nocturne in E-flat major, Op. 9 No. 2",
+"artist": "Musopen (performer uncredited)",
+"url": "https://archive.org/download/musopen-chopin/Nocturne%20Op.%209%20no.%202%20in%20E%20flat%20major.mp3",
+"licence": "CC0 1.0",
+"licenceUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+"source": "https://archive.org/details/musopen-chopin",
+"seconds": 276
+},
+{
+"title": "Carl Nielsen: Jens Vejmand (rec. 1917)",
+"artist": "Mischa Léon (tenor) & King's Orchestra",
+"url": "https://archive.org/download/loc-jukebox-23723-jens-vejmend/jukebox-23723_jens-vejmend.mp3",
+"licence": "Public Domain (PDM 1.0)",
+"licenceUrl": "https://creativecommons.org/publicdomain/mark/1.0/",
+"source": "https://archive.org/details/loc-jukebox-23723-jens-vejmend",
+"seconds": 202
+},
+{
+"title": "Grieg: Peer Gynt Suite No. 1 – Anitra's Dance",
+"artist": "Czech National Symphony Orchestra (Musopen)",
+"url": "https://archive.org/download/MusopenCollectionAsFlac/Greig_PeerGynt/EdvardGrieg-PeerGyntSuiteNo.1Op.46-03-AnitrasDream.mp3",
+"licence": "Public Domain (PDM 1.0)",
+"licenceUrl": "https://creativecommons.org/publicdomain/mark/1.0/",
+"source": "https://archive.org/details/MusopenCollectionAsFlac",
+"seconds": 239
+},
+{
+"title": "Mendelssohn: Symphony No. 4 'Italian' – IV. Saltarello",
+"artist": "Czech National Symphony Orchestra (Musopen)",
+"url": "https://archive.org/download/MusopenCollectionAsFlac/Mendelssohn_ItalianSymphony/FelixMendelssohn-SymphonyNo.4InAMajorOp.90italian-04-Saltarellopresto.mp3",
+"licence": "Public Domain (PDM 1.0)",
+"licenceUrl": "https://creativecommons.org/publicdomain/mark/1.0/",
+"source": "https://archive.org/details/MusopenCollectionAsFlac",
+"seconds": 367
+},
+{
+"title": "H. C. Lumbye: Krolls Ballklänge, waltz (rec. 1914)",
+"artist": "Arthur Pryor's Band",
+"url": "https://archive.org/download/loc-jukebox-135262-krolls-ballkl-nge-waltzer/jukebox-135262_krolls-ballkl-nge-waltzer.mp3",
+"licence": "Public Domain (PDM 1.0)",
+"licenceUrl": "https://creativecommons.org/publicdomain/mark/1.0/",
+"source": "https://archive.org/details/loc-jukebox-135262-krolls-ballkl-nge-waltzer",
+"seconds": 189
+},
+{
+"title": "Grieg: Peer Gynt Suite No. 1 – Åse's Death",
+"artist": "Czech National Symphony Orchestra (Musopen)",
+"url": "https://archive.org/download/MusopenCollectionAsFlac/Greig_PeerGynt/EdvardGrieg-PeerGyntSuiteNo.1Op.46-02-AasesDeath.mp3",
+"licence": "Public Domain (PDM 1.0)",
+"licenceUrl": "https://creativecommons.org/publicdomain/mark/1.0/",
+"source": "https://archive.org/details/MusopenCollectionAsFlac",
+"seconds": 273
+},
+{
+"title": "Augusta",
+"artist": "So I'm An Islander (Søren Nissen Jørgensen)",
+"url": "https://archive.org/download/Augusta/02%20Augusta.mp3",
+"licence": "CC BY-SA 3.0",
+"licenceUrl": "https://creativecommons.org/licenses/by-sa/3.0/",
+"source": "https://archive.org/details/Augusta",
+"seconds": 309
+},
+{
+"title": "Mozart: The Magic Flute – Overture",
+"artist": "Czech National Symphony Orchestra (Musopen)",
+"url": "https://archive.org/download/MusopenCollectionAsFlac/Mozart_MagicFluteOverture/WolfgangAmadeusMozart-MagicFluteOverture.mp3",
+"licence": "Public Domain (PDM 1.0)",
+"licenceUrl": "https://creativecommons.org/publicdomain/mark/1.0/",
+"source": "https://archive.org/details/MusopenCollectionAsFlac",
+"seconds": 400
+},
+{
+"title": "Kuhlau: Trio No. 1 for three flutes, Op. 86",
+"artist": "Marina Otín Montaner, Rafael Adobas & Paola Carcasona (ESMUC)",
+"url": "https://upload.wikimedia.org/wikipedia/commons/c/c1/Kuhlau_Trio_op.86_n1_Esmuc.ogg",
+"licence": "CC BY-SA 4.0",
+"licenceUrl": "https://creativecommons.org/licenses/by-sa/4.0/",
+"source": "https://commons.wikimedia.org/wiki/File:Kuhlau_Trio_op.86_n1_Esmuc.ogg",
+"seconds": 397
+},
+{
+"title": "Charles Kjerulf: Det gamle Kristianshavn (rec. 1917)",
+"artist": "Mischa Léon (tenor) & King's Orchestra",
+"url": "https://archive.org/download/loc-jukebox-22526-det-gamle-kristianshavn/jukebox-22526_det-gamle-kristianshavn.mp3",
+"licence": "Public Domain (PDM 1.0)",
+"licenceUrl": "https://creativecommons.org/publicdomain/mark/1.0/",
+"source": "https://archive.org/details/loc-jukebox-22526-det-gamle-kristianshavn",
+"seconds": 180
+},
+{
+"title": "Grieg: Peer Gynt Suite No. 1 – In the Hall of the Mountain King",
+"artist": "Czech National Symphony Orchestra (Musopen)",
+"url": "https://archive.org/download/MusopenCollectionAsFlac/Greig_PeerGynt/EdvardGrieg-PeerGyntSuiteNo.1Op.46-04-InTheHallOfTheMountainKing.mp3",
+"licence": "Public Domain (PDM 1.0)",
+"licenceUrl": "https://creativecommons.org/publicdomain/mark/1.0/",
+"source": "https://archive.org/details/MusopenCollectionAsFlac",
+"seconds": 154
+}
+]
+},
+{
+"id": "jazz",
+"name": "Nyhavn Jazz",
+"genre": "Jazz and blues",
+"tracks": [
+{
+"title": "Rainin' Copenhagen",
+"artist": "Milestep",
+"url": "https://archive.org/download/jamendo-461092/01-1898092-Milestep-Rainin_%20Copenhagen.mp3",
+"licence": "CC BY 3.0",
+"licenceUrl": "https://creativecommons.org/licenses/by/3.0/",
+"source": "https://archive.org/details/jamendo-461092",
+"seconds": 285
+},
+{
+"title": "Backed Vibes Clean",
+"artist": "Kevin MacLeod (incompetech.com)",
+"url": "https://archive.org/download/Jazz_Sampler-9619/Kevin_MacLeod_-_Backed_Vibes_Clean.mp3",
+"licence": "CC BY 3.0",
+"licenceUrl": "https://creativecommons.org/licenses/by/3.0/",
+"source": "https://archive.org/details/Jazz_Sampler-9619",
+"seconds": 232
+},
+{
+"title": "All About the Sun",
+"artist": "Quantum Jazz",
+"url": "https://archive.org/download/End_of_Line-11636/Quantum_Jazz_-_04_-_All_About_The_Sun.mp3",
+"licence": "CC BY-SA 3.0",
+"licenceUrl": "https://creativecommons.org/licenses/by-sa/3.0/",
+"source": "https://archive.org/details/End_of_Line-11636",
+"seconds": 346
+},
+{
+"title": "It's a Jazz Thing",
+"artist": "Smiling Cynic",
+"url": "https://archive.org/download/ItsAJazzThing_201312/it%27s%20a%20jazz%20thing.mp3",
+"licence": "CC BY 3.0",
+"licenceUrl": "https://creativecommons.org/licenses/by/3.0/",
+"source": "https://archive.org/details/ItsAJazzThing_201312",
+"seconds": 345
+},
+{
+"title": "Closely Unrelated Modes",
+"artist": "Leandro Perpiñán Quartet",
+"url": "https://archive.org/download/jamendo-109284/03-922465-Leandro%20Perpinan-Closely%20Unrelated%20Modes.mp3",
+"licence": "CC BY 3.0",
+"licenceUrl": "https://creativecommons.org/licenses/by/3.0/",
+"source": "https://archive.org/details/jamendo-109284",
+"seconds": 338
+},
+{
+"title": "Slow Burn",
+"artist": "Kevin MacLeod (incompetech.com)",
+"url": "https://archive.org/download/Blues_Sampler-9614/Kevin_MacLeod_-_08_-_Slow_Burn.mp3",
+"licence": "CC BY 3.0",
+"licenceUrl": "https://creativecommons.org/licenses/by/3.0/",
+"source": "https://archive.org/details/Blues_Sampler-9614",
+"seconds": 232
+},
+{
+"title": "Time Flux",
+"artist": "Revolution Void",
+"url": "https://archive.org/download/The_Politics_of_Desire-7876/Revolution_Void_-_02_-_Time_Flux.mp3",
+"licence": "CC BY 3.0",
+"licenceUrl": "https://creativecommons.org/licenses/by/3.0/",
+"source": "https://archive.org/details/The_Politics_of_Desire-7876",
+"seconds": 236
+},
+{
+"title": "Hey Big Shirley (Instrumental)",
+"artist": "LowDown Brass Band",
+"url": "https://archive.org/download/jamendo-285666/01-1847158-LowDown%20Brass%20Band-HEY%20BIG%20SHIRLEY%20INSTRUMENTAL%2020201015.mp3",
+"licence": "CC BY-SA 3.0",
+"licenceUrl": "https://creativecommons.org/licenses/by-sa/3.0/",
+"source": "https://archive.org/details/jamendo-285666",
+"seconds": 227
+},
+{
+"title": "As I Figure",
+"artist": "Kevin MacLeod (incompetech.com)",
+"url": "https://archive.org/download/Jazz_Sampler-9619/Kevin_MacLeod_-_As_I_Figure.mp3",
+"licence": "CC BY 3.0",
+"licenceUrl": "https://creativecommons.org/licenses/by/3.0/",
+"source": "https://archive.org/details/Jazz_Sampler-9619",
+"seconds": 220
+},
+{
+"title": "Groove Factory",
+"artist": "Dr. Tuxedo",
+"url": "https://archive.org/download/jamendo-112860/02-959934-Dr.%20Tuxedo-Groove%20Factory%20.mp3",
+"licence": "CC BY-SA 3.0",
+"licenceUrl": "https://creativecommons.org/licenses/by-sa/3.0/",
+"source": "https://archive.org/details/jamendo-112860",
+"seconds": 221
+},
+{
+"title": "Kinda Sorta",
+"artist": "Smiling Cynic",
+"url": "https://archive.org/download/KindaSorta/kinda%20sorta.mp3",
+"licence": "CC BY 3.0",
+"licenceUrl": "https://creativecommons.org/licenses/by/3.0/",
+"source": "https://archive.org/details/KindaSorta",
+"seconds": 304
+},
+{
+"title": "Orbiting a Distant Planet",
+"artist": "Quantum Jazz",
+"url": "https://archive.org/download/End_of_Line-11636/Quantum_Jazz_-_07_-_Orbiting_A_Distant_Planet.mp3",
+"licence": "CC BY-SA 3.0",
+"licenceUrl": "https://creativecommons.org/licenses/by-sa/3.0/",
+"source": "https://archive.org/details/End_of_Line-11636",
+"seconds": 269
+},
+{
+"title": "Night on the Docks (Sax)",
+"artist": "Kevin MacLeod (incompetech.com)",
+"url": "https://archive.org/download/Jazz_Sampler-9619/Kevin_MacLeod_-_Night_on_the_Docks_-_Sax.mp3",
+"licence": "CC BY 3.0",
+"licenceUrl": "https://creativecommons.org/licenses/by/3.0/",
+"source": "https://archive.org/details/Jazz_Sampler-9619",
+"seconds": 174
+},
+{
+"title": "Flowers of Yvette",
+"artist": "Régis V. Gronoff",
+"url": "https://archive.org/download/jamendo-114064/03-969393-Regis%20V.%20Gronoff-Flowers%20of%20Yvette.mp3",
+"licence": "CC BY-SA 3.0",
+"licenceUrl": "https://creativecommons.org/licenses/by-sa/3.0/",
+"source": "https://archive.org/details/jamendo-114064",
+"seconds": 302
+}
+]
+},
+{
+"id": "elektronisk",
+"name": "Refshaleøen Elektro",
+"genre": "Electronic and chill",
+"tracks": [
+{
+"title": "Night Owl",
+"artist": "Broke For Free",
+"url": "https://archive.org/download/Directionless_EP-8295/Broke_For_Free_-_01_-_Night_Owl.mp3",
+"licence": "CC BY 3.0",
+"licenceUrl": "https://creativecommons.org/licenses/by/3.0/",
+"source": "https://archive.org/details/Directionless_EP-8295",
+"seconds": 194
+},
+{
+"title": "I Can't Stop",
+"artist": "Punch Deck",
+"url": "https://archive.org/download/punch-deck-icant-stop/PunchDeck-ICantStop.mp3",
+"licence": "CC BY 4.0",
+"licenceUrl": "https://creativecommons.org/licenses/by/4.0/",
+"source": "https://archive.org/details/punch-deck-icant-stop",
+"seconds": 273
+},
+{
+"title": "Disco High",
+"artist": "UltraCat",
+"url": "https://archive.org/download/Disco_High-7879/UltraCat_-_01_-_Disco_High.mp3",
+"licence": "CC BY 3.0",
+"licenceUrl": "https://creativecommons.org/licenses/by/3.0/",
+"source": "https://archive.org/details/Disco_High-7879",
+"seconds": 277
+},
+{
+"title": "Yakoezi",
+"artist": "Humdrm",
+"url": "https://archive.org/download/onmp115/01Humdrm_Yakoezi.mp3",
+"licence": "CC BY 3.0",
+"licenceUrl": "https://creativecommons.org/licenses/by/3.0/",
+"source": "https://archive.org/details/onmp115",
+"seconds": 331
+},
+{
+"title": "Daybreak",
+"artist": "Jens East ft. Henk",
+"url": "https://archive.org/download/Daybreak_1040-17859/Jens_East_ft_Henk_-_Daybreak.mp3",
+"licence": "CC BY 4.0",
+"licenceUrl": "https://creativecommons.org/licenses/by/4.0/",
+"source": "https://archive.org/details/Daybreak_1040-17859",
+"seconds": 283
+},
+{
+"title": "A Tourist in His Hometown",
+"artist": "Zero V",
+"url": "https://archive.org/download/onmp071/02_Zero_V_-_A_Tourist_In_His_Hometown.mp3",
+"licence": "CC BY-SA 3.0",
+"licenceUrl": "https://creativecommons.org/licenses/by-sa/3.0/",
+"source": "https://archive.org/details/onmp071",
+"seconds": 393
+},
+{
+"title": "Day Bird",
+"artist": "Broke For Free",
+"url": "https://archive.org/download/Directionless_EP-8295/Broke_For_Free_-_03_-_Day_Bird.mp3",
+"licence": "CC BY 3.0",
+"licenceUrl": "https://creativecommons.org/licenses/by/3.0/",
+"source": "https://archive.org/details/Directionless_EP-8295",
+"seconds": 223
+},
+{
+"title": "Straw Fields",
+"artist": "Rolemusic",
+"url": "https://archive.org/download/enrmp262_rolemusic_-_straw_fields/03_rolemusic_-_straw_fields.mp3",
+"licence": "CC BY 4.0",
+"licenceUrl": "https://creativecommons.org/licenses/by/4.0/",
+"source": "https://archive.org/details/enrmp262_rolemusic_-_straw_fields",
+"seconds": 238
+},
+{
+"title": "Is That You or Are You You?",
+"artist": "Chris Zabriskie",
+"url": "https://archive.org/download/Reappear-11948/Chris_Zabriskie_-_04_-_Is_That_You_or_Are_You_You.mp3",
+"licence": "CC BY 3.0",
+"licenceUrl": "https://creativecommons.org/licenses/by/3.0/",
+"source": "https://archive.org/details/Reappear-11948",
+"seconds": 316
+},
+{
+"title": "Come and Find Me",
+"artist": "Eric Skiff",
+"url": "https://archive.org/download/Resistor_Anthems-9016/Eric_Skiff_-_05_-_Come_and_Find_Me.mp3",
+"licence": "CC BY 3.0",
+"licenceUrl": "https://creativecommons.org/licenses/by/3.0/",
+"source": "https://archive.org/details/Resistor_Anthems-9016",
+"seconds": 200
+},
+{
+"title": "Cloudloop",
+"artist": "Lee Rosevere",
+"url": "https://archive.org/download/leerosevere_musicforpodcasts_6/Lee%20Rosevere%20-%20Music%20For%20Podcasts%206%20-%2006%20Cloudloop.mp3",
+"licence": "CC BY 4.0",
+"licenceUrl": "https://creativecommons.org/licenses/by/4.0/",
+"source": "https://archive.org/details/leerosevere_musicforpodcasts_6",
+"seconds": 300
+},
+{
+"title": "Unexpected Little Happenings",
+"artist": "UltraCat",
+"url": "https://archive.org/download/Disco_High-7879/UltraCat_-_03_-_Unexpected_Little_Happenings.mp3",
+"licence": "CC BY 3.0",
+"licenceUrl": "https://creativecommons.org/licenses/by/3.0/",
+"source": "https://archive.org/details/Disco_High-7879",
+"seconds": 246
+},
+{
+"title": "Enthusiast",
+"artist": "Tours",
+"url": "https://archive.org/download/Enthusiast-12325/Tours_-_Enthusiast.mp3",
+"licence": "CC BY 3.0",
+"licenceUrl": "https://creativecommons.org/licenses/by/3.0/",
+"source": "https://archive.org/details/Enthusiast-12325",
+"seconds": 171
+},
+{
+"title": "Covered in Oil",
+"artist": "Broke For Free",
+"url": "https://archive.org/download/Slam_Funk-7603/Broke_For_Free_-_10_-_Covered_In_Oil.mp3",
+"licence": "CC BY 3.0",
+"licenceUrl": "https://creativecommons.org/licenses/by/3.0/",
+"source": "https://archive.org/details/Slam_Funk-7603",
+"seconds": 256
+}
+]
+},
+{
+"id": "indie",
+"name": "Nørrebro Indie",
+"genre": "Indie and pop",
+"tracks": [
+{
+"title": "Fight the Sea",
+"artist": "Josh Woodward",
+"url": "https://archive.org/download/Crawford_Street-17897/Josh_Woodward_-_01_-_Fight_the_Sea.mp3",
+"licence": "CC BY 4.0",
+"licenceUrl": "https://creativecommons.org/licenses/by/4.0/",
+"source": "https://archive.org/details/Crawford_Street-17897",
+"seconds": 277
+},
+{
+"title": "Bad Sign",
+"artist": "Brad Sucks",
+"url": "https://archive.org/download/Out_Of_It-3406/Brad_Sucks_-_04_-_Bad_Sign.mp3",
+"licence": "CC BY-SA 3.0",
+"licenceUrl": "https://creativecommons.org/licenses/by-sa/3.0/",
+"source": "https://archive.org/details/Out_Of_It-3406",
+"seconds": 232
+},
+{
+"title": "Run Run Superman",
+"artist": "Rinzo & The Hey Hey Panthers",
+"url": "https://archive.org/download/jamendo-165225/01-1415133-Rinzo%20_%20The%20Hey%20Hey%20Panthers-Run%20run%20Superman.mp3",
+"licence": "CC BY 3.0",
+"licenceUrl": "https://creativecommons.org/licenses/by/3.0/",
+"source": "https://archive.org/details/jamendo-165225",
+"seconds": 160
+},
+{
+"title": "Kryckor",
+"artist": "Kontraband",
+"url": "https://archive.org/download/laconia001_kontraband/laconia001_Kontraband_01_Kryckor_128.mp3",
+"licence": "CC BY 2.5",
+"licenceUrl": "https://creativecommons.org/licenses/by/2.5/",
+"source": "https://archive.org/details/laconia001_kontraband",
+"seconds": 183
+},
+{
+"title": "Wishing Well",
+"artist": "The Dream Pop Project",
+"url": "https://archive.org/download/jamendo-170561/01-1472856-The%20Dream%20Pop%20Project-Wishing%20well.mp3",
+"licence": "CC BY 3.0",
+"licenceUrl": "https://creativecommons.org/licenses/by/3.0/",
+"source": "https://archive.org/details/jamendo-170561",
+"seconds": 192
+},
+{
+"title": "Swimming to Cambodia",
+"artist": "Josh Woodward",
+"url": "https://archive.org/download/Crawford_Street-17897/Josh_Woodward_-_15_-_Swimming_to_Cambodia.mp3",
+"licence": "CC BY 4.0",
+"licenceUrl": "https://creativecommons.org/licenses/by/4.0/",
+"source": "https://archive.org/details/Crawford_Street-17897",
+"seconds": 220
+},
+{
+"title": "Nothing Better to Do",
+"artist": "Smiling Cynic",
+"url": "https://archive.org/download/NothingBetterToDo/nothing%20better%20to%20do.mp3",
+"licence": "CC BY 3.0",
+"licenceUrl": "https://creativecommons.org/licenses/by/3.0/",
+"source": "https://archive.org/details/NothingBetterToDo",
+"seconds": 184
+},
+{
+"title": "Candlelight",
+"artist": "Jahzzar",
+"url": "https://archive.org/download/Grab_Bag-12446/02_-_Candlelight.mp3",
+"licence": "CC BY-SA 3.0",
+"licenceUrl": "https://creativecommons.org/licenses/by-sa/3.0/",
+"source": "https://archive.org/details/Grab_Bag-12446",
+"seconds": 308
+},
+{
+"title": "Week Five",
+"artist": "Ben von Wildenhaus",
+"url": "https://archive.org/download/Instrumental_Quaalude_vol_1-11161/Ben_von_Wildenhaus_-_04_-_Week_Five.mp3",
+"licence": "CC BY 3.0",
+"licenceUrl": "https://creativecommons.org/licenses/by/3.0/",
+"source": "https://archive.org/details/Instrumental_Quaalude_vol_1-11161",
+"seconds": 270
+},
+{
+"title": "Stars Collide",
+"artist": "Josh Woodward",
+"url": "https://archive.org/download/joshwoodwardstarscollide/JoshWoodward_StarsCollide.mp3",
+"licence": "CC BY 4.0",
+"licenceUrl": "https://creativecommons.org/licenses/by/4.0/",
+"source": "https://archive.org/details/joshwoodwardstarscollide",
+"seconds": 289
+},
+{
+"title": "Peggy Lee",
+"artist": "Rinzo & The Hey Hey Panthers",
+"url": "https://archive.org/download/jamendo-165225/02-1415135-Rinzo%20_%20The%20Hey%20Hey%20Panthers-Peggy%20Lee.mp3",
+"licence": "CC BY 3.0",
+"licenceUrl": "https://creativecommons.org/licenses/by/3.0/",
+"source": "https://archive.org/details/jamendo-165225",
+"seconds": 174
+},
+{
+"title": "Sundown",
+"artist": "Josh Woodward",
+"url": "https://archive.org/download/Crawford_Street-17897/Josh_Woodward_-_23_-_Sundown.mp3",
+"licence": "CC BY 4.0",
+"licenceUrl": "https://creativecommons.org/licenses/by/4.0/",
+"source": "https://archive.org/details/Crawford_Street-17897",
+"seconds": 256
+}
+]
+}
+]
+}

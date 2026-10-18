@@ -290,7 +290,7 @@ export function createCopenhagenGame({scene,city,mobilityData,cityData,toast,sou
  }
  function update(dt,actor,travelMode,{running=true}={}){
   player=actor;started=running;if(!actor)return;
-  if(running&&!paperShown)setTimeout(showPaper,1500);if(running)paperShown=true;
+  // (The morning paper no longer opens by itself at the start: players found the pop-up confusing. paper() still shows it.)
   {save.nisser??=[];const {m,q,v,one,zero}=NT,now=performance.now()/1000;
    for(const n of nisser){const got=save.nisser.includes(n.i);if(!got&&running&&Math.hypot(n.p[0]-actor.x,n.p[1]-actor.z)<2.6){save.nisser.push(n.i);save.money+=ERA==='h'?24:150;persist();banner('Nisse found!',`${save.nisser.length} of ${nisser.length} · +${ERA==='h'?24:150} ${UNIT}`,'pass');}
     nisseMesh.setMatrixAt(n.i,m.compose(v.set(n.p[0],groundAt(n.p[0],n.p[1])+.05+Math.abs(Math.sin(now*2+n.i))*.12,n.p[1]),q.setFromAxisAngle(THREE.Object3D.DEFAULT_UP,now*.8+n.i),save.nisser.includes(n.i)?zero:one));}
@@ -361,5 +361,5 @@ export function createCopenhagenGame({scene,city,mobilityData,cityData,toast,sou
   return false;
  }
  const blocking=()=>loreOpen||journalOpen||tmapOpen;
- return {photo,debug:()=>({race:race&&{id:race.r.id,k:race.k,t:race.t,c:race.countdown},armed:races.map(r=>r.armed),state,started,player:player&&[player.x,player.z]}),update,key,blocking,people,api,minimapTargets:()=>{const out=[];if(race){out.push({p:race.r.cps[race.k],color:'#ff4fd8'});return out;}for(const r of races)if(state!=='b')out.push({p:r.start,color:'#9b5de5',small:true});const j=job();out.push({p:state==='a'?j.A:j.B,color:state==='a'?'#f2b134':'#46c2b0'});if(save.active){const q=byId[save.active.id];for(const k of frontier())if(!q.steps[k].clue)out.push({p:q.steps[k].p,color:'#e0313e'});}return out;},route:()=>line.ahead()};
+ return {paper:()=>{try{sessionStorage.removeItem('cph-paper-'+ERA);}catch{}showPaper();},photo,debug:()=>({race:race&&{id:race.r.id,k:race.k,t:race.t,c:race.countdown},armed:races.map(r=>r.armed),state,started,player:player&&[player.x,player.z]}),update,key,blocking,people,api,minimapTargets:()=>{const out=[];if(race){out.push({p:race.r.cps[race.k],color:'#ff4fd8'});return out;}for(const r of races)if(state!=='b')out.push({p:r.start,color:'#9b5de5',small:true});const j=job();out.push({p:state==='a'?j.A:j.B,color:state==='a'?'#f2b134':'#46c2b0'});if(save.active){const q=byId[save.active.id];for(const k of frontier())if(!q.steps[k].clue)out.push({p:q.steps[k].p,color:'#e0313e'});}return out;},route:()=>line.ahead()};
 }

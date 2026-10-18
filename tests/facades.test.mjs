@@ -53,8 +53,9 @@ test('groups and height fixes attach to building parts and survive tile reloads'
  assert.equal(attachFacades(index,data),2);
  const shelter=index.tiles[0].parts[1];shelter.start=0;shelter.count=RING.length*6;
  for(let reload=0;reload<2;reload++){
-  const a=extrude(RING,10);applyFacadeHeights(a,[shelter]);
-  assert.ok(Math.abs(Math.max(...a.filter((_,i)=>i%5===1))-3.036)<.01,'roof lowered to the described height');
+  const a=extrude(RING,10),foot=Math.min(...a.filter((_,i)=>i%5===1)),top=Math.max(...a.filter((_,i)=>i%5===1));applyFacadeHeights(a,[shelter]);
+  assert.ok(Math.abs(Math.max(...a.filter((_,i)=>i%5===1))-(foot+(top-foot)*.3))<.01,'roof lowered to the described height (stretched from its foot)');
+  assert.ok(Math.abs(Math.min(...a.filter((_,i)=>i%5===1))-foot)<1e-6,'the foot stays on the ground');
  }
  assert.equal(shelter.height,3);
 });

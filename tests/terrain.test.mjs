@@ -247,3 +247,43 @@ test('the first water sample beside a quay takes the quay height (no slope into 
  assert.equal(ground[2*size+1],-4);   // x=-2, beside the quay: shelf
  assert.equal(ground[2*size+0],-8);   // x=-4: canal bed
 });
+
+test('a bank blurred into a slope is levelled to the land behind it; land farther out and higher ground stay', async () => {
+ const {levelBanks}=await import('../src/terrain.js');
+ const size=20,cell=3,extent=30,ground=new Float32Array(size*size),water=new Float32Array(size*size).fill(NaN);
+ // lake west of x=0 at 0.8; the bank rises 1.0 -> 1.8 over four cells, then flat land at 1.8; a 6 m hill far east
+ for(let j=0;j<size;j++)for(let i=0;i<size;i++){const x=-extent+i*cell,k=j*size+i;water[k]=x<12?.8:NaN;ground[k]=x<0?-.5:x<12?1+x/12*.8:x<45?1.8:6;}
+ const n=levelBanks((x,z)=>x<0,{},{size,cell,extent,ground,water});
+ assert.ok(n>0);
+ const at=x=>ground[10*size+Math.round((x+extent)/cell)];
+ for(const x of [0,3,6,9])assert.ok(Math.abs(at(x)-1.8)<1e-6,`bank at x=${x} is level with the land (${at(x)})`);
+ assert.equal(at(-3),-.5);   // the lake bed is untouched
+ assert.ok(Math.abs(at(27)-1.8)<1e-6);   // land behind stays where it was
+});
+
+test('water at street height (a moat the elevation model never saw) is sunk below its banks; a real basin is left alone', async () => {
+ const {sinkShallowWater}=await import('../src/terrain.js');
+ const size=12,cell=3,extent=18,ground=new Float32Array(size*size).fill(2.6),water=new Float32Array(size*size).fill(NaN);
+ // a moat strip (x in [-6,3]) at 2.5 on 2.6 m ground; a harbour basin (x > 9) at 0 below 2.6 m quays
+ for(let j=0;j<size;j++)for(let i=0;i<size;i++){const x=-extent+i*cell,k=j*size+i;if(x>=-6&&x<=3){water[k]=2.5;}if(x>9){water[k]=0;ground[k]=-4;}}
+ const wet=(x)=>(x>=-6&&x<=3)||x>9;
+ const n=sinkShallowWater(wet,{},{size,cell,extent,ground,water});
+ assert.equal(n,1);
+ const k=6*size+Math.round((0+extent)/cell);
+ assert.ok(Math.abs(water[k]-(2.6-1.8))<1e-5,`moat level ${water[k]}`);
+ assert.ok(ground[k]<water[k]-1);
+ assert.equal(water[6*size+size-1],0); // the harbour keeps its level
+});
+
+test('surveyed building parts (abs) keep their heights; other parts stand on the lowest ground under them', async () => {
+ const {liftBuildings,setTerrain,terrain}=await import('../src/terrain.js');
+ const before=terrain(),size=3,ground=new Float32Array(size*size).fill(2);
+ setTerrain({size,cell:10,extent:10,ground,water:null});
+ try{
+  const a=new Float32Array([0,5,0,0,0, 1,9,0,0,0, 0,9,1,0,0,  0,.12,0,0,0, 1,4,0,0,0, 0,4,1,0,0]);
+  const parts=[{start:0,count:3,abs:1},{start:3,count:3}];
+  liftBuildings(a,parts);
+  assert.equal(a[1],5);assert.equal(parts[0].base,5);          // surveyed: untouched, base = its foot
+  assert.ok(Math.abs(a[16]-2.12)<1e-6);assert.equal(parts[1].base,2); // relative: lifted onto the ground
+ }finally{setTerrain(before);}
+});

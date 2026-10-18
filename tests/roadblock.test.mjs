@@ -37,7 +37,10 @@ test('an arrest door uses the car currently driven after switching model and pai
  const block=createRoadblock(scene,{world,police,carModel:renderer.group}),taken={...makeCar(3,4),visual:{type:'van',paint:'#946a2e'}};
  travel.cars.push(taken);travel.car=travel.actor=taken;renderer.sync(travel);block.startArrest(taken);
  const door=block.group.children.at(-1),panel=door.children[0].children[0];
- assert.equal(panel.material.color.getHexString(),'946a2e');assert.ok(Math.abs(panel.geometry.parameters.height-(renderer.group.userData.spec.belt-.3))<1e-9);
+ assert.equal(panel.material.color.getHexString(),'946a2e');
+ // the shaped door (skin with its window cut out) runs from the sill to this car's roof line
+ panel.geometry.computeBoundingBox();const bb=panel.geometry.boundingBox,spec=renderer.group.userData.spec;
+ assert.ok(Math.abs(bb.min.y-(.34-.012))<.01&&Math.abs(bb.max.y-(spec.h-.12+.012))<.01,`door ${bb.min.y.toFixed(3)}..${bb.max.y.toFixed(3)} for a ${spec.h} m car`);
  block.clearArrest();
 });
 

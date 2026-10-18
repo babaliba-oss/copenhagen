@@ -22,6 +22,10 @@ export const FLOW_SPOTS={
   {name:'Senate Square',x:-4,z:118,heading:Math.PI/2},
   {name:'Hakaniemi',x:0,z:-1013,heading:0},
  ],
+ 'copenhagen-1760':[ // coaches and pairs (createScenario size: COACH_HALF_LENGTH) on the old town's streets
+  {name:'Vimmelskaftet (1760)',x:-341,z:-327,heading:0},
+  {name:'Kongens Nytorv (1760)',x:620,z:-130,heading:Math.PI/2},
+ ],
  tampere:[
   {name:'Hämeenkatu (Keskustori)',x:-49,z:5,heading:-Math.PI/2},
   {name:'Hämeenkatu (east)',x:300,z:-20,heading:-Math.PI/2},
@@ -51,12 +55,13 @@ function observerAt(world,x,z){
  for(let r=0;r<60;r+=1.5)for(let a=0;a<12;a++){const px=x+Math.cos(a*Math.PI/6)*r,pz=z+Math.sin(a*Math.PI/6)*r;if(free(px,pz))return {x:px,z:pz};}
  return {x,z};
 }
-export function createScenario(id,spot,{seed=1,cars,people=40}={}){
+export function createScenario(id,spot,{seed=1,cars,people=40,size=null}={}){
  const c=loadCity(id),random=seeded(seed),at=observerAt(c.world,spot.x,spot.z);
  const player={x:at.x,z:at.z,heading:spot.heading||0,speed:0,edge:undefined};
  const options={random,people,...(cars?{cars}:{})};
  if(c.helsinki)Object.assign(options,{stationCars:16,corridorCars:HARBOUR_CORRIDOR_CARS,corridor:harbourCorridor(c.world.roads)});
  const mobility=new Mobility(structuredClone(c.mobility),c.world,options);
+ if(size)for(const a of mobility.cars){a.halfLength=size.halfLength;a.halfWidth=size.halfWidth;} // a longer vehicle than a car (1760: a coach and pair)
  // Chase-camera view: everything in a wide cone ahead counts as seen and is never recycled.
  mobility.visibilityTest=a=>{const dx=a.x-player.x,dz=a.z-player.z,d=Math.hypot(dx,dz);return d<450&&(d<25||(-dx*Math.sin(player.heading)-dz*Math.cos(player.heading))/d>.45);};
  const trams=new TramSimulation(structuredClone(c.trams),c.world,random);

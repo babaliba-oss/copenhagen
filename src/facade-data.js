@@ -97,7 +97,8 @@ export function applyFacadeHeights(array,parts){
  for(const p of parts){
   const want=p.facade?.height??p.measuredHeight;if(!want)continue;
   p.sourceHeight??=p.height;if(Math.abs(want-p.sourceHeight)<.05)continue; // tiles reload from the original data
-  const k=want/p.sourceHeight;for(let i=p.start;i<p.start+p.count;i++)array[i*5+1]*=k;
+  const k=want/p.sourceHeight;let lo=Infinity;for(let i=p.start;i<p.start+p.count;i++)lo=Math.min(lo,array[i*5+1]);if(!Number.isFinite(lo))lo=0; // stretched from the part's own foot (surveyed parts stand at their terrain height)
+  for(let i=p.start;i<p.start+p.count;i++)array[i*5+1]=lo+(array[i*5+1]-lo)*k;
   p.height=want;
  }
 }

@@ -25,9 +25,10 @@
       <div class="vignette"></div>
       <header class="topbar">
         <a class="wordmark" href="/" aria-label="Grand Tour Copenhagen home"><span class="brand-icon"><img src="/favicon.svg" width="48" height="48" alt="" /></span><span class="brand-name">Grand Tour Copenhagen</span></a>
-        <nav><button id="view-btn" class="nav-btn" title="Switch between angled follow and high camera"><span>▧</span><span id="view-label">Follow</span></button><button id="map-btn" class="nav-btn" aria-label="City map"><span>⌘</span> City map <kbd>M</kbd></button><button id="look-btn" class="nav-btn" aria-label="Time of day and weather" title="T: cycle time of day and weather"><span>☼</span><span id="look-label">Midday</span> <kbd>T</kbd></button><button id="era-btn" class="nav-btn" hidden title="Y: travel between today and 1760"><span>⌛</span><span id="era-label">1760</span> <kbd>Y</kbd></button><button id="help-btn" class="icon-btn" aria-label="Help and controls">?</button><button id="sound-btn" class="icon-btn" aria-label="Enable sound" title="Enable sound">♪<span class="mute-slash">/</span></button></nav>
+        <nav><button id="view-btn" class="nav-btn" title="Switch between angled follow and high camera"><span>▧</span><span id="view-label">Follow</span></button><button id="map-btn" class="nav-btn" aria-label="City map"><span>⌘</span> City map <kbd>M</kbd></button><button id="look-btn" class="nav-btn" aria-label="Time of day and weather" title="T: cycle time of day and weather"><span>☼</span><span id="look-label">Midday</span> <kbd>T</kbd></button><button id="era-btn" class="nav-btn" hidden title="Y: travel between today and 1760"><span>⌛</span><span id="era-label">1760</span> <kbd>Y</kbd></button><button id="radio-btn" class="nav-btn" hidden title="L: change the car radio station (Shift+L back)"><span>📻</span><span id="radio-label">Radio off</span> <kbd>L</kbd></button><button id="help-btn" class="icon-btn" aria-label="Help and controls">?</button><button id="sound-btn" class="icon-btn" aria-label="Enable sound" title="Enable sound">♪<span class="mute-slash">/</span></button></nav>
       </header>
       <aside id="wanted" hidden aria-label="Police wanted level"><div id="wanted-stars"></div><div id="wanted-status"></div></aside>
+      <div id="radio-banner" aria-live="polite" hidden><b id="radio-station"></b><span id="radio-track"></span></div>
       <div class="location-tag"><span class="tiny-cross">✳</span><span id="district-label">SENAATINTORI</span><span class="location-rule"></span><span class="coordinates" id="coordinates">60.169° N · 24.952° E</span></div>
       <section class="intro boot-screen" id="intro" aria-labelledby="boot-title" aria-busy="true">
         <a class="wordmark boot-brand" href="/" aria-label="Grand Tour Copenhagen home"><span class="brand-icon"><img src="/favicon.svg" width="48" height="48" alt="" /></span><span class="brand-name">Grand Tour Copenhagen</span></a>
@@ -49,7 +50,7 @@
               <div><dt>Run / talk</dt><dd><kbd>SHIFT</kbd> / <kbd>G</kbd></dd></div>
               <div><dt>Camera / look around</dt><dd><kbd>C</kbd> / <kbd>Q</kbd> <kbd>E</kbd></dd></div>
               <div><dt>Map / weather</dt><dd><kbd>M</kbd> / <kbd>T</kbd></dd></div>
-              <div><dt>1760 / horn / FPS</dt><dd><kbd>Y</kbd> / <kbd>B</kbd> / <kbd>P</kbd></dd></div><div><dt>Music on / off</dt><dd><kbd>U</kbd></dd></div>
+              <div><dt>1760 / horn / FPS</dt><dd><kbd>Y</kbd> / <kbd>B</kbd> / <kbd>P</kbd></dd></div><div><dt>Music on / off</dt><dd><kbd>U</kbd></dd></div><div><dt>Car radio station</dt><dd><kbd>L</kbd> (<kbd>Shift</kbd>+<kbd>L</kbd> back)</dd></div>
               <div><dt>Postcard photo</dt><dd><kbd>N</kbd></dd></div>
               <div><dt>Pause &amp; all controls</dt><dd><kbd>ESC</kbd></dd></div>
             </dl>
@@ -69,7 +70,7 @@
         <div class="controls-hint"><span><kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> Drive</span><span><kbd>SPACE</kbd> Handbrake</span><span><kbd>R</kbd> Reset</span></div>
         <div class="speedometer" aria-label="Speed and electric battery">
           <div class="speed-dial"><svg viewBox="0 0 240 190" aria-hidden="true"><path class="dial-track" d="M38.59 161 A94 94 0 1 1 201.41 161"/><path id="speed-arc" d="M38.59 161 A94 94 0 1 1 201.41 161" pathLength="100" stroke-dasharray="0 100"/><g id="speed-ticks"></g><path id="speed-needle" d="M117.5 115 L120 40 L122.5 115 L120 122 Z" transform="rotate(-120 120 114)"/><circle class="needle-pin" cx="120" cy="114" r="5"/></svg><span id="drive-gear">P</span><div class="speed-digital"><span id="speed">0</span><span class="speed-unit">KM/H</span></div></div>
-          <div class="battery-row"><span><i class="battery-icon" aria-hidden="true"></i><span id="battery-label">Battery</span></span><span id="battery-value">100.0%</span></div><div id="battery-gauge" class="battery-track" role="meter" aria-label="Battery charge" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100"><span id="battery-fill"></span></div><span class="gear" id="gear">PARKED & READY</span>
+          <div class="battery-row"><span><i class="battery-icon" aria-hidden="true"></i><span id="battery-label">Battery</span></span><span id="battery-value">100.0%</span></div><div id="battery-gauge" class="battery-track" role="meter" aria-label="Battery charge" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100"><span id="battery-fill"></span></div><div class="coach-gait" id="coach-gait" aria-label="Horses' pace" hidden><span class="coach-gait-title">THE COACH</span><span class="coach-gait-pace" id="coach-pace">At rest</span><span class="coach-gait-shoes" aria-hidden="true"><i></i><i></i><i></i><i></i></span></div><span class="gear" id="gear">PARKED & READY</span>
         </div>
       </footer>
       <div class="bottomline" style="justify-content:flex-end"><button id="sources-btn">City © Helsinki · Routes © HSL 2026 · CC BY 4.0 <span>↗</span></button></div>

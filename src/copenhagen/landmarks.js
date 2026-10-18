@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import {facadeGrain} from '../facade-grain.js';
 import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';
-import {groundAt} from '../terrain.js';
+import {groundAt,waterAt,seaLevel} from '../terrain.js';
 
 // Hand-built details the city's LOD2 model cannot carry, placed on its own geometry (positions are local
 // metres in the shared Copenhagen projection; the spire axes are the model's top vertices):
@@ -147,7 +147,7 @@ export function createLandmarks({era=null,mills=[],anchors={}}={}){
  const spinners=[];
  if(today){
   for(const m of tivoli(add,mat,spinners)){m.castShadow=true;group.add(m);}
-  add(mermaid(),1465.3,-1438.7,{y:-1.2,rot:2.2});
+  {const x=1465.3,z=-1438.7,w=waterAt(x,z)??seaLevel();add(mermaid(),x,z,{y:(w??groundAt(x,z))-.35,rot:2.2});} // her rock sits in the water (a fixed height left it floating over the harbour)
   add(rider(4.5),1076.2,-438.8,{rot:.12});add(rider(3.6,'#4d6a59'),191.9,194.8,{rot:-1.2});add(gefion(),1371.2,-729.5,{rot:-.6});
  }
  add(rider(3.2,era===1760?'#b8a46a':'#55715f'),624.6,-57.9,{rot:.6}); // in the middle of Krinsen (the mapped lawn's centroid) // Christian V (1688; gilded lead until 1940s)

@@ -7,7 +7,7 @@ function depths(a,b,pedestrian=false,basis=axes(a).concat(pedestrian?[]:axes(b))
  return basis.map(axis=>(sa.w+(pedestrian?.27:0))*Math.abs(dot(axis,aa[0]))+(sa.l+(pedestrian?.29:0))*Math.abs(dot(axis,aa[1]))+
   (pedestrian?0:sb.w*Math.abs(dot(axis,bb[0]))+sb.l*Math.abs(dot(axis,bb[1])))-Math.abs(dot(delta,axis)));
 }
-export const trafficFootprintsOverlap=(a,b)=>Math.hypot(b.x-a.x,b.z-a.z)<5.2&&depths(a,b).every(d=>d>0);
+export const trafficFootprintsOverlap=(a,b)=>Math.hypot(b.x-a.x,b.z-a.z)<size(a).l+size(b).l+.5&&depths(a,b).every(d=>d>0); // 5.2 m for two cars; longer for coaches
 // Overlap measure for the escape rule. Car against car: the actual overlap
 // area of the two footprints (convex clip). Car against a person: the point's
 // depth product inside the enlarged car box. Both are zero without contact,

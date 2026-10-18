@@ -19,6 +19,8 @@ export function prepareGraph(graph){
 // corners (CORNER_BLEND metres each side) so a car does not jump sideways and snap its heading at every vertex.
 const CORNER_BLEND=2.5;
 const edgeStartDirection=e=>{const a=e.points[0],b=e.points[1],l=e.cumulative[1]||1;return [(b[0]-a[0])/l,(b[1]-a[1])/l];};
+// A vehicle longer than a car (1760: coach and pair, COACH_HALF_LENGTH) carries its size to the footprints it is tested with.
+const sized=(p,a)=>{if(a.halfLength!==undefined){p.halfLength=a.halfLength;p.halfWidth=a.halfWidth;}return p;};
 const edgeEndDirection=e=>{const n=e.points.length,a=e.points[n-2],b=e.points[n-1],l=e.cumulative[n-1]-e.cumulative[n-2]||1;return [(b[0]-a[0])/l,(b[1]-a[1])/l];};
 // nextDir/prevDir: unit directions of the adjacent edges, so the blend also runs across junction nodes.
 export function routePoint(edge,distance,offset=edge.lane,nextDir,prevDir){
@@ -123,8 +125,8 @@ export class Mobility {
   if(a.walking)return p;
   // Slide to the new lateral offset at a walking pace rather than jumping 1.8 m sideways in one frame.
   if(a.offset===undefined||!(this.dt>0))a.offset=target;else{const max=1.4*this.dt;a.offset+=Math.max(-max,Math.min(max,target-a.offset));}
-  if(Math.abs(a.offset-target)>.01){const eased=routePoint(a.edge,a.s,a.offset,nextDir,prevDir);if(vehicleFitsRoad(eased,this.world))return eased;a.offset=target;}
-  return p;
+  if(Math.abs(a.offset-target)>.01){const eased=routePoint(a.edge,a.s,a.offset,nextDir,prevDir);if(vehicleFitsRoad(eased,this.world))return sized(eased,a);a.offset=target;}
+  return sized(p,a);
  }
  // What lies under a point (0 building, 1 road, 2 pavement, 3 neither), memoised on a 25 cm grid: walkers ask
  // this for every 25 cm of every step, and three polygon lookups each was the biggest cost in a frame.
@@ -404,7 +406,7 @@ export class Mobility {
     for(let ti=0;ti<traffic.length;ti++){const b=traffic[ti];if(b===a||b.edge===null)continue;const x=b.x-a.x,z=b.z-a.z;if(x>20||x<-20||z>20||z<-20)continue;
      if(b.ref?.parked||b.ref?.standing)continue; // standing buses: checked along the lane actually driven, below
      const forward=x*dx+z*dz;if(forward<=0||forward>=20||Math.abs(x*dz-z*dx)>=2.1||this.passes(a,b)||oncomingPasses(a,b))continue;
-     const v=Math.max(0,(forward-6)*.85);if(v<desired){desired=v;hold='follow';holdBy=b.ref||b;}
+     const v=Math.max(0,(forward-(a.halfLength??CAR_HALF_LENGTH)-(b.halfLength??CAR_HALF_LENGTH)-1.3)*.85);if(v<desired){desired=v;hold='follow';holdBy=b.ref||b;} // stops ~1.3 m behind (6 m centres for two cars)
     }
     if(this.standing?.length)for(const d of STANDING_PROBES){if(a.s+d>a.edge.length)break;const q=routePoint(a.edge,a.s+d,a.offset??a.edge.lane);if(this.standingAt(q)){const v=Math.max(0,(d-3.5)*.85);if(v<desired){desired=v;hold='follow';holdBy=null;}break;}}
     a.hold=hold;a.holdBy=holdBy;a.atSignal=hold==='signal';
@@ -416,7 +418,7 @@ export class Mobility {
    const p=this.position(a);
    // A step that cannot be taken is undone (undo, above the loop); a car keeps its planned route.
    if(!a.walking){let by=sweptContact(a,p,player)?player:null;
-    if(!by)for(let bi=0;bi<nCars;bi++){const b=this.cars[bi];if(b===a||!b.edge)continue;const x=b.x-p.x,z=b.z-p.z;if(x>5.2||x<-5.2||z>5.2||z<-5.2||!trafficFootprintsOverlap(p,b)||!yieldsTo(a,b))continue;if(this.passes(a,b)){a.passing=b.id;continue;}by=b;break;}
+    if(!by)for(let bi=0;bi<nCars;bi++){const b=this.cars[bi];if(b===a||!b.edge)continue;const x=b.x-p.x,z=b.z-p.z,r=(a.halfLength??CAR_HALF_LENGTH)+(b.halfLength??CAR_HALF_LENGTH)+.5;if(x>r||x<-r||z>r||z<-r||!trafficFootprintsOverlap(p,b)||!yieldsTo(a,b))continue;if(this.passes(a,b)){a.passing=b.id;continue;}by=b;break;}
     by||=this.bodyBlocking(a,p);
     if(by){undo(a,oldS,oldEdge,oldPrev,by);if(a.stuck>4)this.retire(a,player);continue;}}
    // The last half-step out of a crossing is still part of that crossing. Testing
