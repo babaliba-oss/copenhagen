@@ -417,7 +417,7 @@ function toast(message,{important=false}={}){const el=$('toast');if(!important&&
 function progress(n,message){if(gameIsStopped())throw new Error('Startup stopped after a game failure');loadingScreen.progress(n,message);}
 // Static hosts answer a missing file with the app's index.html (200, text/html): treat that as a 404.
 async function json(url,{cache='default'}={}){const r=await fetch(url,{cache,headers:{Accept:'application/json'}});const missing=r.ok&&/text\/html/i.test(r.headers.get('content-type')||'');if(!r.ok||missing)throw Object.assign(Error(`Could not load ${url} (${missing?404:r.status})`),{status:missing?404:r.status});return r.json();}
-async function unpack(url){const r=await fetch(url);if(!r.ok)throw Error(`Could not load ${url} (${r.status})`);const bytes=await r.arrayBuffer();const magic=new Uint8Array(bytes,0,2);if(magic[0]===31&&magic[1]===139)return new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer();return bytes;}
+async function unpack(url){const r=await fetch(url);if(!r.ok||/text\/html/.test(r.headers.get('content-type')||''))throw Error(`Could not load ${url} (${r.ok?'a page came back, not the file':r.status})`);const bytes=await r.arrayBuffer();const magic=new Uint8Array(bytes,0,2);if(magic[0]===31&&magic[1]===139)return new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer();return bytes;}
 async function geometry(url){const a=new Float32Array(await unpack(`${url}.pack`));const g=new THREE.BufferGeometry();const buffer=new THREE.InterleavedBuffer(a,6);g.setAttribute('position',new THREE.InterleavedBufferAttribute(buffer,3,0));g.setAttribute('color',new THREE.InterleavedBufferAttribute(buffer,3,3));g.computeVertexNormals();g.computeBoundingSphere();return g;}
 async function pool(items,n,fn){let next=0;await Promise.all(Array.from({length:Math.min(n,items.length)},async()=>{while(next<items.length){const item=items[next++];await fn(item);}}));}
 
@@ -723,7 +723,7 @@ async function ensureCityModel(){
  // Fog ends at 850 m. Load all ground surfaces that can be seen from this start,
  // then keep the same detail streaming ahead as the player travels.
  if(!cityModelPromise)cityModelPromise=(async()=>{
-  initSurfaceStreamer();await surfaceStreamer.ensure(car,{radius:900});
+  initSurfaceStreamer();await surfaceStreamer.ensure(car,{radius:900}).catch(handleTileError); /* a ground chunk that fails three times is left out (the streamer tries it again later), not the whole game */
   await createTrees();createFallbackBuildings();
  })();
  return cityModelPromise;
