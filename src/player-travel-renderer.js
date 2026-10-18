@@ -11,10 +11,17 @@ export function createPlayerTravelRenderer(scene){
  const models=new Map(),ringGeometry=new THREE.RingGeometry(.7,.75,32),ringMaterial=new THREE.MeshBasicMaterial({color:'#eeaa55',transparent:true,opacity:.7,depthWrite:false,side:THREE.DoubleSide});
  let hand=null; // world position of the right hand, for a carried item (market-shop-renderer.js)
  let rig=null; // the walking player as a rigged character (skinned-people.js library) once it loads; the procedural figure rides, falls and carries
- function setRigged(lib,name){
-  if(rig){rig.mixer.stopAllAction();group.remove(rig.root);rig=null;}
+ // paint: [{from:'#47375b',to:'#d65f39',above:.2}] recolours the character's own copy, so the player is not one of the
+ // walkers (the crowd uses the same characters): vertex colours equal to `from` (sRGB), above/below a height in the rest pose
+ function setRigged(lib,name,paint=[]){
+  if(rig){rig.mixer.stopAllAction();rig.root.traverse(o=>{if(o.isMesh&&o.userData.ownGeometry)o.geometry.dispose();});group.remove(rig.root);rig=null;}
   const model=lib?.models.find(m=>m.name===name)||lib?.models[0];if(!model)return;
   const root=cloneSkinned(model.scene),mixer=new THREE.AnimationMixer(root),actions={};
+  if(paint.length)root.traverse(o=>{if(!o.isMesh||!o.geometry.attributes.color)return;o.geometry=o.geometry.clone();o.userData.ownGeometry=true;
+   const c=o.geometry.attributes.color,y=o.geometry.attributes.position,tmp=new THREE.Color(),rules=paint.map(r=>({...r,f:new THREE.Color(r.from),t:new THREE.Color(r.to)}));
+   for(let i=0;i<c.count;i++){tmp.setRGB(c.getX(i),c.getY(i),c.getZ(i));const h=y.getY(i);
+    for(const r of rules)if(Math.abs(tmp.r-r.f.r)+Math.abs(tmp.g-r.f.g)+Math.abs(tmp.b-r.f.b)<.01&&(r.above===undefined||h>r.above)&&(r.below===undefined||h<r.below)){c.setXYZ(i,r.t.r,r.t.g,r.t.b);break;}}
+   c.needsUpdate=true;});
   for(const k of ['Walk','Run','Idle'])if(model.clips[k])actions[k]=mixer.clipAction(model.clips[k]);
   root.name='Player (rigged)';root.visible=false;group.add(root);rig={root,mixer,actions,state:null,height:model.height,name:model.name};
  }

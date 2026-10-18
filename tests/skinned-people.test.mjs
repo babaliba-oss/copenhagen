@@ -13,6 +13,7 @@ function fakeLibrary(){
  const geometry=new THREE.BoxGeometry(.4,1.8,.3);const n=geometry.attributes.position.count;
  geometry.setAttribute('skinIndex',new THREE.Uint16BufferAttribute(new Array(n*4).fill(0).map((_,i)=>i%4===0?1:0),4));
  geometry.setAttribute('skinWeight',new THREE.Float32BufferAttribute(new Array(n*4).fill(0).map((_,i)=>i%4===0?1:0),4));
+ {const c=new THREE.Color('#47375b'),arr=new Float32Array(n*3);for(let i=0;i<n;i++)arr.set([c.r,c.g,c.b],i*3);geometry.setAttribute('color',new THREE.BufferAttribute(arr,3));} // a purple hoodie all over
  const mesh=new THREE.SkinnedMesh(geometry,new THREE.MeshStandardMaterial());const scene=new THREE.Group();scene.add(root,mesh);mesh.bind(new THREE.Skeleton([root,hips]));
  const clip=name=>new THREE.AnimationClip(name,1,[new THREE.NumberKeyframeTrack('Hips.position[y]',[0,1],[1,1.05])]);
  return {models:[{name:'M_Test',scene,clips:{Walk:clip('Walk'),Run:clip('Run'),Idle:clip('Idle')},height:1.8}],material:mesh.material};
@@ -55,6 +56,15 @@ test('the walking player is the rigged character; riding, falling or carrying sh
  r.update(travel,1/60);assert.equal(rig.visible,true);
  travel.mode='car';r.update(travel,1/60);assert.equal(rig.visible,false,'hidden in the car');
  r.setRigged(null);assert.equal(r.group.getObjectByName('Player (rigged)'),undefined);assert.equal(r.rigged(),null);
+});
+
+test('the player wears its own colours: a recoloured copy, the walkers keep theirs',()=>{
+ const lib=fakeLibrary(),r=createPlayerTravelRenderer(new THREE.Group());r.setRigged(lib,'M_Test',[{from:'#47375b',to:'#d65f39',above:0},{from:'#47375b',to:'#2b2b2b'}]);
+ const rig=r.group.getObjectByName('Player (rigged)');let mine=null,theirs=null;rig.traverse(o=>{if(o.isSkinnedMesh)mine=o;});lib.models[0].scene.traverse(o=>{if(o.isSkinnedMesh)theirs=o;});
+ assert.notEqual(mine.geometry,theirs.geometry,'own geometry');const c=mine.geometry.attributes.color,y=mine.geometry.attributes.position;
+ const orange=new THREE.Color('#d65f39'),dark=new THREE.Color('#2b2b2b');
+ for(let i=0;i<c.count;i++){const want=y.getY(i)>0?orange:dark;assert.ok(Math.abs(c.getX(i)-want.r)<1e-6&&Math.abs(c.getZ(i)-want.b)<1e-6,`vertex ${i}`);}
+ const purple=new THREE.Color('#47375b');assert.ok(Math.abs(theirs.geometry.attributes.color.getX(0)-purple.r)<1e-6,'the walkers\' copy is untouched');
 });
 
 // A `//` comment written into a one-line statement swallows the rest of the line (it hid the Absalon rider and the
