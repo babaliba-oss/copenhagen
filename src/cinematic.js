@@ -40,8 +40,9 @@ const lerp3=(a,b,t)=>[mix(a[0],b[0],t),mix(a[1],b[1],t),mix(a[2],b[2],t)];
 export function pickShots(era,search='',list=SHOTS){
  const forEra=list.filter(s=>s.era===undefined||(era===1760?s.era===1760:s.era==='today'));
  const want=(/[?&]shots=([^&]*)/.exec(search)?.[1]||'').split(',').map(w=>decodeURIComponent(w).trim().toLowerCase()).filter(Boolean);
- if(!want.length)return forEra;
- return forEra.filter((s,i)=>want.some(w=>/^\d+$/.test(w)?+w===i:s.name.toLowerCase().startsWith(w)));
+ const dur=+(/[?&]dur=([\d.]+)/.exec(search)?.[1]||0),cut=list=>dur>0?list.map(s=>({...s,dur:Math.min(s.dur,dur)})):list; /* ?dur=2.4: shorter shots, for a capture that only needs their start */
+ if(!want.length)return cut(forEra);
+ return cut(forEra.filter((s,i)=>want.some(w=>/^\d+$/.test(w)?+w===i:s.name.toLowerCase().startsWith(w))));
 }
 
 // ground(x,z): terrain height; roads(): the road graph; teleport(x,z,heading): start the player's car there (a new
