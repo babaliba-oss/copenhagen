@@ -119,7 +119,7 @@ Notes:
 
 ### Rigged people (src/skinned-people.js)
 
-The ten walkers nearest the camera (within 24 m) and the player on foot are low-poly characters by Quaternius (CC0),
+The ten walkers nearest the camera (within 45 m) and the player on foot are low-poly characters by Quaternius (CC0),
 one skinned mesh each with the material colours in its vertex colours; everyone further away, and anyone with a pose
 (phone, chat, bike), a fall, a suitcase or in a conversation, stays the procedural instanced figure (person-model.js).
 Riding, falling and carrying, the player is the procedural figure too. `?procedural` turns the rigged ones off.
