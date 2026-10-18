@@ -586,8 +586,8 @@ async function buildRoof(t,at){
    for(const k of [5,10]){a[o+k]=a[o];a[o+k+1]=a[o+1];a[o+k+2]=a[o+2];}}
   const parts=t.parts.filter(p=>![211,212,213,1796,57950,STATION_KIOSK_RATU,USPENSKI.ratu].includes(p.ratu)&&!placeHidden.has(p.id)&&!p.duplicate); // duplicate: a second copy of the same building (building-dedupe.js) // place landmarks and shelters are drawn by place-scene.js
   // Far level: one merged shell per atlas. Near level: per-part shells until the worker's details replace them.
-  const normals=await shellNormals(a,mergedShellRanges(parts).map(r=>[r.start,r.end])); // off the main thread (15-40 ms a tile)
-  const mask=createShellMask(parts.length);group.add(...createMergedShells(a,parts,textures,mask,normals));addShadowCasters(group);
+  const shells=await shellNormals(a,mergedShellRanges(parts).map(r=>[r.start,r.end])); // off the main thread (15-40 ms a tile)
+  const mask=createShellMask(parts.length);group.add(...createMergedShells(a,parts,textures,mask,shells?.normals));addShadowCasters(group,shells?.positions);
   if(city.era===1760&&!/[?&]flatroofs/.test(location.search)){const roofParts=parts.filter(p=>!p.noFacade&&!/vold|bastion|batteri|skanse|krudt/i.test(p.name||''));
    roofsInWorker(a,roofParts).then(roofs=>{if(loadedTiles.get(t.file)!==group)return;const m=periodRoofMesh(roofs,facadeGrain(new THREE.MeshStandardMaterial({vertexColors:true,roughness:.85}))); // own material: the camera fade sets opacity per mesh
     if(m){Object.assign(m.userData,{shell:true,role:'detail',occlusion:{opacity:1,clearTime:1},box:m.geometry.boundingBox.clone()});freezeMesh(m);applyMeshLod(m,group.userData.level||'near',focus);group.add(m);}});} // flat roofs get period hipped roofs (period-roofs.js), computed in a worker
@@ -609,8 +609,12 @@ async function buildRoof(t,at){
 // buildings out to the edge of the shadow box now cast too. The casters share the merged shells' geometry and are
 // shown only while the shadow map renders (renderer.shadowMap.render below), so they never draw in the main pass.
 const SHADOW_CASTER=new THREE.MeshBasicMaterial({side:THREE.DoubleSide});SHADOW_CASTER.userData.keep=true;
-function addShadowCasters(group){
- const casters=[];for(const m of group.children)if(m.userData.lod){m.userData.castByTile=true;const c=new THREE.Mesh(m.geometry,SHADOW_CASTER);c.name='Tile shadow caster';c.castShadow=true;c.receiveShadow=false;c.visible=false;c.userData.shadowCaster=true;casters.push(c);}
+function addShadowCasters(group,positions=null){
+ const lods=group.children.filter(m=>m.userData.lod),caster=g=>{const c=new THREE.Mesh(g,SHADOW_CASTER);c.name='Tile shadow caster';c.castShadow=true;c.receiveShadow=false;c.visible=false;c.userData.shadowCaster=true;return c;};
+ for(const m of lods)m.userData.castByTile=true;
+ // One caster per tile from the worker's positions (all atlases together: depth needs nothing else), else one per shell.
+ let casters;if(positions?.length){const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.BufferAttribute(positions,3));g.computeBoundingSphere();casters=[caster(g)];}
+ else casters=lods.map(m=>caster(m.geometry));
  if(casters.length)group.add(...casters);group.userData.casters=casters;
 }
 // Worker-detailed buildings land a couple per frame, each replacing its interim shell, so a tile never freezes a frame.
@@ -647,8 +651,12 @@ async function detailTile(group){
 // (where their fragments are all discarded anyway) are skipped. Checked twice a second.
 const NO_SHADOW=/traffic fleet|person|cyclist|ladcykel|city b|bus|parked|boat|furniture|bench|bike|bollard|sign plate|junction|lamp|post|tram|scooter|stall|umbrella|cafe|crowd/i;
 let trimAt=0,shadowTick=0,keptPrograms=0;
+// Street surfaces stay loaded out to 1-1.7 km, but past ~1 km (two thirds into the fog, behind the buildings from
+// street level) a tile no longer earns its draw call: 40+ surface draws at Rådhuspladsen, about half of them out there.
+const surfaceMeshes=new Set(),SURFACE_RANGE=1000;
 function trimDraws(now){
  if(now<trimAt)return;trimAt=now+500;
+ {const c=camera.position,range=SURFACE_RANGE+Math.max(0,c.y-30)*3;for(const m of surfaceMeshes){const b=m.geometry.boundingSphere;if(b)m.visible=Math.hypot(b.center.x-c.x,b.center.z-c.z)-b.radius<range;}} // further from high up (aerial shots)
  scene.traverse(o=>{if(o.castShadow&&(o.isMesh||o.isInstancedMesh)){let n=o.name,p=o.parent;while(!n&&p){n=p.name;p=p.parent;}if(n&&NO_SHADOW.test(n)&&!o.userData.keepShadow)o.castShadow=false;}});
  if(farCity){const cx=camera.position.x,cz=camera.position.z;for(const m of farCity.children){const b=m.geometry.boundingBox||(m.geometry.computeBoundingBox(),m.geometry.boundingBox);
   const fx=Math.max(Math.abs(b.min.x-cx),Math.abs(b.max.x-cx)),fz=Math.max(Math.abs(b.min.z-cz),Math.abs(b.max.z-cz));m.visible=Math.hypot(fx,fz)>FAR_START;}}
@@ -684,7 +692,7 @@ function initSurfaceStreamer(){
  surfaceStreamer??=createSurfaceStreamer({concurrency:3,onError:handleTileError,load:async (t,{signal}={})=>{
   const g=await surfaceTile(new Float32Array(await unpack(`${dataUrl(t.file)}.pack`)),data.water); // same URL geometry() used
   if(signal?.aborted||gameIsStopped()){g.dispose();return;}
-  const m=new THREE.Mesh(g,surfaceMaterial);m.receiveShadow=true;cityModel.add(m);return m;
+  const m=new THREE.Mesh(g,surfaceMaterial);m.receiveShadow=true;cityModel.add(m);surfaceMeshes.add(m);return m;
  }});
  surfaceStreamer.add(surfaceIndex);
 }
@@ -1136,7 +1144,7 @@ function frame(now){
  if(now-lastUI>140&&ready){updateHUD(now);travelUI.update(travel,{started,paused,mapOpen,busted:police?.busted,hidden:captureMode});peopleUI.update(peopleInteraction?.snapshot(),{hidden:!canTalk()||captureMode||gullEncounter.snapshot().phase==='chase'});refreshMarketUI();noticeGulls();lastUI=now;}
  uploads.step(); // rationed GPU uploads for streamed tiles
  if(ready)speciesTrees?.update(focus,{high:camera.position.y-groundAt(focus.x,focus.z)>22}); // every frame (cheap until the focus moves 8 m): waiting for tile loads made near trees pop in late
- if(now-lastTile>1200&&ready&&!switchingStart){surfaceStreamer?.update(car,{radius:1000,aheadSeconds:12});if(started)surfaceStreamer?.evictFar(car,1700,m=>{if(m){cityModel.remove(m);m.geometry.dispose();}}); /* street surfaces far behind are unloaded (they reload on return): memory stayed growing with exploration */extensionStreamer?.update(car);updateTiles().catch(handleTileError);lastTile=now;}
+ if(now-lastTile>1200&&ready&&!switchingStart){surfaceStreamer?.update(car,{radius:1000,aheadSeconds:12});if(started)surfaceStreamer?.evictFar(car,1700,m=>{if(m){cityModel.remove(m);surfaceMeshes.delete(m);m.geometry.dispose();}}); /* street surfaces far behind are unloaded (they reload on return): memory stayed growing with exploration */extensionStreamer?.update(car);updateTiles().catch(handleTileError);lastTile=now;}
  if(soundscape)soundscape.update(dt,{enabled:sound&&started&&!paused&&!mapOpen,speed:car?.speed||0,mode:travel?.mode,throttle:keys.has('KeyW')||keys.has('ArrowUp')?1:0});
  if(gain){gain.gain.setTargetAtTime(sound&&started&&travel?.mode==='car'&&!paused&&!mapOpen&&!soundscape?.013:0,audioContext.currentTime,.12);oscillator.frequency.setTargetAtTime(42+Math.abs(car?.speed||0)*5,audioContext.currentTime,.1);}
  policeRenderer?.audio(audioContext,sound&&started&&!paused&&!mapOpen&&(!police?.busted||!finale.ended));

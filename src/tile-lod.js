@@ -2,14 +2,15 @@ import * as THREE from 'three';
 import {shellColourAttribute,shellHeightAttribute,creasedShellNormals} from './shell-colors.js';
 import {facadeGrain} from './facade-grain.js';
 
-// Creased normals of a tile's merged shell ranges, worked out in a worker (shell-normals-worker.js); resolves to
-// null when there is no worker, and createMergedShells then computes them itself.
+// Creased normals of a tile's merged shell ranges (and all their positions in one array, for the tile's shadow
+// caster), worked out in a worker (shell-normals-worker.js); resolves to {normals,positions}, or null when there is
+// no worker (createMergedShells then computes the normals itself).
 let normalsWorker=null,normalsFailed=false,normalsId=0;const normalJobs=new Map();
 export function shellNormals(array,ranges){
  if(typeof Worker==='undefined'||normalsFailed||!ranges.length)return Promise.resolve(null);
  if(!normalsWorker){
   try{normalsWorker=new Worker(new URL('./shell-normals-worker.js',import.meta.url),{type:'module'});}catch{normalsFailed=true;return Promise.resolve(null);}
-  normalsWorker.onmessage=({data})=>{const job=normalJobs.get(data.id);if(!job)return;normalJobs.delete(data.id);job(data.error?null:data.normals);};
+  normalsWorker.onmessage=({data})=>{const job=normalJobs.get(data.id);if(!job)return;normalJobs.delete(data.id);job(data.error?null:{normals:data.normals,positions:data.positions});};
   normalsWorker.onerror=e=>{normalsFailed=true;for(const job of normalJobs.values())job(null);normalJobs.clear();e.preventDefault?.();};
  }
  const id=++normalsId,copy=array.slice(); // the tile array itself goes on to the building worker later
