@@ -14,7 +14,7 @@ import {signFace,drawSignFace,PLATE_SIZE} from './sign-faces.js';
 // boxes, benches, bike racks, hydrants and stop shelters are solid. Works for any city that ships the file.
 // Posts are merged per 250 m chunk (two draw calls each: painted parts and sign plates) and chunks beyond
 // view range are not drawn; everything else is one InstancedMesh per kind.
-export const CHUNK=250,VIEW_RANGE=380,SIGNAL_RANGE=350;
+export const CHUNK=500,VIEW_RANGE=380,SIGNAL_RANGE=350; // 500 m post chunks: posts, sign plates and lamp wires in ~10 draws instead of ~21
 export const POSTS={
  lamp:{height:8.4,radius:.09,strength:2.6},
  'traffic-light':{height:3.45,radius:.085,strength:1.8},
