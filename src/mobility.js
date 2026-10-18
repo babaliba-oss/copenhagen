@@ -5,6 +5,7 @@ import {cornerSpeedLimit,edgeCruise,approachCruise,edgeTopSpeed,carLane} from '.
 import {sweptContact} from './contact-geometry.js';
 import {annotateJunctions,annotateCrossings,annotateTramRelations,annotateTramSignals,signalGreen as phaseGreen,tramThreat,boxesOverlap,carBox,oncomingPasses,CAR_HALF_LENGTH} from './lane-model.js';
 const STANDING_PROBES=[3,6,10,15]; // metres ahead checked for a standing bus
+const NEXT_ONE=[null],NO_EDGES=[]; // the next planned edge, passed to cornerSpeedLimit without a fresh array per car
 import {mergeGraph} from './graph-extension.js';
 export const TRAFFIC_MAX_SPEED=50/3.6;
 export const nearStation=p=>Math.hypot(p.x+620,p.z+45)<430;
@@ -315,11 +316,11 @@ export class Mobility {
   if(start-CAR_HALF_LENGTH<-.3)return false;
   const limit=end+3*CAR_HALF_LENGTH+1;let base=-a.s;
   for(let i=-1;i<plan.length&&base<limit;i++){const e=i<0?a.edge:plan[i],cars=this.edgeCars.get(e);
-   if(cars)for(const b of cars){if(b===a||b.speed>4||b===a.unjam)continue;const d=base+b.s;if(d>start&&d<=limit){this.zoneBy=b;return true;}}
+   if(cars)for(let ci=0;ci<cars.length;ci++){const b=cars[ci];if(b===a||b.speed>4||b===a.unjam)continue;const d=base+b.s;if(d>start&&d<=limit){this.zoneBy=b;return true;}}
    base+=e.length;}
   // The way through the block itself: a stopped car standing in it (waiting at another approach's stop line
   // on a corner the lane cuts) would leave this car stuck half way.
-  const still=[];for(const b of this.cars)if(b!==a&&b.edge&&b.speed<3&&b!==a.unjam&&Math.abs(b.x-a.x)<end+8&&Math.abs(b.z-a.z)<end+8)still.push(b);
+  const still=this._still||(this._still=[]);still.length=0;for(let ci=0;ci<this.cars.length;ci++){const b=this.cars[ci];if(b!==a&&b.edge&&b.speed<3&&b!==a.unjam&&Math.abs(b.x-a.x)<end+8&&Math.abs(b.z-a.z)<end+8)still.push(b);} // reused list: called per car per step near junctions
   if(still.length)for(let d=Math.max(start,CAR_HALF_LENGTH+1);d<=end+CAR_HALF_LENGTH;d+=2){const p=this.routeAt(a,plan,d);if(!p)break;for(const b of still)if(Math.abs(b.x-p.x)<6&&Math.abs(b.z-p.z)<6&&boxesOverlap(carBox(p),carBox(b))){this.zoneBy=b;return true;}}
   if(this.externalBodies.length){const p=this.routeAt(a,plan,end+CAR_HALF_LENGTH+.5);if(p)for(const body of this.externalBodies){if(Math.abs(body.x-p.x)>20||Math.abs(body.z-p.z)>20||(body.speed||0)>2)continue;if(boxesOverlap(carBox(p),body)){this.zoneBy=body.ref||body;return true;}}}
   return false;
@@ -385,7 +386,7 @@ export class Mobility {
     if(a.edge.crossing&&a.s<.35&&!running&&!this.world.roads.at(a.x,a.z)&&!this.crossingClear(a.edge,player))desired=0;
    }else{
     const plan=this.plan(a);let hold=null,holdBy=null;
-    desired=cornerSpeedLimit(a.edge,a.s,approachCruise(edgeCruise(a.edge,desired),plan[0],desired,remaining),plan.length?[plan[0]]:[]);
+    if(plan.length)NEXT_ONE[0]=plan[0];desired=cornerSpeedLimit(a.edge,a.s,approachCruise(edgeCruise(a.edge,desired),plan[0],desired,remaining),plan.length?NEXT_ONE:NO_EDGES);
     if(a.edge.roundabout)desired=Math.min(desired,6);
     // Yield to circulating traffic before entering, never to an imaginary signal in the middle of the roundabout.
     if(!a.edge.roundabout&&remaining<10&&this.roads.outgoing[a.edge.to].some(e=>e.roundabout)){
@@ -426,9 +427,9 @@ export class Mobility {
     if(a.stuck>3)this.retire(a,player,!a.walking&&a.stuck>8&&Math.hypot(a.x-player.x,a.z-player.z)>40);continue;}
    // Tiny successful steps between repeated failures are not real progress.
    // Previously they reset the recovery timer, leaving actors stuck indefinitely.
-   if(!a.progressPoint||Math.hypot(p.x-a.progressPoint.x,p.z-a.progressPoint.z)>.5){a.stuck=0;a.progressPoint={x:p.x,z:p.z};}
+   if(!a.progressPoint||Math.hypot(p.x-a.progressPoint.x,p.z-a.progressPoint.z)>.5){a.stuck=0;if(a.progressPoint){a.progressPoint.x=p.x;a.progressPoint.z=p.z;}else a.progressPoint={x:p.x,z:p.z};}
    // Time spent without real progress (2 m), red lights included: a queue that never clears is stalled.
-   if(!a.walking){if(!a.waitFrom||Math.hypot(p.x-a.waitFrom.x,p.z-a.waitFrom.z)>2){a.waitFrom={x:p.x,z:p.z};a.waiting=0;}else a.waiting=(a.waiting||0)+dt;}
+   if(!a.walking){if(!a.waitFrom||Math.hypot(p.x-a.waitFrom.x,p.z-a.waitFrom.z)>2){if(a.waitFrom){a.waitFrom.x=p.x;a.waitFrom.z=p.z;}else a.waitFrom={x:p.x,z:p.z};a.waiting=0;}else a.waiting=(a.waiting||0)+dt;}
    Object.assign(a,p);
   }
   // The impact pass owns contact resolution. Do not push the player sideways

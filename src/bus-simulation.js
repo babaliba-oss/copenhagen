@@ -10,7 +10,14 @@ export function busSamples(p){const d=dims(p),c=Math.cos(p.heading),s=Math.sin(p
 // still road if there is mapped road on both sides of it. Buses used to stall on those for good.
 const SEAM=.4;
 function onRoad(world,x,z){if(world.roads.at(x,z))return true;return (world.roads.at(x+SEAM,z)&&world.roads.at(x-SEAM,z))||(world.roads.at(x,z+SEAM)&&world.roads.at(x,z-SEAM));}
-export function busFitsRoad(p,world){const free=(x,z)=>onRoad(world,x,z)&&!world.buildings.at(x,z)&&!world.trafficForbidden?.at(x,z);if(!free(p.x,p.z))return false;return busSamples(p).every(([x,z])=>free(x,z));}
+// The footprint points of busSamples, tested as they are generated (no list, no closures: every bus, every step).
+function freeAt(world,x,z){return onRoad(world,x,z)&&!world.buildings.at(x,z)&&!world.trafficForbidden?.at(x,z);}
+export function busFitsRoad(p,world){
+ if(!freeAt(world,p.x,p.z))return false;
+ const d=dims(p),c=Math.cos(p.heading),s=Math.sin(p.heading),w=d.width/2;
+ for(let along=-d.length/2;along<=d.length/2+.01;along+=.5)for(let k=-1;k<=1;k++){const side=k*w;if(!freeAt(world,p.x+c*side+s*along,p.z-s*side+c*along))return false;}
+ return true;
+}
 export function busOverlaps(a,b,margin=0){const da=dims(a),db=dims(b),dx=b.x-a.x,dz=b.z-a.z;if(Math.hypot(dx,dz)>(da.length+db.length)/2+margin+3)return false;const axes=p=>[[Math.cos(p.heading),-Math.sin(p.heading)],[Math.sin(p.heading),Math.cos(p.heading)]],aa=axes(a),bb=axes(b);for(const v of [...aa,...bb]){const dot=u=>Math.abs(v[0]*u[0]+v[1]*u[1]);if(Math.abs(dx*v[0]+dz*v[1])>=(da.width/2+margin)*dot(aa[0])+(da.length/2+margin)*dot(aa[1])+db.width/2*dot(bb[0])+db.length/2*dot(bb[1]))return false;}return true;}
 export function safeBusSweep(a,b,world){const distance=Math.hypot(b.x-a.x,b.z-a.z),angle=turn(a.heading,b.heading);if(distance>.02&&Math.abs(angle)/distance>1/8)return false;const n=Math.max(1,Math.ceil(distance/.35),Math.ceil(Math.abs(angle)*dims(a).length/.35));for(let i=0;i<=n;i++){const t=i/n;if(!busFitsRoad({...a,x:a.x+(b.x-a.x)*t,z:a.z+(b.z-a.z)*t,heading:a.heading+angle*t},world))return false;}return true;}
 // Lane assignment: a route line from GTFS or OpenStreetMap usually follows the middle of the street, so
