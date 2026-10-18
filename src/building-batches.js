@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import {facadeGrain} from './facade-grain.js';
 import {litWindows} from './night-windows.js';
+import {signMaterial} from './shop-signs.js';
 
 // A near tile's detailed buildings as a few merged batches, one per material look (atlas, colours, finish, shader
 // variant), instead of one to three meshes per building: 50-70 draw calls at Nyhavn became a handful. The worker's
@@ -8,19 +9,20 @@ import {litWindows} from './night-windows.js';
 // vertices are copied in when it lands (a partial upload). A per-part visibility uniform (uDetail, one float per part,
 // like the merged shells' mask) shows a part once it has landed, hides it when it hands back to the merged shell
 // beyond LOD.building, and dithers it while the chase camera fades it (a separate shader variant, so the usual
-// opaque one keeps early depth testing). Shop signs and authored hero fronts stay as their own meshes.
-export function batched(source){return !source.material.signs&&!!source.role&&source.role!=='detail';}
+// opaque one keeps early depth testing). Shop signs batch too (one shared atlas); authored hero fronts stay their own meshes.
+export function batched(source){return !!source.role&&source.role!=='detail';}
 // Mesh look: everything materialiseBuilding (building-loader.js) derives a material from, plus the attribute set.
 export function batchKey(part,source){
  const m=source.material,attrs=Object.keys(source.attributes).sort().join(',');
- return JSON.stringify([m.color,m.roughness,m.metalness,m.side,!!m.vertexColors,m.textured?part.texture:null,m.combined,source.shell&&!m.textured?(part.noFacade?'stone':'grain'):'',attrs]);
+ return JSON.stringify([m.signs?'signs':m.color,m.roughness,m.metalness,m.side,!!m.vertexColors,m.textured?part.texture:null,m.combined,source.shell&&!m.textured?(part.noFacade?'stone':'grain'):'',attrs]);
 }
 function batchMaterial(part,source,textures,uniforms){
- const {textured,signs,combined,...values}=source.material;
- const material=new THREE.MeshStandardMaterial({...values,map:textured?textures.get(part.texture)||null:null});
- if(source.shell&&!textured)facadeGrain(material,{stone:!!part.noFacade});
- if(combined)litWindows(material,{attribute:'aGlass'});
- else if((values.roughness===.19&&values.metalness===.55)||(values.roughness===.3&&values.metalness===.1&&values.vertexColors))litWindows(material);
+ const {textured,signs,combined,...values}=source.material;let material;
+ if(signs){material=typeof document!=='undefined'?signMaterial():new THREE.MeshStandardMaterial({roughness:.6});material.transparent=true;material.forceSinglePass=true;} // shop signs: the shared sign atlas (drawn on a canvas), lit after dark
+ else{material=new THREE.MeshStandardMaterial({...values,map:textured?textures.get(part.texture)||null:null});
+  if(source.shell&&!textured)facadeGrain(material,{stone:!!part.noFacade});
+  if(combined)litWindows(material,{attribute:'aGlass'});
+  else if((values.roughness===.19&&values.metalness===.55)||(values.roughness===.3&&values.metalness===.1&&values.vertexColors))litWindows(material);}
  const prev=material.onBeforeCompile,prevKey=material.customProgramCacheKey?.bind(material);
  material.onBeforeCompile=(shader,renderer)=>{prev?.call(material,shader,renderer);Object.assign(shader.uniforms,uniforms);
   shader.vertexShader=shader.vertexShader.replace('#include <common>','#include <common>\nattribute float aBid;uniform vec4 uDetail[64];varying float vDetail;')

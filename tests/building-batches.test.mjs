@@ -12,8 +12,7 @@ test("a tile's buildings share batches per material look and land into them by c
  const buildings=[0,1,2].map(i=>({part:part(i),windows:0,meshes:[mesh(i,{}),mesh(i,{roughness:.49,metalness:.28},{role:'roof'})]}));
  buildings[2].meshes.push(mesh(2,{signs:true},{role:'signs'}));
  const b=createBuildingBatches(buildings,new Map(),x=>buildings.indexOf(x));
- assert.equal(b.meshes.length,2,'two looks: facades and roofs');
- assert.equal(b.batched(buildings[2].meshes[2]),false,'shop signs stay their own mesh');
+ assert.equal(b.batched(buildings[2].meshes[2]),true,'shop signs batch too');assert.equal(b.meshes.length,3,'signs are their own look');
  assert.equal(batched({material:{},role:undefined}),false,'meshes without a role (authored hero fronts) stay their own mesh');
  const facades=b.meshes.find(m=>m.material.roughness===.8).geometry;
  assert.equal(facades.attributes.position.count,9);assert.deepEqual([...facades.attributes.aBid.array],[0,0,0,1,1,1,2,2,2]);
