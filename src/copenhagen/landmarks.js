@@ -158,6 +158,18 @@ export function createLandmarks({era=null,mills=[],anchors={}}={}){
   if(anchors.marmorkirken)add(buildingSite(),anchors.marmorkirken[0],anchors.marmorkirken[2]); // Frederik's Church, building site
  }
  if(era===1760)for(const [x,z] of mills){add(windmill(),x,z,{y:groundAt(x,z)+7,material:built});const r=new THREE.Mesh(sails(),mat);r.position.set(x,groundAt(x,z)+14.6,z+2.3);group.add(r);rotors.push(r);}
+ // Static landmarks merge into one mesh per material (1760's windmills, churches, statues and flagpoles were ~20
+ // draws) and the windmill sails turn as one instanced batch. Tivoli's rides and the flags keep their own meshes.
+ const moving=new Set([...rotors,...flags,...spinners.map(sp=>sp.m)]),byMaterial=new Map();group.updateMatrixWorld(true);
+ for(const m of group.children)if(m.isMesh&&!moving.has(m)){let l=byMaterial.get(m.material);if(!l)byMaterial.set(m.material,l=[]);l.push(m);}
+ for(const [material,list] of byMaterial){if(list.length<2)continue;
+  const gs=list.map(m=>{const g=m.geometry.index?m.geometry.toNonIndexed():m.geometry.clone();for(const k of Object.keys(g.attributes))if(!['position','normal','color'].includes(k))g.deleteAttribute(k);return g.applyMatrix4(m.matrix);});
+  if(new Set(gs.map(g=>Object.keys(g.attributes).sort().join())).size>1){gs.forEach(g=>g.dispose());continue;}
+  const merged=new THREE.Mesh(mergeGeometries(gs),material);gs.forEach(g=>g.dispose());merged.name='Landmarks merged';merged.castShadow=merged.receiveShadow=true;
+  for(const m of list){group.remove(m);m.geometry.dispose();}group.add(merged);}
+ let sailBatch=null,turn=0;const spin=new THREE.Matrix4();
+ if(rotors.length){sailBatch=new THREE.InstancedMesh(rotors[0].geometry,mat,rotors.length);sailBatch.name='Windmill sails';sailBatch.instanceMatrix.setUsage(THREE.DynamicDrawUsage);sailBatch.frustumCulled=false;
+  for(const r of rotors){group.remove(r);if(r.geometry!==sailBatch.geometry)r.geometry.dispose();}group.add(sailBatch);}
  let t=0,acc=0;
- return {group,update(dt){t+=dt;acc+=dt;for(const r of rotors)r.rotation.z-=dt*.6;for(const sp of spinners){if(sp.axis==='z')sp.m.rotation.z+=dt*sp.rate;else sp.m.rotation.y+=dt*sp.rate;}if(acc>.05){acc=0;for(const f of flags)f.userData.wave?.(t);}}};
+ return {group,update(dt){t+=dt;acc+=dt;if(sailBatch){turn-=dt*.6;rotors.forEach((r,i)=>sailBatch.setMatrixAt(i,spin.makeRotationZ(turn).setPosition(r.position)));sailBatch.instanceMatrix.needsUpdate=true;}for(const sp of spinners){if(sp.axis==='z')sp.m.rotation.z+=dt*sp.rate;else sp.m.rotation.y+=dt*sp.rate;}if(acc>.05){acc=0;for(const f of flags)f.userData.wave?.(t);}}};
 }
