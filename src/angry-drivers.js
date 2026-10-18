@@ -14,7 +14,18 @@ const FALLBACK={spec:{l:4.4,w:1.8,h:1.5,belt:.95},paint:new THREE.Color('#9aa0a0
 const ease=v=>{v=Math.min(1,Math.max(0,v));return v*v*(3-2*v);};
 // The opening door: a shaped, bevelled door (painted skin, dark trim inside, framed window, handle) on a hinge at
 // its front edge, plus a dark recess over the car's own (closed) door so the opening reads as a hole into the cabin.
-const glassMaterial=new THREE.MeshStandardMaterial({color:'#1b252b',roughness:.1,metalness:.6,side:THREE.DoubleSide}),recessMaterial=new THREE.MeshStandardMaterial({color:'#15191b',roughness:.9}),trimMaterial=new THREE.MeshStandardMaterial({color:'#24272a',roughness:.85,side:THREE.DoubleSide}),handleMaterial=new THREE.MeshStandardMaterial({color:'#b9bcbf',roughness:.3,metalness:.8});
+// The black glass, near-black trim and a flat black recess read as boxes stuck to the car: the glass is now see-through,
+// the door's inside a warm grey with an armrest, and the opening shows the cabin (seat back, cushion, sill) instead of a void.
+function cabinTexture(){
+ const c=globalThis.document?.createElement('canvas');if(!c)return null;c.width=256;c.height=128;const g=c.getContext('2d');
+ const bg=g.createLinearGradient(0,0,0,128);bg.addColorStop(0,'#2b2e31');bg.addColorStop(1,'#1c1e20');g.fillStyle=bg;g.fillRect(0,0,256,128); // cabin in shadow
+ g.fillStyle='#4a4541';g.beginPath();g.roundRect?.(150,10,58,86,14);g.fill(); // seat back (the canvas runs front to back of the opening)
+ g.fillStyle='#3f3b38';g.beginPath();g.roundRect?.(70,78,120,26,8);g.fill(); // cushion
+ g.fillStyle='#55585b';g.fillRect(0,112,256,16); // sill
+ const t=new THREE.CanvasTexture(c);t.colorSpace=THREE.SRGBColorSpace;return t;
+}
+const glassMaterial=new THREE.MeshStandardMaterial({color:'#2f3d44',roughness:.06,metalness:.25,transparent:true,opacity:.55,side:THREE.DoubleSide,depthWrite:false}),recessMaterial=new THREE.MeshStandardMaterial({color:'#ffffff',map:cabinTexture(),roughness:.9}),trimMaterial=new THREE.MeshStandardMaterial({color:'#5a544f',roughness:.8,side:THREE.DoubleSide}),armrestMaterial=new THREE.MeshStandardMaterial({color:'#2e2b29',roughness:.7}),handleMaterial=new THREE.MeshStandardMaterial({color:'#b9bcbf',roughness:.3,metalness:.8});
+if(!recessMaterial.map)recessMaterial.color.set('#1e2124');
 const rounded=(shape,pts,r)=>{const n=pts.length;for(let i=0;i<n;i++){const p=pts[i],a=pts[(i+n-1)%n],b=pts[(i+1)%n],da=Math.hypot(a[0]-p[0],a[1]-p[1]),db=Math.hypot(b[0]-p[0],b[1]-p[1]),k=Math.min(r,da/2,db/2);
  const p1=[p[0]+(a[0]-p[0])/da*k,p[1]+(a[1]-p[1])/da*k],p2=[p[0]+(b[0]-p[0])/db*k,p[1]+(b[1]-p[1])/db*k];if(i===0)shape.moveTo(...p1);else shape.lineTo(...p1);shape.quadraticCurveTo(p[0],p[1],...p2);}shape.closePath();return shape;};
 const sideways=g=>g.rotateY(-Math.PI/2); // shape (along the car, up) extruded outward -> hinge frame (x out to the left, y up, z back)
@@ -31,10 +42,11 @@ export function createDoor(vehicle){
  const trim=new THREE.Mesh(sideways(new THREE.ShapeGeometry(trimShape,4)).translate(.008,0,0),trimMaterial); // inside face of the door (dark), just inboard of the skin
  const glass=new THREE.Mesh(sideways(new THREE.ShapeGeometry(rounded(new THREE.Shape(),win,.03),4)).translate(-T*.5,0,0),glassMaterial);
  const handle=new THREE.Mesh(new THREE.BoxGeometry(.03,.035,.16),handleMaterial);handle.position.set(-T-.02,belt-.13,len-.22);
- hinge.add(skin,trim,glass,handle);
+ const armrest=new THREE.Mesh(new THREE.BoxGeometry(.06,.05,len*.55),armrestMaterial);armrest.position.set(.04,belt-.2,len*.5); // on the inside face
+ hinge.add(skin,trim,glass,handle,armrest);
  const recess=new THREE.Mesh(new THREE.BoxGeometry(.04,top-low-.04,len-.06),recessMaterial);recess.position.set(-W+.01,(top+low)/2,(front+rear)/2);root.add(recess);
  for(const m of [skin,glass,handle])m.castShadow=true;
- return {root,hinge,recess,dispose(){unregisterEnvMaterial(paintMaterial);paintMaterial.dispose();for(const m of [skin,trim,glass,handle,recess])m.geometry.dispose();}};
+ return {root,hinge,recess,dispose(){unregisterEnvMaterial(paintMaterial);paintMaterial.dispose();for(const m of [skin,trim,glass,handle,armrest,recess])m.geometry.dispose();}};
 }
 export function createAngryDrivers({vehicleOf=null}={}){
  const group=new THREE.Group();group.name='Angry drivers';

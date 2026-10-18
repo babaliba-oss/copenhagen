@@ -183,7 +183,9 @@ export function createFacade(faces,spec){
    slab(F,B,(a+b)/2,F.y1-.22,.0,b-a+.1,.44,spec.cornice?.42:.18,c.cornice);
    if(spec.material!=='glass'&&height>6){slab(F,B,(a+b)/2,F.y1-.62,0,b-a,.36,.1,c.cornice);slab(F,B,(a+b)/2,F.y1-.03,.0,b-a+.2,.08,spec.cornice?.58:.3,c.cornice);}}
   // Plinth: a darker stone base along the street.
-  if(spec.material!=='glass'&&height>4)for(const [a,b] of runs(F,F.y0+.4,[F.s0,F.s1]))slab(F,B,(a+b)/2,F.y0+.35,0,b-a,.7,.08,c.plinth);
+  // The plinth stops under the shop windows' sills (0.45 m): at 0.7 m its front, 8 cm out, lay in the panes' own plane and the
+  // bottom of every shop front flickered as a dark jagged bar.
+  if(spec.material!=='glass'&&height>4){const ph=spec.ground?.type==='glass'?0:spec.ground&&spec.ground.type!=='solid'?.44:.7;if(ph)for(const [a,b] of runs(F,F.y0+.4,[F.s0,F.s1]))slab(F,B,(a+b)/2,F.y0+ph/2,0,b-a,ph,.08,c.plinth);}
  }
  const signs=c.signs.length?mergeGeometries(c.signs.map(g=>g.index?g.toNonIndexed():g)):null;c.signs.forEach(g=>g.dispose());if(signs){signs.computeVertexNormals();signs.computeBoundingSphere();}
  return {triangles:G.triangles+B.triangles,glass:G.finish(),relief:B.finish(),signs,windows};
@@ -191,5 +193,7 @@ export function createFacade(faces,spec){
 
 // Materials for the two batches; the shell itself keeps the building's own material.
 export function facadeMaterials(){
- return {glass:new THREE.MeshStandardMaterial({vertexColors:true,roughness:.3,metalness:.1}),relief:new THREE.MeshStandardMaterial({vertexColors:true,roughness:.78})};
+ // Depth offsets: the model's LOD2 walls are not flat, and where one stood the 8 cm a pane is set proud of its face, glass and
+ // wall fought over the same depth and the shop fronts flickered as you drove past (brick showing through the glass in bands).
+ return {glass:new THREE.MeshStandardMaterial({vertexColors:true,roughness:.3,metalness:.1,polygonOffset:true,polygonOffsetFactor:-2,polygonOffsetUnits:-4}),relief:new THREE.MeshStandardMaterial({vertexColors:true,roughness:.78,polygonOffset:true,polygonOffsetFactor:-1,polygonOffsetUnits:-2})};
 }

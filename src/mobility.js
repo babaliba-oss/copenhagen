@@ -6,6 +6,8 @@ import {sweptContact} from './contact-geometry.js';
 import {annotateJunctions,annotateCrossings,annotateTramRelations,annotateTramSignals,signalGreen as phaseGreen,tramThreat,boxesOverlap,carBox,oncomingPasses,CAR_HALF_LENGTH} from './lane-model.js';
 const STANDING_PROBES=[3,6,10,15]; // metres ahead checked for a standing bus
 const NEXT_ONE=[null],NO_EDGES=[]; // the next planned edge, passed to cornerSpeedLimit without a fresh array per car
+// Walker grid cells (mobility step): a 1024-slot hash of 1.5 m cells; collisions only cost a distance test.
+const WALK_CELLS=1024,walkCell=(gx,gz)=>(Math.imul(gx,73856093)^Math.imul(gz,19349663))&(WALK_CELLS-1);
 import {mergeGraph} from './graph-extension.js';
 export const TRAFFIC_MAX_SPEED=50/3.6;
 export const nearStation=p=>Math.hypot(p.x+620,p.z+45)<430;
@@ -64,7 +66,8 @@ export class Mobility {
   this.corridor=corridor;this.corridorEdges=corridor?this.roads.edges.filter(e=>e.length>10&&corridor(...e.points[Math.floor(e.points.length/2)])):[];
   this.corridorIds=new Set(this.corridorEdges.map(e=>e.id));
   this.cars=Array.from({length:cars+stationCars+(this.corridorEdges.length?corridorCars:0)},(_,id)=>({id,stationOnly:id>=cars&&id<cars+stationCars,corridorOnly:id>=cars+stationCars,walking:false,edge:null,s:0,speed:0,cruise:6+random()*5,x:0,z:0,heading:0}));
-  this.people=Array.from({length:people},(_,id)=>({id,walking:true,edge:null,s:0,speed:0,cruise:.85+random()*.65,x:0,z:0,heading:0}));
+  // side: each walker's own distance to the right of the path's line (0.2-0.9 m, spread by id so seeded runs keep their random sequence)
+  this.people=Array.from({length:people},(_,id)=>({id,walking:true,edge:null,s:0,speed:0,cruise:.85+random()*.65,side:.2+(id*.6180339887%1)*.7,x:0,z:0,heading:0}));
  }
  // Trams share the street: tracks are related to lanes once, and their positions are read every step.
  attachTrams(trams){this.trams=trams;annotateTramRelations(this.roads.edges,trams.paths);annotateTramSignals(trams.paths,this.signals||[],this.signalControl);}
@@ -122,11 +125,36 @@ export class Mobility {
   else if(!a.walking&&this.standing?.length){const lane=a.edge.lane,ahead=s=>routePoint(a.edge,Math.min(a.edge.length,a.s+s),lane);
    if(this.standingAt(p)||this.standingAt(ahead(5))||this.standingAt(ahead(10)))for(const offset of [lane-1.1,lane-1.7,lane-2.3,lane+.9,lane+1.6]){const candidate=routePoint(a.edge,a.s,offset,nextDir,prevDir),further=routePoint(a.edge,Math.min(a.edge.length,a.s+8),offset);
     if(vehicleFitsRoad(candidate,this.world)&&vehicleFitsRoad(further,this.world)&&!this.standingAt(candidate)&&!this.standingAt(further)){target=offset;p=candidate;break;}}}
-  if(a.walking)return p;
+  if(a.walking)return this.walkerPlace(a,p);
   // Slide to the new lateral offset at a walking pace rather than jumping 1.8 m sideways in one frame.
   if(a.offset===undefined||!(this.dt>0))a.offset=target;else{const max=1.4*this.dt;a.offset+=Math.max(-max,Math.min(max,target-a.offset));}
   if(Math.abs(a.offset-target)>.01){const eased=routePoint(a.edge,a.s,a.offset,nextDir,prevDir);if(vehicleFitsRoad(eased,this.world))return sized(eased,a);a.offset=target;}
   return sized(p,a);
+ }
+ // A walker's place across the path: its own side distance to the right of the way it walks, halved where the
+ // path is too narrow for it, and eased (round corners, onto a reversed edge) rather than jumped. Everybody used
+ // to walk the line itself, so people walking together, or waiting at the same kerb, stood inside one another.
+ walkerPlace(a,p){
+  const rx=Math.cos(p.heading),rz=-Math.sin(p.heading);let side=a.side||0;
+  while(side>.08&&!this.walkable(p.x+rx*side,p.z+rz*side,a.edge))side*=.5;
+  if(side<=.08)side=0;
+  const tx=rx*side,tz=rz*side;
+  if(a.ox===undefined||!(this.dt>0)){a.ox=tx;a.oz=tz;}
+  else{const ex=tx-a.ox,ez=tz-a.oz,l=Math.hypot(ex,ez),max=.7*this.dt;if(l>max){a.ox+=ex/l*max;a.oz+=ez/l*max;}else{a.ox=tx;a.oz=tz;}}
+  if(!this.walkable(p.x+a.ox,p.z+a.oz,a.edge)){a.ox=tx;a.oz=tz;}
+  p.x+=a.ox;p.z+=a.oz;return p;
+ }
+ // How fast a walker may go so as to stay a step behind whoever walks ahead of it the same way (a queue at a
+ // kerb, a pair on a narrow pavement), or to leave room for someone standing just in front on another path (the
+ // higher id waits). Walkers by 1.5 m cell come from step(); the limiting walker is kept in a.gapBy.
+ walkGap(a,dx,dz){
+  let v=Infinity;a.gapBy=null;const head=this._walkHead,next=this._walkNext,gx=Math.floor(a.x/1.5),gz=Math.floor(a.z/1.5);
+  for(let ix=-1;ix<=1;ix++)for(let iz=-1;iz<=1;iz++)for(let j=head[walkCell(gx+ix,gz+iz)];j>=0;j=next[j]){const b=this.people[j];if(b===a)continue;
+   const x=b.x-a.x,z=b.z-a.z,forward=x*dx+z*dz;if(forward<=.05||forward>1.6)continue;
+   const lateral=Math.abs(x*dz-z*dx),same=-Math.sin(b.heading)*dx-Math.cos(b.heading)*dz>.3;
+   if(same?lateral>=.5:forward*forward+lateral*lateral>=.6||a.id<b.id)continue;
+   const u=Math.max(0,(forward-.7)*1.5);if(u<v){v=u;a.gapBy=b;}}
+  return v;
  }
  // What lies under a point (0 building, 1 road, 2 pavement, 3 neither), memoised on a 25 cm grid: walkers ask
  // this for every 25 cm of every step, and three polygon lookups each was the biggest cost in a frame.
@@ -170,7 +198,7 @@ export class Mobility {
   const nearby=this.spawnCandidates(a,player,graph,()=>(a.stationOnly?this.stationEdges:a.corridorOnly?this.corridorEdges:this.edgesNear(graph,player,a.walking?this.walkSpawn:320)).filter(e=>{const p=e.points[Math.floor(e.points.length/2)],d=Math.hypot(p[0]-player.x,p[1]-player.z);return (!a.walking||!e.crossing)&&d<(a.walking?200:a.corridorOnly?520:320)&&e.length>(a.walking?3:10)&&!(!a.walking&&(this.obstructed?.has(e)||this.trap(e,2)));}));
   let occupancy=null; // walkers per edge, counted once per spawn rather than once per trial
   for(let trial=0;trial<80&&nearby.length;trial++){
-   a.edge=nearby[Math.floor(this.random()*nearby.length)];a.s=this.random()*a.edge.length;a.plan=[];a.prevDir=undefined;
+   a.edge=nearby[Math.floor(this.random()*nearby.length)];a.s=this.random()*a.edge.length;a.plan=[];a.prevDir=undefined;a.ox=undefined;a.gapBy=null;a.gapHeld=0;
    const p=this.position(a);
    if(a.stationOnly&&!inStationTrafficArea(p))continue;
    if(!a.walking&&(this.cars.some(b=>b!==a&&b.edge&&trafficFootprintsOverlap(p,b))||this.hitsBody(carBox(p,1))||this.inConflict(a.edge,a.s)))continue;
@@ -353,6 +381,9 @@ export class Mobility {
   // copies were most of the garbage the game made per frame (collection pauses while driving).
   const traffic=this._traffic||(this._traffic=[]);traffic.length=0;traffic.push(player);for(let i=0;i<this.cars.length;i++)traffic.push(this.cars[i]);for(let i=0;i<this.externalObstacles.length;i++)traffic.push(this.externalObstacles[i]);
   for(let i=0;i<this.people.length;i++){const p=this.people[i];if(p.edge?.crossing&&this.world.roads.at(p.x,p.z))traffic.push(p);}
+  // Walkers by 1.5 m cell in a fixed hash table (no garbage), for walkGap.
+  {const head=this._walkHead||(this._walkHead=new Int32Array(WALK_CELLS)),chain=this._walkNext?.length>=this.people.length?this._walkNext:(this._walkNext=new Int32Array(this.people.length));head.fill(-1);
+  for(let i=0;i<this.people.length;i++){const p=this.people[i];if(!p.edge||p.knockdown)continue;const h=walkCell(Math.floor(p.x/1.5),Math.floor(p.z/1.5));chain[i]=head[h];head[h]=i;}}
   const tramList=this.trams?.trams||[];this.updateParked();
   const undo=(a,oldS,oldEdge,oldPrev,by)=>{if(a.edge!==oldEdge){a.plan?.unshift(a.edge);a.prevDir=oldPrev;}a.s=oldS;a.edge=oldEdge;a.speed=0;a.waiting=(a.waiting||0)+dt;a.stuck=(a.stuck||0)+dt;if(!a.walking){a.hold=by?'contact':'road';a.holdBy=by;}};
   const nCars=this.cars.length,nAgents=nCars+this.people.length;
@@ -386,6 +417,14 @@ export class Mobility {
    if(a.walking){
     if(!running){const x=player.x-a.x,z=player.z-a.z,forward=x*dx+z*dz;if(forward>0&&forward<5&&Math.abs(x*dz-z*dx)<1.7)desired=Math.min(desired,Math.max(0,(forward-2.8)*.85));}
     if(a.edge.crossing&&a.s<.35&&!running&&!this.world.roads.at(a.x,a.z)&&!this.crossingClear(a.edge,player))desired=0;
+    // Never on a crossing: someone waiting for a gap out on the carriageway would hold up the cars (and the cars them).
+    if(!running&&desired>0&&!a.edge.crossing){const g=this.walkGap(a,dx,dz);
+     if(g<desired){a.gapHeld=(a.gapHeld||0)+dt;let ring=false;
+      // Walkers each waiting for the next round a ring would never move: after a while the lowest id in it steps on.
+      if(a.gapHeld>4){let b=a.gapBy,min=a.id;for(let k=0;k<8&&b;k++){if(b===a){ring=min===a.id;break;}min=Math.min(min,b.id);b=b.gapBy;}}
+      if(!ring)desired=g;}
+     else a.gapHeld=0;}
+    else{a.gapBy=null;a.gapHeld=0;}
    }else{
     const plan=this.plan(a);let hold=null,holdBy=null;
     if(plan.length)NEXT_ONE[0]=plan[0];desired=cornerSpeedLimit(a.edge,a.s,approachCruise(edgeCruise(a.edge,desired),plan[0],desired,remaining),plan.length?NEXT_ONE:NO_EDGES);

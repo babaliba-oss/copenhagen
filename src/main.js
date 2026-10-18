@@ -142,7 +142,7 @@ import {updateWorldhoodBrand} from './worldhood-brand.js';
 import {installMapillaryAttribution} from './mapillary-attribution.js';
 import './worldhood-brand.css';
 import earcut from 'earcut';
-import {decodeTerrain,setTerrain,hasTerrain,groundAt,groundPose,liftBuildings,footprintBase,flattenWaterBodies,waterAt,raiseDryHollows,levelBanks,sinkShallowWater,terrain,seaLevel} from './terrain.js';
+import {decodeTerrain,setTerrain,hasTerrain,groundAt,groundPose,liftBuildings,footprintBase,flattenWaterBodies,waterAt,raiseDryHollows,levelBanks,sinkShallowWater,raiseBridgeDecks,terrain,seaLevel} from './terrain.js';
 import {drapeGeometry,dropSunkenSurfaces,settleObject,createTerrainGround,drawLakeMap} from './terrain-mesh.js';
 const impacts=new ImpactSystem();impacts.onVehicleHit=(from,car,a)=>mobility?.knock(a,from,car)??null;
 const finale=new Finale({doc:document}); // shared offence log, pursuit pressure, arrest cinematic and BUSTED screen
@@ -493,11 +493,16 @@ function createFallbackBuildings(buildings=data.buildings){
  for(const b of buildings){
   const bb=b.bbox,cx=(bb[0]+bb[2])/2,cz=(bb[1]+bb[3])/2;
   if(data.water&&inWaterPolygons(data.water,cx,cz))continue; // a mapped footprint on the water (houseboat, pontoon): no 15 m box in the canal
-  if(ratus.has(String(b.ratu))||index.near(cx,cz).some(m=>{const a=m.bbox;return Math.max(0,Math.min(a[2],bb[2])-Math.max(a[0],bb[0]))*Math.max(0,Math.min(a[3],bb[3])-Math.max(a[1],bb[1]))/Math.max(1,(bb[2]-bb[0])*(bb[3]-bb[1]))>.5;})){modelled.push(b);continue;}
+  // cover: the share of the footprint under the model's roofs (scripts/fit-colliders.py); data without it: bounding boxes, which
+  // counted a footprint as modelled when a big neighbour's box lay over it (an invisible wall where nothing was drawn)
+  if(b.cover!==undefined?b.cover>=.5:ratus.has(String(b.ratu))||index.near(cx,cz).some(m=>{const a=m.bbox;return Math.max(0,Math.min(a[2],bb[2])-Math.max(a[0],bb[0]))*Math.max(0,Math.min(a[3],bb[3])-Math.max(a[1],bb[1]))/Math.max(1,(bb[2]-bb[0])*(bb[3]-bb[1]))>.5;})){modelled.push(b);continue;}
+  if(/^(roof|construction|carport|bridge)$/.test(b.kind||''))continue; // canopies and building sites: nothing standing to draw
   if(city.era===1760&&(bb[2]-bb[0])*(bb[3]-bb[1])<60)continue; // today's kiosks, metro shafts and sheds: a windowless brick drum in an 18th-century square
   const shape=new THREE.Shape(b.rings[0].map(p=>new THREE.Vector2(p[0],-p[1])));
   for(const r of b.rings.slice(1))shape.holes.push(new THREE.Path(r.map(p=>new THREE.Vector2(p[0],-p[1]))));
-  const small=(b.bbox[2]-b.bbox[0])*(b.bbox[3]-b.bbox[1])<90;const h=b.height>2?Math.min(60,b.height):small?3.5:15;
+  // OpenStreetMap's 10 m default (and a station's 12 m) stood a 3 m lift shaft or a metro stair up as a slim tower in the street (Nørreport)
+  const area=(bb[2]-bb[0])*(bb[3]-bb[1]),small=area<90,pavilion=/^(train_station|station|elevator|shelter|kiosk|toilets|service|guardhouse|transformer_tower|ticket_booth)$/.test(b.kind||'');
+  const h=pavilion||area<30?Math.min(b.height>2&&b.height!==10?b.height:3.5,4.5):b.height>2&&!(b.height===10&&area<60)?Math.min(60,b.height):small?3.5:15;
   const base=.1+footprintBase(b.rings),g=new THREE.ExtrudeGeometry(shape,{depth:h,bevelEnabled:false,steps:1});g.rotateX(-Math.PI/2);g.translate(0,base,0);g.deleteAttribute('uv');
   // Houses without a 3D model: a plausible town-house colour, a darker roof and the shader's storey-and-bay
   // window grid (aRel = height above the base, total height), so they read as buildings, not blank boxes.
@@ -721,7 +726,7 @@ async function ensureCityModel(){
  return cityModelPromise;
 }
 function rebuildSea(groundExtent){
- const next=createSea(data.water,data,{helsinkiHarbour:city.scenery==='helsinki',groundExtent,deckColor:city.era===1760?'#6b5e4e':'#4a4b4d',deckTexture:city.era===1760?'setts':'asphalt'}),old=sea;tintSea(next);
+ const next=createSea(data.water,data,{helsinkiHarbour:city.scenery==='helsinki',groundExtent,deckColor:city.era===1760?'#6b5e4e':'#4a4b4d',deckTexture:city.era===1760?'setts':'asphalt'}),old=sea;tintSea(next);if(hasTerrain())raiseBridgeDecks(next.group.userData.bridges,(x,z)=>inWaterPolygons(data.water,x,z));
  sea=next;cityModel.add(next.group);ground.geometry.dispose();ground.geometry=next.groundGeometry;
  if(!old)return;
  cityModel.remove(old.group);
@@ -1206,6 +1211,7 @@ async function boot(){
      furniture:loadColouredModels('/models/furniture/',today?['lamp','mast-lamp','park-lamp','bench','bin','traffic-light','crossing-light','wire-shade','bollard','shelter']:['lantern']),
      scooter:today?loadColouredParts('/models/bikes/scooter.glb').then(parts=>{if(parts){setScooterModel(bakeColoured(parts,{},{paint:'paint'}));parts.forEach(p=>p.geometry.dispose());}}):Promise.resolve(),
      buses:today?Promise.all(['city','trunk'].map(async k=>{const parts=await loadColouredParts(`/models/buses/${k}.glb`);if(parts){const by=new Map();for(const p of parts){if(!by.has(p.name))by.set(p.name,[]);by.get(p.name).push(p.geometry);}setBusBodies({[k]:new Map(Array.from(by,([n,gs])=>[n,gs.length>1?mergeGeometries(gs):gs[0]]))});}})):Promise.resolve(),
+     statues:today?loadColouredModel('/models/statues/frederik-v.glb').then(frederikV=>({frederikV})).catch(()=>({})):Promise.resolve({}), // Frederik V at Amalienborg (photogrammetry by alexabhisak, CC BY 4.0; unveiled 1771, so today only)
      carriage:today?Promise.resolve():Promise.all([loadColouredModel('/models/carriage/coach.glb'),loadColouredParts('/models/carriage/horse.glb')]).then(([coach,horse])=>setCarriageModels({coach,horse,bake:bakeColoured}))};}if(city.era===1760){STARTER_VISUALS.none=['bike','scooter'];PERSON_PERIOD.year=1760;document.body.classList.add('era-1760');
     // the errand boy dresses for the century too: red wool coat, breeches, stockings and a black hat
     Object.assign(travelRenderer.look,personLook(2026,{height:1.75,skirt:false,age:'adult',shirt:'#8a2a22',trousers:'#3b2f25',coat:.8,outer:'coat',hat:'#1d1b19',hairStyle:'cap',tights:'#e6e0d0',shoes:'#1b1714',bagType:'shoulder',bagColor:'#6b4a32',accessory:null,phoneWalk:false,scarf:null,stoop:0}));}updateWorldhoodBrand(city);setPlayableRadius(city.radius||2000);
@@ -1287,7 +1293,7 @@ async function boot(){
    if(setTerrain(await terrainData)){if(city.id==='copenhagen')console.info('Water bodies levelled',flattenWaterBodies());if(city.id.startsWith('copenhagen')){const pools=extractPerchedPools(data);if(pools.length)cityModel.add(createPoolSheets(pools));console.info('Perched pools (fountains, ponds above their water level)',pools.length);}if(city.id.startsWith('copenhagen'))buildWaterMask(data.water,terrain()?.extent);if(city.era===1760)console.info('Water at street height sunk below its banks (the moat)',sinkShallowWater((x,z)=>inWaterPolygons(data.water,x,z)));{const t0=performance.now(),n=raiseDryHollows((x,z)=>inWaterPolygons(data.water,x,z));console.info('Dry hollows raised to quay height',n,Math.round(performance.now()-t0)+' ms');}if(city.id.startsWith('copenhagen')){const t0=performance.now(),n=levelBanks((x,z)=>inWaterPolygons(data.water,x,z));console.info('Banks levelled to the quay',n,Math.round(performance.now()-t0)+' ms');} /* paths along the lakes and quays lie level, not down the blurred bank */surfaceMaterial.defines={...surfaceMaterial.defines,TERRAIN:''};surfaceMaterial.needsUpdate=true;ground.visible=false;cityModel.add(createTerrainGround(ground.material,city.id.startsWith('copenhagen')?{cell:10,chunk:180,wet:(x,z)=>inWaterPolygons(data.water,x,z)}:undefined));}
    if((landcoverData.polygons||landcoverData.runs||[]).length)cityModel.add(settleObject(createLandcover(landcoverData)));
    if(city.id.startsWith('copenhagen')){const lawns=(data.parks||[]).filter(p=>/Nurmikko|Kenttä/.test(p.kind)&&p.rings?.[0]?.length>3).map(p=>p.rings);if(lawns.length){const g=settleObject(createLandcover({polygons:lawns,chunk:city.era===1760?900:1800}),{maxEdge:6,tolerance:.18}); /* lawns lie under the surfaces: a coarser drape (1760's fields and ramparts made ~5M triangles) */g.name='Mapped lawns (under the surfaces)';g.position.y-=.22;g.updateMatrixWorld(true);cityModel.add(g);/* the coarse drape strays up to 18 cm: sunk below it, lawns no longer poke through paved squares (1760 blotches); terrain ground sits 50 cm down */}} // lawns the surface data leaves bare (Krinsen on Kongens Nytorv, park lawns)
-   sea=createSea(data.water,data,{helsinkiHarbour:helsinki,deckColor:city.era===1760?'#6b5e4e':'#4a4b4d',deckTexture:city.era===1760?'setts':'asphalt'});tintSea(sea);cityModel.add(sea.group);ground.geometry.dispose();ground.geometry=sea.groundGeometry;
+   sea=createSea(data.water,data,{helsinkiHarbour:helsinki,deckColor:city.era===1760?'#6b5e4e':'#4a4b4d',deckTexture:city.era===1760?'setts':'asphalt'});tintSea(sea);if(hasTerrain())console.info('Ground raised under bridge decks the elevation model never saw',raiseBridgeDecks(sea.group.userData.bridges,(x,z)=>inWaterPolygons(data.water,x,z)));cityModel.add(sea.group);ground.geometry.dispose();ground.geometry=sea.groundGeometry;
    // Helsinki's hand-built scenery (landmarks, harbour, street life, signs). Other cities get the generic engine only.
    async function buildHelsinkiScenery(){
    progress(30,'Loading roads and waterfront');
@@ -1353,8 +1359,13 @@ async function boot(){
    const {streetObstacles,ads,crossingSigns,routeCrossingSigns,roadworks,senateProps,furniture,micromobility,market,kaivokatuDetails}=helsinki?await buildHelsinkiScenery():genericScenery();
    staticCars=[...(furniture.enterableCars||[]),...(harbour.enterableCars||[]),...(stationStreetLife?.enterableCars||[])];
    // Detected street furniture: solid boxes join the obstacles; posts, bins and barriers can be knocked down.
-   {const an=anchorData&&await anchorData;if(an){const ed=eraData&&await eraData;landmarks=createLandmarks({era:city.era,anchors:an,mills:ed?.mills||[]});cityModel.add(landmarks.group);}}
-   {const bd=boatData&&await boatData;if(bd){boats=createBoats(bd,{waterY:CPH_WATER+(sea?.group?.position?.y||0),era:city.era,models:blenderLoads?await blenderLoads.boats:{},wet:(x,z)=>inWaterPolygons(data.water,x,z)});cityModel.add(boats.group);}}
+   {const an=anchorData&&await anchorData;if(an){const ed=eraData&&await eraData;landmarks=createLandmarks({era:city.era,anchors:an,mills:ed?.mills||[],statues:blenderLoads?await blenderLoads.statues:{}});cityModel.add(landmarks.group);}}
+   // HDMS Gorm (Danish armoured gunboat, 1870; model by martyn169, CC BY 4.0) lies at the Opera's quay, an easter egg for today's
+   // harbour. Moored boats in her berth go; she loads after the city, out of the start-up path.
+   const GORM={x:1468,z:-256,yaw:1.134,half:[39,9]},gc=Math.cos(GORM.yaw),gs=Math.sin(GORM.yaw),inBerth=(x,z)=>{const dx=x-GORM.x,dz=z-GORM.z;return Math.abs(dx*gc-dz*gs)<GORM.half[0]+3&&Math.abs(dx*gs+dz*gc)<GORM.half[1]+3;};
+   {const bd=boatData&&await boatData;if(bd){if(city.id==='copenhagen'&&Array.isArray(bd.boats))bd.boats=bd.boats.filter(b=>!inBerth(b[0],b[1]));boats=createBoats(bd,{waterY:CPH_WATER+(sea?.group?.position?.y||0),era:city.era,models:blenderLoads?await blenderLoads.boats:{},wet:(x,z)=>inWaterPolygons(data.water,x,z)});cityModel.add(boats.group);}}
+   if(city.id==='copenhagen'){const here=city;loadColouredModel('/models/boats/hdms-gorm.glb').then(g=>{if(!g||city!==here){g?.dispose();return;}const m=new THREE.Mesh(g,new THREE.MeshStandardMaterial({vertexColors:true,roughness:.55,metalness:.15}));m.name='HDMS Gorm (easter egg)';
+    m.position.set(GORM.x,(waterAt(GORM.x,GORM.z)??CPH_WATER)-.1,GORM.z);m.rotation.y=GORM.yaw;m.castShadow=true;m.receiveShadow=true;cityModel.add(m);}).catch(e=>console.warn('HDMS Gorm:',e.message));}
    harbourBath=city.id==='copenhagen'?createHarbourBath({createPeople:createInstancedPeople}):null;if(harbourBath)cityModel.add(harbourBath.group);
    {const cd=cafeData&&await cafeData;if(cd){const c=createCafes(cd);cityModel.add(c.group);streetObstacles.push(...(c.obstacles||[]));
     // Guests standing at the café tables, chatting (two at most tables).
@@ -1381,6 +1392,18 @@ async function boot(){
     const onRoad=(x,z)=>lanes.at(x,z)&&!islands.at(x,z);
     const inLane=(x,z)=>onRoad(x,z)||[[.6,0],[-.6,0],[0,.6],[0,-.6]].some(([a,b])=>lanes.at(x+a,z+b))&&!walk.at(x,z)&&!islands.at(x,z);mapped.poleAllowed=(x,z)=>!inLane(x,z);
     mapped.items=mapped.items.filter(it=>!onRoad(it.x,it.z));console.info(`Street furniture: ${before-mapped.items.length} items in traffic lanes dropped`);
+    // Benches are photo detections placed to within a few metres, and 920 came with no heading (all faced north). One
+    // beside a street now stands 0.9 m back from the kerb with its seat along it, facing the street; one placed in
+    // the carriageway is moved off it (dropped when that puts it in a house or another lane).
+    {const houses=new SpatialIndex(data.buildings),kerb=(x,z)=>{let best=null,d=Infinity;const seen=new Set();
+      for(const [a,b] of [[0,0],[10,0],[-10,0],[0,10],[0,-10]])for(const p of lanes.near(x+a,z+b)){if(seen.has(p))continue;seen.add(p);if(p.bbox[0]>x+8||p.bbox[2]<x-8||p.bbox[1]>z+8||p.bbox[3]<z-8)continue;
+       for(const r of p.rings)for(let i=0;i<r.length;i++){const [ax,az]=r[i],[bx,bz]=r[(i+1)%r.length],dx=bx-ax,dz=bz-az,l=dx*dx+dz*dz;if(!l)continue;const t=Math.max(0,Math.min(1,((x-ax)*dx+(z-az)*dz)/l)),px=ax+dx*t,pz=az+dz*t,q=Math.hypot(x-px,z-pz);if(q<d){d=q;best={x:px,z:pz,d:q};}}}
+      return best;};
+     let moved=0,turned=0,dropped=0;mapped.items=mapped.items.filter(it=>{if(it.k!=='bench')return true;const e=kerb(it.x,it.z);if(!e||e.d>7)return true;
+      const inside=!!lanes.at(it.x,it.z);let ux=it.x-e.x,uz=it.z-e.z;const l=Math.hypot(ux,uz);if(l<.01)return false;ux/=l;uz/=l;if(inside){ux=-ux;uz=-uz;} // (ux,uz): from the kerb into the pavement
+      if(inside||e.d<.9){const x=e.x+ux*.9,z=e.z+uz*.9;if(lanes.at(x,z)||houses.at(x,z)){dropped++;return false;}it.x=x;it.z=z;moved++;}
+      it.yaw=Math.atan2(-ux,-uz);turned++;return true;}); // the seat faces +Z in the bench model: towards the street
+     console.info(`Street furniture: benches set along the kerb ${turned} (moved off the carriageway ${moved}, dropped ${dropped})`);}
     {const b=mapped.items.length;mapped.items=mapped.items.filter(it=>!([[0,0],[2.5,0],[-2.5,0],[0,2.5],[0,-2.5]].every(([a,b])=>inWaterPolygons(data.water,it.x+a,it.z+b))&&!lanes.at(it.x,it.z)&&!walk.at(it.x,it.z))); /* well out on the water, not the quay-edge lamps and bollards */console.info(`Street furniture: ${b-mapped.items.length} items standing in the water dropped`);} // signs and poles mapped on the water (bridge ends, survey drift)
     // Sign clutter: photo detections give blank blue 'generic plates' (no readable type) and the same sign seen
     // from several photos. Keep posts with a real face, one per face within 5 m, and at most 3 posts in 8 m.

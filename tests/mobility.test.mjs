@@ -61,3 +61,16 @@ test('a car stranded at a dead end with no way back stays beside the player but 
  for(let i=0;i<60;i++)far.step(1/60,{x:100,z:100,heading:0,speed:0});
  assert.ok(farCar.edge===null||farCar.z>-195,'a distant stranded car is recycled instead of blocking the lane');
 });
+
+test('walkers keep their own place on the pavement and a step behind the one ahead, not inside each other',()=>{
+ const pave={rings:[[[-6,5],[6,5],[6,-125],[-6,-125]]],kind:'Jalkakäytävä'},none=new SpatialIndex([]);
+ const sim=new Mobility({roads:{nodes:[],edges:[]},walks:{nodes:[[0,0],[0,-120]],edges:[{from:0,to:1,points:[[0,0],[0,-120]],lane:0}]},signals:[]},{buildings:none,roads:none,pavement:new SpatialIndex([pave])},{cars:0,people:2});
+ const edge=sim.walks.edges[0],[a,b]=sim.people;
+ // the same line, a slow walker 3 m ahead of a fast one: they used to merge into one body and split again
+ Object.assign(a,{edge,s:10,speed:1.4,cruise:1.45,side:.4});Object.assign(b,{edge,s:13,speed:.9,cruise:.9,side:.45});
+ for(const p of [a,b])Object.assign(p,sim.position(p));
+ const player={x:30,z:-60,speed:0};let closest=Infinity; // near enough that nobody is recycled, off the pavement
+ for(let i=0;i<600;i++){sim.step(1/30,player);closest=Math.min(closest,Math.hypot(a.x-b.x,a.z-b.z));}
+ assert.ok(closest>.6,`never closer than a step: ${closest.toFixed(2)} m`);assert.ok(b.s>13+.9*15,'the one ahead walks on at its own pace');
+ assert.ok(Math.abs(a.x)>.15&&Math.abs(a.x)<.9,`off the line, to the right of the way it walks: x=${a.x.toFixed(2)}`);
+});

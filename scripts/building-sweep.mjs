@@ -6,10 +6,10 @@
 // Parts the era hides (GONE names in main.js for 1760) are left out, so walls they used to close show up.
 // Houses stand where the game puts them (relative parts lifted onto the terrain like liftBuildings) and a ray that runs
 // into the ground counts as blocked, so a house on a slope is not reported for its uphill walls.
-// node scripts/building-sweep.mjs copenhagen-1760 [radius] [data dir]  -> JSON summary to stdout
+// node scripts/building-sweep.mjs copenhagen-1760 [radius] [data dir] [--hide]  -> JSON summary to stdout
 import fs from 'node:fs';import path from 'node:path';import zlib from 'node:zlib';
 import {decodeTerrain,setTerrain,groundAt,liftBuildings} from '../src/terrain.js';
-const city=process.argv[2]||'copenhagen-1760',R=+(process.argv[3]||1700),root=process.argv[4]||`public/cities/${city}`;
+const args=process.argv.slice(2).filter(a=>!a.startsWith('--')),city=args[0]||'copenhagen-1760',R=+(args[1]||1700),root=args[2]||`public/cities/${city}`;
 const idx=JSON.parse(fs.readFileSync(path.join(root,'buildings3d-index.json'),'utf8'));
 {let tb=fs.readFileSync(`public/cities/${city}/terrain.pack`);if(tb[0]===31)tb=zlib.gunzipSync(tb);setTerrain(decodeTerrain(tb.buffer.slice(tb.byteOffset,tb.byteOffset+tb.byteLength)));}
 let gone=null;if(city.endsWith('1760')){const src=fs.readFileSync('src/main.js','utf8'),m=src.match(/const GONE=(\/\^.*?\/[a-z]*);/);if(m)gone=eval(m[1]);}
@@ -65,4 +65,9 @@ for(const {p,tile,t0,t1} of parts){const [x0,z0,x1,z1]=p.bbox,cx=(x0+x1)/2,cz=(z
   if(esc>=2){open++;openDirs+=esc;if(where.length<3)where.push([+x.toFixed(1),+z.toFixed(1)]);}}
  if(tested)out.push({id:p.id,name:p.name||'',tile,start:p.start,x:+cx.toFixed(1),z:+cz.toFixed(1),h:+(ymax-ymin).toFixed(1),tested,open,share:+(open/tested).toFixed(2),where});}
 const bad=out.filter(o=>o.open>=2&&o.share>=.15).sort((a,b)=>b.share*Math.sqrt(b.open)-a.share*Math.sqrt(a.open));
+// --hide (1760): shells you see straight through (most rays out from under the roof reach the street) are the unnamed
+// pieces of today's buildings the era's name filter missed (the Black Diamond's and the National Bank's annexes): they join
+// duplicates.json and the game leaves them out. Run before scripts/fit-colliders.py, which then gives them no footprint.
+if(process.argv.includes('--hide')&&city.endsWith('1760')){const shells=bad.filter(o=>o.share>=.7&&o.tested>=4).map(o=>`${o.tile}:${o.start}`);
+ fs.writeFileSync(path.join(root,'duplicates.json'),JSON.stringify([...new Set([...dups,...shells])].sort()));console.error(`${shells.length} shells added to duplicates.json`);}
 console.log(JSON.stringify({city,checked:out.length,hollow:bad.length,list:bad},null,0));

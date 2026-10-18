@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
-import {encodeTerrain,decodeTerrain,setTerrain,groundAt,waterAt,lakeAt,groundPose,footprintBase,liftBuildings,hasTerrain} from '../src/terrain.js';
+import {encodeTerrain,decodeTerrain,setTerrain,groundAt,waterAt,lakeAt,groundPose,footprintBase,liftBuildings,hasTerrain,raiseBridgeDecks} from '../src/terrain.js';
 import {drapeGeometry,dropSunkenSurfaces,settleObject,subdivideGeometry,createLakeGeometry,lakeSurface} from '../src/terrain-mesh.js';
 import {makeCar,driveStep} from '../src/physics.js';
 import {drivingCameraPose} from '../src/driving-camera.js';
@@ -286,4 +286,17 @@ test('surveyed building parts (abs) keep their heights; other parts stand on the
   assert.equal(a[1],5);assert.equal(parts[0].base,5);          // surveyed: untouched, base = its foot
   assert.ok(Math.abs(a[16]-2.12)<1e-6);assert.equal(parts[1].base,2); // relative: lifted onto the ground
  }finally{setTerrain(before);}
+});
+
+test('a bridge deck drawn over the water carries whatever drives onto it',()=>{
+ // a canal 20 m wide (bed 4 m down, water at -3) the elevation model saw no bridge over; a deck drawn at street level crosses it
+ const size=41,water=new Float32Array(size*size).fill(NaN),f=field((x)=>Math.abs(x)<10?-4:0,{size,water});
+ for(let j=0;j<size;j++)for(let i=0;i<size;i++)if(Math.abs(i*2-40)<10)water[j*size+i]=-3;
+ setTerrain(f);const wet=(x,z)=>Math.abs(x)<10;
+ assert.ok(groundAt(0,0)<-3.9,'before: the canal bed under the deck');
+ const raised=raiseBridgeDecks([{rings:[[[-14,-3],[14,-3],[14,3],[-14,3]]],y:.035}],wet);
+ assert.ok(raised>0);assert.ok(Math.abs(groundAt(0,0)-.005)<.02,`the deck's surface, got ${groundAt(0,0)}`);assert.ok(Math.abs(groundAt(-6,2)-.005)<.02,'to its edges');
+ assert.ok(groundAt(0,12)<-3.9,'open water beside the bridge stays water');assert.equal(groundAt(12,0),0,'the banks are left alone');
+ assert.equal(raiseBridgeDecks([{rings:[[[-14,-3],[14,-3],[14,3],[-14,3]]],y:.035}],wet),0,'raising twice changes nothing');
+ setTerrain(null);
 });

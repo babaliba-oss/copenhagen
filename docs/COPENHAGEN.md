@@ -53,6 +53,8 @@ python3 scripts/landmark-colours.py                       # both eras, after the
 node scripts/building-duplicates.mjs copenhagen && node scripts/building-duplicates.mjs copenhagen-1760   # stray copies only:
 echo '[]' > public/cities/copenhagen/insets.json && echo '{}' > public/cities/copenhagen/recolour.json             # the clean split shares no walls
 echo '[]' > public/cities/copenhagen-1760/insets.json && echo '{}' > public/cities/copenhagen-1760/recolour.json
+node scripts/building-sweep.mjs copenhagen-1760 --hide     # 1760: shells you see straight through join duplicates.json
+python3 scripts/fit-colliders.py copenhagen && python3 scripts/fit-colliders.py copenhagen-1760   # last: footprints = the houses you see
 ```
 
 ### How the municipal model becomes houses (scripts/kk-buildings.py)
@@ -78,6 +80,18 @@ in detail are left out, and the ramparts are rebuilt as one smooth earthwork per
 Pass `--faces <file>` (written once with `--save-faces <file>`) to skip re-reading the DXF on reruns.
 Checks: `scripts/building-sweep.mjs` (rays from inside every house at a third of its height; a ray that gets out into
 the street - open sky joined to the map edge - without crossing a wall means you can see into the house).
+
+### Footprints are the houses you see (scripts/fit-colliders.py)
+
+The car, walkers, parked cars and street furniture take the city's footprints (`city.pack` buildings) as the solid houses;
+what you see is the model. Run last, after the building duplicates: every footprint gets `cover`, the share of it under
+the visible roofs. 1760 drops the ones mostly not covered (today's Opera, BLOX, the Black Diamond and 140 others were walls
+in open squares). Today keeps them as plain houses where the model has nothing (`cover` < 0.15: main.js draws a box) and cuts a
+partly covered one (a courtyard or back lot taken in) to the part you see. Houses no footprint covers get their own
+(`kind: 'model'`, the roof plan 0.3 m in from the eaves, minus the carriageway), so Nyboder's rows and thousands of back houses
+are no longer drive-through. Checks: `scripts/collider-sweep.mjs <city>` (walls you hit but cannot see, houses you can drive
+through) and `scripts/bridge-sweep.mjs <city> [--fix]` (bridge decks drawn over water with no ground under them; the game
+raises the ground under every drawn deck, terrain.js `raiseBridgeDecks`).
 
 `<kk data dir>` holds the City of Copenhagen registers (CC BY 4.0): `wires.gpkg`, `masts.gpkg`,
 `streettrees.json`, `furniture_p.json`, `bikeracks.json` and `save.json` (WFS `k101:fredede_bygninger_save`).
