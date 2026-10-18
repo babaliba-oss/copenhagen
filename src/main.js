@@ -1425,8 +1425,8 @@ async function boot(){
     // Benches are photo detections placed to within a few metres, and 920 came with no heading (all faced north). One
     // beside a street now stands 0.9 m back from the kerb with its seat along it, facing the street; one placed in
     // the carriageway is moved off it (dropped when that puts it in a house or another lane).
-    {const houses=new SpatialIndex(data.buildings),kerb=(x,z)=>{let best=null,d=Infinity;const seen=new Set();
-      for(const [a,b] of [[0,0],[10,0],[-10,0],[0,10],[0,-10]])for(const p of lanes.near(x+a,z+b)){if(seen.has(p))continue;seen.add(p);if(p.bbox[0]>x+8||p.bbox[2]<x-8||p.bbox[1]>z+8||p.bbox[3]<z-8)continue;
+    {const houses=new SpatialIndex(data.buildings),wheels=new SpatialIndex(data.roads.filter(r=>!/Koroke/.test(r.kind))),kerb=(x,z)=>{let best=null,d=Infinity;const seen=new Set(); // wheels: carriageway and cycle tracks (a bench stood on the cycle track)
+      for(const [a,b] of [[0,0],[10,0],[-10,0],[0,10],[0,-10]])for(const p of wheels.near(x+a,z+b)){if(seen.has(p))continue;seen.add(p);if(p.bbox[0]>x+8||p.bbox[2]<x-8||p.bbox[1]>z+8||p.bbox[3]<z-8)continue;
        for(const r of p.rings)for(let i=0;i<r.length;i++){const [ax,az]=r[i],[bx,bz]=r[(i+1)%r.length],dx=bx-ax,dz=bz-az,l=dx*dx+dz*dz;if(!l)continue;const t=Math.max(0,Math.min(1,((x-ax)*dx+(z-az)*dz)/l)),px=ax+dx*t,pz=az+dz*t,q=Math.hypot(x-px,z-pz);if(q<d){d=q;best={x:px,z:pz,d:q};}}}
       return best;};
      // away from the streets (parks, squares) a bench with no heading faces the footway it stands on or beside
@@ -1435,8 +1435,8 @@ async function boot(){
       return best;};
      let moved=0,turned=0,dropped=0,parked=0;mapped.items=mapped.items.filter(it=>{if(it.k!=='bench')return true;const e=kerb(it.x,it.z);
       if(!e||e.d>7){if(it.yaw)return true;const w=edgeOf(walk,it.x,it.z,6);if(w&&w.d>.05){const on=!!walk.at(it.x,it.z),sx=(it.x-w.x)/w.d,sz=(it.z-w.z)/w.d;it.yaw=on?Math.atan2(sx,sz):Math.atan2(-sx,-sz);parked++;}return true;}
-      const inside=!!lanes.at(it.x,it.z);let ux=it.x-e.x,uz=it.z-e.z;const l=Math.hypot(ux,uz);if(l<.01)return false;ux/=l;uz/=l;if(inside){ux=-ux;uz=-uz;} // (ux,uz): from the kerb into the pavement
-      if(inside||e.d<.9){const x=e.x+ux*.9,z=e.z+uz*.9;if(lanes.at(x,z)||houses.at(x,z)){dropped++;return false;}it.x=x;it.z=z;moved++;}
+      const inside=!!wheels.at(it.x,it.z);let ux=it.x-e.x,uz=it.z-e.z;const l=Math.hypot(ux,uz);if(l<.01)return false;ux/=l;uz/=l;if(inside){ux=-ux;uz=-uz;} // (ux,uz): from the kerb into the pavement
+      if(inside||e.d<.9){const x=e.x+ux*.9,z=e.z+uz*.9;if(wheels.at(x,z)||houses.at(x,z)){dropped++;return false;}it.x=x;it.z=z;moved++;}
       it.yaw=Math.atan2(-ux,-uz);turned++;return true;}); // the seat faces +Z in the bench model: towards the street
      console.info(`Street furniture: benches set along the kerb ${turned} (moved off the carriageway ${moved}, dropped ${dropped}), park benches turned to their footway ${parked}`);}
     {const b=mapped.items.length;mapped.items=mapped.items.filter(it=>!([[0,0],[2.5,0],[-2.5,0],[0,2.5],[0,-2.5]].every(([a,b])=>inWaterPolygons(data.water,it.x+a,it.z+b))&&!lanes.at(it.x,it.z)&&!walk.at(it.x,it.z))); /* well out on the water, not the quay-edge lamps and bollards */console.info(`Street furniture: ${b-mapped.items.length} items standing in the water dropped`);} // signs and poles mapped on the water (bridge ends, survey drift)
