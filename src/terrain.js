@@ -190,13 +190,15 @@ export function sinkShallowWater(isWet,{depth=1.8,bed=1.3,clearance=1}={},f=fiel
 // Bridges the elevation model never saw (the 1760 moat and canal crossings, footbridges mapped across a canal): the
 // railing builder (quay.js) draws a deck plate over the water, but groundAt read the canal bed under it, so whatever
 // drove onto the bridge dropped into the water beneath the deck. Water samples inside a drawn deck, or close enough
-// that the bilinear ground at its edge would slope down off it, are raised to the deck's surface (decks: [{rings, y}],
-// y the plate's height as drawn). Returns the number of samples raised.
+// that the bilinear ground at its edge would slope down off it, are raised to 12 cm under the deck's surface (decks:
+// [{rings, y}], y the plate's height as drawn): a car's ride height puts its wheels on the plate, and the street surfaces
+// draped on the ground stay under the plate (level with it they showed through as odd two-tone patches). Returns the
+// number of samples raised.
 export function raiseBridgeDecks(decks,isWet,f=field){
  if(!f||!decks?.length)return 0;const n=f.size,g=f.ground,cell=f.cell,E=f.extent;let raised=0;
  const segDist=(x,z,r)=>{let best=Infinity;for(let i=0,m=r.length;i<m;i++){const [ax,az]=r[i],[bx,bz]=r[(i+1)%m],dx=bx-ax,dz=bz-az,l=dx*dx+dz*dz,t=l?Math.max(0,Math.min(1,((x-ax)*dx+(z-az)*dz)/l)):0;best=Math.min(best,Math.hypot(x-ax-dx*t,z-az-dz*t));}return best;};
  for(const d of decks){const r=d.rings[0];if(!(r?.length>2)||!Number.isFinite(d.y))continue;let x0=Infinity,z0=Infinity,x1=-Infinity,z1=-Infinity;for(const [x,z] of r){x0=Math.min(x0,x);z0=Math.min(z0,z);x1=Math.max(x1,x);z1=Math.max(z1,z);}
-  const top=d.y-.03,i0=Math.max(0,Math.floor((x0+E)/cell)-1),i1=Math.min(n-1,Math.ceil((x1+E)/cell)+1),j0=Math.max(0,Math.floor((z0+E)/cell)-1),j1=Math.min(n-1,Math.ceil((z1+E)/cell)+1);
+  const top=d.y-.12,i0=Math.max(0,Math.floor((x0+E)/cell)-1),i1=Math.min(n-1,Math.ceil((x1+E)/cell)+1),j0=Math.max(0,Math.floor((z0+E)/cell)-1),j1=Math.min(n-1,Math.ceil((z1+E)/cell)+1);
   for(let j=j0;j<=j1;j++)for(let i=i0;i<=i1;i++){const k=j*n+i;if(g[k]>=top-1e-3)continue;const x=-E+i*cell,z=-E+j*cell; // (float32 samples: a raised one reads a hair under top)
    if(!isWet(x,z))continue;let c=false;for(let a=0,m=r.length,b=m-1;a<m;b=a++){const [xa,za]=r[a],[xb,zb]=r[b];if((za>z)!==(zb>z)&&x<(xb-xa)*(z-za)/(zb-za)+xa)c=!c;}
    if(!c&&segDist(x,z,r)>cell*.9)continue;g[k]=top;raised++;}}

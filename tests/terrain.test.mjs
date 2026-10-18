@@ -298,7 +298,7 @@ test('a bridge deck drawn over the water carries whatever drives onto it',()=>{
  setTerrain(f);const wet=(x,z)=>Math.abs(x)<10;
  assert.ok(groundAt(0,0)<-3.9,'before: the canal bed under the deck');
  const raised=raiseBridgeDecks([{rings:[[[-14,-3],[14,-3],[14,3],[-14,3]]],y:.035}],wet);
- assert.ok(raised>0);assert.ok(Math.abs(groundAt(0,0)-.005)<.02,`the deck's surface, got ${groundAt(0,0)}`);assert.ok(Math.abs(groundAt(-6,2)-.005)<.02,'to its edges');
+ assert.ok(raised>0);assert.ok(Math.abs(groundAt(0,0)+.085)<.02,`12 cm under the deck plate (a car's ride height puts its wheels on the plate; street surfaces draped on the ground stay under it), got ${groundAt(0,0)}`);assert.ok(Math.abs(groundAt(-6,2)+.085)<.02,'to its edges');
  assert.ok(groundAt(0,12)<-3.9,'open water beside the bridge stays water');assert.equal(groundAt(12,0),0,'the banks are left alone');
  assert.equal(raiseBridgeDecks([{rings:[[[-14,-3],[14,-3],[14,3],[-14,3]]],y:.035}],wet),0,'raising twice changes nothing');
  setTerrain(null);
