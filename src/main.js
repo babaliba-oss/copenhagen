@@ -1042,7 +1042,7 @@ mobileControls=createMobileControls({
  actions:{
   map:()=>showDialog('map-dialog'),camera:cycleCamera,
   weather:()=>{look.cycle();toast(look.label);},sound:()=>$('sound-btn').click(),
-  help:()=>showDialog('help-dialog'),reset:recoverCar,sources:()=>showDialog('sources-dialog'),
+  help:()=>showDialog('help-dialog'),reset:recoverCar,sources:()=>showDialog('sources-dialog'),era:()=>$('era-btn').click(), // phones have no top bar: the Menu carries the time travel
  },
  notify:toast,
 });
@@ -1239,7 +1239,7 @@ async function boot(){
      scooter:today?loadColouredParts('/models/bikes/scooter.glb').then(parts=>{if(parts){setScooterModel(bakeColoured(parts,{},{paint:'paint'}));parts.forEach(p=>p.geometry.dispose());}}):Promise.resolve(),
      buses:today?Promise.all(['city','trunk'].map(async k=>{const parts=await loadColouredParts(`/models/buses/${k}.glb`);if(parts){const by=new Map();for(const p of parts){if(!by.has(p.name))by.set(p.name,[]);by.get(p.name).push(p.geometry);}setBusBodies({[k]:new Map(Array.from(by,([n,gs])=>[n,gs.length>1?mergeGeometries(gs):gs[0]]))});}})):Promise.resolve(),
      statues:today?loadColouredModel('/models/statues/frederik-v.glb').then(frederikV=>({frederikV})).catch(()=>({})):Promise.resolve({}), // Frederik V at Amalienborg (photogrammetry by alexabhisak, CC BY 4.0; unveiled 1771, so today only)
-     carriage:today?Promise.resolve():Promise.all([loadColouredModel('/models/carriage/coach.glb'),loadColouredParts('/models/carriage/horse.glb')]).then(([coach,horse])=>setCarriageModels({coach,horse,bake:bakeColoured}))};}if(city.era===1760){STARTER_VISUALS.none=['bike','scooter'];PERSON_PERIOD.year=1760;document.body.classList.add('era-1760');
+     carriage:today?Promise.resolve():Promise.all([loadColouredModel('/models/carriage/coach.glb'),loadColouredParts('/models/carriage/horse.glb')]).then(([coach,horse])=>setCarriageModels({coach,horse,bake:bakeColoured}))};}if(city.era===1760){STARTER_VISUALS.none=['bike','scooter'];PERSON_PERIOD.year=1760;document.body.classList.add('era-1760');{const t=document.querySelector('.boot-tagline');if(t?.firstChild?.nodeType===3)t.firstChild.textContent='Ride a coach through Copenhagen in 1760.';const k=t?.querySelector('.boot-era-key'),h=t?.querySelector('.boot-era-touch');if(k)k.textContent='Press Y to come back to today.';if(h)h.textContent='Open the menu to come back to today.';}
     // the errand boy dresses for the century too: red wool coat, breeches, stockings and a black hat
     Object.assign(travelRenderer.look,personLook(2026,{height:1.75,skirt:false,age:'adult',shirt:'#8a2a22',trousers:'#3b2f25',coat:.8,outer:'coat',hat:'#1d1b19',hairStyle:'cap',tights:'#e6e0d0',shoes:'#1b1714',bagType:'shoulder',bagColor:'#6b4a32',accessory:null,phoneWalk:false,scarf:null,stoop:0}));}updateWorldhoodBrand(city);setPlayableRadius(city.radius||2000);
    const helsinki=city.scenery==='helsinki';
@@ -1533,7 +1533,7 @@ async function boot(){
     note.textContent=`Map extensions: ${extensions.map(e=>`${e.title} — ${e.provenance.note||`City of Helsinki data fetched ${e.provenance.fetchedAt} (CC BY 4.0); ${e.counts.inferredForestTrees.toLocaleString('en')} forest trees are inferred inside mapped forest areas`}`).join('; ')}. Route crop outlines © OpenStreetMap contributors (ODbL). Seurasaari is car-free in reality.`;
     $('data-counts').after(note);
    }
-   if(city.id.startsWith('copenhagen')&&CITIES[city.id==='copenhagen'?'copenhagen-1760':'copenhagen']){const b=$('era-btn');b.hidden=false;$('era-label').textContent=city.id==='copenhagen'?'1760':'Today';b.addEventListener('click',()=>{if(!started)return;eraJump();$('world').focus();});}
+   if(city.id.startsWith('copenhagen')&&CITIES[city.id==='copenhagen'?'copenhagen-1760':'copenhagen']){const b=$('era-btn');b.hidden=false;$('era-label').textContent=city.id==='copenhagen'?'1760':'Today';{const m=document.querySelector('[data-action="era"]');if(m){m.hidden=false;$('mobile-era-value').textContent=city.id==='copenhagen'?'1760':'Today';}}b.addEventListener('click',()=>{if(!started)return;eraJump();$('world').focus();});}
    if(eraArrival?.to===city.id){showEraCard(city.era===1760?'1760':'today',true);setTimeout(()=>{if(!started)start();},300);} // arriving from the other century: straight into the game
    if(requestedStart&&!pickStart(data.landmarks,requestedStart))toast(`No start called “${requestedStart}”. Starting at ${firstStart.name}.`);
    installMapillaryAttribution(city);
