@@ -117,6 +117,18 @@ Notes:
   and generative Danish folk tunes (fiddle over accordion oom-pah-pah; a cittern in 1760) as background music (U).
 - `big-map.js`: the full-screen map (M) with click-to-travel.
 
+### Trailer footage (src/cinematic.js, src/cine-drive.js)
+
+`?cinematic` runs the trailer shots by themselves with the interface hidden and no music. Most shots follow the
+player's car (the coach in 1760), which drives itself along the road graph towards a target with a tracking camera
+(chase, bumper, front, side, wheel, helicopter, from above, pass-by). The same routes run in both eras, so the two
+recordings cut together mid-drive. The screen goes black between shots while the next place loads.
+- Record on a machine with a real GPU: open `?cinematic` (and `?city=copenhagen-1760&cinematic`) full screen and record
+  the screen until it stays black. `?shots=Nyhavn,Bredgade` (name prefixes or indices) runs only those shots;
+  `?dur=2.4` shortens every shot.
+- `?fixed=30` steps each shot frame by frame for a capture script (`window.__cineFrame()`, the dev server's
+  `window.__renderer`) at full quality; without a GPU (SwiftShader) that costs 10–18 s a frame.
+
 ### Rigged people (src/skinned-people.js)
 
 The ten walkers nearest the camera within 45 m (five within 30 m on phones) and the player on foot are low-poly characters by Quaternius (CC0),
