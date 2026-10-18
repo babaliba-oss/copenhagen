@@ -159,7 +159,10 @@ export function createFacade(faces,spec){
    if(band.index===0&&spec.storeys>1&&spec.ground?.type==='solid'&&spec.estimated){
     // Estimated fronts: windows on the ground floor too, and a street door in the widest run.
     let best=null;for(const [a,b] of runs(F,band.y0+1.2,[F.s0,F.s1]))if(!best||b-a>best[1]-best[0])best=[a,b];
-    const door=best&&best[1]-best[0]>3?(best[0]+best[1])/2+((F.s0*7.3)%1-.5)*(best[1]-best[0])*.4:null;
+    let door=best&&best[1]-best[0]>3?(best[0]+best[1])/2+((F.s0*7.3)%1-.5)*(best[1]-best[0])*.4:null;
+    // the whole doorway (surround, cornice, step) on this wall: one tested at a single height hung off a corner or a bend
+    // in the front, and the door stood turned against the wall beside it
+    if(door!==null&&!F.rect(door-.95,door+.95,band.y0+.1,band.y0+2.95))door=null;
     windows+=upperStorey(F,G,B,band,storeyStyle(spec,1,spec.storeys),c,door);
     if(door!==null){const s=door,y0=band.y0;
      // Street door: stone surround, two panelled leaves set back in it, a glazed fanlight and a step.
