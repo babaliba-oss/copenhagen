@@ -18,7 +18,7 @@ import {createCineDrive,rigPose} from './cine-drive.js';
 export const SHOTS=[
  {name:'Nyhavn',drive:{from:[952,58],toward:[770,2]},cam:'front',dur:5},
  {name:'Nyhavn bumper',drive:{from:[935,52],toward:[770,2]},cam:'low',dur:4},
- {name:'H.C. Andersen',era:'today',at:[900,37],dur:4,orbit:{follow:'hca',c:[892.5,39.2],r:[3.2,2.6],h:[1.75,1.6],a:[2.7,3.6]},look:[892.5,1.45,39.2]}, // in front of him (he faces the canal, north); behind him are the houses
+ {name:'H.C. Andersen',era:'today',at:[900,37],dur:4,orbit:{follow:'hca',c:[892.8,38.5],r:[3.2,2.6],h:[1.75,1.6],a:[2.7,3.6]},look:[892.8,1.45,38.5]}, // in front of him (he faces the canal, north); behind him are the houses
  {name:'Kongens Nytorv',drive:{from:[612,22],toward:[712,-100]},cam:'heli',dur:5},
  {name:'Radio',era:'today',drive:{from:[760,-170],toward:[950,-600]},cam:'chase',dur:5,hud:'radio'},
  {name:'Bredgade',era:1760,drive:{from:[760,-170],toward:[950,-600]},cam:'chase',dur:4},

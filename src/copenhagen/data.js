@@ -91,6 +91,6 @@ export const CHARACTERS = [
   { id: 'ole', name: 'Ole', era: 'b', label: 'Retired fisherman, Gammel Strand', at: [55.67745, 12.57860], look: { coat: '#2b3a55' } },
   { id: 'bent', name: 'Bent', label: 'Pølsevogn, Rådhuspladsen', at: [55.67610, 12.56880], look: { coat: '#f2f2ee' } },
   { id: 'astrid', name: 'Astrid', label: 'Telescope keeper, Rundetårn', at: [55.68152, 12.57560], look: { coat: '#4a3b6b' } },
-  { id: 'hca', name: 'H.C. Andersen', label: 'Writer of fairy tales, Nyhavn 20 (an easter egg)', at: [55.67970, 12.59000], local: [892.5, 39.2], look: { coat: '#1d1f2b', height: 1.85 } },
+  { id: 'hca', name: 'H.C. Andersen', label: 'Writer of fairy tales, Nyhavn 20 (an easter egg)', at: [55.67970, 12.59000], local: [892.8, 38.5], look: { coat: '#1d1f2b', height: 1.85 } },
   { id: 'mette', name: 'Mette', label: 'Lives in Christiania', at: [55.67380, 12.59870], look: { coat: '#3c6b3a' } },
 ];
