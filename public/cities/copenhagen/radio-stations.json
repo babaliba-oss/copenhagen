@@ -7,15 +7,6 @@
 "genre": "Nordic folk and fiddle tunes",
 "tracks": [
 {
-"title": "Danish Dance of Greeting (trad., rec. 1912)",
-"artist": "Prince's Band",
-"url": "https://archive.org/download/loc-jukebox-648076-danish-dance-of-greeting/jukebox-648076_danish-dance-of-greeting.mp3",
-"licence": "Public Domain (PDM 1.0)",
-"licenceUrl": "https://creativecommons.org/publicdomain/mark/1.0/",
-"source": "https://archive.org/details/loc-jukebox-648076-danish-dance-of-greeting",
-"seconds": 189
-},
-{
 "title": "The Holiday",
 "artist": "So I'm An Islander (Søren Nissen Jørgensen)",
 "url": "https://archive.org/download/TheHoliday/02%20The%20Holiday.mp3",
@@ -23,24 +14,6 @@
 "licenceUrl": "https://creativecommons.org/licenses/by-sa/3.0/",
 "source": "https://archive.org/details/TheHoliday",
 "seconds": 353
-},
-{
-"title": "Dala hambo (rec. 1919)",
-"artist": "Lager & Olson (accordion duet)",
-"url": "https://archive.org/download/loc-jukebox-34286-dala-hambo/jukebox-34286_dala-hambo.mp3",
-"licence": "Public Domain (PDM 1.0)",
-"licenceUrl": "https://creativecommons.org/publicdomain/mark/1.0/",
-"source": "https://archive.org/details/loc-jukebox-34286-dala-hambo",
-"seconds": 179
-},
-{
-"title": "Aarhus Tappenstreg (C. C. Møller, rec. 1918)",
-"artist": "Oscar's Orkester",
-"url": "https://archive.org/download/loc-jukebox-28872-aarhus-tappenstreg-marsch/jukebox-28872_aarhus-tappenstreg-marsch.mp3",
-"licence": "Public Domain (PDM 1.0)",
-"licenceUrl": "https://creativecommons.org/publicdomain/mark/1.0/",
-"source": "https://archive.org/details/loc-jukebox-28872-aarhus-tappenstreg-marsch",
-"seconds": 154
 },
 {
 "title": "Karjala (Karelia)",
@@ -52,24 +25,6 @@
 "seconds": 231
 },
 {
-"title": "Värmlandsvisan (trad., rec. 1918)",
-"artist": "William Oscar (violin)",
-"url": "https://archive.org/download/loc-jukebox-28954-v-rmlandsvisan/jukebox-28954_v-rmlandsvisan.mp3",
-"licence": "Public Domain (PDM 1.0)",
-"licenceUrl": "https://creativecommons.org/publicdomain/mark/1.0/",
-"source": "https://archive.org/details/loc-jukebox-28954-v-rmlandsvisan",
-"seconds": 149
-},
-{
-"title": "Scandinavian Selections (Ole Bull, Halfdan Kjerulf; rec. 1920)",
-"artist": "Scandinavian Concert Trio",
-"url": "https://archive.org/download/loc-jukebox-35971-scandinavian-selections/jukebox-35971_scandinavian-selections.mp3",
-"licence": "Public Domain (PDM 1.0)",
-"licenceUrl": "https://creativecommons.org/publicdomain/mark/1.0/",
-"source": "https://archive.org/details/loc-jukebox-35971-scandinavian-selections",
-"seconds": 197
-},
-{
 "title": "Om Bach Æ Larij (Behind the Barn)",
 "artist": "So I'm An Islander (Søren Nissen Jørgensen)",
 "url": "https://archive.org/download/OmBachAELarijBehindTheBarn/06%20Om%20Bach%20%C3%86%20Larij%20%28Behind%20The%20Barn%29.mp3",
@@ -79,24 +34,6 @@
 "seconds": 361
 },
 {
-"title": "Schottis från Axvalla hed (rec. 1919)",
-"artist": "Lager & Olson (accordion duet)",
-"url": "https://archive.org/download/loc-jukebox-33970-schottis-fr-n-axvalla-hed/jukebox-33970_schottis-fr-n-axvalla-hed.mp3",
-"licence": "Public Domain (PDM 1.0)",
-"licenceUrl": "https://creativecommons.org/publicdomain/mark/1.0/",
-"source": "https://archive.org/details/loc-jukebox-33970-schottis-fr-n-axvalla-hed",
-"seconds": 181
-},
-{
-"title": "Sæterjentens søndag (Ole Bull, rec. 1919)",
-"artist": "A. E. Uhe (violin) & J. M. Coopersmith (organ)",
-"url": "https://archive.org/download/loc-jukebox-30707-saetergjentens-sondag/jukebox-30707_saetergjentens-sondag.mp3",
-"licence": "Public Domain (PDM 1.0)",
-"licenceUrl": "https://creativecommons.org/publicdomain/mark/1.0/",
-"source": "https://archive.org/details/loc-jukebox-30707-saetergjentens-sondag",
-"seconds": 172
-},
-{
 "title": "Vapaus (Freedom)",
 "artist": "Valkyrend Variete",
 "url": "https://archive.org/download/Vapaus/Valkyrend_Variete_-_Vapaus_freedom.mp3",
@@ -104,24 +41,6 @@
 "licenceUrl": "https://creativecommons.org/licenses/by-sa/3.0/",
 "source": "https://archive.org/details/Vapaus",
 "seconds": 204
-},
-{
-"title": "Vaggvisa / Vuggevise (Emil Hartmann, rec. 1918)",
-"artist": "William Oscar (violin)",
-"url": "https://archive.org/download/loc-jukebox-28955-vaggvisa/jukebox-28955_vaggvisa.mp3",
-"licence": "Public Domain (PDM 1.0)",
-"licenceUrl": "https://creativecommons.org/publicdomain/mark/1.0/",
-"source": "https://archive.org/details/loc-jukebox-28955-vaggvisa",
-"seconds": 154
-},
-{
-"title": "Potpourri: Norske melodier (trad., rec. 1921)",
-"artist": "Arne Arnesen (violin)",
-"url": "https://archive.org/download/loc-jukebox-43783-potpouri-norske-melodier/jukebox-43783_potpouri-norske-melodier.mp3",
-"licence": "Public Domain (PDM 1.0)",
-"licenceUrl": "https://creativecommons.org/publicdomain/mark/1.0/",
-"source": "https://archive.org/details/loc-jukebox-43783-potpouri-norske-melodier",
-"seconds": 184
 },
 {
 "title": "I'll Return to This Place",
@@ -139,15 +58,6 @@
 "name": "Kanal Klassisk",
 "genre": "Lumbye, Nielsen, Grieg and friends",
 "tracks": [
-{
-"title": "H. C. Lumbye: Traumbilder (rec. 1914)",
-"artist": "Prince's Orchestra",
-"url": "https://archive.org/download/loc-jukebox-647362-traumbilder/jukebox-647362_traumbilder.mp3",
-"licence": "Public Domain (PDM 1.0)",
-"licenceUrl": "https://creativecommons.org/publicdomain/mark/1.0/",
-"source": "https://archive.org/details/loc-jukebox-647362-traumbilder",
-"seconds": 211
-},
 {
 "title": "Grieg: Peer Gynt Suite No. 1 – Morning Mood",
 "artist": "Czech National Symphony Orchestra (Musopen)",
@@ -185,15 +95,6 @@
 "seconds": 276
 },
 {
-"title": "Carl Nielsen: Jens Vejmand (rec. 1917)",
-"artist": "Mischa Léon (tenor) & King's Orchestra",
-"url": "https://archive.org/download/loc-jukebox-23723-jens-vejmend/jukebox-23723_jens-vejmend.mp3",
-"licence": "Public Domain (PDM 1.0)",
-"licenceUrl": "https://creativecommons.org/publicdomain/mark/1.0/",
-"source": "https://archive.org/details/loc-jukebox-23723-jens-vejmend",
-"seconds": 202
-},
-{
 "title": "Grieg: Peer Gynt Suite No. 1 – Anitra's Dance",
 "artist": "Czech National Symphony Orchestra (Musopen)",
 "url": "https://archive.org/download/MusopenCollectionAsFlac/Greig_PeerGynt/EdvardGrieg-PeerGyntSuiteNo.1Op.46-03-AnitrasDream.mp3",
@@ -210,15 +111,6 @@
 "licenceUrl": "https://creativecommons.org/publicdomain/mark/1.0/",
 "source": "https://archive.org/details/MusopenCollectionAsFlac",
 "seconds": 367
-},
-{
-"title": "H. C. Lumbye: Krolls Ballklänge, waltz (rec. 1914)",
-"artist": "Arthur Pryor's Band",
-"url": "https://archive.org/download/loc-jukebox-135262-krolls-ballkl-nge-waltzer/jukebox-135262_krolls-ballkl-nge-waltzer.mp3",
-"licence": "Public Domain (PDM 1.0)",
-"licenceUrl": "https://creativecommons.org/publicdomain/mark/1.0/",
-"source": "https://archive.org/details/loc-jukebox-135262-krolls-ballkl-nge-waltzer",
-"seconds": 189
 },
 {
 "title": "Grieg: Peer Gynt Suite No. 1 – Åse's Death",
@@ -255,15 +147,6 @@
 "licenceUrl": "https://creativecommons.org/licenses/by-sa/4.0/",
 "source": "https://commons.wikimedia.org/wiki/File:Kuhlau_Trio_op.86_n1_Esmuc.ogg",
 "seconds": 397
-},
-{
-"title": "Charles Kjerulf: Det gamle Kristianshavn (rec. 1917)",
-"artist": "Mischa Léon (tenor) & King's Orchestra",
-"url": "https://archive.org/download/loc-jukebox-22526-det-gamle-kristianshavn/jukebox-22526_det-gamle-kristianshavn.mp3",
-"licence": "Public Domain (PDM 1.0)",
-"licenceUrl": "https://creativecommons.org/publicdomain/mark/1.0/",
-"source": "https://archive.org/details/loc-jukebox-22526-det-gamle-kristianshavn",
-"seconds": 180
 },
 {
 "title": "Grieg: Peer Gynt Suite No. 1 – In the Hall of the Mountain King",
