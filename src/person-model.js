@@ -485,6 +485,46 @@ function faceMaterial(){
  material.customProgramCacheKey=()=>'person-face-v1';return material;
 }
 
+// Every crowd in one set of draw calls. Each person batch still writes its own instances (begin/draw/end as before);
+// flushPeople(), once a frame before rendering (main.js), copies the instances of every visible batch into one shared
+// batch per body part and keeps the batch's own meshes out of the render: nine draw calls for all pedestrians, riders,
+// guests and vendors instead of nine for each system. A batch under a moved parent (people aboard a vehicle) or with
+// extra uniform meshes (police) keeps drawing itself.
+const SHARED={batches:new Set(),meshes:null,group:null,faceState:null,faceShape:null},sharedAt=new Int32Array(9);
+function sharedMeshes(){
+ if(SHARED.meshes)return SHARED.meshes;
+ const cloth=new THREE.MeshStandardMaterial({roughness:.9}),skin=new THREE.MeshStandardMaterial({roughness:.7,vertexColors:true}),group=new THREE.Group();group.name='People (all crowds)';
+ const make=(geometry,material,name)=>{const m=new THREE.InstancedMesh(geometry,material,1);m.name=name;m.castShadow=false;m.receiveShadow=false;m.frustumCulled=false;m.count=0;m.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  m.instanceColor=new THREE.InstancedBufferAttribute(new Float32Array(3),3).setUsage(THREE.DynamicDrawUsage);group.add(m);return m;};
+ SHARED.meshes=[make(torsoGeometry(),cloth,'Person torsos and jackets'),make(headGeometry(),faceMaterial(),'Person heads'),make(hairGeometry(),cloth,'Person hair and hats'),make(limbGeometry(),cloth,'Person limbs, hips, neck and feet'),
+  make(coatGeometry(),cloth,'Long coats and skirts'),make(new RoundedBoxGeometry(1,1,1,1,.12).translate(0,-.5,0),cloth,'Bags, backpacks, caps, phones and strollers'),
+  make(torsoLowGeometry(),cloth,'Distant person torsos and coats'),make(headLowGeometry(),skin,'Distant person heads'),make(limbLowGeometry(),cloth,'Distant person limbs')];
+ SHARED.group=group;growShared(1,1,true);return SHARED.meshes;
+}
+function growShared(m,n,force=false){
+ const mesh=SHARED.meshes[m];if(!force&&mesh.instanceMatrix.count>=n)return;const cap=Math.max(n,force?1:mesh.instanceMatrix.count*2);
+ if(!force){mesh.instanceMatrix=new THREE.InstancedBufferAttribute(new Float32Array(cap*16),16).setUsage(THREE.DynamicDrawUsage);mesh.instanceColor=new THREE.InstancedBufferAttribute(new Float32Array(cap*3),3).setUsage(THREE.DynamicDrawUsage);}
+ if(m===1){SHARED.faceState=new THREE.InstancedBufferAttribute(new Float32Array(cap*4),4).setUsage(THREE.DynamicDrawUsage);SHARED.faceShape=new THREE.InstancedBufferAttribute(new Float32Array(cap*4),4).setUsage(THREE.DynamicDrawUsage);
+  mesh.geometry.setAttribute('faceState',SHARED.faceState);mesh.geometry.setAttribute('faceShape',SHARED.faceShape);}
+}
+const unmoved=o=>{const e=o.matrixWorld.elements;return e[0]===1&&e[5]===1&&e[10]===1&&e[12]===0&&e[13]===0&&e[14]===0&&e[1]===0&&e[2]===0&&e[4]===0&&e[6]===0&&e[8]===0&&e[9]===0;};
+const shown=o=>{for(let q=o;q;q=q.parent){if(!q.visible)return false;if(q.isScene)return true;}return false;};
+export function flushPeople(scene){
+ if(!SHARED.batches.size)return;
+ const meshes=sharedMeshes();if(SHARED.group.parent!==scene)scene.add(SHARED.group);
+ sharedAt.fill(0);
+ for(const b of SHARED.batches){const take=shown(b.group)&&unmoved(b.group);b.take=take;for(let m=0;m<9;m++){b.list[m].visible=!take;if(take)sharedAt[m]+=b.list[m].count;}}
+ for(let m=0;m<9;m++)growShared(m,sharedAt[m]);
+ sharedAt.fill(0);
+ for(const b of SHARED.batches){if(!b.take)continue;
+  for(let m=0;m<9;m++){const src=b.list[m],n=Math.min(src.count,src.userData.capacity??src.count);if(!n)continue;const dst=meshes[m],o=sharedAt[m];
+   dst.instanceMatrix.array.set(src.instanceMatrix.array.subarray(0,n*16),o*16);dst.instanceColor.array.set(src.instanceColor.array.subarray(0,n*3),o*3);
+   if(m===1){SHARED.faceState.array.set(b.faceState.array.subarray(0,n*4),o*4);SHARED.faceShape.array.set(b.faceShape.array.subarray(0,n*4),o*4);}
+   sharedAt[m]+=n;}}
+ for(let m=0;m<9;m++){const dst=meshes[m],n=sharedAt[m];dst.count=n;dst.instanceMatrix.clearUpdateRanges();dst.instanceColor.clearUpdateRanges();
+  if(n){dst.instanceMatrix.addUpdateRange(0,n*16);dst.instanceColor.addUpdateRange(0,n*3);}dst.instanceMatrix.needsUpdate=true;dst.instanceColor.needsUpdate=true;}
+ for(const a of [SHARED.faceState,SHARED.faceShape]){a.clearUpdateRanges();if(sharedAt[1])a.addUpdateRange(0,sharedAt[1]*4);a.needsUpdate=true;}
+}
 export function createPersonBatch(capacity,options={}){
  const group=new THREE.Group();group.name=options.name||'Pedestrians';
  const luggage=!!options.luggage,culled=!!options.frustumCulled,lod={...PERSON_LOD,...(options.lod||{})};
@@ -685,5 +725,7 @@ export function createPersonBatch(capacity,options={}){
    if(culled){mesh.boundingSphere??=new THREE.Sphere();if(minX>maxX)mesh.boundingSphere.makeEmpty();else{mesh.boundingSphere.center.set((minX+maxX)/2,(minY+maxY)/2+1,(minZ+maxZ)/2);mesh.boundingSphere.radius=Math.hypot(maxX-minX,maxZ-minZ,maxY-minY)/2+2.5;}}}
   for(const attribute of [faceState,faceShape]){attribute.clearUpdateRanges();if(meshes.head.count)attribute.addUpdateRange(0,meshes.head.count*4);attribute.needsUpdate=true;}
  }
- return {group,meshes,list,begin,draw,end,joints:J,drawCalls:list.length,segmentsPerPerson:segPer,lod};
+ const batch={group,meshes,list,begin,draw,end,joints:J,drawCalls:list.length,segmentsPerPerson:segPer,lod};
+ if(!options.police&&options.shared!==false)SHARED.batches.add({group,list,faceState,faceShape}); // drawn through the shared batches (flushPeople)
+ return batch;
 }

@@ -93,7 +93,7 @@ import {CityCyclists} from './copenhagen/city-cyclists.js';
 import {createTrains} from './copenhagen/trains.js';
 import {createCafes} from './copenhagen/cafes.js';
 import {createStalls} from './copenhagen/stalls.js';
-import {PERIOD as PERSON_PERIOD,personLook} from './person-model.js';
+import {PERIOD as PERSON_PERIOD,personLook,flushPeople} from './person-model.js';
 import {WATER_LEVEL as CPH_WATER} from './quay.js';
 import {createBirds,shoreSamples,inWater} from './birds.js';
 import {createSenateStreetProps} from './senate-street-props.js';
@@ -1150,6 +1150,7 @@ function frame(now){
  if(ready&&resolution.update(frameMs,dt))renderer.setPixelRatio(resolution.scale);
  if(ready&&!captureMode&&governor.update(dt,resolution))console.info('Quality step',governor.level,'to hold the frame rate');
  look.update(dt,now/1000); // blends the active look and re-applies its sun offset after the shadow target above
+ flushPeople(scene); // every crowd's instances into the shared person batches (person-model.js)
  const cpu1=perfOverlay?performance.now():0;
  if(post)post.render(scene,camera);else renderer.render(scene,camera);
  if(perfOverlay)perfOverlay.split(cpu1-cpu0,performance.now()-cpu1); // game code vs. render submission: CPU- or GPU-bound
