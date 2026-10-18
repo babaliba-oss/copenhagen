@@ -5,6 +5,7 @@ import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import * as THREE from 'three';
 import {createSkinnedCrowd} from '../src/skinned-people.js';
+import {createPlayerTravelRenderer} from '../src/player-travel-renderer.js';
 
 // A two-bone stand-in for a Quaternius character: one skinned mesh, Walk/Run/Idle clips on its bones.
 function fakeLibrary(){
@@ -41,6 +42,19 @@ test('figures are released when their walker leaves the range and reused for the
  const drawn=crowd.update(.016,{x:0,z:0},[a,b],[]);
  assert.deepEqual([...drawn].map(w=>w.id),[2]);assert.equal(crowd.group.children.length,1,'one figure, reused');
  crowd.update(.016,null,[a,b],[]);assert.equal(crowd.group.children.filter(c=>c.visible).length,0,'no viewer: all hidden');
+});
+
+test('the walking player is the rigged character; riding, falling or carrying shows the procedural figure',()=>{
+ const r=createPlayerTravelRenderer(new THREE.Group());r.setRigged(fakeLibrary(),'M_Test');
+ const p={x:10,z:-5,heading:0,speed:1.4,distance:0},travel={mode:'walk',riding:null,rides:[],viewActor:()=>p};
+ r.update(travel,1/60);const rig=r.group.getObjectByName('Player (rigged)');
+ assert.ok(rig?.visible,'rigged while walking');assert.equal(rig.position.x,10);assert.equal(r.rigged(),'M_Test');
+ assert.ok(Math.abs(Math.sin(rig.rotation.y))<1e-6&&Math.cos(rig.rotation.y)<-.999,'faces -Z, the way heading 0 walks');
+ p.knockdown={elapsed:.1,duration:2,prone:false,side:1};r.update(travel,1/60);assert.equal(rig.visible,false,'falls as the procedural figure');delete p.knockdown;
+ r.update(travel,1/60,{hold:'carry'});assert.equal(rig.visible,false,'carries as the procedural figure');
+ r.update(travel,1/60);assert.equal(rig.visible,true);
+ travel.mode='car';r.update(travel,1/60);assert.equal(rig.visible,false,'hidden in the car');
+ r.setRigged(null);assert.equal(r.group.getObjectByName('Player (rigged)'),undefined);assert.equal(r.rigged(),null);
 });
 
 // A `//` comment written into a one-line statement swallows the rest of the line (it hid the Absalon rider and the

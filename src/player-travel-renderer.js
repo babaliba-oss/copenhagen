@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import {createPersonBatch,personLook,advanceGait,JOINT} from './person-model.js';
 import {createRideVehicle,PLAYER_BIKE,PLAYER_SCOOTER} from './player-ride-models.js';
 import {groundAt} from './terrain.js';
+import {clone as cloneSkinned} from 'three/addons/utils/SkeletonUtils.js';
 
 export function createPlayerTravelRenderer(scene){
  const group=new THREE.Group();group.name='Player and rideable vehicles';scene.add(group);
@@ -9,7 +10,16 @@ export function createPlayerTravelRenderer(scene){
  const look=personLook(2026,{height:1.75,coat:0,skirt:false,shirt:'#d65f39',trousers:'#273b4a',age:'adult',accessory:null,phoneWalk:false,stoop:0,outer:'jacket',scarf:null,hairStyle:'short',bagType:'backpack'}),gait={};
  const models=new Map(),ringGeometry=new THREE.RingGeometry(.7,.75,32),ringMaterial=new THREE.MeshBasicMaterial({color:'#eeaa55',transparent:true,opacity:.7,depthWrite:false,side:THREE.DoubleSide});
  let hand=null; // world position of the right hand, for a carried item (market-shop-renderer.js)
- return {group,look,hand:()=>hand,update(travel,dt,{visible=true,actorVisible=true,hold=null}={}){
+ let rig=null; // the walking player as a rigged character (skinned-people.js library) once it loads; the procedural figure rides, falls and carries
+ function setRigged(lib,name){
+  if(rig){rig.mixer.stopAllAction();group.remove(rig.root);rig=null;}
+  const model=lib?.models.find(m=>m.name===name)||lib?.models[0];if(!model)return;
+  const root=cloneSkinned(model.scene),mixer=new THREE.AnimationMixer(root),actions={};
+  for(const k of ['Walk','Run','Idle'])if(model.clips[k])actions[k]=mixer.clipAction(model.clips[k]);
+  root.name='Player (rigged)';root.visible=false;group.add(root);rig={root,mixer,actions,state:null,height:model.height,name:model.name};
+ }
+ function play(state){if(rig.state===state)return;const next=rig.actions[state],prev=rig.state&&rig.actions[rig.state];if(!next)return;next.reset().setEffectiveWeight(1).play();if(prev)prev.crossFadeTo(next,.2,false);rig.state=state;}
+ return {group,look,hand:()=>hand,setRigged,rigged:()=>rig?.name||null,update(travel,dt,{visible=true,actorVisible=true,hold=null}={}){
   group.visible=visible;if(!travel)return;
   const p=travel.viewActor();
   const current=new Set(travel.rides);
@@ -32,10 +42,15 @@ export function createPlayerTravelRenderer(scene){
    const actor={...p,speed:Math.abs(p.speed),pose,gaitDirection:pose==='walk'&&p.speed<0?-1:1,groundY:pose==='scooter'?PLAYER_SCOOTER.groundY+lift-.12:pose==='cycle'?lift:.12,running:Math.abs(p.speed)>2.5,grip:true,
     bike:{...bike,crank:p.distance*bike.crankPerMetre},scooter:PLAYER_SCOOTER};
    if(pose==='walk'&&hold!==null&&!p.knockdown)actor.hold=hold;
-   advanceGait(actor,gait,dt,look);person.draw(actor,look,gait);
-   if(pose==='walk'&&!p.knockdown){const J=person.joints,j=JOINT.handR,c=Math.cos(p.heading),s=Math.sin(p.heading),y=actor.groundY+groundAt(p.x,p.z);
+   const rigged=rig&&pose==='walk'&&!p.knockdown&&hold===null;if(rig)rig.root.visible=!!rigged;
+   if(rigged){const k=(look.height||1.75)/rig.height,speed=Math.abs(p.speed||0),state=speed>2.5?'Run':speed>.15?'Walk':'Idle';
+    rig.root.position.set(p.x,actor.groundY+groundAt(p.x,p.z),p.z);rig.root.rotation.set(0,p.heading+Math.PI,0);rig.root.scale.setScalar(k); // the model faces +Z, the player's heading 0 faces -Z
+    play(state);const act=rig.actions[state];if(act)act.timeScale=state==='Walk'?(p.speed<0?-1:1)*Math.min(1.7,Math.max(.55,speed/(1.25*k))):state==='Run'?Math.min(1.6,Math.max(.7,speed/(3.4*k))):1;
+    rig.mixer.update(dt);gait.yaw=undefined;}
+   else advanceGait(actor,gait,dt,look),person.draw(actor,look,gait);
+   if(pose==='walk'&&!p.knockdown&&!rigged){const J=person.joints,j=JOINT.handR,c=Math.cos(p.heading),s=Math.sin(p.heading),y=actor.groundY+groundAt(p.x,p.z);
     hand={x:p.x+J[j]*c+J[j+2]*s,y:y+J[j+1],z:p.z-J[j]*s+J[j+2]*c,heading:p.heading};}
-  }
+  }else if(rig)rig.root.visible=false;
   person.end();
  }};
 }
