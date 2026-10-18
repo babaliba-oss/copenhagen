@@ -72,18 +72,21 @@ export function applyTileLod(group,level,focus,bands=LOD){
  return level;
 }
 // One mesh at its tile's level (newly landed detail does not need the whole tile walked again).
+// castByTile: the tile's shadow casters (merged measured shells drawn only into the shadow map, main.js) cast for
+// this mesh, so it never casts itself. shadowCaster: one of those casters; main.js shows it during the shadow pass.
 export function applyMeshLod(mesh,level,focus,bands=LOD){
  const u=mesh.userData;
+ if(u.shadowCaster)return;
  if(u.lod){
   // Masked shells also stand in at the near level for buildings whose detail has not landed yet.
   const waiting=!!u.maskOn&&level==='near'&&(u.mask?.shown??1)>0;
   mesh.visible=level==='far'||waiting;if(u.maskOn)u.maskOn.value=level==='near'?1:0;
-  mesh.castShadow=waiting&&u.tileBox.distanceToPoint(focus)<bands.shadow;return;}
+  mesh.castShadow=waiting&&!u.castByTile&&u.tileBox.distanceToPoint(focus)<bands.shadow;return;}
  const d=u.box.distanceToPoint(focus);
- if(u.source){mesh.visible=level==='near';mesh.castShadow=mesh.visible&&d<bands.shadow;return;}
+ if(u.source){mesh.visible=level==='near';mesh.castShadow=mesh.visible&&!u.castByTile&&d<bands.shadow;return;}
  const hero=!!u.shell&&u.role==='detail';
  mesh.visible=level==='near'?!!(u.shell||u.provisional||d<bands.detail):hero;
- mesh.castShadow=!!u.shell&&level==='near'&&mesh.visible&&d<bands.shadow;
+ mesh.castShadow=!!u.shell&&!u.castByTile&&level==='near'&&mesh.visible&&d<bands.shadow;
 }
 
 // Buildings never move: skip them in the renderer's per-frame matrix walk. New children must call

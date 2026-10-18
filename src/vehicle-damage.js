@@ -3,7 +3,7 @@ import * as THREE from 'three';
 export function createVehicleDamage(model){
  // Only this car owns these vertices. Never deform the cached civilian mesh.
  const panels=[];
- model.traverse(m=>{if(m.isMesh&&['paint','glass','black'].includes(m.material.name)){
+ model.traverse(m=>{if(m.isMesh&&['paint','glass','black','finishes'].includes(m.material.name)){
   m.geometry=m.geometry.clone();panels.push({mesh:m,base:m.geometry.attributes.position.array.slice()});
  }});
  let version=-1,wasDamaged=false;

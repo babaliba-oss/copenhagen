@@ -127,3 +127,13 @@ test('frame queue rations jobs per step and the scheduler runs nearest-first wit
  release();await new Promise(r=>setTimeout(r,0));
  assert.deepEqual(order,['a','b']);assert.equal(s.waiting,0);assert.equal(s.inFlight,0);
 });
+
+test('meshes whose tile shadow casters cast for them never cast themselves; casters are left to the shadow pass',()=>{
+ const {group,parts,textures}=tileGroup(),focus=new THREE.Vector3(0,0,0);
+ const building={part:parts[0],windows:0,meshes:[{attributes:{position:{array:new Float32Array(9),itemSize:3,normalized:false}},shell:true,role:'facade',material:{color:0xffffff,roughness:.8,metalness:0,side:2,vertexColors:false,textured:true}}]};
+ const meshes=materialiseBuilding(building,textures);for(const m of [...meshes,...group.children])m.userData.castByTile=true;group.add(...meshes);
+ const caster=new THREE.Mesh(group.children[0].geometry,new THREE.MeshBasicMaterial());caster.visible=false;caster.castShadow=true;caster.userData.shadowCaster=true;group.add(caster);
+ applyTileLod(group,'near',focus);
+ assert.ok(group.children.filter(m=>m!==caster).every(m=>!m.castShadow),'nothing but the caster casts');
+ assert.equal(caster.visible,false);assert.equal(caster.castShadow,true);
+});

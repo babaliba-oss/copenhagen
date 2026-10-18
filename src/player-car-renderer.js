@@ -7,6 +7,7 @@ const slope={y:0,pitch:0,roll:0};
 import {unregisterEnvMaterial} from './environment.js';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';
+import {consolidateCar,finishMaterial,FINISHES} from './car-finishes.js';
 
 // A stable scene root follows whichever car is in use. Abandoned cars stay put.
 export function createPlayerCarRenderer(scene){
@@ -16,6 +17,7 @@ export function createPlayerCarRenderer(scene){
  const starter=createVehicle(0,true),entries=new Map();let home=null,current=null;
  const build=(model,owned=false)=>{
   const shared=new Set();model.traverse(m=>{if(m.isMesh)shared.add(m.geometry);});
+  consolidateCar(model); // 7 meshes instead of 20: glass, trim and lamps in one, each wheel in one (car-finishes.js)
   const damage=createVehicleDamage(model),privateGeometry=new Set(),materials=new Set();
   model.traverse(m=>{if(m.isMesh){if(!shared.has(m.geometry))privateGeometry.add(m.geometry);if(m.material.name==='paint')materials.add(m.material);}});
   return {model,damage,dispose(){model.removeFromParent();for(const g of privateGeometry)g.dispose();if(owned)for(const m of materials){unregisterEnvMaterial(m);m.dispose();}}};
@@ -44,13 +46,15 @@ export function createPlayerCarRenderer(scene){
  async upgradeBody(url){
   const gltf=await new GLTFLoader().loadAsync(url),body=starter.userData.body;if(!body)return false;
   const byName=new Map();for(const m of body.children)if(m.isMesh)byName.set(m.material.name,m.material);
+  for(const name of FINISHES)if(!byName.has(name))byName.set(name,finishMaterial()); // merged into the palette mesh below (consolidateCar)
   const groups=new Map();gltf.scene.updateMatrixWorld(true);
   gltf.scene.traverse(o=>{if(!o.isMesh)return;const name=(o.material?.name||'').replace(/\.\d+$/,'');const mat=byName.get(name);if(!mat)return;
    const g=o.geometry.clone().applyMatrix4(o.matrixWorld);for(const k of Object.keys(g.attributes))if(k!=='position'&&k!=='normal')g.deleteAttribute(k);
    if(!groups.has(name))groups.set(name,[]);groups.get(name).push(g.index?g.toNonIndexed():g);});
   if(!groups.has('paint'))return false;
   for(const m of [...body.children]){body.remove(m);m.geometry.dispose();}
-  const merged=[];for(const [name,gs] of groups){const mesh=new THREE.Mesh(mergeGeometries(gs),byName.get(name));mesh.name=name;mesh.castShadow=mesh.receiveShadow=true;body.add(mesh);merged.push(mesh.geometry);gs.forEach(g=>g.dispose());}
+  const merged=[];for(const [name,gs] of groups){const mesh=new THREE.Mesh(mergeGeometries(gs),byName.get(name));mesh.name=name;mesh.userData.finish=name;mesh.castShadow=mesh.receiveShadow=true;body.add(mesh);merged.push(mesh.geometry);gs.forEach(g=>g.dispose());}
+  consolidateCar(starter);
   const before=[];starter.traverse(o=>{if(o.isMesh&&!merged.includes(o.geometry))before.push(o.geometry);});
   first.damage=createVehicleDamage(starter);const live=new Set();starter.traverse(o=>{if(o.isMesh)live.add(o.geometry);});[...merged,...before].forEach(g=>{if(!live.has(g))g.dispose();}); // damage replaced these with its own clones (the old damage's clones too)
   return true;

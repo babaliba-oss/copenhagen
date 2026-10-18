@@ -202,6 +202,10 @@ const renderer=new THREE.WebGLRenderer({canvas:$('world'),antialias:true,powerPr
 // Instanced batches with nothing in them (no pedestrians on foot near the player, no trams, empty LOD levels:
 // ~50 at Nyhavn) still went through program and uniform setup every frame, in the main and shadow passes.
 {const direct=renderer.renderBufferDirect;renderer.renderBufferDirect=function(cam,sc,geometry,material,object,group){if(object.isInstancedMesh&&object.count===0)return;return direct.call(this,cam,sc,geometry,material,object,group);};}
+{const render=renderer.shadowMap.render;renderer.shadowMap.render=function(lights,sc,cam){ // tile shadow casters (addShadowCasters) exist only for this pass
+ if(!this.enabled||(!this.autoUpdate&&!this.needsUpdate))return render.call(this,lights,sc,cam);
+ const shown=[];for(const g of loadedTiles.values())if(g.visible&&g.userData.level==='near')for(const c of g.userData.casters||[]){c.visible=true;shown.push(c);}
+ try{return render.call(this,lights,sc,cam);}finally{for(const c of shown)c.visible=false;}};}
 const fpsMeter=createFpsMeter(renderer);
 const maxPixelRatio=Math.min(devicePixelRatio,1.5),resolution=createAdaptiveResolution({max:maxPixelRatio,min:Math.min(maxPixelRatio,.75)});
 renderer.setPixelRatio(maxPixelRatio);
@@ -544,7 +548,7 @@ function createFarCity(buildings){
 // Macs where shader compiles are slow).
 const pinnedMaterials=new Map();
 function disposeMaterial(m){
- if(!m)return;if(Array.isArray(m)){m.forEach(disposeMaterial);return;}
+ if(!m||m.userData?.keep)return;if(Array.isArray(m)){m.forEach(disposeMaterial);return;}
  // pinned per compiled program (the old key missed onBeforeCompile variants: driving back into an area
  // recompiled its shaders, a 100-300 ms stall each)
  const prog=renderer.properties.get(m)?.currentProgram;
@@ -577,7 +581,7 @@ async function buildRoof(t,at){
    for(const k of [5,10]){a[o+k]=a[o];a[o+k+1]=a[o+1];a[o+k+2]=a[o+2];}}
   const parts=t.parts.filter(p=>![211,212,213,1796,57950,STATION_KIOSK_RATU,USPENSKI.ratu].includes(p.ratu)&&!placeHidden.has(p.id)&&!p.duplicate); // duplicate: a second copy of the same building (building-dedupe.js) // place landmarks and shelters are drawn by place-scene.js
   // Far level: one merged shell per atlas. Near level: per-part shells until the worker's details replace them.
-  const mask=createShellMask(parts.length);group.add(...createMergedShells(a,parts,textures,mask));
+  const mask=createShellMask(parts.length);group.add(...createMergedShells(a,parts,textures,mask));addShadowCasters(group);
   if(city.era===1760&&!/[?&]flatroofs/.test(location.search)){const roofParts=parts.filter(p=>!p.noFacade&&!/vold|bastion|batteri|skanse|krudt/i.test(p.name||''));
    roofsInWorker(a,roofParts).then(roofs=>{if(loadedTiles.get(t.file)!==group)return;const m=periodRoofMesh(roofs,facadeGrain(new THREE.MeshStandardMaterial({vertexColors:true,roughness:.85}))); // own material: the camera fade sets opacity per mesh
     if(m){Object.assign(m.userData,{shell:true,role:'detail',occlusion:{opacity:1,clearTime:1},box:m.geometry.boundingBox.clone()});freezeMesh(m);applyMeshLod(m,group.userData.level||'near',focus);group.add(m);}});} // flat roofs get period hipped roofs (period-roofs.js), computed in a worker
@@ -594,6 +598,15 @@ async function buildRoof(t,at){
   throw new Error(`Building tile ${t.file}: ${error.message||error}`);
  }
 }
+// Building shadows come from each tile's merged measured shells (one draw per atlas), not from every detailed
+// building: 40-90 shadow draws at Nyhavn became a handful. Same walls and roofs, so the same silhouettes, and
+// buildings out to the edge of the shadow box now cast too. The casters share the merged shells' geometry and are
+// shown only while the shadow map renders (renderer.shadowMap.render below), so they never draw in the main pass.
+const SHADOW_CASTER=new THREE.MeshBasicMaterial({side:THREE.DoubleSide});SHADOW_CASTER.userData.keep=true;
+function addShadowCasters(group){
+ const casters=[];for(const m of group.children)if(m.userData.lod){m.userData.castByTile=true;const c=new THREE.Mesh(m.geometry,SHADOW_CASTER);c.name='Tile shadow caster';c.castShadow=true;c.receiveShadow=false;c.visible=false;c.userData.shadowCaster=true;casters.push(c);}
+ if(casters.length)group.add(...casters);group.userData.casters=casters;
+}
 // Worker-detailed buildings land a couple per frame, each replacing its interim shell, so a tile never freezes a frame.
 async function detailTile(group){
  // Two overlapping tile passes can both queue the same tile; only the first gets the work.
@@ -605,7 +618,7 @@ async function detailTile(group){
  const shells=new Map(group.userData.waiting.map(w=>[w.start,w])); // ids repeat within a tile; vertex starts do not
  for(const b of buildings)uploads.push(()=>{
   if(loadedTiles.get(t.file)!==group)return;
-  const meshes=materialiseBuilding(b,textures);for(const m of meshes){freezeMesh(m);applyMeshLod(m,group.userData.level,focus);}
+  const meshes=materialiseBuilding(b,textures);for(const m of meshes){m.userData.castByTile=true;freezeMesh(m);applyMeshLod(m,group.userData.level,focus);} // the tile's shadow casters cast for them
   // Shaders compile in the background first (parallel compile where the GPU offers it); a variant never seen
   // before no longer stalls a frame, the building just lands a moment later.
   const land=()=>{if(loadedTiles.get(t.file)!==group){for(const m of meshes){m.geometry.dispose();disposeMaterial(m.material);}return;}
