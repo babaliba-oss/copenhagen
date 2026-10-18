@@ -90,10 +90,12 @@ export function createStreetLife(scene,mobility,{paintedMarkings=true,mappedSign
  initial=false;
  }
  append();
- return {group,traffic,append,staticCounts:()=>({...counts,signals:signalObjects.length}),update(dt,player){
+ let skinned=null; // the nearest walkers as rigged characters (skinned-people.js), once their models load
+ return {group,traffic,append,staticCounts:()=>({...counts,signals:signalObjects.length}),setSkinned(crowd){if(skinned){group.remove(skinned.group);skinned.dispose();}skinned=crowd;if(crowd)group.add(crowd.group);},update(dt,player){
   traffic.update(dt,player);for(const kerbs of kerbGroups)kerbs.userData.update(player);
+  const near=skinned?skinned.update(dt,player,mobility.people,looks):null;
   people.begin(player); // distance levels: full body near the player, simplified beyond, none past the batch's hide range
-  for(let i=0;i<count;i++){const a=mobility.people[i],v=views[i];advanceGait(a,gaits[i],dt,looks[i]);
+  for(let i=0;i<count;i++){const a=mobility.people[i],v=views[i];advanceGait(a,gaits[i],dt,looks[i]);if(near?.has(a))continue; // drawn rigged
    if(!a.edge||Math.hypot(a.x-player.x,a.z-player.z)>=300){gaits[i].yaw=undefined;continue;}
    v.x=a.x;v.z=a.z;v.speed=a.speed;v.running=a.running;v.knockdown=a.knockdown;v.groundY=a.groundY;v.pose=a.pose;v.suitcase=a.suitcase;
    v.expression=a.expression;v.speaking=a.speaking;v.mouthOpen=a.mouthOpen;
