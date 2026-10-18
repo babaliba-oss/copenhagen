@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';
+import {gaitMaterial,gaitDepthMaterial,horseGeometry,wheelGeometry,stepMotion,withAttributes} from './gait.js';
 
 // A two-horse town coach for Copenhagen 1760, swapped in for the player's car (same physics, forward is -Z).
 // Procedural geometry, vertex-coloured: lacquered body with gilt trim, coachman's box, big rear wheels,
@@ -36,10 +37,39 @@ function legGeometry(coat){
 }
 
 // Blender coach and horse body (scripts/blender/carriage.py): {coach: geometry, horse: parts} once loaded.
-let MODELS=null;
-export function setCarriageModels(models){MODELS=models?.coach&&models?.horse?models:null;}
+let MODELS=null,ARMOURED=null,BROUGHAM=null,COACHMAN=null;
+export function setCarriageModels(models){MODELS=models?.coach&&models?.horse?models:null;ARMOURED=models?.armoured?.geometry?models.armoured:null;BROUGHAM=models?.brougham?.geometry?models.brougham:null;COACHMAN=models?.coachman?.geometry?models.coachman:null;}
+// With the armoured horse (gait.js) the coach and its pair are one geometry, all animated in the vertex shader from one
+// per-instance `motion` (phase, swing, roll): the black town coach with a crown on the door (brougham.glb, textured; the
+// Blender coach when it is missing) with its wheels marked to turn, a pole, the coachman on the box and two horses that trot.
+const COACH_WHEELS=[{x:.82,y:.62,z:1.1,r:.62},{x:-.82,y:.62,z:1.1,r:.62},{x:.72,y:.44,z:-.945,r:.44},{x:-.72,y:.44,z:-.945,r:.44}];
+const flat=g=>g.index?g.toNonIndexed():g.clone();
+function coachman([x,y,z]){
+ if(COACHMAN)return flat(COACHMAN.geometry).translate(x,y,z);
+ return mergeGeometries([box(.42,.55,.3,0,.3,0,'#3a2c45'),box(.26,.26,.24,0,.72,0,'#d9b49a'),box(.36,.12,.36,0,.89,0,'#141414'),box(.42,.04,.42,0,.83,0,'#141414'),box(.36,.14,.5,0,.05,-.2,'#2a2433')]).translate(x,y,z);
+}
+function gaitCoach(){
+ if(!ARMOURED||!(BROUGHAM||MODELS))return null;
+ const near=horseGeometry(ARMOURED.geometry,ARMOURED.pivots,{x:-.62,z:-3.25}),off=horseGeometry(ARMOURED.geometry,ARMOURED.pivots,{x:.62,z:-3.25,coat:.55,offset:.9});
+ const coloured=gaitMaterial(new THREE.MeshStandardMaterial({vertexColors:true,roughness:.62,metalness:.05}));
+ if(!BROUGHAM){const coach=wheelGeometry(flat(MODELS.coach),COACH_WHEELS),g=mergeGeometries([coach,near,off].map(x=>withAttributes(x,{uv:false})));[coach,near,off].forEach(x=>x.dispose());return {geometry:g,materials:coloured};}
+ const e=BROUGHAM.extras,body=withAttributes(wheelGeometry(flat(BROUGHAM.geometry),e.wheels.map(w=>({...w,dx:.1}))));
+ const tip=-4.05,from=(e.poleEnd??-2)+.25,pole=paint(new THREE.CylinderGeometry(.04,.055,from-tip,8).rotateX(Math.PI/2).translate(0,.96,(from+tip)/2),'#2a1d14');
+ const seat=e.box||[0,1.34,-.35],parts=[body,...[near,off,pole,coachman(COACHMAN?[0,seat[1]-.2,seat[2]+.05]:seat)].map(x=>withAttributes(x))],g=mergeGeometries(parts,true);parts.forEach(x=>x.dispose()); /* the coachman model's origin is at his soles, under his hips; his thighs rest 0.2 m above it */
+ for(const grp of g.groups)grp.materialIndex=grp.materialIndex===0?0:1;
+ return {geometry:g,materials:[gaitMaterial(new THREE.MeshStandardMaterial({map:BROUGHAM.texture,roughness:.42,metalness:.15})),coloured]};
+}
+function gaitMesh({geometry,materials},count){
+ const motion=new THREE.InstancedBufferAttribute(new Float32Array(count*3),3);motion.setUsage(THREE.DynamicDrawUsage);geometry.setAttribute('motion',motion);
+ const mesh=new THREE.InstancedMesh(geometry,materials,count);
+ mesh.customDepthMaterial=gaitDepthMaterial();mesh.castShadow=true;mesh.frustumCulled=false;return {mesh,motion};
+}
 export function createCarriage(){
  const group=new THREE.Group();group.name='Coach and horses';
+ const gait=gaitCoach();
+ if(gait){const {mesh,motion}=gaitMesh(gait,1),m={phase:0,amp:0,roll:0};mesh.setMatrixAt(0,new THREE.Matrix4());mesh.name='Coach and pair';group.add(mesh);
+  group.userData.update=(speed,dt)=>{stepMotion(m,speed,dt);motion.setXYZ(0,m.phase,m.amp,m.roll);motion.needsUpdate=true;};
+  return group;}
  const mat=new THREE.MeshStandardMaterial({vertexColors:true,roughness:.55,metalness:.12});
  const lacquer='#1f3a2c',gilt='#c19a45',dark='#16120e';
  const parts=MODELS?[MODELS.coach.clone(),...[[-.62,'#5b3a24'],[.62,'#2e2520']].map(([x,c])=>MODELS.bake(MODELS.horse,{coat:c}).translate(x,0,-3.25))]:[
@@ -72,6 +102,12 @@ export function createCarriage(){
 // at rest stands still and a moving one walks or trots instead of sliding along with frozen legs.
 export const COACH_HALF_LENGTH=3.4,COACH_HALF_WIDTH=.95; // horses' noses to the rear wheels, about 6.6 m (traffic spacing)
 export function createCarriageTraffic(actors){
+ const gait=gaitCoach();
+ if(gait){const count=Math.max(1,actors.length),{mesh,motion}=gaitMesh(gait,count);mesh.name='Coaches';const group=new THREE.Group();group.name='Coach traffic';group.add(mesh);
+  const m4=new THREE.Matrix4(),ahead=new THREE.Matrix4().makeTranslation(0,0,1.2),q=new THREE.Quaternion(),v=new THREE.Vector3(),one=new THREE.Vector3(1,1,1),zero=new THREE.Vector3(0,0,0),UP=new THREE.Vector3(0,1,0);
+  const states=Array.from({length:count},(_,i)=>({phase:i*1.7,amp:0,roll:i*3.3}));
+  return {group,update(groundAt,dt=1/60){actors.forEach((a,i)=>{if(i>=count)return;const on=!!a.edge&&!a.playerTaken;m4.compose(v.set(a.x||0,on?groundAt(a.x,a.z):-100,a.z||0),q.setFromAxisAngle(UP,a.heading||0),on?one:zero).multiply(ahead);mesh.setMatrixAt(i,m4);
+    const s=stepMotion(states[i],on?a.speed||0:0,dt);motion.setXYZ(i,s.phase,s.amp,s.roll);});mesh.instanceMatrix.needsUpdate=true;motion.needsUpdate=true;}};}
  const c=createCarriage();c.position.z=1.2;c.updateMatrixWorld(true);const gs=[],im=new THREE.Matrix4();
  c.traverse(o=>{if(!o.isMesh||o.name==='Horse legs')return;const n=o.isInstancedMesh?o.count:1;for(let i=0;i<n;i++){const g=o.geometry.clone();if(o.isInstancedMesh){o.getMatrixAt(i,im);g.applyMatrix4(im.premultiply(o.matrixWorld));}else g.applyMatrix4(o.matrixWorld);gs.push(g.index?g.toNonIndexed():g);}});
  const shared=new Set();c.traverse(o=>{if(o.isMesh){shared.add(o.geometry);shared.add(o.material);}});shared.forEach(x=>x.dispose());

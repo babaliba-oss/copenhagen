@@ -4,6 +4,7 @@
 // the player's position and travel mode, draws its own markers and HUD, and plugs its characters into the
 // shared conversation system (characters.js).
 import * as THREE from 'three';
+import {loadOneMesh} from './gait.js';
 import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';
 import proj4 from 'proj4';
 import {groundAt} from '../terrain.js';
@@ -89,7 +90,8 @@ export function createCopenhagenGame({scene,city,mobilityData,cityData,toast,sou
  let save={money:0,job:0,done:{},lore:[],active:null,nisser:[]};
  const KEY=SAVE_KEY+(ERA==='h'?'-1760':'');try{save={...save,...JSON.parse(localStorage.getItem(KEY)||'{}')};}catch{}
  if(save.active&&(!byId[save.active.id]||byId[save.active.id].limit))save.active=null; // timed sagas restart after a reload
- const persist=()=>{try{localStorage.setItem(KEY,JSON.stringify(save));}catch{}};
+ let trailer=false; // ?cinematic shows a saga for a few seconds (api.trailer below) and must not touch the player's save
+ const persist=()=>{if(trailer)return;try{localStorage.setItem(KEY,JSON.stringify(save));}catch{}};
 
  // ---- HUD ----
  const hud=document.createElement('div');hud.id='cph-hud';hud.innerHTML=`<div class="cph-money" id="cph-money"></div><div class="cph-card-hint" id="cph-card-hint" hidden></div><div class="cph-card" id="cph-job"></div><div class="cph-card cph-saga" id="cph-saga" hidden></div>`;
@@ -118,6 +120,8 @@ export function createCopenhagenGame({scene,city,mobilityData,cityData,toast,sou
  const nisseGeo=(()=>{const parts=[new THREE.ConeGeometry(.17,.42,10).translate(0,.62,0),new THREE.SphereGeometry(.13,10,8).translate(0,.4,0),new THREE.CylinderGeometry(.14,.18,.34,10).translate(0,.17,0),new THREE.SphereGeometry(.035,6,5).translate(0,.84,0)];
   const cols=['#c8202a','#e9e3d4','#5a6b8a','#f2f2f2'],out=[];parts.forEach((g,k)=>{const n=g.toNonIndexed();const c=new THREE.Color(cols[k]),a=new Float32Array(n.attributes.position.count*3);for(let i=0;i<a.length;i+=3)a.set([c.r,c.g,c.b],i);n.setAttribute('color',new THREE.BufferAttribute(a,3));n.deleteAttribute('uv');out.push(n);});return mergeGeometries(out).scale(1.6,1.6,1.6);})();
  const nisseMesh=new THREE.InstancedMesh(nisseGeo,new THREE.MeshStandardMaterial({vertexColors:true,roughness:.6,emissive:'#3a1210'}),nisser.length);nisseMesh.castShadow=true;nisseMesh.frustumCulled=false;nisseMesh.name='Hidden nisser';scene.add(nisseMesh);
+ // Daniel's scanned felt nisse (public/models/nisse.glb.gz, scripts/models/nisse.py) replaces the cone-and-ball figure once loaded.
+ loadOneMesh('/models/nisse.glb.gz').then(m=>{if(!m?.geometry?.attributes?.color)return;const g=m.geometry.scale(.85,.85,.85);for(const k of Object.keys(g.attributes))if(!['position','normal','color'].includes(k))g.deleteAttribute(k);nisseMesh.geometry.dispose();nisseMesh.geometry=g;nisseMesh.material.emissive.set('#1a0808');});
  const NT={m:new THREE.Matrix4(),q:new THREE.Quaternion(),v:new THREE.Vector3(),one:new THREE.Vector3(1,1,1),zero:new THREE.Vector3()};
  const mkA=beam(scene,0xf2b134),mkB=beam(scene,0x46c2b0),mkQ=[0,1,2,3,4].map(()=>beam(scene,0xe0313e,100));
  const line=createRouteLine(scene,{historic:ERA==='h'});
@@ -361,5 +365,11 @@ export function createCopenhagenGame({scene,city,mobilityData,cityData,toast,sou
   return false;
  }
  const blocking=()=>loreOpen||journalOpen||tmapOpen;
- return {paper:()=>{try{sessionStorage.removeItem('cph-paper-'+ERA);}catch{}showPaper();},photo,debug:()=>({race:race&&{id:race.r.id,k:race.k,t:race.t,c:race.countdown},armed:races.map(r=>r.armed),state,started,player:player&&[player.x,player.z]}),update,key,blocking,people,api,minimapTargets:()=>{const out=[];if(race){out.push({p:race.r.cps[race.k],color:'#ff4fd8'});return out;}for(const r of races)if(state!=='b')out.push({p:r.start,color:'#9b5de5',small:true});const j=job();out.push({p:state==='a'?j.A:j.B,color:state==='a'?'#f2b134':'#46c2b0'});if(save.active){const q=byId[save.active.id];for(const k of frontier())if(!q.steps[k].clue)out.push({p:q.steps[k].p,color:'#e0313e'});}return out;},route:()=>line.ahead()};
+ // ?cinematic (cinematic.js): show a saga as it starts, banner and red beam, without saving anything; end() puts back the
+ // player's own state.
+ let trailerSave=null;
+ const trailerApi={saga(id){const q=byId[id];if(!q)return false;if(!trailer){trailer=true;trailerSave=JSON.stringify(save);}save.active={id,done:[],t:0,shown:-1};routeFor=null;banner('Saga started',`${esc(q.title)} · follow the red beam`,'pick');return true;},
+  banner:(title,sub,kind)=>banner(title,sub,kind),
+  end(){if(!trailer)return;try{save=JSON.parse(trailerSave);}catch{}trailer=false;trailerSave=null;routeFor=null;ban.hidden=true;}};
+ return {trailer:trailerApi,paper:()=>{try{sessionStorage.removeItem('cph-paper-'+ERA);}catch{}showPaper();},photo,debug:()=>({race:race&&{id:race.r.id,k:race.k,t:race.t,c:race.countdown},armed:races.map(r=>r.armed),state,started,player:player&&[player.x,player.z]}),update,key,blocking,people,api,minimapTargets:()=>{const out=[];if(race){out.push({p:race.r.cps[race.k],color:'#ff4fd8'});return out;}for(const r of races)if(state!=='b')out.push({p:r.start,color:'#9b5de5',small:true});const j=job();out.push({p:state==='a'?j.A:j.B,color:state==='a'?'#f2b134':'#46c2b0'});if(save.active){const q=byId[save.active.id];for(const k of frontier())if(!q.steps[k].clue)out.push({p:q.steps[k].p,color:'#e0313e'});}return out;},route:()=>line.ahead()};
 }

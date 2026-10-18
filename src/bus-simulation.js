@@ -168,7 +168,7 @@ export class BusSimulation{
   // A bus that cannot restart leaves the street; the supply brings a new one in later.
   if(this.buses.some(b=>b.done)){this.buses=this.buses.filter(b=>!b.done);this.buses.forEach((b,i)=>b.id=i);}
   // Stop player contact against the actual 12/13 m body, never a tiny car box.
-  for(const b of this.buses)if(busOverlaps(b,player)){if(!leavingBody(player,dt,b))player.speed=0;b.speed=0;const side=(player.x-b.x)*Math.cos(b.heading)-(player.z-b.z)*Math.sin(b.heading);nudgeOut(player,b.heading,(BUS_DIMENSIONS[b.kind].width/2+(player.halfWidth??.98)+.05-Math.abs(side))*(side<0?-1:1),this.world);}
+  for(const b of this.buses)if(!player.cinematic&&busOverlaps(b,player)){ /* the trailer's car is placed, not pushed: it keeps behind the bus instead (cine-drive.js) */if(!leavingBody(player,dt,b))player.speed=0;b.speed=0;const side=(player.x-b.x)*Math.cos(b.heading)-(player.z-b.z)*Math.sin(b.heading);nudgeOut(player,b.heading,(BUS_DIMENSIONS[b.kind].width/2+(player.halfWidth??.98)+.05-Math.abs(side))*(side<0?-1:1),this.world);}
   this.refreshObstacles();
  }
  snapshot(){return this.buses.map(({id,kind,path,x,z,heading,speed,parked,stopId,platform,dwell,doorsOpen,stop})=>({id,kind,line:path.line,destination:path.destination,x,z,heading,speed,parked:!!parked,stopId,platform,dwelling:dwell>0,doorsOpen:!!doorsOpen,busStop:dwell>0?stop?.name||null:null}));}

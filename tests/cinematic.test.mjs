@@ -44,11 +44,22 @@ test('camera rigs sit where their names say',()=>{
 
 test('each era gets its own shots, and ?shots= picks some by name or index',()=>{
  const today=pickShots(null),old=pickShots(1760);
- assert.ok(today.some(s=>s.name==='H.C. Andersen'));assert.ok(!old.some(s=>s.name==='H.C. Andersen'),'no Andersen in 1760: he was born in 1805');
- assert.ok(old.some(s=>s.name==='Ramparts'));assert.ok(!today.some(s=>s.name==='Ramparts'));
- assert.deepEqual(pickShots(null,'?cinematic&shots=nyhavn%20b,bred').map(s=>s.name),['Nyhavn bumper','Bredgade']);
- assert.deepEqual(pickShots(1760,'?shots=0').map(s=>s.name),[old[0].name]);
+ assert.ok(today.some(s=>s.name==='H.C. Andersen'));assert.ok(!old.some(s=>/Andersen/.test(s.name)),'no Andersen in 1760: he was born in 1805');
+ assert.ok(!old.some(s=>s.season||s.hud==='radio'),'no radio or Christmas lights in 1760');assert.ok(today.some(s=>s.season==='christmas')&&today.some(s=>s.hud==='radio'));
+ assert.equal(old.find(s=>s.hud==='quest').saga,'eye');assert.equal(today.find(s=>s.hud==='quest').saga,'hca');
+ assert.ok(!SHOTS.some(s=>/Ramparts|Gorm/.test(s.name)),'the cannon shots are gone');
+ assert.deepEqual(pickShots(null,'?cinematic&shots=nyhavn%20b,radio').map(s=>s.name),['Nyhavn bumper','Radio']);
+ assert.deepEqual(pickShots(1760,'?shots=0%2C1').map(s=>s.name),[old[0].name,old[1].name],'the page writes the comma as %2C');
  assert.ok(SHOTS.filter(s=>s.drive).length>=8,'mostly driving shots');
+ assert.ok(today.findIndex(s=>s.season==='christmas')>today.findIndex(s=>s.name==='The city from above'),'Christmas comes last: the snow stays');
+});
+
+test('the camera stays out of houses: it stops short of a wall between it and the subject, with room around the lens',async()=>{
+ const {clearEye}=await import('../src/cinematic.js');
+ const wall=(x,z,y)=>x>=5&&x<=8&&y<20; // a house from x=5 to 8
+ const e=clearEye([10,2,0],[0,1,0],wall);assert.ok(e[0]<5-.9&&e[0]>2,`pulled in before the wall: ${e[0].toFixed(2)}`);
+ const free=clearEye([4,2,0],[0,1,0],()=>false);assert.deepEqual(free,[4,2,0],'nothing in the way: unchanged');
+ const over=clearEye([10,60,0],[0,1,0],wall);assert.ok(over[0]>9,'high above the roof the view is clear');
 });
 
 test('the hero car follows a slower car ahead in its lane instead of driving through it',async()=>{

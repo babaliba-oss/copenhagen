@@ -105,8 +105,17 @@ Notes:
 
 - `game.js`: delivery jobs, sagas, journal (J), treasure map (K), hidden nisser, the morning paper, GPS line.
 - `characters.js` / `data.js`: authored characters and their dialogue, for both eras.
-- `carriage.js`: the 1760 coach (player) and NPC coaches (the horses' legs swing with each coach's pace; traffic
-  spaces them by their 6.6 m length, `COACH_HALF_LENGTH`, not as cars).
+- `carriage.js` + `gait.js`: the 1760 coach (player) and NPC coaches (traffic spaces them by their 6.6 m length,
+  `COACH_HALF_LENGTH`, not as cars). With the models below loaded, a coach and its pair are one merged geometry animated
+  in the vertex shader (`gait.js`): per-vertex `anim`/`pivot` mark the horses' legs (swing about the shoulder/hip, the knee
+  folds while a leg swings forward, diagonal pairs in a trot) and the wheels (turn about their axles), one per-instance
+  `motion` (gait phase, swing, distance rolled) drives them; shadows use the same patch. Models (Daniel's downloads, his
+  licences; scripts in `scripts/models/`): `carriage/brougham.glb.gz` + `brougham.jpg` (19th-century-carriage.zip, the
+  black coach with the crown; `brougham.py`, wheels and box seat in the mesh extras), `carriage/armored-horse.glb.gz`
+  (armored-horse.zip; `armored_horse.py` bakes the textures into vertex colours and writes the `_leg` weights),
+  `carriage/coachman.glb.gz` (the 18th-century costume from mans-1-costume…zip with the cool-man's head, powdered hair
+  and a tricorne, seated; `coachman.py`), `nisse.glb.gz` (art/nisse.zip, a scanned felt nisse: the hidden nisser and
+  Nissefar; `nisse.py`). All gzipped (unzipped in the browser). Missing files fall back to the Blender coach and horse.
 - `radio.js`: the car radio (L, Shift+L back, or click/tap the now-playing card at the top right; the last station is
   remembered, station 1 on the first drive): stations from `radio-stations.json` stream public-domain / CC0 / CC BY
   recordings from the library that hosts them; each station loops on its own clock like a broadcast.
@@ -127,7 +136,17 @@ recordings cut together mid-drive. The screen goes black between shots while the
   the screen until it stays black. `?shots=Nyhavn,Bredgade` (name prefixes or indices) runs only those shots;
   `?dur=2.4` shortens every shot.
 - `?fixed=30` steps each shot frame by frame for a capture script (`window.__cineFrame()`, the dev server's
-  `window.__renderer`) at full quality; without a GPU (SwiftShader) that costs 10–18 s a frame.
+  `window.__renderer`) at full quality; without a GPU (SwiftShader) that costs 10–18 s a frame. `__cineFrame(n, false)`
+  steps without drawing (checks), `__cine.hold(i, u)` parks on shot i at fraction u (contact sheets).
+- The self-driving car keeps behind whatever is on its route ahead (traffic, buses, a coach crossing at a junction,
+  parked rides, people within 7 m): `cineObstacles()` in main.js, `blocked()` in cine-drive.js. Buses and trams do not
+  push it (`car.cinematic`), and the body does not rumble on setts.
+- The camera never goes into a house: `clearEye()` walks from the subject out to the planned eye and stops short of the
+  first wall in the way, with a metre of air around the lens (`solid()`: footprint and height of the mapped buildings).
+- Shots can set the sky (`sky:'night'`), switch today's seasonal decorations mid-run (`season:'halloween'|'christmas'`,
+  Christmas comes last so the snow stays), follow a character live (`orbit.follow:'hca'|'nisse'`), or show part of the
+  interface: `hud:'radio'` (the now-playing card tuning through the stations) and `hud:'quest'` (a saga starting: banner,
+  red beam and route; game.js `trailer` shows it without touching the save).
 
 ### Rigged people (src/skinned-people.js)
 

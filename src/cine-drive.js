@@ -27,7 +27,8 @@ export function leadCar(p,cars){
   if(Math.abs(dx*fz-dz*fx)>2.2||Math.cos((c.heading||0)-p.heading)<.7)continue;if(!best||along<best.gap)best={gap:along,speed:Math.abs(c.speed||0)};}
  return best;
 }
-export function createCineDrive(roads,{from,toward=null,speed=12,turnSpeed=.45}={}){
+// front: car centre to its nose (a coach's horses reach 3.3 m ahead); half: half its width.
+export function createCineDrive(roads,{from,toward=null,speed=12,turnSpeed=.45,front=2.3,half=.95}={}){
  const start=placeOnRoads(roads,from,toward);if(!start)return null;
  let edge=start.edge,s=start.s,v=speed,distance=0;const visited=new Set([edge.id]);
  const choose=e=>{
@@ -37,15 +38,31 @@ export function createCineDrive(roads,{from,toward=null,speed=12,turnSpeed=.45}=
   return best;};
  let next=choose(edge);
  const pose=()=>routePoint(edge,s,edge.lane??0,next?startDir(next):undefined);
+ // The route ahead without moving: lane poses every `every` m from `a` to `b` metres ahead of the car's centre (junction
+ // choices beyond the next one are guessed the same way the car will make them).
+ const route=(a,b,every=1)=>{const out=[];let e=edge,n=next,at=s;
+  for(let d=a;d<=b;d+=every){let q=s+d;while(q-(at-s)>e.length){const nn=n||choose(e);if(!nn)return out;at+=e.length;e=nn;n=choose(e);}const local=q-(at-s);out.push(routePoint(e,Math.max(0,local),e.lane??0,n?startDir(n):undefined));}
+  return out;};
+ // The first thing on the route ahead: traffic, a bus, a coach crossing at a junction, someone parked in the lane. Its
+ // distance from the car's nose and its speed along the route ({gap, speed} or null). Obstacles: {x, z, heading, speed,
+ // hl, hw} (half length and width; a car's when absent).
+ const blocked=(obstacles,reach=50)=>{
+  if(!obstacles?.length)return null;const p0=pose(),near=[];
+  for(const o of obstacles)if(o&&Number.isFinite(o.x)&&Math.abs(o.x-p0.x)<reach+front+12&&Math.abs(o.z-p0.z)<reach+front+12)near.push(o);
+  if(!near.length)return null;const pts=route(front,front+reach,1);
+  for(let k=0;k<pts.length;k++){const q=pts[k];for(const o of near){if(o.near&&k>o.near)continue;const h=o.heading||0,c=Math.cos(h),sn=Math.sin(h),dx=q.x-o.x,dz=q.z-o.z;
+   if(Math.abs(-dx*sn-dz*c)<(o.hl??2.2)+.4&&Math.abs(dx*c-dz*sn)<(o.hw??.95)+half)return {gap:k,speed:Math.max(0,(o.speed||0)*Math.cos(h-q.heading)),what:o};}}
+  return null;};
  return {
-  get edge(){return edge;},get distance(){return distance;},get speed(){return v;},pose,
-  step(dt,cars=null){
+  get edge(){return edge;},get distance(){return distance;},get speed(){return v;},pose,route,blocked,
+  step(dt,obstacles=null){
    // ease towards the speed the next turn allows (sharp corners at walking pace, straight on at full speed), and
-   // never into the car ahead: follow it at a 12 m gap (the hero is placed, not simulated, and would drive through it)
+   // never into whatever is ahead on the route: keep 4 m behind it at its pace (the hero is placed, not simulated,
+   // and would otherwise drive through it)
    const toEnd=edge.length-s,turn=next?angle(endDir(edge),startDir(next)):0;
    let target=toEnd<18&&turn>.5?Math.max(speed*turnSpeed,speed*(1-turn/Math.PI)):speed;
-   const lead=cars?leadCar(pose(),cars):null;if(lead)target=Math.min(target,Math.max(0,lead.speed+(lead.gap-12)*.6));
-   v+=(target-v)*Math.min(1,dt*2.2);
+   const b=blocked(obstacles);if(b)target=b.gap<2.5?0:Math.min(target,Math.max(0,b.speed+(b.gap-4)*.7));
+   v+=(target-v)*Math.min(1,dt*(target<v?3.2:2.2));
    s+=v*dt;distance+=v*dt;
    while(s>edge.length){const n=next||choose(edge);if(!n){s=edge.length;v=0;break;}s-=edge.length;edge=n;visited.add(edge.id);next=choose(edge);}
    return pose();
