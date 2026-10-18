@@ -131,6 +131,15 @@ export class Mobility {
   if(Math.abs(a.offset-target)>.01){const eased=routePoint(a.edge,a.s,a.offset,nextDir,prevDir);if(vehicleFitsRoad(eased,this.world))return sized(eased,a);a.offset=target;}
   return sized(p,a);
  }
+ // Back onto the lane from where a knock left the car: the nearest point of its own edge, if it is close and the car still
+ // faces roughly that way; the lateral offset then eases back to the lane (position()) instead of jumping.
+ rejoinLane(a){
+  const e=a.edge;if(!e?.points?.length)return false;let best=Infinity,bs=0,acc=0;
+  for(let i=1;i<e.points.length;i++){const [ax,az]=e.points[i-1],[bx,bz]=e.points[i],dx=bx-ax,dz=bz-az,l=Math.hypot(dx,dz);if(!l)continue;const t=Math.max(0,Math.min(1,((a.x-ax)*dx+(a.z-az)*dz)/(l*l))),d=Math.hypot(a.x-ax-dx*t,a.z-az-dz*t);if(d<best){best=d;bs=acc+t*l;}acc+=l;}
+  const c=routePoint(e,Math.min(e.length,bs),0),turn=Math.abs(Math.atan2(Math.sin(a.heading-c.heading),Math.cos(a.heading-c.heading)));
+  if(best>4||turn>1.1)return false;
+  a.s=Math.min(e.length-.01,bs);a.offset=(a.x-c.x)*Math.cos(c.heading)-(a.z-c.z)*Math.sin(c.heading);a.speed=0;a.waiting=0;a.stuck=0;return true;
+ }
  // A walker's place across the path: its own side distance to the right of the way it walks, halved where the
  // path is too narrow for it, and eased (round corners, onto a reversed edge) rather than jumped. Everybody used
  // to walk the line itself, so people walking together, or waiting at the same kerb, stood inside one another.
@@ -395,6 +404,9 @@ export class Mobility {
    if(a.walking&&a.conversation){a.speed=0;continue;}
    // A car the player crashed into coasts on its own momentum, then sits where it stopped as an obstacle
    // until it is out of sight (or long enough has passed) and gets recycled like any other car.
+   // A coach (1760: recoverKnocked set) that was shoved and has come to rest pulls back into its lane after a few seconds;
+   // like a wrecked car it used to stand in the street, horses frozen, until you drove 80 m away.
+   if(a.knocked&&this.recoverKnocked&&a.knocked.rest!=null&&this.time-a.knocked.rest>this.recoverKnocked&&this.rejoinLane(a)){a.knocked=undefined;continue;}
    if(a.knocked){if(!stepKnocked(a,dt,this.world,this.time,{cars:this.cars,obstacles:this.externalObstacles,knock:(b,pose,impulse)=>{if(this.cars[b.id]===b&&b.edge){knockCar(b,impulse,this.time);this.collisions++;}}})&&(this.time-a.knocked.rest>REST_RECYCLE_AFTER&&Math.hypot(a.x-player.x,a.z-player.z)>80||this.canRecycle(a,player)&&Math.hypot(a.x-player.x,a.z-player.z)>160)){a.knocked=undefined;a.damage=undefined;a.edge=null;this.spawn(a,player);}continue;}
    if(a.stationOnly){
     if(!nearStation(player)){this.retire(a,player);continue;}

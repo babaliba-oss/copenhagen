@@ -74,3 +74,13 @@ test('walkers keep their own place on the pavement and a step behind the one ahe
  assert.ok(closest>.6,`never closer than a step: ${closest.toFixed(2)} m`);assert.ok(b.s>13+.9*15,'the one ahead walks on at its own pace');
  assert.ok(Math.abs(a.x)>.15&&Math.abs(a.x)<.9,`off the line, to the right of the way it walks: x=${a.x.toFixed(2)}`);
 });
+test('a shoved coach (1760) pulls back into its lane once it has come to rest, instead of standing in the street',()=>{
+ const graph={nodes:[[0,0],[0,-200]],edges:[{from:0,to:1,points:[[0,0],[0,-200]],length:200,lane:1.5,signal:-1}]};
+ const sim=new Mobility({roads:structuredClone(graph),walks:{nodes:[],edges:[]},signals:[]},{roads:{at:()=>true},pavement:{at:()=>false},buildings:{at:()=>undefined},water:[]},{cars:1,people:0});
+ sim.recoverKnocked=3;const a=sim.cars[0];
+ Object.assign(a,{edge:sim.roads.edges[0],s:40,x:2.6,z:-40,heading:.25,speed:0,cruise:6,knocked:{vx:0,vz:0,spin:0,rest:0,pushedAt:-9}});
+ const player={x:40,z:-100,speed:0};
+ for(let i=0;i<60;i++)sim.step(1/30,player);assert.ok(a.knocked,'still shaken for a moment');
+ for(let i=0;i<240;i++)sim.step(1/30,player);
+ assert.equal(a.knocked,undefined);assert.ok(a.z<-45,`drives on along its lane, z=${a.z.toFixed(1)}`);assert.ok(Math.abs(a.x-1.5)<.3,`back in the lane, x=${a.x.toFixed(2)}`);
+});
