@@ -27,7 +27,7 @@ const ANIMALS={
  pig:()=>mergeGeometries([paint(new THREE.SphereGeometry(.35,10,8).scale(1.5,.9,.9).translate(0,.45,0),'#e2a99a'),paint(new THREE.SphereGeometry(.18,8,6).translate(.55,.5,0),'#e2a99a'),paint(new THREE.CylinderGeometry(.08,.08,.08,8).rotateZ(Math.PI/2).translate(.72,.5,0),'#c98a80')])};
 const rnd=seed=>()=>{seed=(seed*16807)%2147483647;return (seed-1)/2147483646;};
 
-export function createPeriodLife({city,world,water=[],squares=[],gates=[],animalModels={}}){ // animalModels: Blender pig/hen/goose (scripts/blender/animals.py) where loaded
+export function createPeriodLife({city,world,water=[],squares=[],gates=[],animalModels={},propModels={}}){ // animalModels: Blender pig/hen/goose (scripts/blender/animals.py) where loaded; propModels: farm-wagon, covered-wagon (CC BY agt14032013)
  const group=new THREE.Group();group.name='1760 street life';const r=rnd(1760);
  const wet=(x,z)=>water.some(w=>{const b=w.bbox;return (!b||x>=b[0]&&x<=b[2]&&z>=b[1]&&z<=b[3])&&pointInPolygon(x,z,w.rings);});
  const free=(x,z,rad=.6)=>!world.buildings.at(x,z)&&!wet(x,z)&&!world.buildings.at(x+rad,z)&&!world.buildings.at(x-rad,z)&&!world.buildings.at(x,z+rad)&&!world.buildings.at(x,z-rad);
@@ -41,7 +41,7 @@ export function createPeriodLife({city,world,water=[],squares=[],gates=[],animal
   const groups=14+Math.floor(r()*8);
   for(let g=0;g<groups;g++){const a=r()*6.28,d=3+Math.sqrt(r())*34,cx=sq.x+Math.cos(a)*d,cz=sq.z+Math.sin(a)*d,n=2+Math.floor(r()*3);
    for(let i=0;i<n;i++){const b=i/n*6.28+r()*.4,px=cx+Math.cos(b)*.8,pz=cz+Math.sin(b)*.8;person(px,pz,{heading:Math.atan2(px-cx,pz-cz)});}}
-  for(let i=0;i<5;i++){const a=r()*6.28,d=8+r()*24;prop(r()<.7?'handcart':'haywagon',sq.x+Math.cos(a)*d,sq.z+Math.sin(a)*d);}
+  for(let i=0;i<5;i++){const a=r()*6.28,d=8+r()*24,k=r();prop(k<.55?'handcart':k<.75||!propModels['farm-wagon']?'haywagon':k<.9||!propModels['covered-wagon']?'farm-wagon':'covered-wagon',sq.x+Math.cos(a)*d,sq.z+Math.sin(a)*d);} // unhitched wagons stand about the market
   if(r()<.7)animals.push({kind:r()<.5?'hen':'goose',x:sq.x+(r()-.5)*20,z:sq.z+(r()-.5)*20,n:5+Math.floor(r()*5)});
  }
  // quays: along navigable water, a sailor or dock hand every ~25 m, cargo stacked beside them
@@ -64,7 +64,7 @@ export function createPeriodLife({city,world,water=[],squares=[],gates=[],animal
  // props (one instanced mesh per kind per 400 m chunk)
  const mat=new THREE.MeshStandardMaterial({vertexColors:true,roughness:.85});const m4=new THREE.Matrix4(),q=new THREE.Quaternion(),v=new THREE.Vector3(),one=new THREE.Vector3(1,1,1),UP=new THREE.Vector3(0,1,0);
  const chunks=[];
- for(const [kind,list] of Object.entries(props)){if(!PROPS[kind])continue;const geo=PROPS[kind]();const by=new Map();
+ for(const [kind,list] of Object.entries(props)){const geo=propModels[kind]||PROPS[kind]?.();if(!geo)continue;const by=new Map();
   for(const it of list){const k=`${Math.floor(it[0]/400)},${Math.floor(it[1]/400)}`;if(!by.has(k))by.set(k,[]);by.get(k).push(it);}
   for(const its of by.values()){const im=new THREE.InstancedMesh(geo,mat,its.length);im.name=`1760 ${kind}`;im.castShadow=true;im.receiveShadow=true;
    its.forEach(([x,z,yaw],i)=>im.setMatrixAt(i,m4.compose(v.set(x,groundAt(x,z),z),q.setFromAxisAngle(UP,yaw),one)));im.computeBoundingSphere();group.add(im);
