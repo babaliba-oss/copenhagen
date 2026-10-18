@@ -111,7 +111,7 @@ export function createCinematic({doc=document,ground,teleport,place=null,roads=(
   start(){next();},
   // checking shots: park on shot n at fraction u (the car placed where it would be)
   get shots(){return shots.map(s=>s.name);},
-  hold(n,u=.5){if(!(n>=0&&n<shots.length))return;i=n-1;next();const s=shots[n];if(drive){for(let k=0;k<Math.round(s.dur*30*u);k++)car=drive.step(1/30);place?.(car.x,car.z,car.heading,0);}phase='hold';fade.style.opacity='0';show(pose(s,u),true);},
+  hold(n,u=.5){if(!(n>=0&&n<shots.length))return;i=n-1;next();const s=shots[n];if(drive){for(let k=0;k<Math.round(s.dur*30*u);k++)car=drive.step(1/30);place?.(car.x,car.z,car.heading,0);}phase='hold';fade.style.opacity='0';show(pose(s,u),true);if(s.hud){hudOn=s.hud;doc.body.classList.add('cine-'+s.hud);hud?.(s.hud,true,s);}},
   update(dt){
    if(phase==='done'||i<0)return;const s=shots[i];if(phase==='hold'){show(pose(s,.5),true);return;}
    if(phase==='wait'){waited+=dt;show(pose(s,0),true);if(waited>2.5&&(loaded()||waited>14)){phase='play';fade.style.opacity='0';if(s.hud){hudOn=s.hud;doc.body.classList.add('cine-'+s.hud);hud?.(s.hud,true,s);}}return;}

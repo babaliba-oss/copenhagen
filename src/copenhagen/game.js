@@ -292,11 +292,11 @@ export function createCopenhagenGame({scene,city,mobilityData,cityData,toast,sou
   document.body.append(el);const close=()=>{el.remove();removeEventListener('keydown',onKey,true);};const onKey=e=>{if(['Escape','Enter','Space'].includes(e.code)){e.preventDefault();e.stopPropagation();close();}};
   el.querySelector('button').onclick=close;addEventListener('keydown',onKey,true);setTimeout(()=>{if(el.isConnected)close();},14000);
  }
- function update(dt,actor,travelMode,{running=true}={}){
+ function update(dt,actor,travelMode,{running=true,cinematic=false}={}){ // cinematic: ?cinematic drives by, it collects nothing
   player=actor;started=running;if(!actor)return;
   // (The morning paper no longer opens by itself at the start: players found the pop-up confusing. paper() still shows it.)
   {save.nisser??=[];const {m,q,v,one,zero}=NT,now=performance.now()/1000;
-   for(const n of nisser){const got=save.nisser.includes(n.i);if(!got&&running&&Math.hypot(n.p[0]-actor.x,n.p[1]-actor.z)<2.6){save.nisser.push(n.i);save.money+=ERA==='h'?24:150;persist();banner('Nisse found!',`${save.nisser.length} of ${nisser.length} · +${ERA==='h'?24:150} ${UNIT}`,'pass');}
+   for(const n of nisser){const got=save.nisser.includes(n.i);if(!got&&running&&!cinematic&&Math.hypot(n.p[0]-actor.x,n.p[1]-actor.z)<2.6){save.nisser.push(n.i);save.money+=ERA==='h'?24:150;persist();banner('Nisse found!',`${save.nisser.length} of ${nisser.length} · +${ERA==='h'?24:150} ${UNIT}`,'pass');}
     nisseMesh.setMatrixAt(n.i,m.compose(v.set(n.p[0],groundAt(n.p[0],n.p[1])+.05+Math.abs(Math.sin(now*2+n.i))*.12,n.p[1]),q.setFromAxisAngle(THREE.Object3D.DEFAULT_UP,now*.8+n.i),save.nisser.includes(n.i)?zero:one));}
    nisseMesh.instanceMatrix.needsUpdate=true;}
   if(travelMode!==mode){mode=travelMode;routeFor=null;}
@@ -339,7 +339,7 @@ export function createCopenhagenGame({scene,city,mobilityData,cityData,toast,sou
    if(save.active){
     const f=frontier();f.filter(k=>!q.steps[k].clue).slice(0,5).forEach((k,i)=>{const s=q.steps[k];mkQ[i].visible=true;mkQ[i].position.set(s.p[0],groundAt(...s.p),s.p[1]);mkQ[i].children[1].scale.setScalar(pulse);});
     const clue=f.find(k=>q.steps[k].clue);if(clue!=null&&save.active.shown!==clue&&!journalOpen){save.active.shown=clue;showTreasure();}
-    for(const k of f){const s=q.steps[k];if(dist(s.p,here)>(s.r||11))continue;
+    for(const k of f){if(trailer||cinematic)break;const s=q.steps[k];if(dist(s.p,here)>(s.r||11))continue;
      save.active.done.push(k);routeFor=null;
      if(s.card){if(!save.lore.includes(q.id+':'+k))save.lore.push(q.id+':'+k);showLore(q,s.card);}else if(s.toast)toast(`${s.toast[0]}. ${s.toast[1]}`);
      if(save.active.done.length>=q.steps.length)endSaga(true);persist();break;}

@@ -1140,7 +1140,7 @@ function frame(now){
   }
   knockables?.update(car);streetLife.update(dt,car);tramRenderer.update(car);cyclistRenderer.update(car);npcScooterRenderer.update(car,dt);policeRenderer.update(dt);roadblock?.update(dt,car);
   if(police.message){toast(police.message);police.message=null;}
-  if(cph&&car)cph.update(dt,car,travel.mode,{running:started});if(carriage&&car)carriage.userData.update(car.speed||0,dt);coaches?.update(groundAt,dt);parkedCars?.update(car);seasonal?.update(dt,car);boats?.update(dt,car);harbourBath?.update(dt,car);landmarks?.update(dt);trains?.update(dt);cafeGuests?.update(dt,car);periodLife?.update(dt,car);
+  if(cph&&car)cph.update(dt,car,travel.mode,{running:started,cinematic:!!cinematic});if(carriage&&car)carriage.userData.update(car.speed||0,dt);coaches?.update(groundAt,dt);parkedCars?.update(car);seasonal?.update(dt,car);boats?.update(dt,car);harbourBath?.update(dt,car);landmarks?.update(dt);trains?.update(dt);cafeGuests?.update(dt,car);periodLife?.update(dt,car);
  }else if(ready&&police?.busted){policeRenderer.update(dt);roadblock?.update(dt,car);if(finale.cinematicStep(dt,roadblock?.playing)){$('busted-overlay').classList.toggle('live',!!roadblock?.active);$('busted-overlay').hidden=false;$('busted-continue').focus();}} // arrest cinematic: strobes keep flashing, then the end screen
  if(car){
    speedometer.update(car,dt,{mode:travel.mode});
@@ -1225,8 +1225,8 @@ function frame(now){
  if(ready)speciesTrees?.update(focus,{high:camera.position.y-groundAt(focus.x,focus.z)>22}); // every frame (cheap until the focus moves 8 m): waiting for tile loads made near trees pop in late
  if(now-lastTile>1200&&ready&&!switchingStart){surfaceStreamer?.update(car,{radius:1000,aheadSeconds:12});if(started)surfaceStreamer?.evictFar(car,1700,m=>{if(m){cityModel.remove(m);surfaceMeshes.delete(m);m.geometry.dispose();}}); /* street surfaces far behind are unloaded (they reload on return): memory stayed growing with exploration */extensionStreamer?.update(car);updateTiles().catch(handleTileError);lastTile=now;}
  // The radio plays while you drive today's car with the sound on, and its now-playing card is on screen exactly then.
- const radioOn=!!radio&&(cineRadio||sound&&started&&!paused&&!mapOpen&&travel?.mode==='car'&&city?.id==='copenhagen'); /* ?cinematic's radio shot shows the card */
- {const c=$('radio-now');if(c.hidden===radioOn){c.hidden=!radioOn;if(radioOn)flashRadio();}}
+ const radioOn=!!radio&&sound&&started&&!paused&&!mapOpen&&travel?.mode==='car'&&city?.id==='copenhagen';
+ {const c=$('radio-now'),shown=radioOn||cineRadio;if(c.hidden===shown){c.hidden=!shown;if(shown)flashRadio();}} /* ?cinematic's radio shot shows the card (silent unless the sound is on) */
  // Sound never stops the game: an audio error (a browser's Web Audio quirk) is logged once and that frame's sound skipped.
  try{
  radio?.update(dt,{on:radioOn}); // getting in announces the station: the card shows what is on
