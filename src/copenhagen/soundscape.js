@@ -12,7 +12,10 @@ export function createSoundscape(ac,{era=null}={}){
  const tyre=loop(noiseBuf),tBp=ac.createBiquadFilter(),tG=ac.createGain();tBp.type='bandpass';tBp.frequency.value=700;tBp.Q.value=.6;tG.gain.value=0;tyre.connect(tBp);tBp.connect(tG);tG.connect(out);
  // city bed
  const bed=loop(noiseBuf),bLp=ac.createBiquadFilter(),bG=ac.createGain();bLp.type='lowpass';bLp.frequency.value=era===1760?260:380;bG.gain.value=era===1760?.05:.07;bed.connect(bLp);bLp.connect(bG);bG.connect(out);
- const ping=(f,t0,dur,vol,type='sine')=>{const o=ac.createOscillator(),g=ac.createGain();o.type=type;o.frequency.value=f;g.gain.setValueAtTime(0,t0);g.gain.linearRampToValueAtTime(vol,t0+.005);g.gain.exponentialRampToValueAtTime(.0001,t0+dur);o.connect(g);g.connect(out);o.start(t0);o.stop(t0+dur+.05);};
+ // Web Audio throws on a negative or non-finite time, and that error stopped the game: every scheduled note starts
+ // no earlier than now (currentTime still reads 0 for the first frames while the audio device starts up).
+ const when=t=>Number.isFinite(t)?Math.max(t,ac.currentTime):ac.currentTime;
+ const ping=(f,t0,dur,vol,type='sine')=>{t0=when(t0);const o=ac.createOscillator(),g=ac.createGain();o.type=type;o.frequency.value=f;g.gain.setValueAtTime(0,t0);g.gain.linearRampToValueAtTime(vol,t0+.005);g.gain.exponentialRampToValueAtTime(.0001,t0+dur);o.connect(g);g.connect(out);o.start(t0);o.stop(t0+dur+.05);};
  const bell=()=>{const t=ac.currentTime,f=2400+Math.random()*500;ping(f,t,.9,.05);ping(f*2.76,t,.5,.02);ping(f,t+.16,.9,.045);ping(f*2.76,t+.16,.5,.018);};
  const hoof=(v)=>{const t=ac.currentTime,s=ac.createBufferSource(),bp=ac.createBiquadFilter(),g=ac.createGain();s.buffer=noiseBuf;bp.type='bandpass';bp.frequency.value=900+Math.random()*500;bp.Q.value=3;g.gain.setValueAtTime(v,t);g.gain.exponentialRampToValueAtTime(.0001,t+.09);s.connect(bp);bp.connect(g);g.connect(out);s.start(t,Math.random());s.stop(t+.12);};
  let hornG=null;
@@ -28,12 +31,12 @@ export function createSoundscape(ac,{era=null}={}){
  const CHORDS=era===1760?[[50,57,62,66],[55,59,62,67],[57,61,64,69],[50,57,62,66],[52,55,59,64],[57,61,64,67],[50,54,57,62],[57,61,64,69]]:[[41,52,57,60,64],[45,52,55,60,64],[38,50,53,57,64],[46,50,53,57,62]];
  const SCALE=era===1760?[62,64,66,67,69,71,73,74,76,78]:[65,67,69,72,74,76,77,79,81,84];
  const BAR=era===1760?2.4:3.2;
- function padNote(f,t0,dur,vol){const o1=ac.createOscillator(),o2=ac.createOscillator(),lp=ac.createBiquadFilter(),g=ac.createGain();o1.type='triangle';o2.type='sine';o1.frequency.value=f;o2.frequency.value=f*1.003;lp.type='lowpass';lp.frequency.value=900;
+ function padNote(f,t0,dur,vol){t0=when(t0);const o1=ac.createOscillator(),o2=ac.createOscillator(),lp=ac.createBiquadFilter(),g=ac.createGain();o1.type='triangle';o2.type='sine';o1.frequency.value=f;o2.frequency.value=f*1.003;lp.type='lowpass';lp.frequency.value=900;
   g.gain.setValueAtTime(0,t0);g.gain.linearRampToValueAtTime(vol,t0+dur*.35);g.gain.setValueAtTime(vol,t0+dur*.7);g.gain.linearRampToValueAtTime(0,t0+dur*1.05);o1.connect(lp);o2.connect(lp);lp.connect(g);g.connect(mus);o1.start(t0);o2.start(t0);o1.stop(t0+dur*1.1);o2.stop(t0+dur*1.1);o1.onended=()=>{o1.disconnect();o2.disconnect();lp.disconnect();g.disconnect();};}
- function pluck(f,t0,vol){const o=ac.createOscillator(),g=ac.createGain(),lp=ac.createBiquadFilter();o.type=era===1760?'sawtooth':'triangle';o.frequency.value=f;lp.type='lowpass';lp.frequency.setValueAtTime(era===1760?3200:2400,t0);lp.frequency.exponentialRampToValueAtTime(500,t0+.6);
+ function pluck(f,t0,vol){t0=when(t0);const o=ac.createOscillator(),g=ac.createGain(),lp=ac.createBiquadFilter();o.type=era===1760?'sawtooth':'triangle';o.frequency.value=f;lp.type='lowpass';lp.frequency.setValueAtTime(era===1760?3200:2400,t0);lp.frequency.exponentialRampToValueAtTime(500,t0+.6);
   g.gain.setValueAtTime(0,t0);g.gain.linearRampToValueAtTime(vol,t0+.006);g.gain.exponentialRampToValueAtTime(.0001,t0+(era===1760?.7:1.1));o.connect(lp);lp.connect(g);g.connect(mus);g.connect(echo);o.start(t0);o.stop(t0+1.2);o.onended=()=>{o.disconnect();lp.disconnect();g.disconnect();};}
  let musT=0,bar=0,musicOn=(()=>{try{return localStorage.getItem('cph-music')!=='0';}catch{return true;}})(),lastNote=4;
- function scheduleMusic(){const t=ac.currentTime;if(musT<t)musT=t+.1;
+ function scheduleMusic(){const t=ac.currentTime;if(!(musT>t+.05))musT=t+.1; // also at t=0 (musT starts at 0, and the first melody note's jitter went below zero)
   while(musT<t+1.5){const ch=CHORDS[bar%CHORDS.length];
    if(era!==1760)ch.forEach((m,i)=>padNote(mtof(m),musT,BAR,i===0?.03:.016));else{padNote(mtof(ch[0]-12),musT,BAR,.03);ch.slice(1).forEach((m,i)=>pluck(mtof(m),musT+i*.12,.012));}
    const steps=era===1760?6:8;for(let k=0;k<steps;k++){if(Math.random()<(era===1760?.62:.42)){lastNote=Math.max(0,Math.min(SCALE.length-1,lastNote+Math.round((Math.random()-.5)*4)));pluck(mtof(SCALE[lastNote]),musT+k*BAR/steps+(Math.random()-.5)*.02,era===1760?.018:.022);}}
