@@ -326,3 +326,19 @@ test('a bridge deck drawn over the water carries whatever drives onto it',()=>{
  assert.equal(raiseBridgeDecks([{rings:[[[-14,-3],[14,-3],[14,3],[-14,3]]],y:.035}],wet),0,'raising twice changes nothing');
  setTerrain(null);
 });
+
+test('paving over the mapped water is dropped, but not on a bridge deck (the deck keeps the street\'s own surface)', async () => {
+ const {buildSurfaceTile}=await import('../src/surface-tiles.js');
+ // a canal across x in [-10,10] at level 0; the bank at 2 m; a strip of paving from x=-30 to 30 at z in [0,6] (stride 6: xyz rgb)
+ const size=41,cell=2,extent=40,ground=new Float32Array(size*size),water=new Float32Array(size*size);
+ for(let j=0;j<size;j++)for(let i=0;i<size;i++){const x=i*cell-extent,k=j*size+i;ground[k]=Math.abs(x)<10?2:2;water[k]=0;}
+ setTerrain({size,cell,extent,base:0,ground,water,lake:null});
+ const quad=(x0,x1,z0,z1)=>[x0,.02,z0,.5,.5,.5, x1,.02,z0,.5,.5,.5, x1,.02,z1,.5,.5,.5, x0,.02,z0,.5,.5,.5, x1,.02,z1,.5,.5,.5, x0,.02,z1,.5,.5,.5];
+ const floats=()=>new Float32Array([...quad(-30,-10,0,6),...quad(-10,10,0,6),...quad(10,30,0,6)]);
+ const canal=[{rings:[[[-10,-50],[10,-50],[10,50],[-10,50]]]}];
+ const count=g=>(g.index?g.index.count:g.attributes.position.count)/3;
+ const dry=count(buildSurfaceTile(floats(),[],[])),cut=count(buildSurfaceTile(floats(),canal,[])),deck=count(buildSurfaceTile(floats(),canal,[{rings:[[[-12,-1],[12,-1],[12,7],[-12,7]]]}]));
+ assert.ok(cut<dry,`paving over the canal is dropped (${cut} of ${dry} triangles left)`);
+ assert.equal(deck,dry,'on the bridge deck it stays');
+ setTerrain(null);
+});
