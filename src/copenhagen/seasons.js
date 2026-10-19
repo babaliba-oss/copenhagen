@@ -85,7 +85,7 @@ export function createSeasonalDecor(season,{buildings=[],world,places=[],cafes=[
   const trees=[];for(const p of squares){const set=TREE_SPOTS[p.name];if(set&&!world.buildings.at(...set)&&!world.roads.at(...set)){trees.push([set[0],set[1],r()*6.28]);anchors[p.name]=set;continue;}
    for(let k=0;k<40;k++){const a=r()*6.28,d=r()*18,x=p.x+Math.cos(a)*d,z=p.z+Math.sin(a)*d;if(onPavement(x,z)||(!world.roads.at(x,z)&&!world.buildings.at(x,z))){trees.push([x,z,r()*6.28]);anchors[p.name]=[x,z];break;}}}
   // a faint green glow keeps the cone from reading as a black silhouette at night
-  instanced(treeGeometry(),new THREE.MeshStandardMaterial({vertexColors:true,roughness:.8,emissive:'#123d20',emissiveIntensity:.9}),trees,'Christmas trees',{range:900});
+  instanced(treeGeometry(),new THREE.MeshStandardMaterial({vertexColors:true,roughness:.8,emissive:'#123d20',emissiveIntensity:.35}),trees,'Christmas trees',{range:900});
   instanced(new THREE.OctahedronGeometry(.62),glow('#ffd76a'),trees.map(t=>[t[0],t[1],t[2],15.4]),'Christmas tree stars',{range:900});
   const lights=[];for(const t of trees)for(let k=0;k<200;k++){const h=2.2+r()*12.4,rad=(4.2*(1-(h-2)/13.5))*.99,a=r()*6.28;lights.push([t[0]+Math.cos(a)*rad,t[1]+Math.sin(a)*rad,0,h]);}
   instanced(new THREE.SphereGeometry(.1,6,4),glow('#ffe1a0'),lights,'Christmas tree lights',{range:900});
