@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';
 import {groundAt} from '../terrain.js';
+import {inWaterPolygons} from '../geo.js';
 
 // Seasonal dressing for today's Copenhagen, chosen by the date (or ?season=halloween|christmas|none):
 //  - Halloween (10 Oct - 2 Nov): carved pumpkins glowing on doorsteps along the pavements and by café tables,
@@ -69,14 +70,15 @@ export function createSeasonalDecor(season,{buildings=[],world,places=[],cafes=[
   // most pumpkins face the street (away from the wall); a few are turned
   for(const p of spots)if(p[3]===undefined)p[2]+=r()<.8?0:(r()-.5)*2;
   const sc=i=>.8+((i*7919)%13)/13*.7;
-  instanced(pumpkinGeometry(),solid,spots,'Halloween pumpkins',{scale:sc});
+  // lit from inside: a warm glow through the shell reads from any side at night (the face alone only shows head-on)
+  instanced(pumpkinGeometry(),new THREE.MeshStandardMaterial({vertexColors:true,roughness:.7,emissive:'#6a2a08',emissiveIntensity:.9}),spots,'Halloween pumpkins',{scale:sc});
   instanced(faceGeometry(),glow('#ffb238'),spots,'Pumpkin faces',{scale:sc});
   // orange string lights over Nyhavn and the café streets: bulbs along a catenary between pavement points
   const bulbs=[];
   // strings span a street from facade to facade: both ends open ground with a wall just beyond, no house in between
   for(const pl of places.filter(p=>/Nyhavn|Gråbrødre|Kongens|Strøget|Amagertorv|Rundetårn/.test(p.name||''))){let made=0;
    for(let k=0;k<400&&made<10;k++){const a=r()*6.28,d=r()*120,x0=pl.x+Math.cos(a)*d,z0=pl.z+Math.sin(a)*d,dir=r()*6.28,dx=Math.cos(dir),dz=Math.sin(dir);
-    if(!open(x0,z0)||!world.buildings.at(x0-dx*1.2,z0-dz*1.2))continue;let L=0;for(let t=1;t<22;t+=.5){if(!open(x0+dx*t,z0+dz*t)){L=t;break;}}if(L<6||L>20)continue;L-=.6;
+    if(!open(x0,z0)||!world.buildings.at(x0-dx*1.2,z0-dz*1.2))continue;let L=0;for(let t=1;t<22;t+=.5){const x=x0+dx*t,z=z0+dz*t;if(!open(x,z)||inWaterPolygons(world.water,x,z)){L=t;break;}}if(L<6||L>20)continue;L-=.6; // facade to facade, or facade to the quay edge (Nyhavn's promenade)
     for(let j=0;j<=14;j++){const t=j/14;bulbs.push([x0+dx*L*t,z0+dz*L*t,0,5.2-Math.sin(t*Math.PI)*.9]);}made++;}}
   instanced(new THREE.SphereGeometry(.07,6,4),glow('#ff8a1c'),bulbs,'Halloween string lights');
  }
