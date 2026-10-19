@@ -14,6 +14,8 @@ Today:
 python3 scripts/pbf-to-overpass.py Copenhagen.osm.pbf copenhagen   # raw cache in data/raw/cities/copenhagen
 node scripts/city-build.mjs copenhagen                               # move .env.local aside to skip Mapillary here
 python3 scripts/kk-buildings.py bymodel3dkobenhavnbygningerdxf.zip copenhagen   # municipal LOD2 buildings, split into houses (see below)
+python3 scripts/kk-collision.py copenhagen        # footprints for the model's own houses (no OSM footprint): kk-footprints.json,
+                                                  # added to the collision set at load, so the car stops at them
 node scripts/surface-dissolve.mjs copenhagen      # street surfaces layered by road class, trimmed at the water; cycle
                                                   # tracks tagged on roads (cycleway=track) drawn beside them, with a
                                                   # painted bicycle every 40 m (cycle-marks.json)
