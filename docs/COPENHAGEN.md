@@ -153,7 +153,8 @@ Notes:
   it loads: `flatten_model.py <scene.gltf> /tmp/dog_flat.glb tris=1800 k=6 length=0.8 yaw=180`, then
   `scripts/models/dog.py /tmp/dog_flat.glb public/models/animals/dog.glb` cuts it into a body and four legs (pivots and the
   collar in the extras) and greys the coat; the legs swing in diagonal pairs at the walker's trot and each dog's coat
-  takes its colour from the palette. Walkers with a dog or a pram stay procedural figures (the rigged ones had none).
+  takes its colour from the palette; a rigged or baked walker with a dog gets the model dog at heel (`drawLooseDog`).
+  Walkers with a pram stay procedural figures.
 - Trees (`src/tree-species.js`, `src/ez-trees.js`): within 95 m of the player the broadleaf trees are Daniel's tree models
   (`public/models/trees/linden.glb`, "Realistic Tree": limes, maples, ash, chestnuts and the smaller street trees;
   `oak.glb`, "Tree GN" without its vines: oaks, elms, willows), one BatchedMesh per model and part, scaled per tree to the
@@ -202,9 +203,14 @@ recordings cut together mid-drive. The screen goes black between shots while the
 ### Rigged people (src/skinned-people.js)
 
 The ten walkers nearest the camera within 45 m (five within 30 m on phones) and the player on foot are low-poly characters by Quaternius (CC0),
-one skinned mesh each with the material colours in its vertex colours; everyone further away, and anyone with a pose
-(phone, chat, bike), a fall, a suitcase or in a conversation, stays the procedural instanced figure (person-model.js).
-Riding, falling and carrying, the player is the procedural figure too. `?procedural` turns the rigged ones off.
+one skinned mesh each with the material colours in its vertex colours. The walkers beyond them, out to 140 m (70 m on
+phones), are the same characters baked (`createBakedCrowd`): each model's Walk clip is sampled at 12 frames (plus one
+Idle frame) into absolute morph targets, and one InstancedMesh per model blends the two frames either side of each
+walker's phase through a per-instance morph texture, so a crowd of 80 costs a dozen draw calls and no skinning. The
+models bake one at a time after load (30 ms apart), so the first frames are not held up. Anyone with a pose (phone,
+chat, bike), a fall, a suitcase, a pram, running or in a conversation stays the procedural instanced figure
+(person-model.js), as does everyone beyond the baked range. Riding, falling and carrying, the player is the procedural
+figure too. `?procedural` turns the rigged and baked ones off.
 - Files: `public/models/people/<name>.glb.gz` (gzipped GLB, unzipped in the browser: Cloudflare serves .glb uncompressed).
   Today uses twelve characters (with Daniel's cool-man, pmariano and a woman in a party dress); 1760 his Victorian woman, the merchant's wife and
   `W_Medieval` for the women, his costumes for the men in town and the ship boy and six sailors (below); the player is

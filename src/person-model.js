@@ -512,6 +512,13 @@ export function setDogModel(model){
   m.instanceMatrix.setUsage(THREE.DynamicDrawUsage);m.instanceColor=new THREE.InstancedBufferAttribute(new Float32Array(DOGS.cap*3),3).setUsage(THREE.DynamicDrawUsage);DOGS.group.add(m);return m;});
 }
 const dogRoot=new THREE.Matrix4(),dogLeg=new THREE.Matrix4(),dogTint=new THREE.Color();
+// Walkers drawn rigged or baked (skinned-people.js) bring their dog here: on their left, a little ahead, at the trot.
+const LOOSE={list:[],n:0},dogColour=new THREE.Color();
+export function drawLooseDog(walker,look){ // walker: {x,z,y,heading,phase,walking}
+ if(!DOGS.meshes||look?.accessory!=='dog')return;const D=look.dogSize||1,q=(look.height||1.72)/1.74,lx=-.6*q,lz=-.62*q,c=Math.cos(walker.heading),s=Math.sin(walker.heading);
+ const w=walker.walking?1:0,ph=walker.phase*Math.PI*4,d=LOOSE.list[LOOSE.n]??=({});LOOSE.n++;dogColour.set(look.dogColor||'#5a4030');
+ Object.assign(d,{x:walker.x+lx*c+lz*s,y:walker.y+.01*D*Math.abs(Math.sin(ph))*w,z:walker.z-lx*s+lz*c,c,s,D,ph,w,rgb:[dogColour.r,dogColour.g,dogColour.b]});
+}
 function writeDog(d,i){
  const e=dogRoot.elements,D=d.D;e.fill(0);e[0]=d.c*D;e[2]=-d.s*D;e[5]=D;e[8]=d.s*D;e[10]=d.c*D;e[12]=d.x;e[13]=d.y;e[14]=d.z;e[15]=1;
  DOGS.meshes[0].setMatrixAt(i,dogRoot);
@@ -555,6 +562,7 @@ export function flushPeople(scene){
  for(const a of [SHARED.faceState,SHARED.faceShape]){a.clearUpdateRanges();if(sharedAt[1])a.addUpdateRange(0,sharedAt[1]*4);a.needsUpdate=true;}
  if(DOGS.meshes){if(DOGS.group.parent!==scene)scene.add(DOGS.group);let n=0;
   for(const b of SHARED.batches)if(b.take&&b.dogs)for(let i=0;i<b.dogs.n&&n<DOGS.cap;i++)writeDog(b.dogs.list[i],n++);
+  for(let i=0;i<LOOSE.n&&n<DOGS.cap;i++)writeDog(LOOSE.list[i],n++);LOOSE.n=0;
   for(const m of DOGS.meshes){m.count=n;m.instanceMatrix.needsUpdate=true;m.instanceColor.needsUpdate=true;}}
 }
 export function createPersonBatch(capacity,options={}){
