@@ -18,6 +18,9 @@ export const SIT={hipY:.56,hipZ:-.04,lean:.1,feet:[[.13,.09,.42],[.13,.09,.36]],
 // player's own bike (a = the crank angle, as the bike's cranks turn) and e-scooter (one foot ahead of the other).
 export const rideSpec=(b,a=0)=>({hipY:b.hipY,hipZ:-(b.hipZ||0),lean:.35,crank:{y:b.crankY,z:-(b.crankZ||0),r:b.crankR,x:b.pedalX??.13,a},hands:[[b.barX,b.barY,-b.barZ],[b.barX,b.barY,-b.barZ]]});
 export const standSpec=sc=>({hipY:sc.hipY,hipZ:0,lean:.15,feet:[[.07,.08,-sc.frontZ],[.07,.08,-sc.backZ]],hands:[[sc.barX,sc.barY,-sc.barZ],[sc.barX,sc.barY,-sc.barZ]]});
+// Standing composed (a character waiting where the camera comes close: H.C. Andersen): hips where Idle has them, the
+// feet under them a hand apart, the arms where Idle has them. From the rig's own Idle measurements (measure).
+export const standSpecFrom=(m,s)=>{const hy=m.hip.y/s,hz=m.hip.z/s,ay=Math.min(m.ankleL.y,m.ankleR.y)/s,w=(p,x)=>[Math.abs(p.x)/s,p.y/s,p.z/s];return {hipY:hy,hipZ:hz,lean:0,feet:[[.11,ay,hz+.03],[.11,ay,hz-.01]],hands:[w(m.wristL),w(m.wristR)]};}; // the arms as Idle holds them
 const NAMES={
  thighL:['UpperLeg.L','LeftUpLeg'],shinL:['LowerLeg.L','LeftLeg'],footL:['Foot.L','LeftFoot'],
  thighR:['UpperLeg.R','RightUpLeg'],shinR:['LowerLeg.R','RightLeg'],footR:['Foot.R','RightFoot'],
@@ -64,7 +67,7 @@ export function pose(root,bones,m,spec,s){
  // lean the trunk forward about the model's X, mostly low in the back, and bring the head back up; at least spec.lean,
  // more where the arms would not reach the hands' targets (the characters' torsos and arms differ a lot)
  let lean=spec.lean||0;const X=new THREE.Vector3(1,0,0);
- if(spec.hands&&bones.spine1){
+ if(spec.hands&&bones.spine1&&lean>0){ // (a pose with no lean of its own keeps its back straight)
   const base=wpos(bones.spine1,new THREE.Vector3()),sh=[wpos(bones.armL,new THREE.Vector3()),wpos(bones.armR,new THREE.Vector3())];
   const reach=Math.min(m.upperLenL+m.foreLenL,m.upperLenR+m.foreLenR)*.97,R=new THREE.Quaternion();
   const want=spec.hands.map((h,i)=>new THREE.Vector3((i?-1:1)*h[0]*s,h[1]*s,h[2]*s).sub(off));

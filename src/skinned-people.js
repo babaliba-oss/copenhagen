@@ -3,7 +3,7 @@ import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {clone as cloneSkinned} from 'three/addons/utils/SkeletonUtils.js';
 import {groundAt} from './terrain.js';
 import {smoothHeading} from './person-model.js';
-import {rigOf,measure,pose,RIDE,SIT,POSE_HEIGHT} from './people-poses.js';
+import {rigOf,measure,pose,RIDE,SIT,POSE_HEIGHT,standSpecFrom} from './people-poses.js';
 import {MeshoptSimplifier} from 'meshoptimizer';
 let simplifier=null;MeshoptSimplifier.ready.then(()=>{simplifier=MeshoptSimplifier;}).catch(()=>{});
 import {safeFlatShading} from './safe-flat.js';
@@ -40,9 +40,12 @@ export async function loadPeopleModels(base,names){
 const RUN=2.6,IDLE=.15,FADE=.25;
 // One rigged figure standing in for a single character (H.C. Andersen): its own scene (no clone), Idle when it stands,
 // Walk or Run when it moves. update(dt, actor) follows the actor's position, heading and speed.
-export function createRiggedFigure(model,{height=1.8}={}){
- const root=model.scene,mixer=new THREE.AnimationMixer(root),actions={},gait={};let state=null;
+// stand: when he stands still, a composed stance on top of Idle (feet under the hips, people-poses.js) instead of the
+// retargeted Idle's wide, one-foot-back stance, which looked odd on Andersen in his close-up.
+export function createRiggedFigure(model,{height=1.8,stand=false}={}){
+ const root=model.scene,mixer=new THREE.AnimationMixer(root),actions={},gait={};let state=null,still=null;
  for(const k of ['Walk','Run','Idle'])if(model.clips[k])actions[k]=mixer.clipAction(model.clips[k]);
+ if(stand&&actions.Idle){actions.Idle.play();mixer.setTime(0);root.updateMatrixWorld(true);const bones=rigOf(root);if(bones){const m=measure(bones),s=model.height/POSE_HEIGHT;still={bones,s,m,spec:standSpecFrom(m,s)};}mixer.stopAllAction();}
  const k=height/model.height;root.scale.setScalar(k);root.name=`Rigged ${model.name}`;
  return {root,update(dt,a){
   if(!a||!Number.isFinite(a.x)){root.visible=false;return;}root.visible=true;
@@ -50,7 +53,11 @@ export function createRiggedFigure(model,{height=1.8}={}){
   const speed=Math.abs(a.speed||0),next=a.running||speed>RUN?'Run':speed>IDLE&&a.walking!==false?'Walk':'Idle';
   if(next!==state&&actions[next]){actions[next].reset().setEffectiveWeight(1).play();if(state&&actions[state])actions[state].crossFadeTo(actions[next],FADE,false);state=next;}
   const act=actions[state];if(act)act.timeScale=state==='Walk'?THREE.MathUtils.clamp(speed/(1.25*k),.55,1.7):state==='Run'?THREE.MathUtils.clamp(speed/(3.4*k),.7,1.6):1;
-  mixer.update(dt);}};
+  mixer.update(dt);
+  if(still&&state==='Idle'&&actions.Idle.getEffectiveWeight()>.99){ // posed at the origin, then put back where he stands
+   const x=root.position.x,y=root.position.y,z=root.position.z,h=root.rotation.y;root.position.set(0,0,0);root.rotation.set(0,0,0);root.scale.setScalar(1);root.updateMatrixWorld(true);
+   const off=pose(root,still.bones,still.m,still.spec,still.s),c=Math.cos(h),sn=Math.sin(h);
+   root.position.set(x+(off.x*c+off.z*sn)*k,y+off.y*k,z+(-off.x*sn+off.z*c)*k);root.rotation.set(0,h,0);root.scale.setScalar(k);}}};
 }
 // A figure that reads at a distance (H.C. Andersen at Nyhavn): his near-black coat and trousers came out as one dark
 // shape with a white shirt in it. The darkest colours are lifted into a deep warm grey so the coat's folds, lapels and
