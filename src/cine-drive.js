@@ -30,14 +30,27 @@ export function leadCar(p,cars){
 // front: car centre to its nose (a coach's horses reach 3.3 m ahead); half: half its width.
 export function createCineDrive(roads,{from,toward=null,speed=12,turnSpeed=.45,front=2.3,half=.95}={}){
  const start=placeOnRoads(roads,from,toward);if(!start)return null;
- let edge=start.edge,s=start.s,v=speed,distance=0;const visited=new Set([edge.id]);
+ let edge=start.edge,s=start.s,v=speed,distance=0;const visited=new Set([edge.id]),past=[]; // past: the edges behind, nearest first
  const choose=e=>{
   let options=roads.outgoing[e.to].filter(o=>o.to!==e.from&&o.length>.3);if(!options.length)options=roads.outgoing[e.to];if(!options.length)return null;
   const end=e.points.at(-1),there=toward&&Math.hypot(toward[0]-end[0],toward[1]-end[1])<25,want=toward&&!there?unit(toward[0]-end[0],toward[1]-end[1]):endDir(e),ahead=endDir(e);
   let best=null,score=Infinity;for(const o of options){const d=startDir(o);const sc=angle(want,d)+.35*angle(ahead,d)+(visited.has(o.id)?2:0);if(sc<score){score=sc;best=o;}}
   return best;};
  let next=choose(edge);
- const pose=()=>routePoint(edge,s,edge.lane??0,next?startDir(next):undefined);
+ // The pose is smooth across junctions, frame to frame: the heading is the road's direction over 2.5 m either side of the
+ // car (back along the edges it came by), and a change of lane offset between two edges (a one-way street's lane runs
+ // near the centreline, a two-way street's to the right) is eased over SHIFT metres, the car turning into the drift.
+ // Taking each edge's own direction and lane snapped the car up to 56 degrees and 1.8 m sideways in one frame.
+ const SHIFT=14,BLEND=2.5;let shiftFrom=edge.lane??0,shiftTo=shiftFrom,shiftAt=SHIFT;
+ const offset=()=>{const t=Math.min(1,shiftAt/SHIFT);return shiftFrom+(shiftTo-shiftFrom)*t*t*(3-2*t);};
+ const drift=()=>{if(shiftAt>=SHIFT)return 0;const t=shiftAt/SHIFT;return (shiftTo-shiftFrom)*6*t*(1-t)/SHIFT;}; // sideways metres per metre
+ const along=d=>{ // the centreline d metres along the route from the car (behind it: the edges it came along)
+  if(d<0){let e=edge,q=s+d;for(let j=0;q<0&&j<past.length;j++){e=past[j];q+=e.length;}return routePoint(e,Math.max(0,q),0);}
+  let e=edge,n=next,q=s+d;while(q>e.length){const nn=n||choose(e);if(!nn)return routePoint(e,e.length,0);q-=e.length;e=nn;n=choose(e);}
+  return routePoint(e,q,0);};
+ const pose=()=>{const c=along(0),a=along(-BLEND),b=along(BLEND);let dx=b.x-a.x,dz=b.z-a.z;const l=Math.hypot(dx,dz);
+  if(l<1e-6)return routePoint(edge,s,offset(),next?startDir(next):undefined);dx/=l;dz/=l;
+  const o=offset(),k=drift();return {x:c.x-dz*o,z:c.z+dx*o,heading:Math.atan2(-(dx-dz*k),-(dz+dx*k))};};
  // The route ahead without moving: lane poses every `every` m from `a` to `b` metres ahead of the car's centre (junction
  // choices beyond the next one are guessed the same way the car will make them).
  const route=(a,b,every=1)=>{const out=[];let e=edge,n=next,at=s;
@@ -63,8 +76,9 @@ export function createCineDrive(roads,{from,toward=null,speed=12,turnSpeed=.45,f
    let target=toEnd<18&&turn>.5?Math.max(speed*turnSpeed,speed*(1-turn/Math.PI)):speed;
    const b=blocked(obstacles);if(b)target=b.gap<2.5?0:Math.min(target,Math.max(0,b.speed+(b.gap-4)*.7));
    v+=(target-v)*Math.min(1,dt*(target<v?3.2:2.2));
-   s+=v*dt;distance+=v*dt;
-   while(s>edge.length){const n=next||choose(edge);if(!n){s=edge.length;v=0;break;}s-=edge.length;edge=n;visited.add(edge.id);next=choose(edge);}
+   s+=v*dt;distance+=v*dt;shiftAt+=v*dt;
+   while(s>edge.length){const n=next||choose(edge);if(!n){s=edge.length;v=0;break;}s-=edge.length;past.unshift(edge);past.length=Math.min(past.length,8);edge=n;visited.add(edge.id);next=choose(edge);
+    const lane=edge.lane??0;if(Math.abs(lane-shiftTo)>.01){shiftFrom=offset();shiftTo=lane;shiftAt=0;}}
    return pose();
   }};
 }
