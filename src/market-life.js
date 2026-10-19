@@ -9,6 +9,15 @@ import {createBakedPeople,WALK_FRAMES} from './skinned-people.js';
 // as the baked characters, walking, standing or (café guests) seated, and the procedural figure only for the fallen,
 // the far and the tiny (a stand-in hidden behind a rigged figure).
 let bakedPeople=null;
+// The road index (world.roads, see setCrowdRoads): a car that keeps to the road only scares the crowd when it comes very close.
+let crowdRoads=null;export function setCrowdRoads(index){crowdRoads=index;}
+// Does the player's approach send a free-standing person running? Only a car (or the 1760 coach) does, moving at more
+// than 2 m/s: someone on foot, a bike or a scooter walks through a crowd without scattering it. A car that is on the
+// road scares people within 3.5 m; one off the road, on the square among them, within 7 m.
+export function crowdPanics(p,player){
+ if(!player||(player.travelMode??'car')!=='car'||Math.abs(player.speed||0)<=2)return false;
+ const d=Math.hypot(p.x-player.x,p.z-player.z);return d<(crowdRoads?.at?.(player.x,player.z)?3.5:7);
+}
 export function setBakedPeople(lib,{range=90,pick=p=>p.id}={}){bakedPeople=lib?{lib,range,pick,version:(bakedPeople?.version||0)+1}:null;}
 
 // Original geometry, photo-guided atmosphere rather than recorded individual people.
@@ -109,7 +118,7 @@ export function createInstancedPeople(records,options={}){
     if(!p.gaveUp&&!p.caught){p.gaveUp=true;options.onEvent?.('gave-up',p);}
     p.running=0;if(go(p.homeX,p.homeZ,1.2)>.3)continue;
     p.chaseUntil=0;p.gaveUp=false;p.caught=false;p.speed=0;p.heading=p.homeHeading??p.heading;continue;}
-   const distance=player?Math.hypot(p.x-player.x,p.z-player.z):Infinity,panic=player&&Math.abs(player.speed||0)>2&&distance<7;
+   const panic=crowdPanics(p,player);
    p.running=panic||p.panicUntil>time||p.scared?1:0;p.speed=0;
    let dx=0,dz=0;
    if(p.running&&(p.scared||player)){const from=p.scared||player;dx=p.x-from.x;dz=p.z-from.z;}

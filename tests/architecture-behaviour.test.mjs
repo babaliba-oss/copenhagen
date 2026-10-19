@@ -23,6 +23,14 @@ test('pedestrians run away from a car on a collision course, then calm down',()=
  for(let i=0;i<60;i++)sim.step(1/60,car);assert.ok(p.running);assert.ok(p.speed>3);assert.ok(p.z<0,'escape runs away, not toward the car');assert.equal(sim.world.roads.at(p.x,p.z),false);
  for(let i=0;i<240;i++)sim.step(1/60,{...car,speed:0});assert.equal(p.running,false);assert.ok(p.speed<2);
 });
+test('a car that keeps to the road does not set the pavement running; one about to mount the kerb, or off the road, does',()=>{
+ const walker=()=>{const sim=pedestrianWorld(),p=sim.people[0];Object.assign(p,{edge:sim.walks.edges[0],s:100,x:3,z:0,heading:Math.PI,speed:1});return [sim,p];};
+ let [sim,p]=walker();for(let i=0;i<60;i++)sim.step(1/60,{x:0,z:10,heading:0,speed:10});assert.equal(p.running,false,'driving past in the lane, 3 m from the kerb walker');
+ [sim,p]=walker();for(let i=0;i<60;i++)sim.step(1/60,{x:1.5,z:10,heading:0,speed:10});assert.ok(p.running,'swerving to 1.5 m of the walker');
+ [sim,p]=walker();for(let i=0;i<60;i++)sim.step(1/60,{x:3,z:10,heading:0,speed:4.5,travelMode:'walk'});assert.equal(p.running,false,'the player sprinting at them on foot');
+ [sim,p]=walker();for(let i=0;i<60;i++)sim.step(1/60,{x:3,z:10,heading:0,speed:6,travelMode:'bike'});assert.equal(p.running,false,'a bike');
+ [sim,p]=walker();for(let i=0;i<60;i++)sim.step(1/60,{x:3,z:10,heading:0,speed:10,travelMode:'car'});assert.ok(p.running,'the car up on the pavement');
+});
 test('walking routes cannot enter a carriageway except a designated crossing',()=>{
  const sim=pedestrianWorld();assert.equal(sim.walkable(0,0,{crossing:false}),false);assert.equal(sim.walkable(0,0,{crossing:true}),true);assert.equal(sim.walkable(3,0,{crossing:false}),true);assert.equal(sim.walkable(6,0,{crossing:false}),false);
  assert.equal(sim.safeWalkSegment({x:3,z:0},{x:1.5,z:0},{crossing:false}),false);

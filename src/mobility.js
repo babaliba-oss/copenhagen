@@ -44,11 +44,21 @@ export function signalGreen(edge,time){
  // Road edges carry their junction's own axes (lane-model.js); other edges fall back to north/south.
  return phaseGreen(edge.signal,edge.signalGroup??Math.abs(Math.cos(routePoint(edge,Math.max(0,edge.length-4),0).heading))>.707,time);
 }
-export function approachingPedestrian(person,car){
+export function approachingPedestrian(person,car,lateral=5.5){ // lateral: how far from the car's line the person counts as in its way
  const speed=Math.abs(car.speed||0);if(speed<2)return false;
  const vx=-Math.sin(car.heading||0)*car.speed,vz=-Math.cos(car.heading||0)*car.speed,dx=person.x-car.x,dz=person.z-car.z;
  const t=(dx*vx+dz*vz)/(speed*speed);
- return t>-.15&&t<2.2&&Math.hypot(dx-vx*Math.max(0,t),dz-vz*Math.max(0,t))<5.5&&Math.hypot(dx,dz)<Math.min(28,8+speed*1.7);
+ return t>-.15&&t<2.2&&Math.hypot(dx-vx*Math.max(0,t),dz-vz*Math.max(0,t))<lateral&&Math.hypot(dx,dz)<Math.min(28,8+speed*1.7);
+}
+// Whether the player's approach makes a walker run (flee below). Only a car (or the 1760 coach) does: on foot, on a bike
+// or a scooter the player passes without anyone running. A walker on the pavement beside a car that keeps to the road
+// runs only when the car would pass within 2 m (about to mount the kerb); a car off the road, on a square or the
+// pavement, sends anyone within 5.5 m of its line running. Before, a car driving down any street at more than 7 km/h
+// set the whole pavement running.
+export function threatens(person,player,roads){
+ if(player.travelMode&&player.travelMode!=='car')return false;
+ const lateral=roads?.at(player.x,player.z)&&!roads.at(person.x,person.z)?2:5.5;
+ return approachingPedestrian(person,player,lateral);
 }
 // Recycle a car that has made no real progress this long when it is away from the player (last resort).
 const STALLED_AFTER=40;
@@ -278,7 +288,7 @@ export class Mobility {
  }
  hold(a,seconds){if(a.walking)a.holdUntil=this.time+seconds;}
  flee(a,player){
-  const threatened=approachingPedestrian(a,player);
+  const threatened=threatens(a,player,this.world.roads);
   if(threatened){
    if(!a.running||this.time>(a.turnAfter||0)){
     const ahead=routePoint(a.edge,Math.min(a.edge.length,a.s+5),0),behind=routePoint(a.edge,Math.max(0,a.s-5),0),px=player.x-Math.sin(player.heading)*player.speed*.5,pz=player.z-Math.cos(player.heading)*player.speed*.5;

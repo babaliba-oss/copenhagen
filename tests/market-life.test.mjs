@@ -23,3 +23,17 @@ test('market geometry stays instanced and simulated movement remains within vali
  for(const p of m.people)assert.ok(safe(p.x,p.z),p.id);
  m.reset();assert.deepEqual(m.people.map(p=>[p.x,p.z]),start);
 });
+
+test('a free-standing crowd scatters only from a car, and only close by when the car keeps to the road', async () => {
+ const {crowdPanics,setCrowdRoads}=await import('../src/market-life.js');
+ const p={x:0,z:0};
+ setCrowdRoads({at:(x,z)=>Math.abs(z)<3}); // a road along z = 0 .. the square beyond
+ assert.equal(crowdPanics(p,{x:5,z:0,speed:6,travelMode:'car'}),false,'a car on the road, 5 m off');
+ assert.ok(crowdPanics(p,{x:3,z:0,speed:6,travelMode:'car'}),'a car on the road, 3 m off');
+ assert.ok(crowdPanics(p,{x:4,z:4,speed:6,travelMode:'car'}),'a car on the square, 5.7 m off');
+ assert.equal(crowdPanics(p,{x:4,z:4,speed:6}),true,'no travel mode: the player car');
+ assert.equal(crowdPanics(p,{x:2,z:5,speed:4.5,travelMode:'walk'}),false,'the player running through on foot');
+ assert.equal(crowdPanics(p,{x:2,z:5,speed:6,travelMode:'scooter'}),false,'a scooter');
+ assert.equal(crowdPanics(p,{x:2,z:5,speed:1.5,travelMode:'car'}),false,'a car creeping');
+ setCrowdRoads(null);assert.ok(crowdPanics(p,{x:5,z:0,speed:6,travelMode:'car'}),'without a road index every car counts');
+});
