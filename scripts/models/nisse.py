@@ -1,43 +1,47 @@
-"""The nisse (Daniel's scan, art/nisse.zip: a photographed felt nisse figurine, 252k triangles + 8k texture) -> the game's
-hidden nisser and Nissefar:  python3 scripts/models/nisse.py source/model.glb source/tex_u0_v0_diffuse.jpg public/models/nisse.glb
-Cuts off the round stand, bakes the texture into vertex colours, stands it on y=0 facing -Z, 1 m tall (the game scales it),
-then simplify with gltf-transform (weld; simplify --ratio 0.02 --error 0.004) and gzip.
+"""The nisse for the hidden nisser and Nissefar: "Gnome (Female) (Pig Tails)" by David Wigforss (CC BY-NC 4.0,
+sketchfab.com/3d-models/ba5c774d246b42d9bd916bf0e9f0552e: free for a free game; a commercial one would need another,
+e.g. the CC BY "Domesticated Garden Gnome" by schmoldt.art). Blender as a Python module:
+   python3 scripts/models/nisse.py <scene.gltf> public/models/nisse.glb && gzip -9 -n -f public/models/nisse.glb
+One textured mesh (position, normal, uv and its base-colour texture at 512 px, no normal map), 1 m tall, standing on
+y = 0 and facing -Z (the game scales it), as gait.js's loadOneMesh reads it.
 """
-import sys, json, struct, numpy as np, trimesh
-from PIL import Image
-src, texf, out = sys.argv[1:4]
-s = trimesh.load(src, force='scene'); T, gn = s.graph[s.graph.nodes_geometry[0]]
-m = s.geometry[gn].copy(); m.apply_transform(T)
-v = np.asarray(m.vertices); y0 = v[:, 1].min(); H = v[:, 1].max() - y0
-keep = (v[m.faces][:, :, 1].min(1) > y0 + 0.058 * H)  # the stand: everything below the boots
-m.update_faces(keep); m.remove_unreferenced_vertices()
-v = np.asarray(m.vertices); uv = np.asarray(m.visual.uv)
-img = np.asarray(Image.open(texf).convert('RGB').resize((2048, 2048), Image.LANCZOS), np.float32) / 255
-h, w = img.shape[:2]; px = np.clip((uv[:, 0] % 1) * (w - 1), 0, w - 1).astype(int); py = np.clip((1 - uv[:, 1] % 1) * (h - 1), 0, h - 1).astype(int)
-col = img[py, px]; col = np.where(col <= 0.04045, col / 12.92, ((col + 0.055) / 1.055) ** 2.4)
-base = v[:, 1].min(); top = v[:, 1].max(); S = 1 / (top - base)
-foot = v[v[:, 1] < base + 0.05 * (top - base)]; cx, cz = foot[:, 0].mean(), foot[:, 2].mean()
-P = np.stack([-(v[:, 0] - cx) * S, (v[:, 1] - base) * S, -(v[:, 2] - cz) * S], 1).astype(np.float32)  # turned to face -Z
-m2 = trimesh.Trimesh(P, m.faces, process=False); N = np.asarray(m2.vertex_normals, np.float32)
-F = np.asarray(m.faces, np.uint32).reshape(-1)
-attrs = {'POSITION': P, 'NORMAL': N, 'COLOR_0': col.astype(np.float32)}
-blob = b''; views = []; accs = []
-def add(arr, target, comp, count, typ, minmax=False):
-    global blob
-    while len(blob) % 4: blob += b'\0'
-    off = len(blob); data = arr.tobytes(); blob += data
-    views.append({'buffer': 0, 'byteOffset': off, 'byteLength': len(data), **({'target': target} if target else {})})
-    a = {'bufferView': len(views) - 1, 'componentType': comp, 'count': count, 'type': typ}
-    if minmax: a['min'] = arr.min(0).tolist(); a['max'] = arr.max(0).tolist()
-    accs.append(a); return len(accs) - 1
-prim = {'attributes': {k: add(a, 34962, 5126, len(a), 'VEC3', k == 'POSITION') for k, a in attrs.items()}, 'mode': 4}
-prim['indices'] = add(F, 34963, 5125, F.size, 'SCALAR')
-gltf = {'asset': {'version': '2.0'}, 'scene': 0, 'scenes': [{'nodes': [0]}], 'nodes': [{'mesh': 0, 'name': 'nisse'}], 'meshes': [{'name': 'nisse', 'primitives': [prim], 'extras': {'source': 'nisse scan (Daniel, art/nisse.zip)'}}],
-        'accessors': accs, 'bufferViews': views, 'buffers': [{'byteLength': len(blob)}]}
-js = json.dumps(gltf, separators=(',', ':')).encode()
-while len(js) % 4: js += b' '
-while len(blob) % 4: blob += b'\0'
-with open(out, 'wb') as f:
-    f.write(struct.pack('<III', 0x46546C67, 2, 12 + 8 + len(js) + 8 + len(blob))); f.write(struct.pack('<II', len(js), 0x4E4F534A)); f.write(js)
-    f.write(struct.pack('<II', len(blob), 0x004E4942)); f.write(blob)
-print('wrote', out, len(P), 'vertices', len(F) // 3, 'faces')
+import bpy, sys, math
+from mathutils import Matrix, Vector
+
+src, out = sys.argv[1], sys.argv[2]
+bpy.ops.wm.read_factory_settings(use_empty=True)
+bpy.ops.import_scene.gltf(filepath=src)
+meshes = [o for o in bpy.data.objects if o.type == 'MESH']
+for o in meshes:
+    o.data.transform(o.matrix_world)
+for o in meshes:
+    o.parent = None; o.matrix_world = Matrix.Identity(4)
+for o in list(bpy.data.objects):
+    if o.type != 'MESH': bpy.data.objects.remove(o, do_unlink=True)
+for o in bpy.data.objects: o.select_set(True)
+bpy.context.view_layer.objects.active = meshes[0]
+if len(meshes) > 1: bpy.ops.object.join()
+o = bpy.context.view_layer.objects.active; o.name = o.data.name = 'nisse'
+# Blender is Z up: the figure faces glTF +Z (Blender -Y); turn it half round so it faces glTF -Z, feet centred on the origin.
+o.data.transform(Matrix.Rotation(math.pi, 4, 'Z'))
+zs = [v.co.z for v in o.data.vertices]; z0, z1 = min(zs), max(zs)
+feet = [v.co for v in o.data.vertices if v.co.z < z0 + .08 * (z1 - z0)]
+cx, cy = sum(c.x for c in feet) / len(feet), sum(c.y for c in feet) / len(feet)
+s = 1 / (z1 - z0)
+o.data.transform(Matrix.Scale(s, 4) @ Matrix.Translation(Vector((-cx, -cy, -z0))))
+for a in list(o.data.color_attributes): o.data.color_attributes.remove(a)
+while len(o.data.uv_layers) > 1: o.data.uv_layers.remove(o.data.uv_layers[-1])
+# the base colour only, at 512 px
+for m in o.data.materials:
+    nt = m.node_tree
+    for n in list(nt.nodes):
+        if n.type == 'NORMAL_MAP' or (n.type == 'TEX_IMAGE' and n.image and 'normal' in n.image.name.lower()): nt.nodes.remove(n)
+    for n in nt.nodes:
+        if n.type == 'TEX_IMAGE' and n.image and max(n.image.size) > 512: n.image.scale(512, 512)
+    b = nt.nodes.get('Principled BSDF')
+    if b: b.inputs['Metallic'].default_value = 0; b.inputs['Roughness'].default_value = .75
+print('triangles', sum(len(p.vertices) - 2 for p in o.data.polygons), 'height', round(max(v.co.z for v in o.data.vertices), 3))
+kw = dict(filepath=out, export_format='GLB', use_selection=False, export_yup=True, export_apply=True, export_texcoords=True, export_normals=True,
+          export_tangents=False, export_materials='EXPORT', export_image_format='JPEG', export_animations=False)
+try: bpy.ops.export_scene.gltf(**kw, export_vertex_color='NONE')
+except TypeError: bpy.ops.export_scene.gltf(**kw)

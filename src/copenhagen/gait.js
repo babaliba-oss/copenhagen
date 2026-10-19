@@ -68,8 +68,8 @@ export function stepMotion(m,speed,dt){const v=Math.min(Math.abs(speed),14);m.ph
 export async function loadOneMesh(url){
  try{const r=await fetch(url);if(!r.ok)throw Error(`${url}: ${r.status}`);let bytes=await r.arrayBuffer();const m=new Uint8Array(bytes,0,2);
   if(m[0]===31&&m[1]===139)bytes=await new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer();
-  const gltf=await new GLTFLoader().parseAsync(bytes,'');let geometry=null;gltf.scene.traverse(o=>{if(o.isMesh&&!geometry)geometry=o.geometry;});
-  const json=gltf.parser.json;return geometry?{geometry,extras:json.meshes?.[0]?.extras||json.nodes?.[0]?.extras||{}}:null;
+  const gltf=await new GLTFLoader().parseAsync(bytes,'');let geometry=null,map=null;gltf.scene.traverse(o=>{if(o.isMesh&&!geometry){geometry=o.geometry;map=o.material?.map||null;}});
+  const json=gltf.parser.json;return geometry?{geometry,map,extras:json.meshes?.[0]?.extras||json.nodes?.[0]?.extras||{}}:null; // map: the mesh's base-colour texture, if it has one
  }catch(e){console.warn('Model not loaded, the old one kept:',url,e?.message||e);return null;}
 }
 // The armoured horse (armored-horse.glb.gz, scripts/models/armored_horse.py): colour and `_leg` per vertex, leg pivots in extras.

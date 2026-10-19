@@ -27,7 +27,7 @@ const ANIMALS={
  pig:()=>mergeGeometries([paint(new THREE.SphereGeometry(.35,10,8).scale(1.5,.9,.9).translate(0,.45,0),'#e2a99a'),paint(new THREE.SphereGeometry(.18,8,6).translate(.55,.5,0),'#e2a99a'),paint(new THREE.CylinderGeometry(.08,.08,.08,8).rotateZ(Math.PI/2).translate(.72,.5,0),'#c98a80')])};
 const rnd=seed=>()=>{seed=(seed*16807)%2147483647;return (seed-1)/2147483646;};
 
-export function createPeriodLife({city,world,water=[],squares=[],gates=[],animalModels={},propModels={}}){ // animalModels: Blender pig/hen/goose (scripts/blender/animals.py) where loaded; propModels: farm-wagon, covered-wagon (CC BY agt14032013)
+export function createPeriodLife({city,world,water=[],squares=[],gates=[],animalModels={},propModels={}}){ // animalModels: Blender pig/hen/goose (scripts/blender/animals.py) where loaded; propModels: farm-wagon, covered-wagon (CC BY agt14032013), and Daniel's barrel and crate (CC BY RipeR / SomeKevin) for the cargo on the quays
  const group=new THREE.Group();group.name='1760 street life';const r=rnd(1760);
  const wet=(x,z)=>water.some(w=>{const b=w.bbox;return (!b||x>=b[0]&&x<=b[2]&&z>=b[1]&&z<=b[3])&&pointInPolygon(x,z,w.rings);});
  const free=(x,z,rad=.6)=>!world.buildings.at(x,z)&&!wet(x,z)&&!world.buildings.at(x+rad,z)&&!world.buildings.at(x-rad,z)&&!world.buildings.at(x,z+rad)&&!world.buildings.at(x,z-rad);
@@ -44,6 +44,12 @@ export function createPeriodLife({city,world,water=[],squares=[],gates=[],animal
   for(let i=0;i<5;i++){const a=r()*6.28,d=8+r()*24,k=r();prop(k<.55?'handcart':k<.75||!propModels['farm-wagon']?'haywagon':k<.9||!propModels['covered-wagon']?'farm-wagon':'covered-wagon',sq.x+Math.cos(a)*d,sq.z+Math.sin(a)*d);} // unhitched wagons stand about the market
   if(r()<.7)animals.push({kind:r()<.5?'hen':'goose',x:sq.x+(r()-.5)*20,z:sq.z+(r()-.5)*20,n:5+Math.floor(r()*5)});
  }
+ // Daniel's night watchman (a scan: red coat, halberd and lantern; CC BY augustusburg_ger) stands on half the squares, and a
+ // woman sits at her distaff (CC BY MSU) on most, facing the square. Picked from each square's position, not from r(): the
+ // crowds and carts above keep their places (the trailer shots were checked against them).
+ for(const sq of squares){const h=k=>{const s=Math.sin(sq.x*12.9898+sq.z*78.233+k*37.719)*43758.5453;return s-Math.floor(s);};
+  for(const [kind,p,d0,d1,k] of [['watchman',.5,10,22,1],['spinner',.7,6,20,5]]){if(!propModels[kind]||h(k)>p)continue;
+   const a=h(k+1)*6.28,d=d0+h(k+2)*(d1-d0),x=sq.x+Math.cos(a)*d,z=sq.z+Math.sin(a)*d;prop(kind,x,z,Math.atan2(x-sq.x,z-sq.z));}}
  // quays: along navigable water, a sailor or dock hand every ~25 m, cargo stacked beside them
  const NO=/lake|moat|pond|basin|reflect|fountain/,NONAME=/grav|sø|spring|dam/i;
  let quayN=0;

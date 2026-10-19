@@ -119,15 +119,59 @@ Notes:
   black coach with the crown; `brougham.py`, wheels and box seat in the mesh extras), `carriage/armored-horse.glb.gz`
   (armored-horse.zip; `armored_horse.py` bakes the textures into vertex colours and writes the `_leg` weights),
   `carriage/coachman.glb.gz` (the 18th-century costume from mans-1-costume…zip with the cool-man's head, powdered hair
-  and a tricorne, seated; `coachman.py`), `nisse.glb.gz` (art/nisse.zip, a scanned felt nisse: the hidden nisser and
-  Nissefar; `nisse.py`). All gzipped (unzipped in the browser). Missing files fall back to the Blender coach and horse.
+  and a tricorne, seated; `coachman.py`), `nisse.glb.gz` (Daniel's pick, "Gnome (Female) (Pig Tails)" by David Wigforss, textured: the hidden
+  nisser and Nissefar; `nisse.py`. CC BY-NC 4.0, so fine while the game is free; the earlier scan's licence did not allow
+  redistribution). All gzipped (unzipped in the browser). Missing files fall back to the Blender coach and horse.
 - `radio.js`: the car radio (L, Shift+L back, or click/tap the now-playing card at the top right; the last station is
   remembered, station 1 on the first drive): stations from `radio-stations.json` stream public-domain / CC0 / CC BY
   recordings from the library that hosts them; each station loops on its own clock like a broadcast.
 - `landmarks.js`: Vor Frelsers stair, Børsen spire, Tivoli rides, statues, flags, 1760 windmills.
 - `parked-cars.js`, `boats.js`, `rails.js`, `trains.js`, `city-cyclists.js`, `cafes.js`: street life.
+- `boats.js` in 1760: among the big moorings, the merchant schooner and Amphion, then Daniel's frigate (Svjatoi Nikolai,
+  furled sails) and weathered galleon, about 50 m bow to bowsprit: picked by a hash of the mooring's position, and only
+  where no neighbour's hull overlaps theirs and the whole hull is open water clear of bridges (`bridge(x,z)` from main.js:
+  the city's road and footway areas). Models: `public/models/boats/frigate.glb`, `galleon.glb`.
+- `street-food.js`: five hot-dog stands today (Rådhuspladsen twice, Kongens Nytorv, Amagertorv, Torvehallerne), spots
+  picked on open pavement, the counter to the square; drawn and solid as mapped furniture (`hotdog-stand`). Cargo bikes:
+  `mapped-furniture.js` puts one at a third of the racks left without bicycles (`furniture/cargo-bike.glb`). The bins are
+  Daniel's "City Trash Can" (`furniture/bin.glb`, in place of the one `scripts/blender/furniture.py` made).
 - `harbour-bath.js`: Havnebadet Islands Brygge (decks, diving tower, bathers); `inHarbourBath()` keeps boats out.
-- `period-life.js`: 1760 crowds on squares, quays and gates, carts and animals. `soundscape.js`: engine, tyres, bells, hooves,
+- `pant.js` (today): empty cans by the benches, bins, bus shelters and hot-dog stands, worth their deposit (1 kr each) to
+  whoever picks them up, as plenty of Copenhageners do: about a quarter of the benches, a third of the bins, nearly half
+  the shelters and two at every stand, picked by a hash of the spot (the same spots every visit), never on a road, in a
+  house or in the water; walk, ride or drive within 1.9 m. A can picked up is back after five minutes. Only the cans
+  within 90 m are drawn (one instanced mesh, refilled four times a second), with a slow glint; the count shows next to
+  the money and titles come at 10, 50, 150 and 400 cans (game.js). Can: the regular can of Daniel's "Cans!" pack (Tiago Oliveira, CC BY
+  4.0) as a clean lathe of its measured profile, painted like a lemon-lime soda (green, a white wave over a thin lemon
+  line, no name or logo): `scripts/models/can.py <scene.gltf> public/models/props/can.glb`, drawn half as big again.
+- `park-geese.js`: flocks of three to seven geese on the lawns of the biggest parks (14 today, 6 in 1760; not the
+  cemeteries), most within 25 m of a lake or moat, grazing about their spot and waddling off when someone comes within
+  5 m. Model: Daniel's goose ("Goose Low Poly" by Atlas, CC BY 4.0), also the 1760 squares' geese (`animals/goose.glb`):
+  `scripts/models/plain_model.py <scene.gltf> public/models/animals/goose.glb height=0.62 yaw=132` (its body points 42
+  degrees off its axes; turned to face +X like the other animals).
+- Dogs on leads (`person-model.js`): Daniel's Labrador ("dog" by neighbor, CC BY 4.0) in place of the capsule dog where
+  it loads: `flatten_model.py <scene.gltf> /tmp/dog_flat.glb tris=1800 k=6 length=0.8 yaw=180`, then
+  `scripts/models/dog.py /tmp/dog_flat.glb public/models/animals/dog.glb` cuts it into a body and four legs (pivots and the
+  collar in the extras) and greys the coat; the legs swing in diagonal pairs at the walker's trot and each dog's coat
+  takes its colour from the palette. Walkers with a dog or a pram stay procedural figures (the rigged ones had none).
+- Trees (`src/tree-species.js`, `src/ez-trees.js`): within 95 m of the player the broadleaf trees are Daniel's tree models
+  (`public/models/trees/linden.glb`, "Realistic Tree": limes, maples, ash, chestnuts and the smaller street trees;
+  `oak.glb`, "Tree GN" without its vines: oaks, elms, willows), one BatchedMesh per model and part, scaled per tree to the
+  register's height and the family's crown width. Birches and conifers keep the procedural EZ-Tree crowns, as does every
+  family when the models do not load (`?car=classic`). Build: `python3 scripts/models/tree_build.py <scene.gltf> <out.glb>
+  leaves=<leaf materials> bark=<bark materials> [drop=] keep= grow= twigs= bark_tris= bark_tex= leaf_tex=` (Blender):
+  a share of the leaf cards kept and grown so the crown stays closed, twig pieces dropped and the bark decimated, the
+  textures cut to 512 px (leaf materials packed into one atlas), the trunk base at the origin. linden: `leaves=normal_leaves
+  bark=trunk keep=0.24 grow=1.42 twigs=6 bark_tris=1500 leaf_tex=256` (4.4k triangles); oak: `leaves=ClusterB,ClusterB2
+  bark=BarkB drop=VinesB,PruneB,CortexB keep=0.5 grow=1.22 bark_tris=1800 leaf_tex=1024` (4.9k).
+- Frederik V at Amalienborg (`statues/frederik-v.glb`): `scripts/models/frederik_v.py` colours alexabhisak's untextured CC BY
+  upload by zone (green bronze rider, pale stone plinth, black railing), 12k triangles.
+- `period-life.js`: 1760 crowds on squares, quays and gates, carts and animals; the quays' cargo uses Daniel's barrel and
+  crate (`props/barrel.glb`, `crate.glb`), and the squares get his night watchman (half of them) and a spinner at her
+  distaff (most), placed from each square's position so the rest keeps its layout. Pigs and hens are his too
+  (`animals/pig.glb`, `hen.glb`, in place of the `scripts/blender/animals.py` ones, which would overwrite them; head along
+  +X), and the market stalls his food stand (`props/market-stall.glb`, passed to `stalls.js` as `model`; the old stall
+  with its coloured awnings is the fallback). `soundscape.js`: engine, tyres, bells, hooves,
   and generative Danish folk tunes (fiddle over accordion oom-pah-pah; a cittern in 1760) as background music (U).
 - `big-map.js`: the full-screen map (M) with click-to-travel.
 
@@ -160,13 +204,14 @@ one skinned mesh each with the material colours in its vertex colours; everyone 
 (phone, chat, bike), a fall, a suitcase or in a conversation, stays the procedural instanced figure (person-model.js).
 Riding, falling and carrying, the player is the procedural figure too. `?procedural` turns the rigged ones off.
 - Files: `public/models/people/<name>.glb.gz` (gzipped GLB, unzipped in the browser: Cloudflare serves .glb uncompressed).
-  Today uses ten characters (with Daniel's cool-man), 1760 `W_Medieval` for the women and Daniel's costumes for every man
-  (below); the player is `M_Casual_Hoodie` today and `R_Coat_Blue` in 1760 (main.js, where the street life is created).
+  Today uses twelve characters (with Daniel's cool-man, pmariano and a woman in a party dress); 1760 his Victorian woman, the merchant's wife and
+  `W_Medieval` for the women, his costumes for the men in town and the ship boy and six sailors (below); the player is
+  `M_Casual_Hoodie` today and `R_Coat_Blue` in 1760 (main.js, where the street life is created).
 - Two rigs: the men (M_*) and the women (W_*) share bone names, but the women's bones are turned differently, so each
   has its own copy of the 9 clips (Walk, Run, Idle, Idle_Neutral, Wave, Interact, Punch_Right, HitRecieve, Death):
   `anims.glb.gz` for M_*, `anims_w.glb.gz` for W_* (retargeted, feet planted). Clips play in place (Root never moves).
 - R_* (Daniel's models): `R_CoolMan` today (cool-man.zip, a Ready Player Me avatar on a Mixamo skeleton) and in 1760
-  `R_Coat_Red`, `R_Domostroj`, `R_Mysli` (his three 18th-century costumes dressed on the cool-man's skeleton: the
+  `R_Coat_Red`, `R_Domostroj` (his 18th-century costumes, Man's #1 and #3, dressed on the cool-man's skeleton: the
   avatar's head and hands with powdered hair and a tricorne, the costume's skin weights from the nearest avatar vertex with
   the arms first lowered to the costume's pose, inner clothes taking the weights of the coat over them so they do not poke
   through). Clips: the Quaternius set retargeted onto that skeleton (`anims_r.glb.gz`: world rotation deltas from the
@@ -180,6 +225,25 @@ Riding, falling and carrying, the player is the procedural figure too. `?procedu
   place of his generic figure): the red coat in black with dark trousers, a white cravat, a top hat and his own hair
   (`coat=#17181f vest=#3b3430 drawers=#1b1b21 hose=#1b1b21 shoes=#141414 cravat=#ece9e2 hat=top hair=keep detail=2.5`). Another Ready Player Me
   avatar (same skeleton) can go through rpm_build.py the same way. Mix: `TODAY_MIX` / `PERIOD_MIX` in main.js.
+  `R_Mysli` (Man's #4) is out: the upload it came from is CC BY-NC-ND. Ready Player Me avatars (the cool-man, pmariano)
+  come with Ready Player Me's terms, which allow non-commercial use: fine while the game is free.
+- Figures without a skeleton of their own (a scan or sculpt in one pose) go onto the Quaternius rigs with
+  `scripts/people/figure_build.py <template M_/W_ .glb, gunzipped> <figure> <out.glb> name=M_X [arm=deg] [hips=f] [crop=x0:x1]`:
+  the figure is stretched onto the template's heights and arm span, the template's arms lowered to the figure's (`arm`,
+  degrees below horizontal) and its skin weights copied from the nearest template vertex facing the same way, then the
+  figure is turned back into the template's T-pose by inverse skinning. Colours: the texture per triangle, k flat colours
+  in the vertex colours. It keeps the template's skeleton, so the M_/W_ clips play on it unchanged. Built this way:
+  `W_Victorian` (template W_Medieval, arm=72), `W_Merchant` (the merchant's wife, W_Medieval, arm=80), `M_Shipboy` (the
+  Royal Navy ship boy, M_Suit, T-pose, `skip=Gun_low,Sword_`), `M_Sailor1`–`6` (the pirate crew, M_Suit, one `crop` per
+  figure, arm 66–85, `hips=0.5`) for 1760, and `M_Pmariano` (M_Casual_2, arm=67) and `W_Dress` ("Woman Dress 2", W_Formal, arm=48,
+  `skip=eye_,eyelash_,tooth`) today. Check a build by posing it with
+  a clip before shipping it (hands, hips): a wrong arm angle bends the arms, a wrong hip height the legs.
+- Static models (ships, props, standing figures) go through `scripts/models/flatten_model.py <in> <out.glb> [tris=]
+  [k=] [length=|height=|scale=] [yaw=] [base=] [thin=] [minpart=] [tex=|matex=|colors=] [predecimate=]`: texture
+  colours per triangle, k flat colours, simplified, one mesh per colour for `loadColouredModel(s)` (it keeps position and
+  normal only, so every vertex needs a normal). Shared reader: `scripts/models/model_io.py` (Blender as a Python module,
+  `pip install bpy`). Sketchfab "source" downloads carry no licence file: check the model's page before using it (the
+  repo is public: CC0 or CC BY only), and credit it in the era's `attribution` in `public/cities/index.json`.
 - Rebuild from the Quaternius sources (the grand-theft-ladcykel assets: M_*.glb, W_*.glb, anims_h.glb):
   `python3 scripts/people/ppl_build.py scripts/people <assets> <out>` (numpy only), check with `ppl_verify.py`, then
   `gzip -9 -n` each output into public/models/people. The rest pose is rebuilt as the true T-pose (the sources store an

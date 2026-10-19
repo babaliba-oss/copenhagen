@@ -37,11 +37,14 @@ test('the carriage marks its wheels per part, and they turn about their own axle
  assert.ok(count.every(c=>c>1000),`each wheel turns as a whole: ${count}`);assert.ok(!g.attributes._wheel,'the marker is dropped');
 });
 
-test('the coachman and the nisse carry their colours, at their size',async()=>{
+test('the coachman and the nisse carry their colours (the nisse may be textured), at their size',async()=>{
  const man=await model('carriage/coachman.glb.gz'),b=new THREE.Box3().setFromBufferAttribute(man.geometry.attributes.position);
  assert.ok(man.geometry.attributes.color&&b.max.y>1.2&&b.max.y<1.45&&b.min.z<-.4,'seated: 1.3 m to the hat, knees forward (-Z)');
- const nisse=await model('nisse.glb.gz'),c=new THREE.Box3().setFromBufferAttribute(nisse.geometry.attributes.position);
- assert.ok(nisse.geometry.attributes.color&&Math.abs(c.max.y-1)<.02&&Math.abs(c.min.y)<.02,'a 1 m nisse standing on y=0 (the game scales it)');
+ // the nisse may be textured (the pig-tails gnome): read its glTF JSON, as Node cannot decode the image
+ const nb=gunzipSync(readFileSync(new URL('../public/models/nisse.glb.gz',import.meta.url))),nj=JSON.parse(nb.subarray(20,20+nb.readUInt32LE(12)).toString());
+ const prim=nj.meshes[0].primitives[0],pos=nj.accessors[prim.attributes.POSITION],mat=nj.materials?.[prim.material];
+ assert.ok(prim.attributes.COLOR_0!=null||prim.attributes.TEXCOORD_0!=null&&mat?.pbrMetallicRoughness?.baseColorTexture,'vertex-coloured or textured');
+ assert.ok(Math.abs(pos.max[1]-1)<.02&&Math.abs(pos.min[1])<.02,'a 1 m nisse standing on y=0 (the game scales it)');
 });
 
 test('gait motion: the trot quickens and grows with speed, the wheels roll the distance, angles stay small',()=>{

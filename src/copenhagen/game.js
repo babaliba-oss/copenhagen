@@ -11,6 +11,7 @@ import {groundAt} from '../terrain.js';
 import {SpatialIndex,bounds,inWaterPolygons} from '../geo.js';
 import {JOBS,JOBS_1760,SAGAS,CHARACTERS} from './data.js';
 import {connectCharacters} from './characters.js';
+import {createPant,PANT_KR} from './pant.js';
 import './copenhagen.css';
 
 const SAVE_KEY='cph-game-v1';
@@ -102,6 +103,15 @@ export function createCopenhagenGame({scene,city,mobilityData,cityData,toast,sou
  document.body.append(hud,lore,journal,tmap);
  const $=id=>document.getElementById(id);
 
+ // ---- pant: empty cans by benches, bins, shelters and hot-dog stands, 1 kr each (pant.js); today only ----
+ let pant=null;
+ const PANT_TITLES=[[10,'Pantsamler'],[50,'Pantjæger'],[150,'Pantkonge'],[400,'Pantlegende']];
+ // where people sit with a beer: the Nyhavn quays, Dronning Louises Bro, Islands Brygge, Ofelia Plads, Kongens Have
+ const PANT_HOTSPOTS=[[55.68003,12.58930],[55.67998,12.59130],[55.67955,12.59010],[55.68628,12.56400],[55.66505,12.57600],[55.68100,12.59600],[55.68545,12.57960]];
+ function setFurniture(items,{clear,geometry}={}){if(ERA==='h'||pant||!items?.length)return;
+  pant=createPant({items:[...items,...PANT_HOTSPOTS.map(p=>{const [x,z]=ll(p);return {k:'hotspot',x,z};})],clear,geometry});scene.add(pant.group);}
+ function clink(){if(!soundOn())return;try{ac??=new (window.AudioContext||window.webkitAudioContext)();const t0=ac.currentTime; // an aluminium can: a short bright clink
+  for(const [f,v] of [[2350,.05],[3520,.03],[5180,.018]]){const o=ac.createOscillator(),g=ac.createGain();o.type='sine';o.frequency.value=f;g.gain.setValueAtTime(v,t0);g.gain.exponentialRampToValueAtTime(.0001,t0+.2);o.connect(g).connect(ac.destination);o.start(t0);o.stop(t0+.22);}}catch{}}
  // ---- big moments: GTA-style banner with a short chime ----
  const ban=document.createElement('div');ban.id='cph-banner';ban.hidden=true;document.body.append(ban);let banT=0;
  let ac=null;
@@ -128,8 +138,9 @@ export function createCopenhagenGame({scene,city,mobilityData,cityData,toast,sou
  const nisseGeo=(()=>{const parts=[new THREE.ConeGeometry(.17,.42,10).translate(0,.62,0),new THREE.SphereGeometry(.13,10,8).translate(0,.4,0),new THREE.CylinderGeometry(.14,.18,.34,10).translate(0,.17,0),new THREE.SphereGeometry(.035,6,5).translate(0,.84,0)];
   const cols=['#c8202a','#e9e3d4','#5a6b8a','#f2f2f2'],out=[];parts.forEach((g,k)=>{const n=g.toNonIndexed();const c=new THREE.Color(cols[k]),a=new Float32Array(n.attributes.position.count*3);for(let i=0;i<a.length;i+=3)a.set([c.r,c.g,c.b],i);n.setAttribute('color',new THREE.BufferAttribute(a,3));n.deleteAttribute('uv');out.push(n);});return mergeGeometries(out).scale(1.6,1.6,1.6);})();
  const nisseMesh=new THREE.InstancedMesh(nisseGeo,new THREE.MeshStandardMaterial({vertexColors:true,roughness:.6,emissive:'#3a1210'}),nisser.length);nisseMesh.castShadow=true;nisseMesh.frustumCulled=false;nisseMesh.name='Hidden nisser';scene.add(nisseMesh);
- // Daniel's scanned felt nisse (public/models/nisse.glb.gz, scripts/models/nisse.py) replaces the cone-and-ball figure once loaded.
- loadOneMesh('/models/nisse.glb.gz').then(m=>{if(!m?.geometry?.attributes?.color)return;const g=m.geometry.scale(.85,.85,.85);for(const k of Object.keys(g.attributes))if(!['position','normal','color'].includes(k))g.deleteAttribute(k);nisseMesh.geometry.dispose();nisseMesh.geometry=g;nisseMesh.material.emissive.set('#1a0808');});
+ // Daniel's pick of nisse (public/models/nisse.glb.gz: the pig-tails gnome, scripts/models/nisse.py) replaces the cone-and-ball figure once loaded.
+ loadOneMesh('/models/nisse.glb.gz').then(m=>{if(!m?.geometry||!m.geometry.attributes.color&&!m.map)return;const g=m.geometry.scale(.85,.85,.85);for(const k of Object.keys(g.attributes))if(!['position','normal','color','uv'].includes(k))g.deleteAttribute(k);nisseMesh.geometry.dispose();nisseMesh.geometry=g;
+  if(m.map){nisseMesh.material.vertexColors=false;nisseMesh.material.map=m.map;nisseMesh.material.roughness=.75;nisseMesh.material.needsUpdate=true;}nisseMesh.material.emissive.set('#1a0808');}); // textured (the gnome) or vertex-coloured
  const NT={m:new THREE.Matrix4(),q:new THREE.Quaternion(),v:new THREE.Vector3(),one:new THREE.Vector3(1,1,1),zero:new THREE.Vector3()};
  const mkA=beam(scene,0xf2b134),mkB=beam(scene,0x46c2b0),mkQ=[0,1,2,3,4].map(()=>beam(scene,0xe0313e,100));
  const line=createRouteLine(scene,{historic:ERA==='h'});
@@ -268,7 +279,7 @@ export function createCopenhagenGame({scene,city,mobilityData,cityData,toast,sou
  let hudClock=1;const setHtml=(el,h)=>{if(el&&el.__h!==h){el.__h=h;el.innerHTML=h;}};
  function updateHud(){
   {const n=save.delivered||0,r=rankOf(n),next=RANKS[r+1],from=RANKS[r][1],pct=next?Math.round((n-from)/(next[1]-from)*100):100;
-   setHtml($('cph-money'),`<b>${fmtKr(save.money)} ${UNIT}</b>${save.nisser?.length?` · nisser ${save.nisser.length}/${nisser.length}`:''}<span class="cph-rank">${esc(RANKS[r][0])}${save.streak>1?` · streak ×${save.streak}`:''}<i style="--p:${pct}%"></i></span>`);}
+   setHtml($('cph-money'),`<b>${fmtKr(save.money)} ${UNIT}</b>${save.nisser?.length?` · nisser ${save.nisser.length}/${nisser.length}`:''}${save.pant?` · pant ${save.pant}`:''}<span class="cph-rank">${esc(RANKS[r][0])}${save.streak>1?` · streak ×${save.streak}`:''}<i style="--p:${pct}%"></i></span>`);}
   if(race){const r=race.r,b=save.best[r.id];setHtml($('cph-job'),`<p class="cph-kick">Race · checkpoint ${Math.min(race.k+1,r.cps.length)}/${r.cps.length} · <kbd>X</kbd> quit</p><h3>${esc(r.title)}</h3><p class="cph-race-time">${race.countdown>0?Math.ceil(race.countdown):fmtT(race.t)}</p><p>Gold ${fmtT(r.par[0])} · silver ${fmtT(r.par[1])} · bronze ${fmtT(r.par[2])}${b!=null?` · best ${fmtT(b)}`:''}</p>`);}
   else{
   const j=job(),t=state==='a'?j.A:j.B,d=line.points?line.remaining():dist(t,[player.x,player.z]);
@@ -307,6 +318,8 @@ export function createCopenhagenGame({scene,city,mobilityData,cityData,toast,sou
    for(const n of nisser){const got=save.nisser.includes(n.i);if(!got&&running&&!cinematic&&Math.hypot(n.p[0]-actor.x,n.p[1]-actor.z)<2.6){save.nisser.push(n.i);save.money+=ERA==='h'?24:150;persist();banner('Nisse found!',`${save.nisser.length} of ${nisser.length} · +${ERA==='h'?24:150} ${UNIT}`,'pass');}
     nisseMesh.setMatrixAt(n.i,m.compose(v.set(n.p[0],groundAt(n.p[0],n.p[1])+.05+Math.abs(Math.sin(now*2+n.i))*.12,n.p[1]),q.setFromAxisAngle(THREE.Object3D.DEFAULT_UP,now*.8+n.i),save.nisser.includes(n.i)?zero:one));}
    nisseMesh.instanceMatrix.needsUpdate=true;}
+  if(pant){const n=pant.update(dt,actor,{collect:running&&!cinematic});if(n){const before=save.pant||0;save.pant=before+n;save.money+=n*PANT_KR;persist();clink();
+    const t=PANT_TITLES.find(([k])=>before<k&&save.pant>=k);if(t)banner(t[1],`${save.pant} cans · ${fmtKr(save.pant*PANT_KR)} ${UNIT} in pant`,'pass');}}
   if(travelMode!==mode){mode=travelMode;routeFor=null;}
   const here=[actor.x,actor.z];
   // races
@@ -379,5 +392,5 @@ export function createCopenhagenGame({scene,city,mobilityData,cityData,toast,sou
  const trailerApi={saga(id){const q=byId[id];if(!q)return false;if(!trailer){trailer=true;trailerSave=JSON.stringify(save);}save.active={id,done:[],t:0,shown:-1};routeFor=null;banner('Saga started',`${esc(q.title)} · follow the red beam`,'pick');return true;},
   banner:(title,sub,kind)=>banner(title,sub,kind),
   end(){if(!trailer)return;try{save=JSON.parse(trailerSave);}catch{}trailer=false;trailerSave=null;routeFor=null;ban.hidden=true;}};
- return {trailer:trailerApi,paper:()=>{try{sessionStorage.removeItem('cph-paper-'+ERA);}catch{}showPaper();},photo,debug:()=>({race:race&&{id:race.r.id,k:race.k,t:race.t,c:race.countdown},armed:races.map(r=>r.armed),state,started,player:player&&[player.x,player.z]}),update,key,blocking,people,api,minimapTargets:()=>{const out=[];if(race){out.push({p:race.r.cps[race.k],color:'#ff4fd8'});return out;}for(const r of races)if(state!=='b')out.push({p:r.start,color:'#9b5de5',small:true});const j=job();out.push({p:state==='a'?j.A:j.B,color:state==='a'?'#f2b134':'#46c2b0'});if(save.active){const q=byId[save.active.id];for(const k of frontier())if(!q.steps[k].clue)out.push({p:q.steps[k].p,color:'#e0313e'});}return out;},route:()=>line.ahead()};
+ return {setFurniture,trailer:trailerApi,paper:()=>{try{sessionStorage.removeItem('cph-paper-'+ERA);}catch{}showPaper();},photo,debug:()=>({race:race&&{id:race.r.id,k:race.k,t:race.t,c:race.countdown},armed:races.map(r=>r.armed),state,started,player:player&&[player.x,player.z]}),update,key,blocking,people,api,minimapTargets:()=>{const out=[];if(race){out.push({p:race.r.cps[race.k],color:'#ff4fd8'});return out;}for(const r of races)if(state!=='b')out.push({p:r.start,color:'#9b5de5',small:true});const j=job();out.push({p:state==='a'?j.A:j.B,color:state==='a'?'#f2b134':'#46c2b0'});if(save.active){const q=byId[save.active.id];for(const k of frontier())if(!q.steps[k].clue)out.push({p:q.steps[k].p,color:'#e0313e'});}return out;},route:()=>line.ahead()};
 }

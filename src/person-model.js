@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';
 import {RoundedBoxGeometry} from 'three/addons/geometries/RoundedBoxGeometry.js';
+import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {applyImpactPose} from './impact-pose.js';
 import {groundAt} from './terrain.js';
 
@@ -491,6 +492,34 @@ function faceMaterial(){
 // guests and vendors instead of nine for each system. A batch under a moved parent (people aboard a vehicle) or with
 // extra uniform meshes (police) keeps drawing itself.
 const SHARED={batches:new Set(),meshes:null,group:null,faceState:null,faceShape:null},sharedAt=new Int32Array(9);
+// Dogs on leads: the dog model where it loads (loadDogModel + setDogModel: public/models/animals/dog.glb, made by
+// scripts/models/dog.py, a body and four legs), five instanced meshes for every crowd. The legs swing about their
+// shoulders and hips at the trot (diagonal pairs) and each dog's grey coat takes its colour. Each batch lists its dogs
+// while it draws; flushPeople writes those of the batches it shows. Without the model, the capsule dog (drawDog).
+const DOG_PARTS=['body','leg_fl','leg_fr','leg_bl','leg_br'],DOG_PHASE={leg_fl:0,leg_br:0,leg_fr:Math.PI,leg_bl:Math.PI};
+const DOGS={pivots:null,collar:null,base:1,meshes:null,group:null,cap:48};
+export async function loadDogModel(url){
+ try{const gltf=await new GLTFLoader().loadAsync(url),ex=gltf.parser.json.scenes?.[0]?.extras||{},parts={};
+  gltf.scene.traverse(o=>{if(o.isMesh&&DOG_PARTS.includes(o.name)){const g=o.geometry;for(const k of Object.keys(g.attributes))if(!['position','normal','color'].includes(k))g.deleteAttribute(k);parts[o.name]=g;}});
+  if(!DOG_PARTS.every(k=>parts[k])||!ex.pivots)throw Error('a body, four legs and their pivots expected');
+  return {parts,pivots:ex.pivots,collar:ex.collar||[0,.32,-.24],base:ex.base||.3};
+ }catch(e){console.warn('Dog model not loaded, the capsule dogs stay:',e?.message||e);return null;}
+}
+export function setDogModel(model){
+ if(!model||DOGS.meshes)return;Object.assign(DOGS,{pivots:model.pivots,collar:model.collar,base:model.base});
+ const material=new THREE.MeshStandardMaterial({vertexColors:true,roughness:.85});DOGS.group=new THREE.Group();DOGS.group.name='Dogs on leads';
+ DOGS.meshes=DOG_PARTS.map(k=>{const m=new THREE.InstancedMesh(model.parts[k],material,DOGS.cap);m.name=`Dogs (${k})`;m.count=0;m.frustumCulled=false;m.castShadow=true;
+  m.instanceMatrix.setUsage(THREE.DynamicDrawUsage);m.instanceColor=new THREE.InstancedBufferAttribute(new Float32Array(DOGS.cap*3),3).setUsage(THREE.DynamicDrawUsage);DOGS.group.add(m);return m;});
+}
+const dogRoot=new THREE.Matrix4(),dogLeg=new THREE.Matrix4(),dogTint=new THREE.Color();
+function writeDog(d,i){
+ const e=dogRoot.elements,D=d.D;e.fill(0);e[0]=d.c*D;e[2]=-d.s*D;e[5]=D;e[8]=d.s*D;e[10]=d.c*D;e[12]=d.x;e[13]=d.y;e[14]=d.z;e[15]=1;
+ DOGS.meshes[0].setMatrixAt(i,dogRoot);
+ for(let k=1;k<5;k++){const name=DOG_PARTS[k],p=DOGS.pivots[name],a=.3*d.w*Math.sin(d.ph+DOG_PHASE[name]),ca=Math.cos(a),sa=Math.sin(a);
+  dogLeg.set(1,0,0,0, 0,ca,-sa,p[1]-(ca*p[1]-sa*p[2]), 0,sa,ca,p[2]-(sa*p[1]+ca*p[2]), 0,0,0,1).premultiply(dogRoot); // the leg turned about its pivot
+  DOGS.meshes[k].setMatrixAt(i,dogLeg);}
+ dogTint.setRGB(Math.min(4,d.rgb[0]/DOGS.base),Math.min(4,d.rgb[1]/DOGS.base),Math.min(4,d.rgb[2]/DOGS.base));for(const m of DOGS.meshes)m.setColorAt(i,dogTint);
+}
 function sharedMeshes(){
  if(SHARED.meshes)return SHARED.meshes;
  const cloth=new THREE.MeshStandardMaterial({roughness:.9}),skin=new THREE.MeshStandardMaterial({roughness:.7,vertexColors:true}),group=new THREE.Group();group.name='People (all crowds)';
@@ -524,6 +553,9 @@ export function flushPeople(scene){
  for(let m=0;m<9;m++){const dst=meshes[m],n=sharedAt[m];dst.count=n;dst.instanceMatrix.clearUpdateRanges();dst.instanceColor.clearUpdateRanges();
   if(n){dst.instanceMatrix.addUpdateRange(0,n*16);dst.instanceColor.addUpdateRange(0,n*3);}dst.instanceMatrix.needsUpdate=true;dst.instanceColor.needsUpdate=true;}
  for(const a of [SHARED.faceState,SHARED.faceShape]){a.clearUpdateRanges();if(sharedAt[1])a.addUpdateRange(0,sharedAt[1]*4);a.needsUpdate=true;}
+ if(DOGS.meshes){if(DOGS.group.parent!==scene)scene.add(DOGS.group);let n=0;
+  for(const b of SHARED.batches)if(b.take&&b.dogs)for(let i=0;i<b.dogs.n&&n<DOGS.cap;i++)writeDog(b.dogs.list[i],n++);
+  for(const m of DOGS.meshes){m.count=n;m.instanceMatrix.needsUpdate=true;m.instanceColor.needsUpdate=true;}}
 }
 export function createPersonBatch(capacity,options={}){
  const group=new THREE.Group();group.name=options.name||'Pedestrians';
@@ -558,6 +590,7 @@ export function createPersonBatch(capacity,options={}){
  const UNIFORM={jacket:list.indexOf(meshes.jacket),vest:list.indexOf(meshes.vest)},BAG=5,WHITE=[1,1,1];
  const SEG=3,LOW_TORSO=6,LOW_HEAD=7,LOW_SEG=8;
  const J=createJoints();let px=0,pz=0,c=1,s=0,ground=0,minX=0,maxX=0,minZ=0,maxZ=0,minY=0,maxY=0,focus=null,far=false;
+ const dogs={list:[],n:0},modelDogs=!options.police&&options.shared!==false; // dogs drawn as the model (flushPeople), where it is loaded
  function write(mesh,idx,Xx,Xy,Xz,Yx,Yy,Yz,Zx,Zy,Zz,tx,ty,tz,rgb){
   // Body-space basis/translation to world, column-major.
   if(idx>=mesh.userData.capacity)return;
@@ -580,7 +613,7 @@ export function createPersonBatch(capacity,options={}){
  const jsegFree=(ax,ay,az,bx,by,bz,rx,rz,rgb)=>seg(ax,ay,az,bx,by,bz,rx,rz,1,0,0,rx*.6,rx*.6,rgb);
  const jseg=(a,b,rx,rz,ea,eb,rgb,hx=1,hy=0,hz=0)=>seg(J[a],J[a+1],J[a+2],J[b],J[b+1],J[b+2],rx,rz,hx,hy,hz,ea,eb,rgb);
  // `viewer` ({x,z}) selects each person's level by distance; without one everybody is drawn in full.
- function begin(viewer=null){cursor.fill(0);minX=minZ=minY=Infinity;maxX=maxZ=maxY=-Infinity;focus=viewer&&Number.isFinite(viewer.x)&&Number.isFinite(viewer.z)?viewer:null;}
+ function begin(viewer=null){cursor.fill(0);dogs.n=0;minX=minZ=minY=Infinity;maxX=maxZ=maxY=-Infinity;focus=viewer&&Number.isFinite(viewer.x)&&Number.isFinite(viewer.z)?viewer:null;}
  function draw(actor,look=actor,gait=actor,time=0){
   const distance=focus?Math.hypot(actor.x-focus.x,actor.z-focus.z):0;
   if(distance>lod.hide)return false;
@@ -678,7 +711,13 @@ export function createPersonBatch(capacity,options={}){
    seg(0,.62,z-.78,0,.86,z-.98,.21*q,.16,1,0,0,0,0,col.bag);}
  }
  // A dog on a lead at the walker's left, trotting at twice the walker's cadence.
+ function drawModelDog(look,gait,H,col){
+  const D=look.dogSize||1,q=H/1.74,x=-.6*q,z=-.62*q,w=gait.gaitWalk||0,ph=(gait.gaitPhase||0)*2,lift=.01*D*Math.abs(Math.sin(ph))*w;
+  const d=dogs.list[dogs.n]??=({});dogs.n++;Object.assign(d,{x:px+x*c+z*s,y:ground+lift,z:pz-x*s+z*c,c,s,D,ph,w,rgb:col.dog}); // body space to world, as write() does
+  const k=DOGS.collar,hand=JOINT.handL;seg(J[hand],J[hand+1],J[hand+2],x+k[0]*D,k[1]*D+lift,z+k[2]*D,.006,.006,1,0,0,0,0,col.black); // the lead
+ }
  function drawDog(look,gait,H,col){
+  if(DOGS.meshes&&modelDogs)return drawModelDog(look,gait,H,col);
   const D=look.dogSize||1,q=H/1.74,x=-.6*q,z=-.62*q,h=.36*D,L=.26*D,w=gait.gaitWalk||0,ph=(gait.gaitPhase||0)*2,c=col.dog;
   const lift=.012*D*Math.abs(Math.sin(ph))*w,y=h+lift,chest=[x,y,z-L],hip=[x,y+.01,z+L],head=[x,y+.17*D,z-L-.12*D];
   seg(...hip,...chest,.1*D,.13*D,1,0,0,.07*D,.09*D,c);
@@ -726,6 +765,6 @@ export function createPersonBatch(capacity,options={}){
   for(const attribute of [faceState,faceShape]){attribute.clearUpdateRanges();if(meshes.head.count)attribute.addUpdateRange(0,meshes.head.count*4);attribute.needsUpdate=true;}
  }
  const batch={group,meshes,list,begin,draw,end,joints:J,drawCalls:list.length,segmentsPerPerson:segPer,lod};
- if(!options.police&&options.shared!==false)SHARED.batches.add({group,list,faceState,faceShape}); // drawn through the shared batches (flushPeople)
+ if(!options.police&&options.shared!==false)SHARED.batches.add({group,list,faceState,faceShape,dogs}); // drawn through the shared batches (flushPeople)
  return batch;
 }
