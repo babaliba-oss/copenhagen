@@ -80,6 +80,7 @@ const FRAMES=12,CRANK=8,SETS={walk:FRAMES+1,ride:CRANK,sit:1};
 export const WALK_FRAMES=FRAMES; // the Idle frame follows them
 const baked=new WeakMap(),queue=[];let ticking=false;
 const tick=()=>{const t0=performance.now();while(queue.length&&performance.now()-t0<8){const job=queue.shift();try{job();}catch(e){console.warn('Baked person not made:',e?.message||e);}}if(!queue.length){ticking=false;return;}setTimeout(tick,30);}; // jobs back to back for up to 8 ms a tick (a crowd's renderer only makes meshes from bakes already done)
+export const bakesPending=()=>queue.length>0; // the trailer waits for these before a shot (main.js)
 const later=job=>{queue.push(job);if(!ticking){ticking=true;MeshoptSimplifier.ready.catch(()=>{}).finally(()=>setTimeout(tick,0));}}; // after the simplifier, so every bake has its far version
 // The far version of a baked model: about a third of its triangles (meshoptimizer keeps the vertices it uses, so the
 // frames and colours are shared), for the baked people beyond LOD_NEAR metres, where a 6,000-triangle character is a
