@@ -38,3 +38,14 @@ test('one batched mesh per level; trees shown by distance', () => {
  s.update({x:0,z:0});assert.deepEqual(s.levels(),{near:1,mid:1,far:1});
  assert.equal(treeLevel(80),'near');assert.equal(treeLevel(100),'mid');assert.equal(treeLevel(1000),null); // near is 95 m (full EZ crowns)
 });
+
+test('the tree models stand with their root flare below the ground', async () => {
+ const THREE=await import('three');const {unitParts,ROOT}=await import('../src/ez-trees.js');
+ // a 2 m wide, 10 m tall model whose lowest 1.6 m is roots (the oak's proportions): the roots go under y = 0
+ const bark=new THREE.BoxGeometry(2,10,2);bark.translate(0,5,0);const leaves=new THREE.BoxGeometry(6,4,6);leaves.translate(0,8,0);
+ const box=new THREE.Box3().setFromBufferAttribute(bark.attributes.position).union(new THREE.Box3().setFromBufferAttribute(leaves.attributes.position));
+ const parts=unitParts([{geometry:bark},{geometry:leaves}],box,1.6);
+ assert.ok(Math.abs(parts[0].geometry.boundingBox.min.y- -.16)<1e-6,'the roots hang 16% of the height below the ground');
+ assert.ok(Math.abs(parts[0].geometry.boundingBox.max.y-.84)<1e-6);assert.ok(Math.abs(parts[1].geometry.boundingBox.max.y-.84)<1e-6,'the crown comes down with the trunk');
+ assert.ok(ROOT.oak>ROOT.linden&&ROOT.linden>0,'the oak has the bigger roots');
+});

@@ -11,22 +11,32 @@ const KIND={spruce:2,fir:2,larch:2,pine:2,birch:1,lime:3,maple:4,elm:4,ash:4,che
 const SEED={0:1836,1:2918,2:4137,3:5021,4:6480};
 const MODEL={lime:'linden',maple:'linden',ash:'linden',chestnut:'linden',broadleaf:'linden',poplar:'linden',blossom:'linden',rowan:'linden',alder:'linden',oak:'oak',elm:'oak',willow:'oak'};
 const MODEL_KIND={linden:5,oak:6};
+// Both models are sculpted with their roots: the linden's flare is 1.7 m wide over its lowest 0.9 m (trunk 1 m), the oak's
+// 4 m wide over its lowest 0.8 m and still 2.6 m at 2 m up (trunk 1.6 m). Standing on the pavement they read as a tree
+// pulled out of the ground and set down on its root ball, so this much of each model (metres, model scale) goes below
+// the ground: the trunk comes out of the pavement with a little of the flare, as a street tree does.
+export const ROOT={linden:.9,oak:1.6};
 export const ezKind=(family,models=null)=>{const m=MODEL[family];return m&&models?.[MODEL_KIND[m]]?MODEL_KIND[m]:KIND[family]??null;};
 // The tree models as template parts ({geometry, material} for the bark, then the leaves), each scaled into a unit box
-// standing on y = 0 like route-trees.js's template(), so one instance matrix (width, height, width) fits either.
+// standing on y = 0 like route-trees.js's template(), so one instance matrix (width, height, width) fits either; the
+// roots (ROOT) hang below y = 0.
 export async function loadTreeModels(base='/models/trees/'){
  const loader=new GLTFLoader(),out={};
- await Promise.all(Object.entries(MODEL_KIND).map(async ([name,kind])=>{try{out[kind]=modelParts(await loader.loadAsync(`${base}${name}.glb`));}catch(e){console.warn('Tree model not loaded, the EZ crowns stay:',name,e?.message||e);}}));
+ await Promise.all(Object.entries(MODEL_KIND).map(async ([name,kind])=>{try{out[kind]=modelParts(await loader.loadAsync(`${base}${name}.glb`),ROOT[name]);}catch(e){console.warn('Tree model not loaded, the EZ crowns stay:',name,e?.message||e);}}));
  return out;
 }
-function modelParts(gltf){
+// Scales a model's parts into the unit box with `root` metres of it below y = 0 (see ROOT). Exported for the tests.
+export function unitParts(parts,box,root=0){
+ const size=box.getSize(new THREE.Vector3());
+ for(const {geometry} of parts){geometry.translate(0,-box.min.y-root,0);geometry.scale(1/size.x,1/size.y,1/size.z);geometry.computeBoundingBox();geometry.computeBoundingSphere();}
+ return parts;
+}
+function modelParts(gltf,root=0){
  gltf.scene.updateMatrixWorld(true);const parts=[],box=new THREE.Box3();
  gltf.scene.traverse(o=>{if(!o.isMesh)return;const g=o.geometry.clone().applyMatrix4(o.matrixWorld);for(const k of Object.keys(g.attributes))if(!['position','normal','uv'].includes(k))g.deleteAttribute(k);
   g.computeBoundingBox();box.union(g.boundingBox);parts.push({leaves:/leaves/i.test(`${o.name} ${o.material?.name||''}`),geometry:g,map:o.material?.map||null});o.geometry.dispose();});
  if(parts.length!==2||parts[0].leaves===parts[1].leaves)throw Error('a tree model needs one bark and one leaves mesh');
- const size=box.getSize(new THREE.Vector3());
- return parts.sort((a,b)=>a.leaves-b.leaves).map(({leaves,geometry,map})=>{
-  geometry.translate(0,-box.min.y,0);geometry.scale(1/size.x,1/size.y,1/size.z);geometry.computeBoundingBox();geometry.computeBoundingSphere();
+ return unitParts(parts.sort((a,b)=>a.leaves-b.leaves),box,root).map(({leaves,geometry,map})=>{
   if(map)map.anisotropy=4;
   // Leaves: cut-out cards seen from both sides, with a little translucency so backlit crowns are not black.
   const material=new THREE.MeshStandardMaterial({map,roughness:1,metalness:0,side:leaves?THREE.DoubleSide:THREE.FrontSide,alphaTest:leaves?.45:0,alphaToCoverage:leaves,
