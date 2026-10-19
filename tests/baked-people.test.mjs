@@ -100,3 +100,14 @@ test('the instanced crowds draw their people as the characters once the models a
  setBakedPeople(null);crowd.update(.1,{x:0,z:0});
  const left=[];crowd.group.traverse(o=>{if(o.isInstancedMesh&&/^Baked /.test(o.name))left.push(o.name);});assert.equal(left.length,0,'models dropped when unset');
 });
+
+test('a standing figure (H.C. Andersen) keeps his feet under him, wherever he stands and faces', async () => {
+ const {createRiggedFigure}=await import('../src/skinned-people.js');
+ const hca=await model('R_HCA'),fig=createRiggedFigure(hca,{height:1.85,stand:true});
+ for(const [x,z,heading] of [[0,0,0],[892.8,38.5,2.1]]){
+  for(let i=0;i<20;i++)fig.update(1/30,{x,z,heading,speed:0});
+  fig.root.updateMatrixWorld(true);const bones=rigOf(fig.root),feet=[bones.footL,bones.footR].map(at),hips=at(bones.thighL).add(at(bones.thighR)).multiplyScalar(.5);
+  for(const f of feet)assert.ok(Math.hypot(f.x-hips.x,f.z-hips.z)<.22,`foot ${f.x.toFixed(2)},${f.z.toFixed(2)} under the hips ${hips.x.toFixed(2)},${hips.z.toFixed(2)}`);
+  assert.ok(Math.hypot(hips.x-x,hips.z-z)<.15,'standing where he is');assert.ok(feet.every(f=>f.y<fig.root.position.y+.22),'ankles just above the ground');
+ }
+});
