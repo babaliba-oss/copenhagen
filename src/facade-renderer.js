@@ -60,6 +60,7 @@ function pane(F,G,s,y,w,h,glass,arch=false,tone=null){
 }
 const flat=(F,B,s,y,e,w,h,color)=>B.add(F.place(new THREE.PlaneGeometry(w,h),s,y,e),color);
 const slab=(F,B,s,y,e,w,h,depth,color)=>{const g=new THREE.BoxGeometry(w,h,depth),i=g.index.array;g.setIndex([...i.slice(0,30)]);B.add(F.place(g,s,y,e+depth/2),color);}; // no back face (it lies on the wall)
+const ledge=(F,B,s,y,e,w,h,depth,color)=>{const g=new THREE.BoxGeometry(w,h,depth),i=g.index.array;g.setIndex([...i.slice(0,12),...i.slice(18,30)]);B.add(F.place(g,s,y,e+depth/2),color);}; // nor a top: a plinth's 8 cm top, lit from above, drew a white line along the street at knee height
 
 // Evenly spaced bay centres across [a,b] with at least `margin` at each end.
 export function bays(a,b,pitch,margin=.6){
@@ -153,6 +154,7 @@ export function createFacade(faces,spec){
   const F=new FaceFrame(face),width=F.s1-F.s0,height=F.y1-F.y0;
   if(width<2.5||height<2.4||Math.abs(face.normal.y)>.12)continue;
   const bands=storeyBands(spec,height).map(b=>({...b,y0:b.y0+F.y0,y1:b.y1+F.y0}));
+  let doorAt=null; // this face's street door: the plinth stops either side of it (it ran across the door, 1 cm in front of the leaves)
   // A differently clad base (granite, brick) over the lower storeys.
   if(c.lower){const top=bands[Math.min(bands.length-1,spec.lowerStoreys-1)].y1;for(const [a,b] of runs(F,F.y0+1,[F.s0,F.s1]))slab(F,B,(a+b)/2,(F.y0+top)/2,.0,b-a,top-F.y0,.02,c.lower);}
   for(const band of bands){
@@ -164,7 +166,7 @@ export function createFacade(faces,spec){
     // in the front, and the door stood turned against the wall beside it
     if(door!==null&&!F.rect(door-.95,door+.95,band.y0+.1,band.y0+2.95))door=null;
     windows+=upperStorey(F,G,B,band,storeyStyle(spec,1,spec.storeys),c,door);
-    if(door!==null){const s=door,y0=band.y0;
+    if(door!==null){const s=door,y0=band.y0;doorAt=s;
      // Street door: stone surround, two panelled leaves set back in it, a glazed fanlight and a step.
      for(const dx of [-.74,.74])slab(F,B,s+dx,y0+1.4,0,.18,2.8,.14,c.surround);slab(F,B,s,y0+2.86,0,1.66,.16,.18,c.cornice);
      flat(F,B,s,y0+1.12,.07,1.3,2.24,c.door);flat(F,B,s,y0+1.12,.08,.04,2.2,linear('#1c1410')); // 7 cm proud: the model's walls are not perfectly flat, and a leaf at 2 cm vanished into the brick
@@ -188,7 +190,7 @@ export function createFacade(faces,spec){
   // Plinth: a darker stone base along the street.
   // The plinth stops under the shop windows' sills (0.45 m): at 0.7 m its front, 8 cm out, lay in the panes' own plane and the
   // bottom of every shop front flickered as a dark jagged bar.
-  if(spec.material!=='glass'&&height>4){const ph=spec.ground?.type==='glass'?0:spec.ground&&spec.ground.type!=='solid'?.44:.7;if(ph)for(const [a,b] of runs(F,F.y0+.4,[F.s0,F.s1]))slab(F,B,(a+b)/2,F.y0+ph/2,0,b-a,ph,.08,c.plinth);}
+  if(spec.material!=='glass'&&height>4){const ph=spec.ground?.type==='glass'?0:spec.ground&&spec.ground.type!=='solid'?.44:.7;if(ph)for(const [a0,b0] of runs(F,F.y0+.4,[F.s0,F.s1]))for(const [a,b] of doorAt===null?[[a0,b0]]:[[a0,Math.min(b0,doorAt-.9)],[Math.max(a0,doorAt+.9),b0]])if(b-a>.3)ledge(F,B,(a+b)/2,F.y0+ph/2,0,b-a,ph,.08,c.plinth);}
  }
  const signs=c.signs.length?mergeGeometries(c.signs.map(g=>g.index?g.toNonIndexed():g)):null;c.signs.forEach(g=>g.dispose());if(signs){signs.computeVertexNormals();signs.computeBoundingSphere();}
  return {triangles:G.triangles+B.triangles,glass:G.finish(),relief:B.finish(),signs,windows};
