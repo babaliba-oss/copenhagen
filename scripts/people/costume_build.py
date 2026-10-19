@@ -4,6 +4,8 @@
 # costume's pose (then brought back to the avatar's bind pose by inverse skinning). Hair powdered, a tricorne on top.
 #   python3 scripts/people/costume_build.py scripts/people <dhana.gltf> <costume.glb> <costume textures dir> <name> <out dir> [coat=#hex]
 #   [vest= drawers= hose= shoes= cravat=#hex] [detail=2] [hat=top] [hair=keep]  (R_HCA: the red coat in black with dark trousers, a top hat, his own hair)
+#   <costume> may also be a USD scene (scene.usdc) or a glTF scene (scene.gltf, with parts=<node prefixes> to keep): R_Mysli is
+#   Moskvin's CC BY "Textiles: Man's costume #4": parts=Farn_shoe,Man_hose,blouse,coat,trousers
 import sys, os, json, numpy as np, trimesh
 sys.path.insert(0, sys.argv[1]); import ppl_glb as G
 _argv = sys.argv; sys.argv = [_argv[0], _argv[1], '/tmp/', '/tmp/']; import ppl_build as PB; sys.argv = _argv
@@ -72,8 +74,22 @@ def usd_parts(path):  # Sketchfab USDZ (unzipped scene.usdc + 0/<material>_baseC
             V, F, col = P, tris, np.full((len(P), 3), .35)
         out.append((prim.GetName(), V, F, col))
     return out
-if COSTUME.endswith(('.usdc', '.usda', '.usd')):
-    raw = usd_parts(COSTUME)
+def gltf_parts(path):  # a glTF costume (Moskvin's "Textiles: Man's costume #4", the Mysli coat): its own nodes only (parts=
+    # node-name prefixes; the scene also holds a table, rulers and cloth swatches), each coloured from <TEXDIR>/<material>_baseColor.jpeg
+    keep = [k for k in opts.get('parts', '').split(',') if k]
+    sc = trimesh.load(path, force='scene'); out = []
+    for node in sc.graph.nodes_geometry:
+        T, gn = sc.graph[node]
+        if keep and not any(node.startswith(k) or gn.startswith(k) for k in keep): continue
+        g = sc.geometry[gn].copy(); g.apply_transform(T)
+        mname = getattr(getattr(g.visual, 'material', None), 'name', '') or ''
+        tex = next((t for t in (os.path.join(TEXDIR, mname + e) for e in ('_baseColor.jpeg', '_baseColor.jpg', '_baseColor.png')) if os.path.exists(t)), None)
+        uv = getattr(g.visual, 'uv', None)
+        col = sample(tex, uv) if tex and uv is not None else np.full((len(g.vertices), 3), .35)
+        out.append((node, np.asarray(g.vertices, np.float64), np.asarray(g.faces), col))
+    return out
+if COSTUME.endswith(('.usdc', '.usda', '.usd', '.gltf')):
+    raw = gltf_parts(COSTUME) if COSTUME.endswith('.gltf') else usd_parts(COSTUME)
     area = lambda v, f: float(np.linalg.norm(np.cross(v[f[:, 1]] - v[f[:, 0]], v[f[:, 2]] - v[f[:, 0]]), axis=1).sum() / 2)
     areas = [area(v, f) for _, v, f, _ in raw]; total = sum(areas)
     for (name, v, f, c), ar in zip(raw, areas):  # the triangle budget follows the surface (the trousers under the coat had most of the triangles)

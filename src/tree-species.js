@@ -133,13 +133,13 @@ export function treeInstance(t,i=0){
  return {family,height:h*(.95+(hash%11)/100),width,variant:hash%2,yaw:(hash%628)/100,tint:.92+(hash%17)/100};
 }
 
-// Trees at least 2.2 m apart (register duplicates and the densest plantings thinned: Rådhuspladsen's cherry grove is
-// listed 1.2-2 m apart and read as one wall of crowns), and each tree's distance to its nearest neighbour (t.space), so
+// Trees at least 3.5 m apart (register duplicates and the densest plantings thinned: Rådhuspladsen's cherry grove is
+// listed 1.2-2 m apart, 77 trees in 40 m, and read as one wall of crowns; 29 stay), and each tree's distance to its nearest neighbour (t.space), so
 // close plantings get crowns that fit their spacing.
 export function spaceTrees(trees){
  const C=5,grid=new Map(),key=(x,z)=>Math.floor(x/C)*73856093^Math.floor(z/C)*19349663,kept=[];
  const near=(x,z,f)=>{for(let i=-1;i<=1;i++)for(let j=-1;j<=1;j++){const l=grid.get(key(x+i*C,z+j*C));if(l)for(const o of l)f(o);}};
- for(const t of trees){const [x,z]=t.p;let dup=false;near(x,z,o=>{if(Math.hypot(o.p[0]-x,o.p[1]-z)<2.2)dup=true;});if(dup)continue;
+ for(const t of trees){const [x,z]=t.p;let dup=false;near(x,z,o=>{if(Math.hypot(o.p[0]-x,o.p[1]-z)<3.5)dup=true;});if(dup)continue;
   kept.push(t);const k=key(x,z);if(!grid.has(k))grid.set(k,[]);grid.get(k).push(t);}
  for(const t of kept){const [x,z]=t.p;let d=Infinity;near(x,z,o=>{if(o!==t)d=Math.min(d,Math.hypot(o.p[0]-x,o.p[1]-z));});t.space=d<C?d:0;} // 0: none within 5 m, no cap
  return kept;

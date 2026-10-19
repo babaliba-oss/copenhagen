@@ -159,8 +159,8 @@ Notes:
   `oak.glb`, "Tree GN" without its vines: oaks, elms, willows), one BatchedMesh per model and part, scaled per tree to the
   register's height and the family's crown width. Birches and conifers keep the procedural EZ-Tree crowns, as does every
   family when the models do not load (`?car=classic`; `?eztrees` keeps EZ-Tree for all, to compare). `spaceTrees`
-  keeps trees at least 2.2 m apart (the register lists some twice, 1-2 m apart: Rådhuspladsen's cherry grove read as one
-  wall) and caps each crown at 1.8 times the distance to its nearest neighbour. Build: `python3 scripts/models/tree_build.py <scene.gltf> <out.glb>
+  keeps trees at least 3.5 m apart (the register lists some twice, 1-2 m apart: Rådhuspladsen's cherry grove, 77 trees
+  within 40 m, read as one wall; 29 stay, 4% fewer trees in all) and caps each crown at 1.8 times the distance to its nearest neighbour. Build: `python3 scripts/models/tree_build.py <scene.gltf> <out.glb>
   leaves=<leaf materials> bark=<bark materials> [drop=] keep= grow= twigs= bark_tris= bark_tex= leaf_tex=` (Blender):
   a share of the leaf cards kept and grown so the crown stays closed, twig pieces dropped and the bark decimated, the
   textures cut to 512 px (leaf materials packed into one atlas), the trunk base at the origin. linden: `leaves=normal_leaves
@@ -227,7 +227,8 @@ Riding, falling and carrying, the player is the procedural figure too. `?procedu
   place of his generic figure): the red coat in black with dark trousers, a white cravat, a top hat and his own hair
   (`coat=#17181f vest=#3b3430 drawers=#1b1b21 hose=#1b1b21 shoes=#141414 cravat=#ece9e2 hat=top hair=keep detail=2.5`). Another Ready Player Me
   avatar (same skeleton) can go through rpm_build.py the same way. Mix: `TODAY_MIX` / `PERIOD_MIX` in main.js.
-  `R_Mysli` (Man's #4) is out: the upload it came from is CC BY-NC-ND. Ready Player Me avatars (the cool-man, pmariano)
+  `R_Mysli` (Man's #4) is built from Moskvin's CC BY "Textiles: Man's costume #4" (the earlier upload is CC BY-NC-ND):
+  `costume_build.py scripts/people <dhana.gltf> <its scene.gltf> <its textures> R_Mysli <out> parts=Farn_shoe,Man_hose,blouse,coat,trousers`. Ready Player Me avatars (the cool-man, pmariano)
   come with Ready Player Me's terms, which allow non-commercial use: fine while the game is free.
 - Figures without a skeleton of their own (a scan or sculpt in one pose) go onto the Quaternius rigs with
   `scripts/people/figure_build.py <template M_/W_ .glb, gunzipped> <figure> <out.glb> name=M_X [arm=deg] [hips=f] [crop=x0:x1]`:
