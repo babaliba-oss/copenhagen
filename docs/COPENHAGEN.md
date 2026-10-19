@@ -57,7 +57,18 @@ echo '[]' > public/cities/copenhagen/insets.json && echo '{}' > public/cities/co
 echo '[]' > public/cities/copenhagen-1760/insets.json && echo '{}' > public/cities/copenhagen-1760/recolour.json
 node scripts/building-sweep.mjs copenhagen-1760 --hide     # 1760: shells you see straight through join duplicates.json
 python3 scripts/fit-colliders.py copenhagen && python3 scripts/fit-colliders.py copenhagen-1760   # last: footprints = the houses you see
+python3 scripts/surface-fill.py copenhagen          # after fit-colliders, and again after any surface-dissolve.mjs: paving for the
+                                                    # unmapped strips between the streets and the houses (below)
 ```
+
+Most of today's pavements are not mapped as areas (OpenStreetMap draws them as lines or not at all), so the rendered
+ground stopped at the carriageway's edge. Beside it lay the bare terrain, half a metre below street level
+(terrain-mesh.js): a sunken grey-green strip with a dark trench at the foot of the houses, and the ground under each
+building (its mapped outline at 8.5 cm, surfaceChunks) as a pale line beyond it, at the base of every Nyhavn facade in the
+trailer's first shot. Walkers on it stood in the air. scripts/surface-fill.py paves whatever lies within 5 m of a road and
+is covered by no surface, building or water: 3.4 km², appended to the surface chunks at 4.5 cm (the ground shader's
+pavement band, under the mapped pavement). It drops its own earlier fill first, so it can be rerun. 1760 keeps its
+cobbles and the bare-ground pavements (main.js); `--dry` reports what it would add (0.12 km² there).
 
 ### How the municipal model becomes houses (scripts/kk-buildings.py)
 
