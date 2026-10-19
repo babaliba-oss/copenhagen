@@ -116,9 +116,15 @@ export function createCinematic({doc=document,ground,teleport,place=null,roads=(
   if(s.drive&&roads())drive=drives(s);
   if(drive){car=drive.pose();side=s.side??(near?pickSide(s):s.cam==='side'||s.cam==='pass'||s.cam==='wheel'?openSide(s):1);
    if(s.cam==='pass'){const probe=drives(s);let p=probe.pose();for(let k=0;k<Math.round(s.dur*30*.5);k++)p=probe.step(1/30);
-    const rx=Math.cos(p.heading),rz=-Math.sin(p.heading),focus=[p.x,ground(p.x,p.z)+1.1,p.z],at=d=>[p.x+rx*d*side,Math.max(ground(p.x+rx*d*side,p.z+rz*d*side),ground(p.x,p.z)-.4)+1.5,p.z+rz*d*side];
-    const d=[6,5,7,4.5,8].find(d=>!nearAt(at(d),2)&&clear(at(d)[0],at(d)[2]))??6; /* the camera stands where no trunk or post is within 2 m (it stood in a tree on the Christianshavn canal) */
-    eye0=lens(clearEye(at(d),focus,solid),focus);}
+    const rx=Math.cos(p.heading),rz=-Math.sin(p.heading),fx=-Math.sin(p.heading),fz=-Math.cos(p.heading),focus=[p.x,ground(p.x,p.z)+1.1,p.z];
+    const at=(d,a=0)=>{const x=p.x+rx*d*side+fx*a,z=p.z+rz*d*side+fz*a;return [x,Math.max(ground(x,z),ground(p.x,p.z)-.4)+1.5,z];};
+    // The camera stands where no trunk or post is within 2 m (it stood in a tree on the Christianshavn canal): beside the
+    // car's mid-shot position first, else a little along the street either way (a quay with a row of trees every 7 m has
+    // a gap between them), and failing all of that where the nearest object is furthest off.
+    const spots=[];for(const a of [0,2.5,-2.5,5,-5])for(const d of [6,5,7,4.5,8])spots.push([d,a]);
+    const room=([d,a])=>{const e=at(d,a);if(!clear(e[0],e[2]))return -1;for(const r of [2,1.5,1,.5])if(!nearAt(e,r))return r;return 0;};
+    let best=spots.find(sp=>room(sp)>=2);if(!best){let r=-2;for(const sp of spots){const q=room(sp);if(q>r){r=q;best=sp;}}}
+    eye0=lens(clearEye(at(...(best||[6,0])),focus,solid),focus);}
    teleport(car.x,car.z,car.heading);
    if(clearRoute){const probe=drives(s);clearRoute(probe.route(-3,(s.drive.speed??pace)*s.dur+25,1.5).map(p=>[p.x,p.z]));}} // nothing parked in the car's lane
   else{clearRoute?.([]);teleport(...((s.orbit?.follow&&find(s.orbit.follow))||s.at||[s.orbit?.c?.[0]??0,s.orbit?.c?.[1]??0]));}

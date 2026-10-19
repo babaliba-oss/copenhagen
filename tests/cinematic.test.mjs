@@ -94,3 +94,20 @@ test('a tracking camera rides the side of the car with fewer posts in the lens',
  let without=null;createCinematic({doc,ground:()=>0,teleport(){},roads:()=>roads,setCamera:p=>{without=p;},loaded:()=>true,era:'today',shots,speed:10}).start();
  assert.ok(without.eye[2]>0,'without the obstacle check it rides the right-hand side as before');
 });
+test('the pass camera finds the gap in a row of quay trees rather than standing in one',async()=>{
+ const {createCinematic}=await import('../src/cinematic.js');
+ // a straight road west-east; trunks every 7 m along both pavements at 4.5-8 m from the lane, so every distance beside the
+ // car's mid-shot position has a tree within 2 m unless the camera moves along the street
+ const nodes=[[-200,0],[200,0]],edges=[{from:0,to:1,points:[nodes[0],nodes[1]],lane:1.6},{from:1,to:0,points:[nodes[1],nodes[0]],lane:1.6}];
+ const roads=prepareGraph({nodes,edges}),trunks=[];
+ const doc={createElement:()=>({style:{},classList:{add(){},remove(){}},append(){}}),head:{append(){}},body:{classList:{add(){},remove(){},toggle(){}},append(){}}};
+ const shots=[{name:'p',drive:{from:[-100,0],toward:[200,0]},cam:'pass',dur:3,side:1}];
+ // the car's mid-shot x: run once without trees and read the eye
+ let plain=null;createCinematic({doc,ground:()=>0,teleport(){},roads:()=>roads,setCamera:p=>{plain=p;},loaded:()=>true,era:'today',shots,speed:10}).start();
+ const mx=plain.eye[0];for(let x=mx-35;x<=mx+35;x+=7)for(const z of [4.6,6.2,7.8,9.4])trunks.push([x,z]); // a tree at every candidate distance, in line with the car
+ const near=(x,z,y,d=.9)=>trunks.some(([px,pz])=>Math.hypot(x-px,z-pz)<.3+d);
+ let cam=null;createCinematic({doc,ground:()=>0,teleport(){},roads:()=>roads,setCamera:p=>{cam=p;},loaded:()=>true,era:'today',shots,near,speed:10}).start();
+ const nearest=Math.min(...trunks.map(([px,pz])=>Math.hypot(cam.eye[0]-px,cam.eye[2]-pz)));
+ assert.ok(nearest>2,`the lens keeps 2 m from every trunk (nearest ${nearest.toFixed(2)} m, eye x ${cam.eye[0].toFixed(1)} vs car ${mx.toFixed(1)})`);
+ assert.ok(Math.abs(cam.eye[0]-mx)>1,'it moved along the street to the gap between the trees');
+});
