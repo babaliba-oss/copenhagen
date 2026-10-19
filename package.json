@@ -44,6 +44,7 @@
     "@dgreenheck/ez-tree": "^1.1.0",
     "earcut": "^3.0.2",
     "fast-xml-parser": "^5.4.0",
+    "meshoptimizer": "^0.22.0",
     "polygon-clipping": "^0.15.7",
     "proj4": "^2.20.0",
     "three": "^0.183.0"

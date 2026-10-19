@@ -17,6 +17,7 @@ const roots=[...new Set(imports.filter(s=>!s.startsWith('.')&&!s.startsWith('/')
 const notices={
  '@dgreenheck/ez-tree':{file:'LICENSE'},
  earcut:{file:'LICENSE'},
+ meshoptimizer:{file:'LICENSE.md'},
  mgrs:{file:'license.md'},
  'polygon-clipping':{file:'LICENSE.md'},
  proj4:{file:'LICENSE.md'},

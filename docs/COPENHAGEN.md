@@ -221,6 +221,21 @@ models bake one at a time after load (30 ms apart), so the first frames are not 
 chat, bike), a fall, a suitcase, a pram, running or in a conversation stays the procedural instanced figure
 (person-model.js), as does everyone beyond the baked range. Riding, falling and carrying, the player is the procedural
 figure too. `?procedural` turns the rigged and baked ones off.
+- The other crowds are the characters as well: the cyclists (cyclists.js, set `ride`: 8 frames round the crank, two
+  blended at each rider's crank angle, out to 140 m) and every crowd made by `createInstancedPeople` (market-life.js:
+  the café guests, seated, set `sit`; the squares, the market, the game's people and the 1760 crowd, walking or
+  standing, set `walk`; out to 90 m, 45 m on phones). The fallen, the far and the tiny keep the procedural figure.
+- The seated and cycling poses (src/people-poses.js) are made from each model's Idle pose by turning bones in world
+  space, so one description serves both rigs: hips onto the saddle or chair, a lean in the back, two-bone IK for the
+  legs (the pedals round the crank, or the feet under the table) and the arms (the bike's swept-back grips, or the
+  table top). `node scripts/people/pose-preview.mjs <name> <out.json>` writes the posed vertices for a software render;
+  tests/baked-people.test.mjs checks the feet stay on the pedals all the way round, for both rigs.
+- The player rides as the rigged character too: on the bike, the ladcykel and the e-scooter, the Idle pose is put back
+  each frame and posed on the ride's own anchors (player-ride-models.js; `rideSpec`, `standSpec`), the feet going round
+  on the drawn pedals. The bike's cranks now turn forward (the top pedal moving ahead, as the wheels' tops do), and the
+  procedural rider's feet with them.
+- Far versions: each baked model also gets a version with about a third of its triangles (meshoptimizer's `simplify`,
+  which keeps the vertices it uses, so the frames and colours are shared), drawn for the baked people beyond 32 m.
 - Files: `public/models/people/<name>.glb.gz` (gzipped GLB, unzipped in the browser: Cloudflare serves .glb uncompressed).
   Today uses twelve characters (with Daniel's cool-man, pmariano and a woman in a party dress); 1760 his Victorian woman, the merchant's wife and
   `W_Medieval` for the women, his costumes for the men in town and the ship boy and six sailors (below); the player is

@@ -1,6 +1,15 @@
 import {SpatialIndex} from './geo.js';
+import {groundAt} from './terrain.js';
+const THREE_CLAMP=(v,a,b)=>Math.max(a,Math.min(b,v));
 import {createPersonBatch,advanceGait,personLook} from './person-model.js';
 import {createLooseMicromobility} from './parked-micromobility.js';
+import {createBakedPeople,WALK_FRAMES} from './skinned-people.js';
+
+// The character models for the instanced crowds, once loaded (main.js): each crowd then draws its people within `range`
+// as the baked characters, walking, standing or (café guests) seated, and the procedural figure only for the fallen,
+// the far and the tiny (a stand-in hidden behind a rigged figure).
+let bakedPeople=null;
+export function setBakedPeople(lib,{range=90,pick=p=>p.id}={}){bakedPeople=lib?{lib,range,pick,version:(bakedPeople?.version||0)+1}:null;}
 
 // Original geometry, photo-guided atmosphere rather than recorded individual people.
 // Appearance (clothing, skin, hair, build, bags) comes from the shared person model.
@@ -56,9 +65,30 @@ export function createInstancedPeople(records,options={}){
  const people=records.map((p,i)=>({id:`crowd-${i}`,homeX:p.x,homeZ:p.z,heading:0,pose:'chat',walking:true,edge:{crossing:false,market:true},speed:0,running:0,panicUntil:0,...personLook(i*13+(options.seed??0)),...p}));
  // One shared articulated person batch (torso, head, hair, limbs, coats, bags/luggage).
  const batch=createPersonBatch(people.length,{name:options.name||'Instanced pedestrian crowd',luggage:!!options.luggage,frustumCulled:true});
- const group=batch.group;let time=0,lastDraw=-1,viewer=null;
+ const group=batch.group;let time=0,lastDraw=-1,viewer=null,models=null;
+ // The character models (setBakedPeople): one renderer for walking and standing, one for sitting, made on first use.
+ const hash=v=>{let h=2166136261;for(const c of String(v))h=Math.imul(h^c.charCodeAt(0),16777619);return h>>>0;};
+ const phases=new Map(),FR=WALK_FRAMES;
+ function modelsNow(){
+  if(!bakedPeople||options.models===false){if(models){for(const r of models.r)group.remove(r.group),r.dispose();models=null;}return null;}
+  if(models?.version===bakedPeople.version)return models;if(models)for(const r of models.r)group.remove(r.group),r.dispose();
+  const {lib,range}=bakedPeople,cap=Math.max(4,Math.min(48,Math.ceil(people.length/lib.models.length*1.6)+2)),pick=p=>hash(p.id??'');
+  const walk=createBakedPeople(lib,{set:'walk',capacity:cap,range,pick,name:`${options.name||'Crowd'} (models)`}),sit=people.some(p=>p.seated)?createBakedPeople(lib,{set:'sit',capacity:cap,range,pick,name:`${options.name||'Crowd'} (models, seated)`}):null;
+  models={version:bakedPeople.version,walk,sit,r:[walk,sit].filter(Boolean)};for(const r of models.r)group.add(r.group);return models;
+ }
+ function drawModel(m,p){
+  if(p.knockdown||(p.height??1.7)<.6)return false;
+  const y=(p.groundY??.13)+groundAt(p.x,p.z);
+  if(p.seated)return !!m.sit&&m.sit.draw(p,p,0,1,0,0,{y:(p.groundY??0)+groundAt(p.x,p.z),heading:p.heading||0}); // the chairs stand on the ground, not the pavement's lift
+  const speed=Math.abs(p.speed||0);if(speed<.15)return m.walk.draw(p,p,FR,1,0,0,{y,heading:p.heading||0});
+  const k=m.walk.kindOf(p);if(!k)return false;let st=phases.get(p);if(!st)phases.set(p,st={ph:hash(p.id??'')%1000/1000,t:time});
+  st.ph=(st.ph+(time-st.t)*THREE_CLAMP(speed/(1.25*(p.height||1.72)/k.height),.55,2.2)/k.D)%1;st.t=time;
+  const f=st.ph*FR,i0=Math.floor(f)%FR,w=f-Math.floor(f);return m.walk.draw(p,p,i0,1-w,(i0+1)%FR,w,{y,heading:p.heading||0});
+ }
  // The batch picks each person's detail level from the viewer's position (see person-model.js).
- function render(){batch.begin(viewer);for(const p of people)batch.draw(p,p,p,time);batch.end();}
+ function render(){const m=modelsNow();batch.begin(viewer);if(m)for(const r of m.r)r.begin(viewer);
+  for(const p of people){if(m&&drawModel(m,p))continue;batch.draw(p,p,p,time);}
+  batch.end();if(m)for(const r of m.r)r.end();}
  const clear=(x,z,p)=>safe(x,z)&&!people.some(q=>q!==p&&Math.hypot(q.x-x,q.z-z)<.69)&&!scooters.some(q=>Math.hypot(q.x-x,q.z-z)<1.2);
  function update(dt,player){
   const step=clamp(dt||0,0,.08);time+=step;viewer=player||null;

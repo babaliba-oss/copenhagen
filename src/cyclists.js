@@ -5,6 +5,7 @@ import {SpatialIndex} from './geo.js';
 import {surfaceId} from './harbour-layout.js';
 import {applyImpactPose} from './impact-pose.js';
 import {createPersonBatch,personLook} from './person-model.js';
+import {drawRider} from './skinned-people.js';
 import {groundAt} from './terrain.js';
 
 // Centreline checked against dedicated municipal cycle polygons 41192/42153.
@@ -48,7 +49,7 @@ export function createCyclistRenderer(scene,sim){
  // Saddle height fits a ~1.75 m rider whose foot reaches the pedal at the bottom of the stroke.
  const front=[0,.37,-.61],rear=[0,.37,.61],crank=[0,.36,.08],seat=[0,.86,.25],head=[0,.94,-.43];
  for(const [a,b] of [[rear,seat],[rear,crank],[seat,crank],[crank,head],[head,seat],[head,front]])tube(a,b,.027,'frame');
- tube(head,[0,1.17,-.46],.024,'metal');tube([-.29,1.17,-.46],[.29,1.17,-.46],.027,'dark');tube([0,.85,.25],[0,.93,.26],.022,'metal');tube([0,.96,.14],[0,.96,.36],.05,'dark');
+ tube(head,[0,1.17,-.46],.024,'metal');tube([-.13,1.17,-.46],[.13,1.17,-.46],.027,'dark');for(const sx of [-1,1])tube([sx*.13,1.17,-.46],[sx*.27,1.15,-.31],.027,'dark'); /* a city bike's swept-back bar */tube([0,.85,.25],[0,.93,.26],.022,'metal');tube([0,.96,.14],[0,.96,.36],.05,'dark');
  const count=sim.riders.length,tmp=new THREE.Object3D(),specs=[];
  function batch(geometry,mat,pose){const mesh=new THREE.InstancedMesh(geometry,mats[mat],count);mesh.castShadow=true;mesh.frustumCulled=false;group.add(mesh);specs.push({mesh,pose});return mesh;}
  const FRAMES=['#caa72b','#1d1f22','#e8e6df','#2d4f7a','#7a2a20','#3f5d45','#9aa0a6','#c8202a','#e0b4c0','#1f6f6a'];
@@ -59,12 +60,17 @@ export function createCyclistRenderer(scene,sim){
  // Riders use the shared articulated person: hips on the saddle, feet on the pedals, hands on the bar.
  const riders=createPersonBatch(count,{name:'Cyclist riders'});group.add(riders.group);
  const looks=sim.riders.map(r=>personLook(9001+r.id*17,{height:1.72+r.id%4*.04,coat:0,skirt:false,bagType:r.id%3===0?'backpack':null,hairStyle:r.id%4===3?'short':'beanie',hat:['#e8e6df','#2a2d33','#c23b33','#3a5a6a'][r.id%4]}));
- const actors=sim.riders.map(()=>({x:0,z:0,heading:0,speed:0,pose:'cycle',groundY:.10,bike:{hipY:1.06,hipZ:.2,crankY:.36,crankZ:.08,crankR:.17,crank:0,barX:.25,barY:1.17,barZ:-.44}}));
+ let baked=null;
+ const actors=sim.riders.map((r,i)=>({rider:i,x:0,z:0,heading:0,speed:0,pose:'cycle',groundY:.10,bike:{hipY:1.06,hipZ:.2,crankY:.36,crankZ:.08,crankR:.17,crank:0,barX:.27,barY:1.15,barZ:-.32}}));
  return {group,update(player){
   sim.riders.forEach((r,i)=>{for(const {mesh,pose} of specs){const [x,y,z,rx]=pose(r),c=Math.cos(r.heading),s=Math.sin(r.heading);tmp.position.set(r.x+x*c+z*s,y+.10+groundAt(r.x,r.z),r.z-x*s+z*c);tmp.rotation.set(rx,r.heading,0,'YXZ');tmp.scale.setScalar(!r.playerTaken&&Math.hypot(r.x-player.x,r.z-player.z)<420?1:0);tmp.updateMatrix();mesh.setMatrixAt(i,tmp.matrix);if(r.knockdown&&!r.playerTaken)applyImpactPose(mesh,i,r);}});
   specs.forEach(({mesh})=>mesh.instanceMatrix.needsUpdate=true);
-  riders.begin();
-  sim.riders.forEach((r,i)=>{if(r.playerTaken||Math.hypot(r.x-player.x,r.z-player.z)>=420)return;const a=actors[i];a.x=r.x;a.z=r.z;a.heading=r.heading;a.speed=r.speed;a.knockdown=r.knockdown;a.bike.crank=r.phase*.42;riders.draw(a,looks[i],a);});
-  riders.end();
- }};
+  riders.begin();baked?.begin(player);
+  sim.riders.forEach((r,i)=>{if(r.playerTaken||Math.hypot(r.x-player.x,r.z-player.z)>=420)return;const a=actors[i];a.x=r.x;a.z=r.z;a.heading=r.heading;a.speed=r.speed;a.knockdown=r.knockdown;a.bike.crank=r.phase*.42;
+   if(!a.knockdown&&baked&&drawRider(baked,a,looks[i],a.bike.crank,{y:.10+groundAt(a.x,a.z),heading:a.heading}))return; // the character model on the bike
+   riders.draw(a,looks[i],a);});
+  riders.end();baked?.end();
+ },
+ // the characters on the bikes (skinned-people.js createBakedPeople, set 'ride'); the procedural rider where they cannot be
+ setBaked(people){if(baked)group.remove(baked.group);baked=people;if(people)group.add(people.group);}};
 }

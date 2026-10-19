@@ -31,7 +31,7 @@ export function addBicycleMotion(root,anchors=PLAYER_BIKE){
  return {wheels,cranks,pedals,update(distance=0){
   const phase=distance*anchors.crankPerMetre;
   for(const wheel of wheels)wheel.rotation.x=-distance/.352;
-  for(let side=0;side<2;side++){const angle=phase+(side?Math.PI:0);cranks[side].rotation.x=angle;pedals[side].rotation.x=-angle;}
+  for(let side=0;side<2;side++){const angle=phase+(side?Math.PI:0);cranks[side].rotation.x=-angle;pedals[side].rotation.x=angle;} // forward: the top pedal moves ahead (-Z), as the wheels' tops do
  }};
 }
 

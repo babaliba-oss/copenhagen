@@ -212,7 +212,7 @@ export function posePerson(actor,look,gait,out,time=0){
    // Pedal under the ball of the foot; knee points forward and up.
    const fp=-.25+.2*Math.sin(ang),ball=.06656*H,drop=.028*H;
    const ankleY=b.pedalX?b.crankY+b.crankR*Math.cos(ang)+(b.pedalTop||0)+.036*k-Math.sin(fp)*ball+Math.cos(fp)*drop:b.crankY+b.crankR*Math.cos(ang)+ankleH*.9;
-   const ankleZ=b.pedalX?b.crankZ+b.crankR*Math.sin(ang)+Math.cos(fp)*ball+Math.sin(fp)*drop:b.crankZ+b.crankR*Math.sin(ang)+.05;
+   const ankleZ=b.pedalX?b.crankZ-b.crankR*Math.sin(ang)+Math.cos(fp)*ball+Math.sin(fp)*drop:b.crankZ-b.crankR*Math.sin(ang)+.05; // pedalling forward (player-ride-models.js cranks)
    ik(out,hj,JOINT.kneeL+side*3,JOINT.ankleL+side*3,sgn*(b.pedalX||P.hipX*H*hw*1.1),ankleY,ankleZ,Lt,Ls,0,.5,-1);
   }
  }else if(scooterFeet){
