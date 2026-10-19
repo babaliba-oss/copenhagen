@@ -98,7 +98,7 @@ void main(){
   cloud+=uSunGlow*pow(mu,10.0)*(1.0-d)*.5; // silver lining near the sun
   // Faint streaky cirrus higher up.
   vec2 ci=vec2(p.x*.18+p.y*.05,p.y*.7-p.x*.2)+uDrift*.6+vec2(uTime*.006,0.0);
-  float c=smoothstep(.5,.85,fbm3(ci*vec2(1.0,3.5)))*.38;
+  float c=smoothstep(.5,.85,fbm3(ci*vec2(1.0,3.5)))*.2; // .38 drew a streak running straight up from the end of the street like a searchlight (it lines up with the view and converges on the horizon)
   float fade=smoothstep(.015,.28,dir.y);
   // Distant clouds sink into the horizon haze.
   vec3 haze=mix(uHorizon,col,.35);
