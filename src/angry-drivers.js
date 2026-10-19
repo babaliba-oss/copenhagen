@@ -66,11 +66,13 @@ export function createAngryDrivers({vehicleOf=null}={}){
    const k=d.car.knocked;
    // Recycled or claimed cars no longer own this old roadside animation.
    if(!k||d.car.playerTaken||d.car.edge===null){remove(d);continue;}
-   // Climb out once the car has stopped (or shortly after the hit if it keeps creeping).
-   if(d.start===null){if(k.rest===null&&time-d.hit<ANGRY.delay+1.5)continue;if(time-d.hit<ANGRY.delay)continue;
+   // Climb out once the car has come to rest (a car still coasting used to leave its driver and door behind in the road).
+   if(d.start===null){if(k.rest===null||time-d.hit<ANGRY.delay)continue;
     const h=d.car.heading,lx=-Math.cos(h),lz=Math.sin(h),fx=-Math.sin(h),fz=-Math.cos(h);
-    d.start=time;d.seat={x:d.car.x+fx*SEAT_FORWARD,z:d.car.z+fz*SEAT_FORWARD,lx,lz,out:Math.atan2(-lx,-lz)};
+    d.start=time;d.at={x:d.car.x,z:d.car.z,heading:h};d.seat={x:d.car.x+fx*SEAT_FORWARD,z:d.car.z+fz*SEAT_FORWARD,lx,lz,out:Math.atan2(-lx,-lz)};
     d.door=createDoor(vehicleOf?.(d.car)||FALLBACK);d.door.root.position.set(d.car.x,.12+groundAt(d.car.x,d.car.z),d.car.z);d.door.root.rotation.y=h;group.add(d.door.root);}
+   // Shoved again, or moving off: the scene is over (the driver is back in, the door shut) rather than a door left in the road.
+   if(k.rest===null||Math.hypot(d.car.x-d.at.x,d.car.z-d.at.z)>.5||Math.abs(Math.atan2(Math.sin(d.car.heading-d.at.heading),Math.cos(d.car.heading-d.at.heading)))>.15){remove(d);continue;}
    // Timeline: door swings open, driver climbs out, gestures; later climbs back in and pulls the door shut.
    const t=time-d.start,leave=Math.max(d.angry-d.hit,0)+ANGRY.stay+ANGRY.door+ANGRY.climb,back=t>leave?(t-leave)/ANGRY.back:0;
    if(back>=1+ANGRY.close/ANGRY.back){remove(d);continue;}
