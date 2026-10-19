@@ -1,0 +1,253 @@
+{
+ "bpm": 100,
+ "crop": "crop=3402:1914:9:300,scale=1920:1080",
+ "segments": [
+  {
+   "id": "00",
+   "src": "m",
+   "t": 123.0,
+   "d": 3.0,
+   "cap": null,
+   "title": true,
+   "act": "hook"
+  },
+  {
+   "id": "01",
+   "src": "m",
+   "t": 13.6,
+   "d": 3.0,
+   "cap": "Every street is the real one. Drive it.",
+   "act": "hook"
+  },
+  {
+   "id": "02",
+   "src": "m",
+   "t": 21.1,
+   "d": 2.4,
+   "cap": null,
+   "act": "hook"
+  },
+  {
+   "id": "03",
+   "src": "m",
+   "t": 34.1,
+   "d": 3.0,
+   "cap": "Kongens Nytorv. Traffic, cyclists, crowds.",
+   "act": "today"
+  },
+  {
+   "id": "04",
+   "src": "m",
+   "t": 41.7,
+   "d": 3.0,
+   "cap": "A car radio with real Copenhagen stations.",
+   "act": "today"
+  },
+  {
+   "id": "09",
+   "src": "m",
+   "t": 83.8,
+   "d": 1.8,
+   "cap": null,
+   "act": "today"
+  },
+  {
+   "id": "05",
+   "src": "m",
+   "t": 49.2,
+   "d": 3.0,
+   "cap": "Amalienborg",
+   "act": "today"
+  },
+  {
+   "id": "06",
+   "src": "m",
+   "t": 63.2,
+   "d": 2.4,
+   "cap": "Sagas to follow.",
+   "act": "today"
+  },
+  {
+   "id": "07",
+   "src": "m",
+   "t": 27.6,
+   "d": 3.0,
+   "cap": "H.C. Andersen, at Nyhavn 20, where the fairy tales began.",
+   "act": "today"
+  },
+  {
+   "id": "08",
+   "src": "m",
+   "t": 77.8,
+   "d": 1.2,
+   "cap": null,
+   "act": "today",
+   "in": 0.5
+  },
+  {
+   "id": "10",
+   "src": "m",
+   "t": 109.9,
+   "d": 2.4,
+   "cap": "Rådhuspladsen",
+   "act": "today"
+  },
+  {
+   "id": "11",
+   "src": "m",
+   "t": 116.5,
+   "d": 3.0,
+   "cap": "Park the car. Walk, or take a bike.",
+   "act": "today"
+  },
+  {
+   "id": "12",
+   "src": "m",
+   "t": 90.4,
+   "d": 2.4,
+   "cap": "Say hi to Nissefar.",
+   "act": "today"
+  },
+  {
+   "id": "13",
+   "card": [
+    "Press Y.",
+    "Copenhagen, 1760."
+   ],
+   "d": 3.0,
+   "act": "card"
+  },
+  {
+   "id": "14n",
+   "src": "h",
+   "t": 12.0,
+   "d": 3.0,
+   "cap": "Same streets. 266 years earlier.",
+   "act": "1760"
+  },
+  {
+   "id": "15n",
+   "src": "h",
+   "t": 67.2,
+   "d": 1.8,
+   "cap": null,
+   "act": "1760",
+   "in": 0.4
+  },
+  {
+   "id": "16",
+   "src": "h",
+   "t": 25.9,
+   "d": 3.0,
+   "cap": "Kongens Nytorv, 1760",
+   "act": "1760"
+  },
+  {
+   "id": "17",
+   "src": "h",
+   "t": 33.1,
+   "d": 2.4,
+   "cap": null,
+   "act": "1760"
+  },
+  {
+   "id": "18",
+   "src": "h",
+   "t": 39.7,
+   "d": 3.0,
+   "cap": "Amalienborg, newly built",
+   "act": "1760"
+  },
+  {
+   "id": "19n",
+   "src": "h",
+   "t": 54.0,
+   "d": 3.0,
+   "cap": "Sagas of its own",
+   "act": "1760",
+   "in": 0.6
+  },
+  {
+   "id": "20n",
+   "src": "h",
+   "t": 101.3,
+   "d": 2.4,
+   "cap": "A harbour full of sail",
+   "act": "1760"
+  },
+  {
+   "id": "23",
+   "split": [
+    [
+     "m",
+     13.9
+    ],
+    [
+     "h",
+     11.9
+    ]
+   ],
+   "d": 2.4,
+   "cap": "Every route runs in both eras.",
+   "act": "both"
+  },
+  {
+   "id": "24m",
+   "split": [
+    [
+     "m",
+     55.9,
+     0.2
+    ],
+    [
+     "h",
+     47.2
+    ]
+   ],
+   "d": 2.4,
+   "cap": null,
+   "act": "both"
+  },
+  {
+   "id": "25",
+   "wipe": [
+    [
+     "m",
+     130.6,
+     3.2
+    ],
+    [
+     "h",
+     110.3,
+     2.4
+    ]
+   ],
+   "xfade": 0.8,
+   "d": 4.8,
+   "cap": "One city, two centuries. Press Y any time.",
+   "act": "both"
+  },
+  {
+   "id": "26",
+   "src": "m",
+   "t": 139.1,
+   "d": 3.0,
+   "cap": "It follows the calendar. Halloween…",
+   "act": "seasons"
+  },
+  {
+   "id": "27",
+   "src": "m",
+   "t": 146.6,
+   "d": 3.0,
+   "cap": "…and Christmas.",
+   "act": "seasons"
+  },
+  {
+   "id": "29",
+   "end": true,
+   "d": 5.4,
+   "act": "end"
+  }
+ ]
+}

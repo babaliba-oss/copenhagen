@@ -20,3 +20,5 @@ docs/RELEASE_REVIEW.md
 *.blend1
 
 __pycache__/
+trailer/logo.png
+trailer/out*
