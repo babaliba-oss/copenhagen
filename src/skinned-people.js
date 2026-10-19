@@ -52,6 +52,18 @@ export function createRiggedFigure(model,{height=1.8}={}){
   const act=actions[state];if(act)act.timeScale=state==='Walk'?THREE.MathUtils.clamp(speed/(1.25*k),.55,1.7):state==='Run'?THREE.MathUtils.clamp(speed/(3.4*k),.7,1.6):1;
   mixer.update(dt);}};
 }
+// A figure that reads at a distance (H.C. Andersen at Nyhavn): his near-black coat and trousers came out as one dark
+// shape with a white shirt in it. The darkest colours are lifted into a deep warm grey so the coat's folds, lapels and
+// tails show; the top hat (the highest few percent) stays nearly black. The figure gets its own copy of the geometry.
+export function defineFigure(root,{lift=3,warm=[.007,.005,.003]}={}){
+ root.traverse(o=>{if(!o.isMesh||!o.geometry.attributes.color)return;o.geometry=o.geometry.clone();
+  const c=o.geometry.attributes.color,p=o.geometry.attributes.position;let top=-Infinity,low=Infinity;for(let i=0;i<p.count;i++){top=Math.max(top,p.getY(i));low=Math.min(low,p.getY(i));}
+  const hat=top-(top-low)*.07;
+  for(let i=0;i<c.count;i++){const r=c.getX(i),g=c.getY(i),b=c.getZ(i);if(Math.max(r,g,b)>=.035)continue;const k=p.getY(i)>hat?1.3:lift,w=p.getY(i)>hat?0:1;
+   c.setXYZ(i,r*k+warm[0]*w,g*k+warm[1]*w,b*k+warm[2]*w);}
+  c.needsUpdate=true;});
+ return root;
+}
 // Baked people: the characters without a skeleton, for everyone beyond the rigged few. A model is baked once per set
 // (lazily, from a shared queue run a few milliseconds a tick) into morph targets of absolute vertex positions: `walk`, its Walk cycle
 // at FRAMES frames plus one Idle frame; `ride`, CRANK frames of pedalling a bike; `sit`, sitting on a café chair (the

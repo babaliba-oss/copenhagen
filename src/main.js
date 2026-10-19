@@ -98,7 +98,7 @@ import {createCafes} from './copenhagen/cafes.js';
 import {createStalls} from './copenhagen/stalls.js';
 import {hotdogItems} from './copenhagen/street-food.js';
 import {createParkGeese} from './copenhagen/park-geese.js';
-import {PERIOD as PERSON_PERIOD,personLook,flushPeople,loadDogModel,setDogModel,drawLooseDog} from './person-model.js';import {loadPeopleModels,createSkinnedCrowd,createBakedCrowd,createBakedPeople,createRiggedFigure} from './skinned-people.js';
+import {PERIOD as PERSON_PERIOD,personLook,flushPeople,loadDogModel,setDogModel,drawLooseDog} from './person-model.js';import {loadPeopleModels,createSkinnedCrowd,createBakedCrowd,createBakedPeople,createRiggedFigure,defineFigure} from './skinned-people.js';
 const TODAY_MIX=[0,0,1,1,1,2,2,3,3,4,4,5,5,6,7,8,9,9,9,9,9,10,10,10,11,11]; // rigged walkers today, by the names' order where they load: casual clothes most, Daniel's cool-man often, his pmariano (glasses, denim shirt) and a woman in a party dress, suits, then now and then a worker in hi-vis or the punk
 const PERIOD_MIX=[0,0,0,6,6,6,6,7,7,1,1,2,15,4,5,8,9,10,11,12,13,14]; // 1760: women two times in five (Daniel's Victorian woman most, the merchant's wife, W_Medieval), the men in his 18th-century costumes (the red coat also in brown and green; the blue one is the player's), and sailors: the Royal Navy ship boy and the six of the pirate crew
 import {WATER_LEVEL as CPH_WATER} from './quay.js';
@@ -1420,7 +1420,7 @@ async function boot(){
      const nisseFar={mesh:null,p:npc.people.find(p=>p.script==='nisse')};if(nisseFar.p)loadOneMesh('/models/nisse.glb.gz').then(m=>{if(!m?.geometry||!m.geometry.attributes.color&&!m.map||!npc.group.parent)return;const g=m.geometry.scale(1.15,1.15,1.15);nisseFar.mesh=new THREE.Mesh(g,new THREE.MeshStandardMaterial(m.map?{map:m.map,roughness:.75}:{vertexColors:true,roughness:.85}));nisseFar.mesh.castShadow=true;nisseFar.mesh.name='Nissefar';cityModel.add(nisseFar.mesh);nisseFar.p.height=.05;});
      // H.C. Andersen is a rigged figure too: the red-coat costume in black with dark trousers, a white cravat and a top hat on
      // the cool-man (scripts/people/costume_build.py ... R_HCA hat=top hair=keep detail=2.5); the generic body shrinks away.
-     const hcaRig={fig:null,p:npc.people.find(p=>p.script==='hca')};if(hcaRig.p&&!/[?&]procedural/.test(location.search))loadPeopleModels('/models/people/',['R_HCA']).then(lib=>{const m=lib?.models?.[0];if(!m||!npc.group.parent)return;hcaRig.fig=createRiggedFigure(m,{height:hcaRig.p.height||1.85});hcaRig.fig.root.traverse(o=>{if(o.isMesh)o.castShadow=true;});cityModel.add(hcaRig.fig.root);hcaRig.p.height=.05;});
+     const hcaRig={fig:null,p:npc.people.find(p=>p.script==='hca')};if(hcaRig.p&&!/[?&]procedural/.test(location.search))loadPeopleModels('/models/people/',['R_HCA']).then(lib=>{const m=lib?.models?.[0];if(!m||!npc.group.parent)return;hcaRig.fig=createRiggedFigure(m,{height:hcaRig.p.height||1.85});defineFigure(hcaRig.fig.root);hcaRig.fig.root.traverse(o=>{if(o.isMesh)o.castShadow=true;});cityModel.add(hcaRig.fig.root);hcaRig.p.height=.05;});
      npc.update=(u=>(dt,player)=>{if(player){npcCentre.x=player.x;npcCentre.z=player.z;}u(dt,player);npc.group.visible=true;if(nisseFar.mesh){const q=nisseFar.p;nisseFar.mesh.position.set(q.x,groundAt(q.x,q.z),q.z);nisseFar.mesh.rotation.y=q.heading||0;}hcaRig.fig?.update(dt,hcaRig.p);})(npc.update);cityModel.add(npc.group);marketLife={...life(),...npc,group:npc.group};detailPeople=npc.people;}
     harbour={group:new THREE.Group(),obstacles:[],knockables:null};knockables=combineKnockables([breakableSigns]); // traffic-signal posts bend when hit, in every city
     finale.zone=null; // station tram scheduling is Helsinki-specific
@@ -1534,6 +1534,7 @@ async function boot(){
    const marketCameraObstacles=new SpatialIndex((market.stalls||[]).map(s=>solidBox({x:s.x,z:s.z,width:s.w+.5,depth:s.d+.5,yaw:s.facing||0})));
    world.travelCameraBuildings={at:(x,z)=>world.cameraBuildings.at(x,z)||marketCameraObstacles.at(x,z)}; // walking cameras must stay outside canopy roofs and counters
    world.collisionBuildings=world.cameraBuildings;
+   if(city.id==='copenhagen'){const here=city;json(dataUrl('kk-footprints.json')).then(list=>{if(city===here&&list?.length)world.cameraBuildings.add(list);}).catch(()=>{});} // the city model's own houses with no mapped footprint (scripts/kk-collision.py): the car drove into them
    world.objects=new WorldObjects([...streetObstacles,...ads.obstacles,...breakableSigns.bodies]);
    cityModel.traverse(object=>{if(object.worldObjects)world.objects.add(object.worldObjects);});
    // ?start=<name> picks any start on the city map (fuzzy, accent-insensitive).
