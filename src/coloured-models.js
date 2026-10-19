@@ -25,3 +25,13 @@ export async function loadColouredModel(url,recolour){const parts=await loadColo
 export async function loadColouredModels(base,names){
  const out={};await Promise.all(names.map(async n=>{const g=await loadColouredModel(`${base}${n}.glb`);if(g)out[n]=g;}));return out;
 }
+// The Halloween pumpkins (scripts/models/pumpkins.py): meshes named <model><level>_<part> with their own vertex colours
+// (COLOR_0, linear), e.g. A0_body, A0_glow, A1_body. Resolves to {A:{0:{body,glow},1:{body,glow}},...} or null.
+export async function loadPumpkins(url){
+ try{
+  const gltf=await loader.loadAsync(url),out={};
+  gltf.scene.traverse(o=>{const m=o.isMesh&&/^([A-Z])([01])_(body|glow)$/.exec(o.name);if(!m)return;const g=o.geometry;for(const k of Object.keys(g.attributes))if(!['position','normal','color'].includes(k))g.deleteAttribute(k);
+   g.computeBoundingSphere();((out[m[1]]??={})[m[2]]??={})[m[3]]=g;});
+  return Object.keys(out).length?out:null;
+ }catch(e){console.warn('Pumpkins not loaded, procedural kept:',e?.message||e);return null;}
+}

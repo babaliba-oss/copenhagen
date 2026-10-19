@@ -155,6 +155,16 @@ Notes:
   collar in the extras) and greys the coat; the legs swing in diagonal pairs at the walker's trot and each dog's coat
   takes its colour from the palette; a rigged or baked walker with a dog gets the model dog at heel (`drawLooseDog`).
   Walkers with a pram stay procedural figures.
+- Halloween pumpkins (`src/copenhagen/seasons.js`, `pumpkinPools`): Daniel's three models in place of the procedural
+  pumpkin, shared 45/35/20 across the doorsteps and café tables: A, "Halloween pumpkin" by monsieurmo (its grin and eyes
+  painted on to glow); B, "Halloween pumpkin" by Nick Kotik, and C, "Halloween Pumpkin" by Charlie Tinley (both carved
+  through and hollow: the inside walls glow as if a candle burned in them), all CC BY 4.0.
+  `npm i --no-save meshoptimizer@0.22.0`, then `scripts/models/pumpkins.py public/models/props/pumpkins.glb A=<dir> B=<dir>
+  C=<dir>` (each the unzipped Sketchfab folder) writes `<model><level>_<body|glow>` meshes with vertex colours sampled
+  from the textures: level 0 (1,500-1,900 triangles) is meshoptimizer's attribute-aware simplification
+  (`scripts/models/simplify.mjs`), so body and glow share their seam; level 1 (about 200) is a sphere shrink-wrapped onto
+  the model by rays from its middle, the carving closed over and glowing. Within 40 m of the player the pumpkins are
+  level 0, out to 260 m level 1: one instanced pool per model, level and part, refilled four times a second.
 - Trees (`src/tree-species.js`, `src/ez-trees.js`): within 95 m of the player the broadleaf trees are Daniel's tree models
   (`public/models/trees/linden.glb`, "Realistic Tree": limes, maples, ash, chestnuts and the smaller street trees;
   `oak.glb`, "Tree GN" without its vines: oaks, elms, willows), one BatchedMesh per model and part, scaled per tree to the

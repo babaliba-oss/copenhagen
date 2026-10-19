@@ -5,7 +5,7 @@ import {inWaterPolygons} from '../geo.js';
 
 // Seasonal dressing for today's Copenhagen, chosen by the date (or ?season=halloween|christmas|none):
 //  - Halloween (10 Oct - 2 Nov): carved pumpkins glowing on doorsteps along the pavements and by café tables,
-//    and orange string lights over Nyhavn's quay.
+//    and orange string lights over Nyhavn's quay. The pumpkins are Daniel's three models where they load (pumpkinPools).
 //  - Christmas (20 Nov - 6 Jan): big lit trees on the main squares, warm bulb strings across the shopping
 //    streets, wreaths of light on the pavements, and gently falling snow around the player.
 // Everything is instanced (a handful of draw calls) and placed from the map data at load.
@@ -33,6 +33,35 @@ function faceGeometry(){
  const parts=[shape([[-.11,.21],[-.04,.21],[-.075,.27]]),shape([[.04,.21],[.11,.21],[.075,.27]]),shape([[-.12,.13],[.12,.13],[.09,.08],[.05,.11],[0,.07],[-.05,.11],[-.09,.08]])];
  const g=mergeGeometries(parts.map(q=>{const n=q.toNonIndexed();n.deleteAttribute('uv');return n;}));g.translate(0,.02,.245);return g;
 }
+// Daniel's pumpkins (public/models/props/pumpkins.glb, scripts/models/pumpkins.py: A by monsieurmo, B by Nick Kotik,
+// C by Charlie Tinley, all CC BY 4.0), each in two levels and two parts: the detailed one (1,500-1,900 triangles) for
+// the pumpkins within NEAR of the player, a shrink-wrapped one (about 200) for the rest out to FAR. One instanced pool
+// per model, level and part, refilled four times a second from the matrices worked out at load; the lit `body` keeps
+// a faint glow of its own, the `glow` part (the painted face of A, the candle-lit insides of B and C) is unlit.
+export const PUMPKIN_NEAR=40,PUMPKIN_FAR=260;
+const PUMPKIN_SHARE={A:.45,B:.35,C:.2};
+export function pumpkinPools(models,spots,scale,glowMaterial){
+ const group=new THREE.Group();group.name='Halloween pumpkins (models)';
+ const kinds=Object.keys(models).filter(k=>models[k]?.[0]?.body&&models[k]?.[1]?.body);if(!kinds.length||!spots.length)return null;
+ const total=kinds.reduce((a,k)=>a+(PUMPKIN_SHARE[k]??.2),0);
+ const kindOf=i=>{let u=(Math.imul(i+1,2654435761)>>>0)/4294967296*total;for(const k of kinds){u-=PUMPKIN_SHARE[k]??.2;if(u<0)return k;}return kinds[kinds.length-1];};
+ const body=new THREE.MeshStandardMaterial({vertexColors:true,roughness:.7,emissive:'#6a2a08',emissiveIntensity:.55});
+ const m4=new THREE.Matrix4(),q=new THREE.Quaternion(),v=new THREE.Vector3(),sv=new THREE.Vector3(),UP=new THREE.Vector3(0,1,0);
+ const by={};kinds.forEach(k=>by[k]={x:[],z:[],m:[]});
+ spots.forEach((p,i)=>{const b=by[kindOf(i)],sc=scale(i);b.x.push(p[0]);b.z.push(p[1]);b.m.push(m4.compose(v.set(p[0],groundAt(p[0],p[1])+(p[3]??0),p[1]),q.setFromAxisAngle(UP,p[2]||0),sv.set(sc,sc,sc)).toArray());});
+ const sets=kinds.filter(k=>by[k].x.length).map(k=>{const b=by[k],n=b.x.length,mats=new Float32Array(n*16);b.m.forEach((e,i)=>mats.set(e,i*16));
+  const lv=[0,1].map(l=>['body','glow'].map(part=>{const g=models[k][l][part];if(!g)return null;const im=new THREE.InstancedMesh(g,part==='body'?body:glowMaterial,l?n:Math.min(n,400));im.name=`Halloween pumpkins (${k}${l} ${part})`;im.count=0;im.visible=false;im.frustumCulled=false;group.add(im);return im;}).filter(Boolean));
+  return {x:b.x,z:b.z,mats,lv,cap:Math.min(n,400)};});
+ let wait=0;
+ function update(dt,player){
+  if(!player||(wait-=dt)>0)return;wait=.25;
+  for(const st of sets){const n=[0,0];
+   for(let i=0;i<st.x.length;i++){const d=Math.hypot(st.x[i]-player.x,st.z[i]-player.z);let l=d<PUMPKIN_NEAR?0:d<PUMPKIN_FAR?1:-1;if(l<0)continue;if(!l&&n[0]>=st.cap)l=1; // a full near pool: the far model
+    for(const im of st.lv[l])im.instanceMatrix.array.set(st.mats.subarray(i*16,i*16+16),n[l]*16);n[l]++;}
+   st.lv.forEach((ims,l)=>{for(const im of ims){im.count=n[l];im.visible=n[l]>0;if(n[l])im.instanceMatrix.needsUpdate=true;}});}
+ }
+ return {group,update,counts:()=>Object.fromEntries(sets.flatMap(st=>st.lv.flat().map(im=>[im.name,im.count])))};
+}
 // Christmas trees at set spots where a square needs one ([x, z], open paving clear of the lanes); elsewhere a seeded
 // spot within 18 m of the square's landmark. Either way the spot is kept in `anchors` (the cinematic circles it).
 const TREE_SPOTS={};
@@ -42,7 +71,7 @@ function treeGeometry(){
  return mergeGeometries(parts);
 }
 
-export function createSeasonalDecor(season,{buildings=[],world,places=[],cafes=[],walks=[],seed=1031}={}){
+export function createSeasonalDecor(season,{buildings=[],world,places=[],cafes=[],walks=[],seed=1031,pumpkins=null}={}){
  const group=new THREE.Group();group.name=`Seasonal decorations (${season})`;
  if(!season||!world)return {group,update(){},season:null};
  const r=rnd(seed),m4=new THREE.Matrix4(),q=new THREE.Quaternion(),v=new THREE.Vector3(),s=new THREE.Vector3(1,1,1),UP=new THREE.Vector3(0,1,0);
@@ -63,16 +92,18 @@ export function createSeasonalDecor(season,{buildings=[],world,places=[],cafes=[
    items.forEach(([p,i],j)=>{const sc=scale(i);im.setMatrixAt(j,m4.compose(v.set(p[0],groundAt(p[0],p[1])+(p[3]??y),p[1]),q.setFromAxisAngle(UP,p[2]||0),s.set(sc,sc,sc)));cx+=p[0];cz+=p[1];});
    im.computeBoundingSphere();group.add(im);chunks.push({im,x:cx/items.length,z:cz/items.length,range});}
   return true;};
- const flakes=[];let snow=null;const anchors={}; // where the square's tree stands (the cinematic circles Kongens Nytorv's)
+ const flakes=[];let snow=null,pools=null;const anchors={}; // where the square's tree stands (the cinematic circles Kongens Nytorv's)
  if(season==='halloween'){
   const keep=Math.min(1,2600/Math.max(1,doorsteps.length)),nyhavn=places.find(p=>p.name==='Nyhavn'),busy=(x,z)=>nyhavn&&Math.hypot(x-nyhavn.x,z-nyhavn.z)<160; // every doorstep along Nyhavn (the cinematic's Halloween drive), a share elsewhere
   const spots=[...doorsteps.filter(([x,z])=>busy(x,z)||r()<keep),...cafes.map(c=>[c[0]+(r()-.5)*.6,c[1]+(r()-.5)*.6,r()*6.28,.78])];
   // most pumpkins face the street (away from the wall); a few are turned
   for(const p of spots)if(p[3]===undefined)p[2]+=r()<.8?0:(r()-.5)*2;
-  const sc=i=>.8+((i*7919)%13)/13*.7;
-  // lit from inside: a warm glow through the shell reads from any side at night (the face alone only shows head-on)
-  instanced(pumpkinGeometry(),new THREE.MeshStandardMaterial({vertexColors:true,roughness:.7,emissive:'#6a2a08',emissiveIntensity:.9}),spots,'Halloween pumpkins',{scale:sc});
-  instanced(faceGeometry(),glow('#ffb238'),spots,'Pumpkin faces',{scale:sc});
+  const sc=i=>(.8+((i*7919)%13)/13*.7)*(spots[i][3]===undefined?1:.6); // smaller on the café tables
+  pools=pumpkins?pumpkinPools(pumpkins,spots,sc,new THREE.MeshBasicMaterial({vertexColors:true,toneMapped:false,fog:true})):null;
+  if(pools)group.add(pools.group);
+  else{ // the procedural pumpkin, lit from inside: a warm glow through the shell reads from any side at night (the face alone only shows head-on)
+   instanced(pumpkinGeometry(),new THREE.MeshStandardMaterial({vertexColors:true,roughness:.7,emissive:'#6a2a08',emissiveIntensity:.9}),spots,'Halloween pumpkins',{scale:sc});
+   instanced(faceGeometry(),glow('#ffb238'),spots,'Pumpkin faces',{scale:sc});}
   // orange string lights over Nyhavn and the café streets: bulbs along a catenary between pavement points
   const bulbs=[];
   // strings span a street from facade to facade: both ends open ground with a wall just beyond, no house in between
@@ -105,6 +136,6 @@ export function createSeasonalDecor(season,{buildings=[],world,places=[],cafes=[
  }
  let t=0;
  let cull=0;
- return {group,season,update(dt,player){t+=dt;if(player&&(cull-=dt)<=0){cull=.5;for(const c of chunks)c.im.visible=Math.hypot(c.x-player.x,c.z-player.z)<c.range;}if(!snow||!player)return;const p=snow.geometry.attributes.position;snow.position.set(player.x,groundAt(player.x,player.z),player.z);
-  for(let i=0;i<flakes.length;i++){let y=p.getY(i)-dt*flakes[i];if(y<0)y+=30;p.setY(i,y);p.setX(i,p.getX(i)+Math.sin(t*.7+i)*dt*.15);}p.needsUpdate=true;},anchors,stats:{doorsteps:doorsteps.length}};
+ return {group,season,update(dt,player){t+=dt;pools?.update(dt,player);if(player&&(cull-=dt)<=0){cull=.5;for(const c of chunks)c.im.visible=Math.hypot(c.x-player.x,c.z-player.z)<c.range;}if(!snow||!player)return;const p=snow.geometry.attributes.position;snow.position.set(player.x,groundAt(player.x,player.z),player.z);
+  for(let i=0;i<flakes.length;i++){let y=p.getY(i)-dt*flakes[i];if(y<0)y+=30;p.setY(i,y);p.setX(i,p.getX(i)+Math.sin(t*.7+i)*dt*.15);}p.needsUpdate=true;},anchors,pumpkins:pools,stats:{doorsteps:doorsteps.length,pumpkinModels:!!pools}};
 }
