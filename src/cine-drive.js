@@ -30,7 +30,7 @@ export function leadCar(p,cars){
 // front: car centre to its nose (a coach's horses reach 3.3 m ahead); half: half its width.
 export function createCineDrive(roads,{from,toward=null,speed=12,turnSpeed=.45,front=2.3,half=.95}={}){
  const start=placeOnRoads(roads,from,toward);if(!start)return null;
- let edge=start.edge,s=start.s,v=speed,distance=0;const visited=new Set([edge.id]),past=[]; // past: the edges behind, nearest first
+ let edge=start.edge,s=start.s,v=speed,distance=0;const visited=new Set([edge.id]),past=[]; // past: the edges behind, nearest first (the heading looks back across a junction)
  const choose=e=>{
   let options=roads.outgoing[e.to].filter(o=>o.to!==e.from&&o.length>.3);if(!options.length)options=roads.outgoing[e.to];if(!options.length)return null;
   const end=e.points.at(-1),there=toward&&Math.hypot(toward[0]-end[0],toward[1]-end[1])<25,want=toward&&!there?unit(toward[0]-end[0],toward[1]-end[1]):endDir(e),ahead=endDir(e);

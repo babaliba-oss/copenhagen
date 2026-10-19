@@ -218,6 +218,14 @@ recordings cut together mid-drive. The screen goes black between shots while the
   push it (`car.cinematic`), and the body does not rumble on setts.
 - The camera never goes into a house: `clearEye()` walks from the subject out to the planned eye and stops short of the
   first wall in the way, with a metre of air around the lens (`solid()`: footprint and height of the mapped buildings).
+- Nor into a sign, lamp post or tree trunk: `near()` in main.js (world.objects, indexed between shots) keeps the lens
+  0.9 m from them, a side/wheel/pass camera picks the side of the car with fewer of them within 2 m over the whole shot
+  (`pickSide`), and the pass camera stands where none is within 2 m. A chase camera still swings across the inside of
+  a sharp corner (a camera on the car's path behind it was tried: it ended up beside the car, looking at its flank), so
+  the drive shots avoid sharp turns. The car's own heading is the road's over 2.5 m either side of it and a lane-offset
+  change is eased over 14 m, so it never snaps at a junction.
+- Order in the frame: the trailer moves the car before the car model and the camera are placed for the frame. Placed
+  after, the model trailed the camera by a frame and shook whenever frame times varied (Daniel's first recording).
 - Shots can set the sky (`sky:'night'`), switch today's seasonal decorations mid-run (`season:'halloween'|'christmas'`,
   Christmas comes last so the snow stays), follow a character live (`orbit.follow:'hca'|'nisse'`), or show part of the
   interface: `hud:'radio'` (the now-playing card tuning through the stations) and `hud:'quest'` (a saga starting: banner,

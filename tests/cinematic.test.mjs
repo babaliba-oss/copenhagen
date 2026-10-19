@@ -80,3 +80,17 @@ test('the hero car follows a slower car ahead in its lane instead of driving thr
  const gap=slow.x-d.pose().x;assert.ok(gap>6,`kept back: gap ${gap.toFixed(1)} m`);assert.ok(Math.abs(d.speed-5)<1.5,`matched its speed: ${d.speed.toFixed(1)}`);
  assert.equal(leadCar(d.pose(),[{x:d.pose().x+20,z:-1.6,heading:d.pose().heading+Math.PI,speed:9,edge:{}}]),null,'oncoming traffic in the other lane is not a lead');
 });
+
+test('a tracking camera rides the side of the car with fewer posts in the lens',async()=>{
+ const {createCinematic}=await import('../src/cinematic.js');
+ // a straight road west-east with a row of posts just right (south, +z) of the eastbound lane
+ const nodes=[[-200,0],[200,0]],edges=[{from:0,to:1,points:[nodes[0],nodes[1]],lane:1.6},{from:1,to:0,points:[nodes[1],nodes[0]],lane:1.6}];
+ const roads=prepareGraph({nodes,edges}),posts=[];for(let x=-150;x<150;x+=6)posts.push([x,7.6]); // 0.5 m from the right-hand side camera's lens (lane 1.6 + 6.5 m)
+ const near=(x,z,y,d=.9)=>posts.some(([px,pz])=>Math.hypot(x-px,z-pz)<.06+d);
+ const doc={createElement:()=>({style:{},classList:{add(){},remove(){}},append(){}}),head:{append(){}},body:{classList:{add(){},remove(){},toggle(){}},append(){}}};
+ const shots=[{name:'t',drive:{from:[-100,0],toward:[200,0]},cam:'side',dur:3}];
+ let cam=null;createCinematic({doc,ground:()=>0,teleport(){},roads:()=>roads,setCamera:p=>{cam=p;},loaded:()=>true,era:'today',shots,near,speed:10}).start();
+ assert.ok(cam.eye[2]<0,`the lens is north of the road, away from the posts (z ${cam.eye[2].toFixed(2)})`);
+ let without=null;createCinematic({doc,ground:()=>0,teleport(){},roads:()=>roads,setCamera:p=>{without=p;},loaded:()=>true,era:'today',shots,speed:10}).start();
+ assert.ok(without.eye[2]>0,'without the obstacle check it rides the right-hand side as before');
+});

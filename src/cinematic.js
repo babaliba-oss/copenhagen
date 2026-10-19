@@ -24,7 +24,7 @@ export const SHOTS=[
  {name:'Bredgade',era:1760,drive:{from:[760,-170],toward:[950,-600]},cam:'chase',dur:4},
  {name:'Amalienborg',at:[990,-488],dur:5,orbit:{c:[1072,-430],r:[150,118],h:[58,44],a:[2.25,2.85]},look:[1072,6,-430]},
  {name:'Holmens Kanal',drive:{from:[600,100],toward:[640,260]},cam:'side',dur:4},
- {name:'Saga',era:'today',drive:{from:[985,40],toward:[800,0]},cam:'chase',dur:5,hud:'quest',saga:'hca'}, // up Toldbodgade and into Nyhavn, towards the red beam at Nyhavn 20 (the old route drove away from it: 160 -> 190 m)
+ {name:'Saga',era:'today',drive:{from:[950,58],toward:[800,0]},cam:'chase',dur:5,hud:'quest',saga:'hca'}, // along Nyhavn towards the red beam at Nyhavn 20 (from Toldbodgade the chase camera swung across the corner's sign and traffic light as the car turned in)
  {name:'Saga',era:1760,drive:{from:[560,360],toward:[480,480]},cam:'chase',dur:5,hud:'quest',saga:'eye'}, // south towards Børsen: its red beam ahead and to the right (the old route kept it off screen to the left)
  {name:'Knippelsbro',drive:{from:[650,520],toward:[800,660]},cam:'low',dur:4},
  {name:'Christianshavn canal',drive:{from:[1063,669],toward:[853,896]},cam:'pass',dur:4},
@@ -72,7 +72,7 @@ export function pickShots(era,search='',list=SHOTS){
 // ground(x,z): terrain height; roads(): the road graph; teleport(x,z,heading): start the player's car there (a new
 // start: traffic and streaming follow); place(x,z,heading,speed): move it there this frame (while it drives); setCamera({eye,target}|null); loaded(): tiles in; clear(x,z): no building there (a side camera
 // goes to the open side of the street).
-export function createCinematic({doc=document,ground,teleport,place=null,roads=()=>null,cars=()=>null,clear=()=>true,solid=null,setCamera,loaded,era=null,shots=SHOTS,speed=null,onEnd=()=>{},setSky=null,setSeason=null,hud=null,find=()=>null,wait=[2.5,14],clearRoute=null}){
+export function createCinematic({doc=document,ground,teleport,place=null,roads=()=>null,cars=()=>null,clear=()=>true,solid=null,near=null,setCamera,loaded,era=null,shots=SHOTS,speed=null,onEnd=()=>{},setSky=null,setSeason=null,hud=null,find=()=>null,wait=[2.5,14],clearRoute=null}){
  const style=doc.createElement('style');
  style.textContent='body.cinematic *{visibility:hidden!important;cursor:none!important}body.cinematic canvas#world,body.cinematic #cine-fade{visibility:visible!important}body.cinematic.cine-radio #radio-now,body.cinematic.cine-radio #radio-now *,body.cinematic.cine-quest #cph-banner,body.cinematic.cine-quest #cph-banner *,body.cinematic.cine-quest #cph-saga,body.cinematic.cine-quest #cph-saga *{visibility:visible!important}#cine-fade{position:fixed;inset:0;background:#000;z-index:100;opacity:1;transition:opacity .35s;pointer-events:none}';
  doc.head.append(style);doc.body.classList.add('cinematic');
@@ -81,16 +81,28 @@ export function createCinematic({doc=document,ground,teleport,place=null,roads=(
  const size=era===1760?{front:3.4,half:1}:{front:2.4,half:1}; // the car's nose (a coach's horses) ahead of its centre, and its half width
  const drives=s=>createCineDrive(roads(),{from:s.drive.from,toward:s.drive.toward,speed:s.drive.speed??pace,...size});
  let i=-1,phase='wait',t=0,waited=0,drive=null,car=null,side=1,eye0=null,holdU=.5;const sm={eye:null,target:null};
+ // near(x,z,y): a post, sign, tree trunk or other street object within a metre of that point. The lens keeps out of them,
+ // easing in towards its subject (the chase camera went through a sign at the Saga corner, the pass camera stood in a trunk).
+ const lens=(eye,focus)=>near?clearEye(eye,focus,near,{los:false,room:.01,min:2}):eye;
+ const nearAt=(e,d)=>!!near&&near(e[0],e[2],e[1],d);
+ // Which side of the car a tracking camera rides: the side whose lens, over the whole shot, passes fewest houses (clear) and
+ // fewest street objects within 2 m (posts, signs, trunks). The chase camera over the right-hand pavement filled the frame
+ // with a traffic sign at the Saga corner; on the left it rides over the road.
+ const pickSide=s=>{const n=Math.round(s.dur*30),score={1:0,'-1':0};
+  for(const side of [1,-1]){const probe=drives(s);if(!probe)return 1;let p=probe.pose();
+   for(let k=0;k<=n;k++){if(k)p=probe.step(1/30);const r=rigPose(s.cam,p,k/n,{side}),g=ground(p.x,p.z),eye=[r.eye[0],g+r.eye[1],r.eye[2]];
+    if(!clear(eye[0],eye[2]))score[side]+=4;if(nearAt(eye,2))score[side]+=1;}}
+  return score[-1]<score[1]?-1:1;};
  const fromRig=(s,u)=>{const r=rigPose(s.cam,car,u,{side});const g=ground(car.x,car.z);
   const eye=s.cam==='pass'&&eye0?eye0:[r.eye[0],Math.max(ground(r.eye[0],r.eye[2]),g-.4)+r.eye[1],r.eye[2]];
-  return {eye:s.cam==='pass'?eye:clearEye(eye,[car.x,g+1.1,car.z],solid),target:[r.target[0],g+r.target[1],r.target[2]]};};
+  return {eye:s.cam==='pass'?eye:lens(clearEye(eye,[car.x,g+1.1,car.z],solid),[car.x,g+1.1,car.z]),target:[r.target[0],g+r.target[1],r.target[2]]};};
  const pose=(s,u)=>{
   if(s.drive)return car?fromRig(s,u):null;
   const e=ease(u);
   if(s.orbit){const o=s.orbit,c=(o.follow&&find(o.follow))||o.c,a=mix(o.a[0],o.a[1],e),r=mix(o.r[0],o.r[1],e),x=c[0]+Math.sin(a)*r,z=c[1]+Math.cos(a)*r;
-   const lx=o.follow?c[0]:s.look[0],lz=o.follow?c[1]:s.look[2],target=[lx,ground(lx,lz)+s.look[1],lz];return {eye:clearEye([x,ground(x,z)+mix(o.h[0],o.h[1],e),z],target,solid),target};}
+   const lx=o.follow?c[0]:s.look[0],lz=o.follow?c[1]:s.look[2],target=[lx,ground(lx,lz)+s.look[1],lz];return {eye:lens(clearEye([x,ground(x,z)+mix(o.h[0],o.h[1],e),z],target,solid),target),target};}
   const E=lerp3(s.eye[0],s.eye[1],e),T=lerp3(s.target[0],s.target[1],e),target=[T[0],ground(T[0],T[2])+T[1],T[2]];
-  return {eye:clearEye([E[0],ground(E[0],E[2])+E[1],E[2]],target,solid,{los:false}),target};};
+  return {eye:lens(clearEye([E[0],ground(E[0],E[2])+E[1],E[2]],target,solid,{los:false}),target),target};};
  const show=(p,snap,dt=0)=>{if(!p)return;if(snap||!sm.eye){sm.eye=[...p.eye];sm.target=[...p.target];}
   else{const k=1-Math.exp(-dt*9);for(let j=0;j<3;j++){sm.eye[j]+=(p.eye[j]-sm.eye[j])*k;sm.target[j]+=(p.target[j]-sm.target[j])*k;}}
   setCamera({eye:[...sm.eye],target:[...sm.target]});};
@@ -102,9 +114,11 @@ export function createCinematic({doc=document,ground,teleport,place=null,roads=(
  const next=()=>{hudOff();i++;if(i>=shots.length){phase='done';fade.style.opacity='1';setCamera(null);setSky?.('golden');onEnd();return;}
   const s=shots[i];setSky?.(s.sky||'golden');setSeason?.(s.season||null); /* the date's own season stays out of the other shots: in October every golden-hour street had pumpkins, and the Halloween shot was nothing new */phase='wait';t=0;waited=0;fade.style.opacity='1';drive=null;car=null;eye0=null;sm.eye=null;
   if(s.drive&&roads())drive=drives(s);
-  if(drive){car=drive.pose();side=s.side??(s.cam==='side'||s.cam==='pass'||s.cam==='wheel'?openSide(s):1);
+  if(drive){car=drive.pose();side=s.side??(near?pickSide(s):s.cam==='side'||s.cam==='pass'||s.cam==='wheel'?openSide(s):1);
    if(s.cam==='pass'){const probe=drives(s);let p=probe.pose();for(let k=0;k<Math.round(s.dur*30*.5);k++)p=probe.step(1/30);
-    const rx=Math.cos(p.heading),rz=-Math.sin(p.heading);eye0=clearEye([p.x+rx*6*side,Math.max(ground(p.x+rx*6*side,p.z+rz*6*side),ground(p.x,p.z)-.4)+1.5,p.z+rz*6*side],[p.x,ground(p.x,p.z)+1.1,p.z],solid);}
+    const rx=Math.cos(p.heading),rz=-Math.sin(p.heading),focus=[p.x,ground(p.x,p.z)+1.1,p.z],at=d=>[p.x+rx*d*side,Math.max(ground(p.x+rx*d*side,p.z+rz*d*side),ground(p.x,p.z)-.4)+1.5,p.z+rz*d*side];
+    const d=[6,5,7,4.5,8].find(d=>!nearAt(at(d),2)&&clear(at(d)[0],at(d)[2]))??6; /* the camera stands where no trunk or post is within 2 m (it stood in a tree on the Christianshavn canal) */
+    eye0=lens(clearEye(at(d),focus,solid),focus);}
    teleport(car.x,car.z,car.heading);
    if(clearRoute){const probe=drives(s);clearRoute(probe.route(-3,(s.drive.speed??pace)*s.dur+25,1.5).map(p=>[p.x,p.z]));}} // nothing parked in the car's lane
   else{clearRoute?.([]);teleport(...((s.orbit?.follow&&find(s.orbit.follow))||s.at||[s.orbit?.c?.[0]??0,s.orbit?.c?.[1]??0]));}
