@@ -1109,6 +1109,7 @@ function frame(now){
  mobileControls.update({started,paused,mapOpen,busted:!!police?.busted,mode:travel?.mode||'car',speed:car?.speed||0});
  if(ready)peopleInteraction.update(dt,car,nearbyPeople(),{enabled:canTalk()});
  if(ready&&marketShop){marketShop.update(paused||mapOpen?0:dt,car,{enabled:canTalk()});for(const m of marketShop.drainMessages())marketUI.say(m);}
+ if(cinematic){if(paused)setPaused(false);if(!started)start();cinematic.update(Math.min(.5,frameMs/1000));} // wall-clock pacing; the trailer never waits on a pause or a start-point preview. Before the car model is placed (below): placed after it, the car was drawn a frame behind the camera that tracked it and shook whenever frame times varied
  if(ready&&!paused&&!mapOpen&&!police?.busted){
   camera.updateMatrixWorld();trafficFrustum.setFromProjectionMatrix(trafficProjection.multiplyMatrices(camera.projectionMatrix,camera.matrixWorldInverse));
   mobility.visibilityTest=trafficInView;if(buses)buses.simulation.visibilityTest=trafficInView;
@@ -1177,7 +1178,6 @@ function frame(now){
  trimDraws(now);
  {const progs=renderer.info.programs;if(progs&&progs.length!==keptPrograms){for(const pr of progs)if(!pr.__kept){pr.__kept=true;pr.usedTimes++;}keptPrograms=progs.length;}} // compiled shaders are never released: a bus sign, a tile or a landmark leaving and coming back no longer recompiles (100-300 ms stall each)
  {shadowTick=(shadowTick+1)%2;renderer.shadowMap.needsUpdate=!started||captureMode||resolution.smoothed<40||shadowTick===0;} // every frame (alternating heavy and light frames paced unevenly: 1 then 2 vsyncs); every second frame only below ~25 fps
- if(cinematic){if(paused)setPaused(false);if(!started)start();cinematic.update(Math.min(.5,frameMs/1000));} // wall-clock pacing; the trailer never waits on a pause or a start-point preview
  if(inspectionCamera){camera.position.set(...inspectionCamera.eye);camera.lookAt(...inspectionCamera.target);}
  {const pose=roadblock?.cameraPose()||finale.cameraPose(car);if(pose){camera.position.set(...pose.position);camera.lookAt(...pose.target);}} // arrest cinematic orbit
  const wantFov=chaseCamera&&started&&!inspectionCamera?cameraFov:DRIVE_FOV.min;if(camera.fov!==wantFov){camera.fov=wantFov;camera.updateProjectionMatrix();}
@@ -1567,6 +1567,15 @@ async function boot(){
    ready=true;carGroup.visible=true;marker.visible=true;loadingScreen.ready(startPoint.name);
    if(CINEMATIC)setTimeout(()=>{start();camera.layers.disable(1);let steerFrom=null;cinematic=createCinematic({ground:(x,z)=>{const g=groundAt(x,z);if(!inWaterPolygons(data.water,x,z))return g;const w=waterAt(x,z)??seaLevel();return w!==null&&w>g?w:g;}, /* over water: heights from the surface, not the bed */setCamera:p=>{inspectionCamera=p;},loaded:()=>!loadingTiles.size&&!uploads.size&&!peopleLoading&&!bakesPending(), /* the people baked before a shot plays: a bake mid-shot is a hitch */era:city.era,shots:pickShots(city.era,location.search),roads:()=>mobility?.roads,cars:()=>cineObstacles(car),clear:(x,z)=>!world?.buildings?.at(x,z),
     solid:(x,z,y)=>{const b=world?.cameraBuildings?.at(x,z);return !!b&&y<groundAt(x,z)+(b.height>2?Math.min(60,b.height):12)+.6;}, /* the lens stays out of houses (cinematic.js clearEye) */
+    near:(()=>{let n=-1,index=null;const LENS=.9,round=it=>it.radius>0&&!it.rings; /* street objects within a metre of the lens: posts, signs, trunks, bins, stalls, parked cars */
+     return (x,z,y)=>{const objs=world?.objects;if(!objs)return false;
+      const size=objs.items.size; /* sign posts included: breakable items are in world.objects too (not in its own index) */
+      if(index===null||size!==n&&cinematic?.phase!=='play'){n=size;const list=[]; /* rebuilt between shots only: never a hitch mid-shot */
+       for(const it of objs.items){if(!round(it)&&!it.rings?.length)continue;const b=round(it)?[it.x-it.radius,it.z-it.radius,it.x+it.radius,it.z+it.radius]:(it.bbox||bounds(it.rings));list.push({it,b,top:it.height??(it.tree?8:3),bbox:[b[0]-LENS,b[1]-LENS,b[2]+LENS,b[3]+LENS]});}
+       index=new SpatialIndex(list,8);}
+      const g=groundAt(x,z);for(const e of index.near(x,z)){const it=e.it;if(it.disabled||it.playerTaken||it.knocked||it.state==='down'||it.state==='flying')continue;if(y>g+e.top+.4)continue;
+       if(round(it)?Math.hypot(x-it.x,z-it.z)<it.radius+LENS:x>e.bbox[0]&&x<e.bbox[2]&&z>e.bbox[1]&&z<e.bbox[3])return true;}
+      return false;};})(),
     setSky:name=>{if(look&&look.name!==name)look.set(name,{instant:true});},setSeason:name=>{switchSeason(name).catch(e=>console.warn('Season switch failed',e));},hud:cineHud,clearRoute:points=>parkedCars?.hideAlong?.(points),wait:(w=>w>0?[w,w]:[2.5,14])(+new URLSearchParams(location.search).get('cinewait')||0), /* ?cinewait=0.6: start each shot without waiting for the tiles (headless checks) */find:name=>{if(name.startsWith('tree:'))return seasonal?.anchors?.[name.slice(5)]||null;const p=detailPeople.find(p=>p.script===name);return p?[p.x,p.z]:null;}, /* tree:<square>: where its Christmas tree stands (seasons.js) */
     teleport:(x,z,heading)=>{if(heading===undefined){let best=null,d=Infinity;for(const n of mobility?.roads?.nodes||[]){const q=(n[0]-x)**2+(n[1]-z)**2;if(q<d){d=q;best=n;}}if(best)[x,z]=best;}setStart({name:'Cinematic',district:city.name,x,z,heading:heading??0});steerFrom=null;car.cinematic=true;},
     place:(x,z,heading,speed)=>{const turn=steerFrom===null?0:Math.atan2(Math.sin(heading-steerFrom),Math.cos(heading-steerFrom));steerFrom=heading;car.steer+=(Math.max(-1,Math.min(1,turn*12))-car.steer)*.25;car.distance=(car.distance||0)+Math.hypot(x-car.x,z-car.z);car.x=x;car.z=z;car.heading=heading;car.speed=speed;car.cinematic=true;}});
