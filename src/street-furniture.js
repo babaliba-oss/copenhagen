@@ -51,6 +51,15 @@ export function kerbStoneMaterial(){
  material.customProgramCacheKey=()=>'granite-kerb-v1';
  return material;
 }
+// Kerb runs shorter than `min` metres in all (segments joined end to end) dropped: a pavement fragment poking into the
+// carriageway left one or two stones standing in the road, which read as bricks dropped there (Rådhuspladsen).
+export function keepLongKerbs(segments,min=3){
+ const key=p=>`${Math.round(p[0]*10)},${Math.round(p[1]*10)}`,parent=new Map(),find=k=>{while(parent.get(k)!==k){parent.set(k,parent.get(parent.get(k)));k=parent.get(k);}return k;};
+ const add=k=>{if(!parent.has(k))parent.set(k,k);},union=(a,b)=>{add(a);add(b);const ra=find(a),rb=find(b);if(ra!==rb)parent.set(ra,rb);};
+ for(const s of segments)union(key(s.a),key(s.b));
+ const total=new Map();for(const s of segments){const r=find(key(s.a));total.set(r,(total.get(r)||0)+Math.hypot(s.b[0]-s.a[0],s.b[1]-s.a[1]));}
+ return segments.filter(s=>total.get(find(key(s.a)))>=min);
+}
 // segments: [{a:[x,z],b:[x,z],lowered}] in world metres. Returns a group of
 // chunked merged meshes so distant kerbs are frustum-culled instead of drawn.
 export const KERB_VIEW_RANGE=520;

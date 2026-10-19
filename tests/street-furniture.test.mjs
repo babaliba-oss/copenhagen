@@ -88,3 +88,13 @@ test('scene assembly: solid obstacles for cars and racks, knockable bins and sco
  const combined=combineKnockables([null,knockables]);assert.equal(combined.snapshot().count,knockables.snapshot().count);
  group.traverse(o=>{o.geometry?.dispose();o.material?.dispose();});
 });
+
+test('kerb stubs shorter than 3 m in all are left out; runs joined end to end count together', async () => {
+ const {keepLongKerbs}=await import('../src/street-furniture.js');
+ const segs=[{a:[0,0],b:[1.5,0]},{a:[1.5,0],b:[3,0]},{a:[3,0],b:[4.5,0]}, // a 4.5 m kerb in three pieces: kept
+  {a:[10,10],b:[11.2,10]}, // a lone 1.2 m stone in the road: dropped
+  {a:[20,0],b:[21,0]},{a:[21,0],b:[21,1]}]; // a 2 m corner stub: dropped
+ const kept=keepLongKerbs(segs);
+ assert.equal(kept.length,3);
+ assert.ok(kept.every(s=>s.a[1]===0&&s.a[0]<5));
+});

@@ -4,7 +4,7 @@ import {createTrafficRenderer} from './traffic-renderer.js';
 import {routePoint,signalGreen} from './mobility.js';
 import {signalAnchor,authoredOlympiaMarkings} from './road-safety.js';
 import {crossingPolygons,kerbSegments} from './crossing-markings.js';
-import {createGraniteKerbs} from './street-furniture.js';
+import {createGraniteKerbs,keepLongKerbs} from './street-furniture.js';
 import earcut,{flatten} from 'earcut';
 import {createPersonBatch,advanceGait,personLook,smoothHeading} from './person-model.js';
 import {createBreakableSigns} from './breakable-signs.js';
@@ -73,7 +73,7 @@ export function createStreetLife(scene,mobility,{paintedMarkings=true,mappedSign
    else if(!ok&&run>=0){const p=t=>[a[0]+dx*t/n,a[1]+dz*t/n];if(k-run>=1)kerbs.push(...kerbSegments(p(run),p(k),crossingData.chains));run=-1;}
   }
  }
- const kerbGroup=kerbs.length&&paintedMarkings?settleObject(createGraniteKerbs(kerbs)):null;if(kerbGroup){group.add(kerbGroup);kerbGroups.push(kerbGroup);}
+ const longKerbs=keepLongKerbs(kerbs),kerbGroup=longKerbs.length&&paintedMarkings?settleObject(createGraniteKerbs(longKerbs)):null; // stray stubs (bricks in the road) left outif(kerbGroup){group.add(kerbGroup);kerbGroups.push(kerbGroup);}
  const signalPosts=createBreakableSigns('Traffic signal posts');
  // One post per approach that stops at the signal (lane-model.js), showing that approach's own phase.
  for(const e of mobility.roads.edges){if(e.signal<0||e.length<4)continue;const key=`${e.signal}:${Math.round(routePoint(e,e.length-3).heading/1.6)}`;if(used.has(key))continue;
