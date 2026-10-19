@@ -158,7 +158,9 @@ Notes:
   (`public/models/trees/linden.glb`, "Realistic Tree": limes, maples, ash, chestnuts and the smaller street trees;
   `oak.glb`, "Tree GN" without its vines: oaks, elms, willows), one BatchedMesh per model and part, scaled per tree to the
   register's height and the family's crown width. Birches and conifers keep the procedural EZ-Tree crowns, as does every
-  family when the models do not load (`?car=classic`). Build: `python3 scripts/models/tree_build.py <scene.gltf> <out.glb>
+  family when the models do not load (`?car=classic`; `?eztrees` keeps EZ-Tree for all, to compare). `spaceTrees`
+  keeps trees at least 2.2 m apart (the register lists some twice, 1-2 m apart: Rådhuspladsen's cherry grove read as one
+  wall) and caps each crown at 1.8 times the distance to its nearest neighbour. Build: `python3 scripts/models/tree_build.py <scene.gltf> <out.glb>
   leaves=<leaf materials> bark=<bark materials> [drop=] keep= grow= twigs= bark_tris= bark_tex= leaf_tex=` (Blender):
   a share of the leaf cards kept and grown so the crown stays closed, twig pieces dropped and the bark decimated, the
   textures cut to 512 px (leaf materials packed into one atlas), the trunk base at the origin. linden: `leaves=normal_leaves
