@@ -32,10 +32,12 @@ function faceGeometry(){
  const parts=[shape([[-.11,.21],[-.04,.21],[-.075,.27]]),shape([[.04,.21],[.11,.21],[.075,.27]]),shape([[-.12,.13],[.12,.13],[.09,.08],[.05,.11],[0,.07],[-.05,.11],[-.09,.08]])];
  const g=mergeGeometries(parts.map(q=>{const n=q.toNonIndexed();n.deleteAttribute('uv');return n;}));g.translate(0,.02,.245);return g;
 }
+// Christmas trees at set spots where a square needs one ([x, z], open paving clear of the lanes); elsewhere a seeded
+// spot within 18 m of the square's landmark. Either way the spot is kept in `anchors` (the cinematic circles it).
+const TREE_SPOTS={};
 function treeGeometry(){
  const parts=[colour(new THREE.CylinderGeometry(.35,.45,2.2,8).translate(0,1.1,0),'#4a3524')];
  for(let k=0;k<5;k++){const r=4.2-k*.75,h=3.4;parts.push(colour(new THREE.ConeGeometry(r,h,14).translate(0,2+k*2.1+h/2,0),k%2?'#1f4a2a':'#24522e'));}
- parts.push(colour(new THREE.OctahedronGeometry(.6).translate(0,15.4,0),'#f2cf5a'));
  return mergeGeometries(parts);
 }
 
@@ -60,9 +62,10 @@ export function createSeasonalDecor(season,{buildings=[],world,places=[],cafes=[
    items.forEach(([p,i],j)=>{const sc=scale(i);im.setMatrixAt(j,m4.compose(v.set(p[0],groundAt(p[0],p[1])+(p[3]??y),p[1]),q.setFromAxisAngle(UP,p[2]||0),s.set(sc,sc,sc)));cx+=p[0];cz+=p[1];});
    im.computeBoundingSphere();group.add(im);chunks.push({im,x:cx/items.length,z:cz/items.length,range});}
   return true;};
- const flakes=[];let snow=null;
+ const flakes=[];let snow=null;const anchors={}; // where the square's tree stands (the cinematic circles Kongens Nytorv's)
  if(season==='halloween'){
-  const keep=Math.min(1,2600/Math.max(1,doorsteps.length)),spots=[...doorsteps.filter(()=>r()<keep),...cafes.map(c=>[c[0]+(r()-.5)*.6,c[1]+(r()-.5)*.6,r()*6.28,.78])];
+  const keep=Math.min(1,2600/Math.max(1,doorsteps.length)),nyhavn=places.find(p=>p.name==='Nyhavn'),busy=(x,z)=>nyhavn&&Math.hypot(x-nyhavn.x,z-nyhavn.z)<160; // every doorstep along Nyhavn (the cinematic's Halloween drive), a share elsewhere
+  const spots=[...doorsteps.filter(([x,z])=>busy(x,z)||r()<keep),...cafes.map(c=>[c[0]+(r()-.5)*.6,c[1]+(r()-.5)*.6,r()*6.28,.78])];
   // most pumpkins face the street (away from the wall); a few are turned
   for(const p of spots)if(p[3]===undefined)p[2]+=r()<.8?0:(r()-.5)*2;
   const sc=i=>.8+((i*7919)%13)/13*.7;
@@ -79,10 +82,13 @@ export function createSeasonalDecor(season,{buildings=[],world,places=[],cafes=[
  }
  if(season==='christmas'){
   const squares=places.filter(p=>/Kongens Nytorv|Rådhuspladsen|Nyhavn|Amagertorv|Gråbrødre|Torvehallerne/.test(p.name||''));
-  const trees=[];for(const p of squares){for(let k=0;k<40;k++){const a=r()*6.28,d=r()*18,x=p.x+Math.cos(a)*d,z=p.z+Math.sin(a)*d;if(onPavement(x,z)||(!world.roads.at(x,z)&&!world.buildings.at(x,z))){trees.push([x,z,r()*6.28]);break;}}}
-  instanced(treeGeometry(),solid,trees,'Christmas trees',{range:900});
-  const lights=[];for(const t of trees)for(let k=0;k<90;k++){const h=2.2+r()*12.4,rad=(4.2*(1-(h-2)/13.5))*.98,a=r()*6.28;lights.push([t[0]+Math.cos(a)*rad,t[1]+Math.sin(a)*rad,0,h]);}
-  instanced(new THREE.SphereGeometry(.09,6,4),glow('#ffe1a0'),lights,'Christmas tree lights',{range:900});
+  const trees=[];for(const p of squares){const set=TREE_SPOTS[p.name];if(set&&!world.buildings.at(...set)&&!world.roads.at(...set)){trees.push([set[0],set[1],r()*6.28]);anchors[p.name]=set;continue;}
+   for(let k=0;k<40;k++){const a=r()*6.28,d=r()*18,x=p.x+Math.cos(a)*d,z=p.z+Math.sin(a)*d;if(onPavement(x,z)||(!world.roads.at(x,z)&&!world.buildings.at(x,z))){trees.push([x,z,r()*6.28]);anchors[p.name]=[x,z];break;}}}
+  // a faint green glow keeps the cone from reading as a black silhouette at night
+  instanced(treeGeometry(),new THREE.MeshStandardMaterial({vertexColors:true,roughness:.8,emissive:'#123d20',emissiveIntensity:.9}),trees,'Christmas trees',{range:900});
+  instanced(new THREE.OctahedronGeometry(.62),glow('#ffd76a'),trees.map(t=>[t[0],t[1],t[2],15.4]),'Christmas tree stars',{range:900});
+  const lights=[];for(const t of trees)for(let k=0;k<200;k++){const h=2.2+r()*12.4,rad=(4.2*(1-(h-2)/13.5))*.99,a=r()*6.28;lights.push([t[0]+Math.cos(a)*rad,t[1]+Math.sin(a)*rad,0,h]);}
+  instanced(new THREE.SphereGeometry(.1,6,4),glow('#ffe1a0'),lights,'Christmas tree lights',{range:900});
   // warm bulb strings across the walking streets (named pedestrian polygons), every 14 m along each street
   const strings=[],pointIn=(x,z,ring)=>{let c=false;for(let i=0,j=ring.length-1;i<ring.length;j=i++){const [xi,zi]=ring[i],[xj,zj]=ring[j];if((zi>z)!==(zj>z)&&x<(xj-xi)*(z-zi)/(zj-zi)+xi)c=!c;}return c;};
   for(const poly of walks){if(!/Strøget|Frederiksberggade|Nygade|Vimmelskaftet|Amagertorv|Østergade|Købmagergade|Strædet|Kronprinsensgade|Pilestræde/.test(poly.name||''))continue;const ring=poly.rings?.[0];if(!ring||ring.length<4)continue;
@@ -98,5 +104,5 @@ export function createSeasonalDecor(season,{buildings=[],world,places=[],cafes=[
  let t=0;
  let cull=0;
  return {group,season,update(dt,player){t+=dt;if(player&&(cull-=dt)<=0){cull=.5;for(const c of chunks)c.im.visible=Math.hypot(c.x-player.x,c.z-player.z)<c.range;}if(!snow||!player)return;const p=snow.geometry.attributes.position;snow.position.set(player.x,groundAt(player.x,player.z),player.z);
-  for(let i=0;i<flakes.length;i++){let y=p.getY(i)-dt*flakes[i];if(y<0)y+=30;p.setY(i,y);p.setX(i,p.getX(i)+Math.sin(t*.7+i)*dt*.15);}p.needsUpdate=true;},stats:{doorsteps:doorsteps.length}};
+  for(let i=0;i<flakes.length;i++){let y=p.getY(i)-dt*flakes[i];if(y<0)y+=30;p.setY(i,y);p.setX(i,p.getX(i)+Math.sin(t*.7+i)*dt*.15);}p.needsUpdate=true;},anchors,stats:{doorsteps:doorsteps.length}};
 }

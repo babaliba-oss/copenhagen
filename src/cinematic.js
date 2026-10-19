@@ -36,8 +36,8 @@ export const SHOTS=[
  {name:'Strøget',at:[130,140],dur:4,eye:[[146,1.8,134],[134,1.8,137]],target:[[100,1.6,149],[90,1.6,149]]}, // down the street from Amagertorv (the old path ran through the houses)
  {name:'Harbour',at:[1100,175],dur:5,eye:[[1110,4,160],[1150,4,190]],target:[[1230,3,280],[1250,3,300]]}, // low over the water (heights from the surface)
  {name:'The city from above',at:[300,200],dur:6,eye:[[320,140,320],[470,270,470]],target:[[120,0,120],[60,0,60]]},
- {name:'Halloween',era:'today',sky:'night',season:'halloween',drive:{from:[952,58],toward:[770,2]},cam:'side',dur:5},
- {name:'Christmas',era:'today',sky:'night',season:'christmas',at:[604,6],dur:5,orbit:{c:[603.9,5.5],r:[36,27],h:[15,9],a:[.4,1.2]},look:[603.9,5,5.5]},
+ {name:'Halloween',era:'today',sky:'night',season:'halloween',drive:{from:[952,58],toward:[770,2]},cam:'chase',dur:5}, // chase: both pavements and the strings of lights ahead (the side camera saw one pumpkin, and a lamp post crossed the car)
+ {name:'Christmas',era:'today',sky:'night',season:'christmas',at:[604,6],dur:5,orbit:{follow:'tree:Kongens Nytorv',c:[603.9,5.5],r:[36,27],h:[15,9],a:[.4,1.2]},look:[603.9,6.5,5.5]}, // circles the square's tree (it stood off to one side and filled the foreground)
  {name:'Christmas on Strøget',era:'today',sky:'night',season:'christmas',at:[150,132],dur:4,eye:[[176,1.7,127],[160,1.7,130]],target:[[126,2.6,138],[118,2.6,141]]},
 ];
 const ease=t=>t<.5?2*t*t:1-Math.pow(-2*t+2,2)/2;
