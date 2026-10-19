@@ -1,8 +1,11 @@
-// Cloudflare Workers static-assets deploy for this fork (Workers Builds: build `npm ci && npm run build`, deploy `npx wrangler deploy`).
+// Cloudflare Workers static-assets deploy for this fork (Workers Builds: build `npm ci && npm run build`, deploy `npx wrangler deploy` on main).
+// Other branches (e.g. live-fixes) build with `npx wrangler preview`, which refuses to run without a `previews` block.
+// Empty is enough: a Preview takes assets and compatibility settings from the top level.
 {
   "name": "copenhagen",
   "compatibility_date": "2026-10-01",
   "workers_dev": true,
   "preview_urls": true,
-  "assets": { "directory": "./dist" }
+  "assets": { "directory": "./dist" },
+  "previews": {}
 }
