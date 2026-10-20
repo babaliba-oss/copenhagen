@@ -20,7 +20,8 @@ test('the car stops at one instead of driving in', () => {
  // a good-sized one near the middle of town: drive at it from 12 m out
  const area=f=>(f.bbox[2]-f.bbox[0])*(f.bbox[3]-f.bbox[1]),f=list.filter(f=>area(f)>150).reduce((a,b)=>Math.hypot(b.bbox[0]-300,b.bbox[1]-200)<Math.hypot(a.bbox[0]-300,a.bbox[1]-200)?b:a);
  const index=new SpatialIndex([f]),inside=(x,z)=>!!index.at(x,z);
- let [cx,cz]=f.rings[0][0];for(let k=0;k<200&&!inside(cx,cz);k++){const [x0,z0,x1,z1]=f.bbox;cx=x0+Math.random()*(x1-x0);cz=z0+Math.random()*(z1-z0);}
+ let seed=7;const rnd=()=>(seed=(seed*16807)%2147483647)/2147483647; // seeded: the point used to be random, and a rare miss failed the run
+ let [cx,cz]=f.rings[0][0];for(let k=0;k<200&&!inside(cx,cz);k++){const [x0,z0,x1,z1]=f.bbox;cx=x0+rnd()*(x1-x0);cz=z0+rnd()*(z1-z0);}
  assert.ok(inside(cx,cz));
  let sx=cx+12,sz=cz;for(let k=0;k<40&&inside(sx,sz);k++)sx+=3; // outside it, on its east side
  const car=makeCar(sx,sz);car.heading=Math.PI/2; // heading pi/2 drives towards -x
