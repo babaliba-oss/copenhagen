@@ -12,8 +12,8 @@
  body.mobile-controls-ready :is(.location-tag,.bottomline,.right-tools,.landmark-label,#location-readout,.controls-hint){display:none}
  body.mobile-controls-ready.driving #touch-aux{display:block;position:absolute;right:var(--mobile-right);left:auto;top:var(--mobile-top);bottom:auto;z-index:27}
  body.mobile-controls-ready #touch-aux #touch-menu{display:flex;align-items:center;justify-content:center;gap:7px;width:auto;min-width:86px;height:44px;padding:0 12px;font:600 12px 'DM Sans',sans-serif;letter-spacing:0;background:#f8f5eeee;color:#30312e;border:1px solid #e3ded2;border-radius:8px;box-shadow:0 3px 14px #30312e15;touch-action:manipulation}
- body.mobile-controls-ready.driving #touch-aux{display:flex;gap:8px;align-items:center}
- body.mobile-controls-ready #touch-aux #touch-unstuck{height:44px;padding:0 14px;font:600 12px 'DM Sans',sans-serif;background:#da5e38;color:#fff8ed;border:0;border-radius:8px;box-shadow:0 3px 16px #18191329;animation:unstuck-in .25s ease-out}
+ body.mobile-controls-ready.driving #touch-aux{display:flex;flex-direction:row;flex-wrap:nowrap;gap:8px;align-items:center}
+ body.mobile-controls-ready #touch-aux #touch-unstuck{width:auto;white-space:nowrap;height:44px;padding:0 14px;font:600 12px 'DM Sans',sans-serif;background:#da5e38;color:#fff8ed;border:0;border-radius:8px;box-shadow:0 3px 16px #18191329;animation:unstuck-in .25s ease-out}
  body.mobile-controls-ready #touch-aux #touch-unstuck[hidden]{display:none}
  @keyframes unstuck-in{from{opacity:0;transform:translateY(-4px)}}
  #touch-menu svg{width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round}
@@ -128,3 +128,10 @@
  body.touch #cph-hud .cph-card .cph-go{margin-top:2px;font-size:13px}
  body.touch #cph-hud .cph-card-hint{padding:5px 10px;font-size:12px;line-height:1.3}
 }
+/* In play the wordmark is a label, not a link: a thumb reaching for Menu reloaded the page. Narrow phones (≤380 px)
+   drop its name while driving so it and Menu (and Get unstuck) fit one row. Double taps on the 3D view no longer zoom the page. */
+@media(pointer:coarse){
+ body.mobile-controls-ready.driving .topbar .wordmark{pointer-events:none}
+ #world{touch-action:none}
+}
+@media(pointer:coarse) and (max-width:380px){body.mobile-controls-ready.driving .topbar .wordmark .brand-name{display:none}body.mobile-controls-ready.driving .topbar .wordmark{padding-right:4px}}

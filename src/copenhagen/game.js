@@ -91,9 +91,17 @@ export function createCopenhagenGame({scene,city,mobilityData,cityData,toast,sou
  // ---- save ----
  let save={money:0,job:0,done:{},lore:[],active:null,nisser:[]};
  const KEY=SAVE_KEY+(ERA==='h'?'-1760':'');try{save={...save,...JSON.parse(localStorage.getItem(KEY)||'{}')};}catch{}
+ { // an old or hand-edited save: wrong types here threw inside update() on every frame
+  const obj=v=>!!v&&typeof v==='object'&&!Array.isArray(v);
+  for(const k of ['money','job'])if(!Number.isFinite(save[k]))save[k]=0;
+  for(const k of ['done','cards','best'])if(k in save&&!obj(save[k]))save[k]=k==='done'?{}:undefined;
+  for(const k of ['lore','nisser'])if(!Array.isArray(save[k]))save[k]=[];
+  if(save.active&&(!obj(save.active)||!Array.isArray(save.active.done)))save.active=null;
+ }
  if(save.active&&(!byId[save.active.id]||byId[save.active.id].limit))save.active=null; // timed sagas restart after a reload
  let trailer=false; // ?cinematic shows a saga for a few seconds (api.trailer below) and must not touch the player's save
- const persist=()=>{if(trailer)return;try{localStorage.setItem(KEY,JSON.stringify(save));}catch{}};
+ let filming=false; // ?cinematic: the self-driving trailer car passes jobs and races; none of it is saved
+ const persist=()=>{if(trailer||filming)return;try{localStorage.setItem(KEY,JSON.stringify(save));}catch{}};
 
  // ---- HUD ----
  const hud=document.createElement('div');hud.id='cph-hud';hud.innerHTML=`<div class="cph-money" id="cph-money"></div><div class="cph-card-hint" id="cph-card-hint" hidden></div><div class="cph-card" id="cph-job"></div><div class="cph-card cph-saga" id="cph-saga" hidden></div>`;
@@ -214,7 +222,7 @@ export function createCopenhagenGame({scene,city,mobilityData,cityData,toast,sou
  function showLore(q,card){loreQ.push([q,card]);if(!loreOpen)nextLore();}
  function nextLore(){const it=loreQ.shift();if(!it){loreOpen=false;lore.hidden=true;return;}const [q,[t,txt]]=it;loreOpen=true;$('cph-lore-kick').textContent=q.title;$('cph-lore-title').textContent=t;$('cph-lore-text').textContent=txt;lore.hidden=false;}
  $('cph-lore-go').onclick=()=>nextLore();
- function startSaga(id){const q=byId[id];save.active={id,done:[],t:q.limit||0,shown:-1};persist();routeFor=null;banner('Saga started',`${esc(q.title)} · follow the red beam`,'pick');}
+ function startSaga(id){const q=byId[id];save.active={id,done:[],t:q.limit||0,shown:-1};persist();routeFor=null;wayTo=null;banner('Saga started',`${esc(q.title)} · follow the red beam`,'pick');}
  function endSaga(win){const q=byId[save.active.id];if(win){save.done[q.id]=1;save.money+=q.pay;banner('Saga complete',`${esc(q.title)} · +${fmtKr(q.pay)} ${UNIT}`,'rank');}else banner('Saga failed',`${esc(q.title)} · talk to ${esc(giverName(q))} to try again`,'fail');save.active=null;persist();routeFor=null;}
  const api={
   era:ERA,
@@ -282,7 +290,7 @@ export function createCopenhagenGame({scene,city,mobilityData,cityData,toast,sou
    setHtml($('cph-money'),`<b>${fmtKr(save.money)} ${UNIT}</b>${save.nisser?.length?` · nisser ${save.nisser.length}/${nisser.length}`:''}${save.pant?` · pant ${save.pant}`:''}<span class="cph-rank">${esc(RANKS[r][0])}${save.streak>1?` · streak ×${save.streak}`:''}<i style="--p:${pct}%"></i></span>`);}
   if(race){const r=race.r,b=save.best[r.id];setHtml($('cph-job'),`<p class="cph-kick">Race · checkpoint ${Math.min(race.k+1,r.cps.length)}/${r.cps.length} · <kbd>X</kbd> quit</p><h3>${esc(r.title)}</h3><p class="cph-race-time">${race.countdown>0?Math.ceil(race.countdown):fmtT(race.t)}</p><p>Gold ${fmtT(r.par[0])} · silver ${fmtT(r.par[1])} · bronze ${fmtT(r.par[2])}${b!=null?` · best ${fmtT(b)}`:''}</p>`);}
   else{
-  const j=job(),t=state==='a'?j.A:j.B,d=line.points?line.remaining():dist(t,[player.x,player.z]);
+  const j=job(),t=state==='a'?j.A:j.B,d=line.points&&target().kind==='job'?line.remaining():dist(t,[player.x,player.z]); // the line may lead to a saga step or a character instead
   setHtml($('cph-job'),`<p class="cph-kick">Job ${save.job%jobs.length+1}/${jobs.length}</p><h3>${esc(j.t)}</h3><p>${esc(j.d)}</p><p class="cph-go">${state==='a'?'Pick up at':'Deliver to'} <b>${esc(state==='a'?j.aName:j.bName)}</b> · ${d>1000?(d/1000).toFixed(1)+' km':Math.round(d/10)*10+' m'}${state==='b'?` · <span class="${timer<15?'cph-low':''}">${Math.max(0,timer).toFixed(0)} s</span>`:''}</p>`);
   }
   {let near=null,nd=Infinity;for(const c of postcards){if(save.cards[c.id])continue;const d=dist(c.p,[player.x,player.z]);if(d<200&&d<nd){nd=d;near=c;}}
@@ -312,6 +320,7 @@ export function createCopenhagenGame({scene,city,mobilityData,cityData,toast,sou
   el.querySelector('button').onclick=close;addEventListener('keydown',onKey,true);setTimeout(()=>{if(el.isConnected)close();},14000);
  }
  function update(dt,actor,travelMode,{running=true,cinematic=false}={}){ // cinematic: ?cinematic drives by, it collects nothing
+  filming=cinematic;
   player=actor;started=running;if(!actor)return;
   // (The morning paper no longer opens by itself at the start: players found the pop-up confusing. paper() still shows it.)
   {save.nisser??=[];const {m,q,v,one,zero}=NT,now=performance.now()/1000;
@@ -342,7 +351,7 @@ export function createCopenhagenGame({scene,city,mobilityData,cityData,toast,sou
   if(state==='b'&&running){timer-=dt;if(timer<=0){banner('Job failed',`Too slow: ${esc(j.t)}. Streak lost.`,'fail');save.streak=0;save.job++;state='a';persist();routeFor=null;}}
   const t=state==='a'?j.A:j.B;
   if(running&&dist(here,t)<9){
-   if(state==='a'){state='b';const len=(walk.route(walk.nearest(...j.A),walk.nearest(...j.B))||[]).reduce((s,p,i,a)=>i?s+dist(p,a[i-1]):0,0)||dist(j.A,j.B)*1.4;timer=Math.round(len/6+35);banner('Picked up',`Deliver to <b>${esc(j.bName)}</b> in ${timer} s`,'pick');routeFor=null;}
+   if(state==='a'){state='b';wayTo=null;const len=(walk.route(walk.nearest(...j.A),walk.nearest(...j.B))||[]).reduce((s,p,i,a)=>i?s+dist(p,a[i-1]):0,0)||dist(j.A,j.B)*1.4;timer=Math.round(len/6+35);banner('Picked up',`Deliver to <b>${esc(j.bName)}</b> in ${timer} s`,'pick');routeFor=null;}
    else{const before=rankOf(save.delivered||0);save.delivered=(save.delivered||0)+1;save.streak=(save.streak||0)+1;
     const base=j.pay+timer*4,streakBonus=save.streak>=3?Math.round(base*.25):0,pay=Math.round(base*payBonus())+streakBonus;save.money+=pay;save.job++;state='a';persist();routeFor=null;
     const after=rankOf(save.delivered);

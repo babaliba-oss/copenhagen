@@ -48,7 +48,9 @@ export function createMobileControls({keys,canPlay=()=>true,onMenuChange=()=>{},
  on(pad,'keyup',e=>{if(['ArrowLeft','ArrowRight'].includes(e.code)){e.preventDefault();e.stopPropagation();input.release('keyboard');refreshPressed();}});
  on(pad,'blur',()=>{input.release('keyboard');refreshPressed();});on(pad,'contextmenu',e=>e.preventDefault());
  on(win,'pointerup',end);on(win,'pointercancel',end);
- for(const event of ['blur','pagehide','orientationchange','resize'])on(win,event,release);
+ for(const event of ['blur','pagehide','orientationchange'])on(win,event,release);
+ // iOS shows and hides its toolbar on taps near the bottom edge (a height-only resize): a held pedal stays held then.
+ let width=win.innerWidth;on(win,'resize',()=>{if(win.innerWidth!==width){width=win.innerWidth;release();}});
  on(doc,'visibilitychange',()=>{if(doc.hidden)release();});
 
  function refreshMenu(){

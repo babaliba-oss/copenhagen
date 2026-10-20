@@ -52,7 +52,7 @@ export function createBigMap({base,view,landmarks,player,targets,route,onTravel,
  const resetPointers=()=>{fingers.clear();pinch=null;drag=null;}; // a finger still down when the map closed never lifts here
  cv.addEventListener('pointermove',e=>{const [px,py]=local(e);if(fingers.has(e.pointerId))fingers.set(e.pointerId,[px,py]);
   if(pinch&&fingers.size===2){const s1=spread();const [wx,wz]=toWorld(...pinch.mid);setZoom(pinch.zoom*s1.d/Math.max(1,pinch.d));const [nx,nz]=toWorld(...s1.mid);cx+=wx-nx;cz+=wz-nz;clamp();pinch.mid=s1.mid;return;}
-  if(drag){const dx=px-drag.at[0],dy=py-drag.at[1];if(Math.hypot(dx,dy)>4)drag.moved=true;cx=drag.cx-dx/S();cz=drag.cz-dy/S();clamp();}else{hover=pick(px,py);cv.style.cursor=hover?'pointer':'grab';}});
+  if(drag){const dx=px-drag.at[0],dy=py-drag.at[1];if(Math.hypot(dx,dy)>6*(cv.width/(cv.clientWidth||cv.width)))drag.moved=true; /* 6 CSS px: a tap that wobbles is still a tap */cx=drag.cx-dx/S();cz=drag.cz-dy/S();clamp();}else{hover=pick(px,py);cv.style.cursor=hover?'pointer':'grab';}});
  cv.addEventListener('pointerup',e=>{const wasPinch=fingers.size>1||pinch;lift(e);const d=drag;drag=null;if(wasPinch)return;if(d&&!d.moved){const l=pick(...local(e));if(l){close();onTravel(l);}}});
  cv.addEventListener('wheel',e=>{e.preventDefault();setZoom(zoom*(e.deltaY<0?1.2:1/1.2),local(e));},{passive:false});
  dlg.querySelectorAll('[data-z]').forEach(b=>b.addEventListener('click',()=>setZoom(zoom*+b.dataset.z)));

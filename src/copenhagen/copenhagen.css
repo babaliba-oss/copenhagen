@@ -76,7 +76,7 @@ body.era-1760 #app .speedometer .gear{color:#cdb68a}
 .cph-paper-card kbd{margin-left:6px;font-size:10px}
 
 /* Whole-city map (M) */
-#big-map{width:min(1400px,96vw);height:min(940px,94vh);max-width:none;max-height:none;padding:16px 18px 10px;border:0;border-radius:18px;background:#f6f3ea;color:#25292b;display:none;flex-direction:column;gap:10px;box-shadow:0 30px 80px rgba(0,0,0,.35)}
+#big-map{width:min(1400px,96vw);height:min(940px,94vh);height:min(940px,94dvh);max-width:none;max-height:none;padding:16px 18px 10px;border:0;border-radius:18px;background:#f6f3ea;color:#25292b;display:none;flex-direction:column;gap:10px;box-shadow:0 30px 80px rgba(0,0,0,.35)}
 #big-map[open]{display:flex}
 #big-map::backdrop{background:rgba(18,24,28,.55);backdrop-filter:blur(3px)}
 #big-map .bm-top{display:flex;align-items:center;gap:18px;flex-wrap:wrap}

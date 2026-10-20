@@ -164,7 +164,7 @@ const speedometer=createSpeedometer();
 let waterfrontLandmarks,palaceLife,cityHallFlag,sea,marketScene,marketLife,universityLife,stationStreetLife,terminalLife,knockables;
 let marketShop=null,marketShopRenderer=null; // buying at market stalls on foot (market-shop.js)
 const gullEncounter=new GullEncounter();
-let safeBirdFlight=null;
+let safeBirdFlight=null,wasReading=false;
 let cph=null,harbourBath=null,periodLife=null,parkGeese=null,cafeGuests=null,carriage=null,coaches=null,parkedCars=null,boats=null,landmarks=null,trains=null,detailPeople=[],travel=null,peopleInteraction=null,staticCars=[],trafficCars=[],cameraTransition=null;
 
 const $=id=>document.getElementById(id);
@@ -934,9 +934,10 @@ function start(){if(!ready)return;if(previewing){startAfterPreview=true;return;}
 function focusWorldControls(){if(started&&!paused&&!mapOpen&&!police?.busted&&!gameIsStopped())$('world').focus({preventScroll:true});}
 let bigMap=null;
 async function travelTo(l){ /* big map: jump to a named place */
- if(switchingStart||!ready)return;switchingStart=true;toast(`Travelling to ${l.name}…`);
+ if(switchingStart||!ready)return;if(police?.level>0){toast('Lose the police first.');return;} // no map hop out of a chase
+ switchingStart=true;toast(`Travelling to ${l.name}…`);
  try{await extensionStreamer.ensureStart(l);const near=roofIndex.tiles.filter(t=>tileDistance(t,l)<430).sort((a,b)=>tileDistance(a,l)-tileDistance(b,l));
-  await Promise.all([surfaceStreamer.ensure(l,{radius:900}),pool(near,4,t=>loadRoof(t,l))]);setStart(l);history.replaceState(null,'',startUrl(location,city,l));if(!started)start();}
+  await Promise.all([surfaceStreamer.ensure(l,{radius:900}),pool(near,4,t=>loadRoof(t,l))]);if(police?.busted)return; /* arrested while the tiles loaded: the BUSTED screen wins */setStart(l);history.replaceState(null,'',startUrl(location,city,l));if(!started)start();}
  catch(e){handleTileError(e);}finally{switchingStart=false;}
 }
 function showDialog(id){if(!ready||police?.busted)return;
@@ -975,7 +976,7 @@ function restart(){if(!ready)return;setBusted(false);knockables?.resetAll();dist
 function continueDriving(){if(!ready)return;roadblock?.standDown();police?.reset();finale.resume();repairCar();tramSim?.clearAround(car);setBusted(false);toast('Back on the road — wanted level cleared.');}
 $('busted-restart').addEventListener('click',restart);$('busted-continue').addEventListener('click',continueDriving);
 function zoom(delta){desiredSpan=THREE.MathUtils.clamp(desiredSpan+delta*.35,36,240);}
-document.addEventListener('click',e=>{if(!e.target.closest?.('#cph-card-hint')||!cph?.photo)return;const d=camera.getWorldDirection(new THREE.Vector3());cph.photo({dir:[d.x,d.z],snap:snapPhoto});}); // touch: the postcard hint is the button (N on a keyboard)
+document.addEventListener('click',e=>{if(!e.target.closest?.('#cph-card-hint')||!cph?.photo||!started||paused||mapOpen||police?.busted)return;const d=camera.getWorldDirection(new THREE.Vector3());cph.photo({dir:[d.x,d.z],snap:snapPhoto});}); // touch: the postcard hint is the button (N on a keyboard)
 $('start-btn').addEventListener('click',start);$('map-btn').addEventListener('click',()=>showDialog('map-dialog'));$('minimap-btn').addEventListener('click',()=>showDialog('map-dialog'));$('help-btn').addEventListener('click',()=>showDialog('help-dialog'));$('sources-btn').addEventListener('click',()=>showDialog('sources-dialog'));$('zoom-in').addEventListener('click',()=>zoom(-40));$('zoom-out').addEventListener('click',()=>zoom(40));$('resume-btn').addEventListener('click',()=>setPaused(false));
 $('view-label').textContent='Drive';$('view-btn').title='C: cycle Drive, Follow and High cameras · Hold Q/E to look left/right';
 function cycleCamera(){if(chaseCamera){chaseCamera=false;highCamera=false;}else if(!highCamera)highCamera=true;else {chaseCamera=true;highCamera=false;}$('view-label').textContent=chaseCamera?'Drive':highCamera?'High':'Follow';}
@@ -1002,6 +1003,7 @@ window.addEventListener('keydown',e=>{
  const pick=startPicker&&pickerStep(e.code,{ready:ready&&!gameIsStopped(),started,blocked:mapOpen||!!police?.busted});
  if(pick){e.preventDefault();if(!e.repeat)startPicker.step(pick);return;} // before the start ←/→ choose the place; afterwards they steer
  if(e.code!=='Escape'&&e.target.closest?.('button,a,summary,input,select,textarea,[contenteditable="true"]'))return;
+ if(e.metaKey||e.ctrlKey){if(e.code.startsWith('Meta'))keys.clear();return;} // browser shortcuts (Cmd+A, Ctrl+R): macOS sends no keyup for keys let go under Cmd
  if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space'].includes(e.code)&&!mapOpen)e.preventDefault();
  if(e.repeat)return;
  if(police?.busted){if(finale.ended&&e.code==='Tab')return;e.preventDefault();if(!finale.ended)return;if(e.code==='Enter'||e.code==='Escape')continueDriving();else if(e.code==='KeyR')restart();return;} // BUSTED screen: Enter/Esc continue, R restarts; Tab moves between its two buttons (the HUD is inert)
@@ -1009,6 +1011,7 @@ window.addEventListener('keydown',e=>{
  if(e.code==='Escape'&&cph?.blocking?.()&&cph.key(e.code)){e.preventDefault();return;}
  if(e.code==='Escape'){if(marketShop?.close()){refreshMarketUI();return;}if(peopleInteraction?.close())return;if(!mapOpen)setPaused(!paused);return;}
  if(mapOpen)return;
+ if(paused&&!['KeyG','KeyP','KeyH','KeyV'].includes(e.code))return; // paused: no recover, era jump, map or camera underneath the pause card
  if(cph&&started&&cph.key(e.code)){e.preventDefault();return;}
  if(e.code==='KeyY'&&started&&city?.id?.startsWith('copenhagen')){e.preventDefault();eraJump();return;}
  if(e.code==='KeyL'&&started&&radio){e.preventDefault();tuneRadio(e.shiftKey?-1:1);return;} // car radio: next station (Shift: back)
@@ -1039,7 +1042,11 @@ window.addEventListener('keydown',e=>{
  if(!started&&ready&&['KeyW','KeyA','KeyS','KeyD','ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.code))start();
  if(!paused)keys.add(e.code);
 });
-window.addEventListener('keyup',e=>keys.delete(e.code));window.addEventListener('blur',()=>{keys.clear();if(!perfOverlay&&!CINEMATIC)setPaused(true);}); // ?perf: no pause on blur, so a screenshot tool can be opened mid-stalldocument.addEventListener('visibilitychange',()=>{if(document.hidden){keys.clear();setPaused(true);}});
+window.addEventListener('keyup',e=>{keys.delete(e.code);if(e.code.startsWith('Meta'))keys.clear();});window.addEventListener('blur',()=>{keys.clear();if(!perfOverlay&&!CINEMATIC)setPaused(true);}); // ?perf: no pause on blur, so a screenshot tool can be opened mid-stall
+document.addEventListener('visibilitychange',()=>{if(document.hidden){keys.clear();setPaused(true);}});
+// iOS suspends audio when the app is backgrounded or a call comes in ('interrupted'), and a context created outside a
+// tap starts suspended: the next touch or key brings it back (the sound button only toggles).
+for(const type of ['pointerdown','keydown'])window.addEventListener(type,()=>{if(sound&&audioContext&&audioContext.state!=='running')audioContext.resume().catch(()=>{});},{capture:true,passive:true});
 $('world').addEventListener('wheel',e=>{e.preventDefault();zoom(Math.sign(e.deltaY)*22);},{passive:false});
 $('sound-btn').addEventListener('click',async()=>{sound=!sound;peopleInteraction?.setVoiceEnabled(sound);if(sound&&!audioContext){audioContext=new AudioContext();oscillator=audioContext.createOscillator();gain=audioContext.createGain();oscillator.type='triangle';gain.gain.value=0;oscillator.connect(gain);gain.connect(audioContext.destination);oscillator.start();}if(sound&&!soundscape&&city?.id?.startsWith('copenhagen'))soundscape=createSoundscape(audioContext,{era:city.era});try{localStorage.setItem('cph-sound',sound?'1':'0');}catch{}if(sound)await audioContext.resume().catch(()=>{}); /* a refused resume only means silence, never a stopped game */$('sound-btn').setAttribute('aria-label',sound?'Mute sound':'Enable sound');$('sound-btn').title=sound?'Mute sound':'Enable sound';$('sound-btn').querySelector('.mute-slash').hidden=sound;});
 // After a HUD action, the next movement/interaction key belongs to the game.
@@ -1115,11 +1122,13 @@ function frame(now){
  if(gameIsStopped())return;
  if(!fixedCall){requestAnimationFrame(frame);if(FIXED){fixedNow=now;if(cinematic?.phase==='play')return;}} /* ?fixed: while a shot plays, only the capture script advances the world */frameNow=now;
  const cpu0=performance.now(),frameMs=fixedCall?1000/FIXED:lastTime?now-lastTime:0;fpsMeter?.tick(frameMs);perfOverlay?.tick(frameMs,now);const steps=fixedCall?[1/FIXED]:simulationSteps(lastTime?(now-lastTime)/1000:0),dt=steps.reduce((a,b)=>a+b,0);if(!fixedCall)lastTime=now;
- mobileControls.update({started,paused,mapOpen,busted:!!police?.busted,mode:travel?.mode||'car',speed:car?.speed||0});
+ // A saga card, treasure map or the journal is read with the world held (their timers, traffic, the car) and the keys let go.
+ const reading=!!(cph?.blocking?.()&&!cinematic);if(reading!==wasReading){wasReading=reading;if(reading){keys.clear();keys.tilt=0;}}
+ mobileControls.update({started,paused,mapOpen:mapOpen||reading,busted:!!police?.busted,mode:travel?.mode||'car',speed:car?.speed||0});
  if(ready)peopleInteraction.update(dt,car,nearbyPeople(),{enabled:canTalk()});
  if(ready&&marketShop){marketShop.update(paused||mapOpen?0:dt,car,{enabled:canTalk()});for(const m of marketShop.drainMessages())marketUI.say(m);}
  if(cinematic){if(paused)setPaused(false);if(!started)start();cinematic.update(Math.min(.5,frameMs/1000));} // wall-clock pacing; the trailer never waits on a pause or a start-point preview. Before the car model is placed (below): placed after it, the car was drawn a frame behind the camera that tracked it and shook whenever frame times varied
- if(ready&&!paused&&!mapOpen&&!police?.busted){
+ if(ready&&!paused&&!mapOpen&&!reading&&!police?.busted){
   camera.updateMatrixWorld();trafficFrustum.setFromProjectionMatrix(trafficProjection.multiplyMatrices(camera.projectionMatrix,camera.matrixWorldInverse));
   mobility.visibilityTest=trafficInView;if(buses)buses.simulation.visibilityTest=trafficInView;
   for(const step of steps){
@@ -1550,7 +1559,10 @@ async function boot(){
    world.objects=new WorldObjects([...streetObstacles,...ads.obstacles,...breakableSigns.bodies]);
    cityModel.traverse(object=>{if(object.worldObjects)world.objects.add(object.worldObjects);});
    // ?start=<name> picks any start on the city map (fuzzy, accent-insensitive).
-   setStart(firstStart);history.replaceState(null,'',startUrl(location,city,firstStart));
+   // Y keeps your spot in the other century, but a quay of today can be harbour in 1760 (and a street can be a house):
+   // land at the nearest named place instead, so the car (and R, which returns to the start) isn't stuck in the water.
+   let arrival=firstStart;if(eraArrival?.to===city.id){const {x,z}=firstStart;if(world.buildings.at(x,z)||!world.roads.at(x,z)&&inWaterPolygons(world.water||[],x,z)){const d=l=>Math.hypot(l.x-x,l.z-z);arrival=[...data.landmarks].sort((a,b)=>d(a)-d(b))[0]||firstStart;afterStart(1500,()=>toast(`That spot was ${city.era===1760?'harbour or houses in 1760':'built over by now'}: you arrive at ${arrival.name}.`));}}
+   setStart(arrival);history.replaceState(null,'',startUrl(location,city,arrival));
    progress(58,'Preparing the driving map');await new Promise(r=>setTimeout(r,30));drawMapBase();
    progress(68,'Loading buildings and textures');focus.set(car.x,0,car.z);await Promise.all([ensureCityModel(),updateTiles()]);
    if(vehicleBodies)console.info('Blender car bodies',await vehicleBodies);
