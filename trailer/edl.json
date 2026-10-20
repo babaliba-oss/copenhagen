@@ -16,7 +16,7 @@
    "src": "m",
    "t": 13.6,
    "d": 3.0,
-   "cap": "Every street is the real one. Drive it.",
+   "cap": null,
    "act": "hook"
   },
   {
@@ -41,7 +41,11 @@
    "t": 41.7,
    "d": 3.0,
    "cap": "A car radio with real Copenhagen stations.",
-   "act": "today"
+   "act": "today",
+   "feed": {
+    "zoom": 0.9,
+    "x": 560
+   }
   },
   {
    "id": "09",
@@ -65,7 +69,11 @@
    "t": 63.2,
    "d": 2.4,
    "cap": "Sagas to follow.",
-   "act": "today"
+   "act": "today",
+   "feed": {
+    "zoom": 0.9,
+    "x": 0
+   }
   },
   {
    "id": "07",
@@ -165,14 +173,18 @@
    "d": 3.0,
    "cap": "Sagas of its own",
    "act": "1760",
-   "in": 0.6
+   "in": 0.6,
+   "feed": {
+    "zoom": 0.9,
+    "x": 0
+   }
   },
   {
    "id": "20n",
    "src": "h",
    "t": 101.3,
    "d": 2.4,
-   "cap": "A harbour full of sail",
+   "cap": "A harbour of historical ships",
    "act": "1760"
   },
   {

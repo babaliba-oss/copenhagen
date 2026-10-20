@@ -15,7 +15,13 @@ os.makedirs(OUT, exist_ok=True)
 E = json.load(open(os.path.join(os.path.dirname(__file__), 'edl.json')))
 W, H, FPS = (1080, 1350, 60) if FEED else (1920, 1080, 60)
 VID_Y = 135  # feed: the square video sits here; bands of 135 px above and below
-FRAME = 'scale=1920:1080,crop=1080:1080:420:0,pad=1080:1350:0:135:color=0x0a0a0c' if FEED else 'null'
+FRAME = 'null'
+def feed_frame(tag, zoom=1.0, x=None):
+    """4:5: the 16:9 frame blown up and blurred fills the canvas; the sharp picture (a 1:1 crop, or a little more of the
+    frame at zoom < 1 where a HUD popup sits at the edge) lies over it, centred. `x`: the crop's left edge in the scaled frame."""
+    w, h = round(1920 * zoom), round(1080 * zoom); ch = min(1080, h); x = round((w - 1080) / 2) if x is None else x
+    return (f"split[bg{tag}][fg{tag}];[bg{tag}]scale=2400:1350,crop=1080:1350,boxblur=28:3,eq=brightness=-0.2:saturation=0.85[bgb{tag}];"
+            f"[fg{tag}]scale={w}:{h},crop=1080:{ch}:{x}:0[fgc{tag}];[bgb{tag}][fgc{tag}]overlay=0:{(1350 - ch) // 2}")
 REPO = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'public', 'fonts')
 SERIF = f'{REPO}/spectral/Spectral-SemiBold.ttf'
 SERIF_R = f'{REPO}/spectral/Spectral-Regular.ttf'
@@ -40,8 +46,14 @@ def shadowed(img, alpha_blur=10):
     sh = Image.new('RGBA', img.size, (0, 0, 0, 0)); sh.putalpha(a.point(lambda v: int(v * .75)))
     return Image.alpha_composite(sh, img)
 
-def caption_png(text, path, era=None):
+def caption_png(text, path, style='band'):
     img = Image.new('RGBA', (W, H), (0, 0, 0, 0)); d = ImageDraw.Draw(img)
+    if FEED and style == 'box':  # the stacked split has no band: a box at the bottom left of the lower half, as in 16:9
+        f = font(SANS, 40, 600); pad_x, pad_y = 28, 16; tw = d.textlength(text, font=f); th = 48
+        x0, y0 = 48, H - 56 - th - 2 * pad_y
+        d.rounded_rectangle([x0, y0, x0 + tw + 2 * pad_x, y0 + th + 2 * pad_y], radius=12, fill=(14, 14, 18, 170))
+        d.rounded_rectangle([x0, y0 + 8, x0 + 5, y0 + th + 2 * pad_y - 8], radius=2, fill=RED)
+        d.text((x0 + pad_x + 4, y0 + pad_y - 3), text, font=f, fill=CREAM); img.save(path); return
     if FEED:
         f = font(SANS, 44, 600); tw = d.textlength(text, font=f)
         if tw > W - 80:  # two lines, split near the middle at a space
@@ -49,6 +61,8 @@ def caption_png(text, path, era=None):
             lines = [' '.join(words[:best]), ' '.join(words[best:])]
         else: lines = [text]
         y = VID_Y + 1080 + (135 - 54 * len(lines)) / 2 - 4
+        mw = max(d.textlength(ln, font=f) for ln in lines)
+        d.rounded_rectangle([W / 2 - mw / 2 - 30, y - 10, W / 2 + mw / 2 + 30, y + 54 * len(lines) + 6], radius=12, fill=(14, 14, 18, 170))
         for ln in lines:
             w = d.textlength(ln, font=f); d.text(((W - w) / 2, y), ln, font=f, fill=CREAM); y += 54
         d.rounded_rectangle([W / 2 - 24, VID_Y + 1080 + 10, W / 2 + 24, VID_Y + 1080 + 14], radius=2, fill=RED)
@@ -92,18 +106,18 @@ def end_png(path):
     d.rounded_rectangle([(W - w) / 2 - 40, yb, (W + w) / 2 + 40, yb + 100], radius=16, fill=(246, 241, 230, 255))
     d.text(((W - w) / 2, yb + 16), t, font=f3, fill=INK)
     lines = ['Made by Daniel Șfița  ·  Built on worldhood by Lasse Saari',
-             'Map data © OpenStreetMap contributors', '3D buildings: Københavns Kommune (CC BY 4.0)'] if FEED else ['Made by Daniel Șfița  ·  Built on worldhood by Lasse Saari',
-             'Map data © OpenStreetMap contributors  ·  3D buildings: Københavns Kommune (CC BY 4.0)']
+             'Map data © OpenStreetMap contributors', '3D buildings: Københavns Kommune (CC BY 4.0)', 'Music: Rock Me Now by Pufino (freetouse.com)'] if FEED else ['Made by Daniel Șfița  ·  Built on worldhood by Lasse Saari',
+             'Map data © OpenStreetMap contributors  ·  3D buildings: Københavns Kommune (CC BY 4.0)', 'Music: Rock Me Now by Pufino (freetouse.com)']
     for i, t in enumerate(lines):
         w = d.textlength(t, font=f4); d.text(((W - w) / 2, (1060 if FEED else 880) + i * 42), t, font=f4, fill=GREY)
     img.save(path)
 
-def label_png(text, path, x):
+def label_png(text, path, x, y=None):
     """small era label at the top of a split-screen half"""
     img = Image.new('RGBA', (W, H), (0, 0, 0, 0)); d = ImageDraw.Draw(img)
     f = font(SANS, 30, 700); spaced = '  '.join(text)
     tw = d.textlength(spaced, font=f)
-    y = VID_Y + 40 if FEED else 56
+    y = 56 if y is None else y
     d.rounded_rectangle([x - tw / 2 - 26, y, x + tw / 2 + 26, y + 62], radius=12, fill=(14, 14, 18, 150))
     d.text((x - tw / 2, y + 12), spaced, font=f, fill=CREAM)
     img.save(path)
@@ -122,23 +136,27 @@ for s in segs:
     inputs = []; fc = ''; vin = '[0:v]'
     if 'src' in s or 'split' in s or 'wipe' in s:
         if 'src' in s:
-            inputs += ['-i', f'{CUTS}/c{sid}.mp4']; fc += f"[0:v]trim=start={s.get('in', 0)}:duration={d},setpts=PTS-STARTPTS,{FRAME}[v0];"; vin = '[v0]'
+            fr = feed_frame(sid, **s.get('feed', {})) if FEED else FRAME
+            inputs += ['-i', f'{CUTS}/c{sid}.mp4']; fc += f"[0:v]trim=start={s.get('in', 0)}:duration={d},setpts=PTS-STARTPTS,{fr}[v0];"; vin = '[v0]'
         elif 'split' in s:
             inputs += ['-i', f'{CUTS}/c{sid}a.mp4', '-i', f'{CUTS}/c{sid}b.mp4']
             ina = s['split'][0][2] if len(s['split'][0]) > 2 else 0; inb = s['split'][1][2] if len(s['split'][1]) > 2 else 0  # optional offsets into each cut
-            if FEED: fc += (f"[0:v]trim=start={ina}:duration={d},setpts=PTS-STARTPTS,crop=536:1080:692:0[a];[1:v]trim=start={inb}:duration={d},setpts=PTS-STARTPTS,crop=536:1080:692:0[b];"
-                            f"color=c=0xF6F1E6:s=8x1080:r={FPS}:d={d}[bar];[a][bar][b]hstack=inputs=3,pad=1080:1350:0:135:color=0x0a0a0c[v0];")
+            if FEED: fc += (f"[0:v]trim=start={ina}:duration={d},setpts=PTS-STARTPTS,scale=1193:671,crop=1080:671:56:0[a];[1:v]trim=start={inb}:duration={d},setpts=PTS-STARTPTS,scale=1193:671,crop=1080:671:56:0[b];"
+                            f"color=c=0xF6F1E6:s=1080x8:r={FPS}:d={d}[bar];[a][bar][b]vstack=inputs=3[v0];")  # today above 1760, each nearly the whole 16:9 frame
             else: fc += (f"[0:v]trim=start={ina}:duration={d},setpts=PTS-STARTPTS,crop=956:1080:482:0[a];[1:v]trim=start={inb}:duration={d},setpts=PTS-STARTPTS,crop=956:1080:482:0[b];"
                    f"color=c=0xF6F1E6:s=8x1080:r={FPS}:d={d}[bar];[a][bar][b]hstack=inputs=3[v0];")
             la, lb = f'{OUT}/lab_today.png', f'{OUT}/lab_1760.png'
-            if not os.path.exists(la): label_png('TODAY', la, 270 if FEED else 480); label_png('1760', lb, 810 if FEED else 1440)
+            if not os.path.exists(la):
+                if FEED: label_png('TODAY', la, 540, 36); label_png('1760', lb, 540, 671 + 8 + 36)
+                else: label_png('TODAY', la, 480); label_png('1760', lb, 1440)
             inputs += ['-loop', '1', '-framerate', str(FPS), '-t', str(d), '-i', la, '-loop', '1', '-framerate', str(FPS), '-t', str(d), '-i', lb]
             fc += f"[2:v]format=rgba,fade=t=in:st=0.2:d=0.3:alpha=1[la];[3:v]format=rgba,fade=t=in:st=0.2:d=0.3:alpha=1[lb];[v0][la]overlay=shortest=1[v1];[v1][lb]overlay=shortest=1[v0b];"
             vin = '[v0b]'
         else:
             (sa, ta, da), (sb, tb, db) = s['wipe']; x = s['xfade']
             inputs += ['-i', f'{CUTS}/c{sid}a.mp4', '-i', f'{CUTS}/c{sid}b.mp4']
-            fc += f"[0:v]trim=duration={da},setpts=PTS-STARTPTS,{FRAME}[a];[1:v]trim=duration={db},setpts=PTS-STARTPTS,{FRAME}[b];[a][b]xfade=transition=wipeleft:duration={x}:offset={da - x}[v0];"
+            fa, fb = (feed_frame(sid + 'a'), feed_frame(sid + 'b')) if FEED else (FRAME, FRAME)
+            fc += f"[0:v]trim=duration={da},setpts=PTS-STARTPTS,{fa}[a];[1:v]trim=duration={db},setpts=PTS-STARTPTS,{fb}[b];[a][b]xfade=transition=wipeleft:duration={x}:offset={da - x}[v0];"
             vin = '[v0]'
         n_in = len([i for i in inputs if i == '-i'])
         if s.get('title'):
@@ -146,7 +164,7 @@ for s in segs:
             inputs += ['-loop', '1', '-framerate', str(FPS), '-t', str(d), '-i', png]
             fc += f"[{n_in}:v]format=rgba,fade=t=in:st=0.6:d=0.6:alpha=1[ovf];{vin}[ovf]overlay=shortest=1[vo];"; vin = '[vo]'
         elif s.get('cap'):
-            png = f'{OUT}/cap_{sid}.png'; caption_png(s['cap'], png)
+            png = f'{OUT}/cap_{sid}.png'; caption_png(s['cap'], png, 'box' if 'split' in s else 'band')
             inputs += ['-loop', '1', '-framerate', str(FPS), '-t', str(d), '-i', png]
             fc += f"[{n_in}:v]format=rgba,fade=t=in:st=0.3:d=0.35:alpha=1,fade=t=out:st={d - .5}:d=0.35:alpha=1[ovf];{vin}[ovf]overlay=shortest=1[vo];"; vin = '[vo]'
         # a 6-frame dip at the very start of the first shot and the last seasonal shot is handled by the cards around them
