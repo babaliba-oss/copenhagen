@@ -118,3 +118,13 @@
  body.touch .edge-invite{max-width:min(320px,calc(100% - 24px));padding:12px 40px 12px 14px}
  body.touch .edge-invite strong{font-size:14px}
 }
+/* Phone landscape: ~225 px between the top bar and the controls. The money, postcard hint and job card took 194 of
+   it, so any toast or the wanted stars sent the whole block into waiting (touch-docks.js). One line each, wider. */
+@media(pointer:coarse) and (max-height:500px){
+ body.touch #cph-hud{width:min(360px,calc(50vw - 24px));gap:5px}
+ body.touch #cph-hud .cph-money{flex-wrap:nowrap;font-size:15px;padding:3px 10px}
+ body.touch #cph-hud .cph-money b{white-space:nowrap}body.touch #cph-hud .cph-rank{flex-basis:auto}
+ body.touch #cph-hud .cph-card{padding:6px 10px}body.touch #cph-hud .cph-card h3{font-size:15px;margin:1px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+ body.touch #cph-hud .cph-card .cph-go{margin-top:2px;font-size:13px}
+ body.touch #cph-hud .cph-card-hint{padding:5px 10px;font-size:12px;line-height:1.3}
+}
