@@ -263,8 +263,11 @@ export class PoliceSimulation{
   // Never teleport a visible stuck car. Retire units only well away from player.
   this.units=this.units.filter(u=>u.parked||distance(u,player)<450&&!(u.stuck>8&&distance(u,player)>85));
   this.seen=this.units.some(u=>this.canSee(u,player));
-  this.escape=!this.seen?this.escape+dt:0;
   const canArrest=this.units.some(u=>distance(u,player)<(surge?SURGE.arrestRange:10)&&this.clearSight(u,player));
+  // Stand-off: the player is off any road the units can drive (a plaza, Strøget) and they can only watch from the kerb.
+  // After 10 s of that the escape clock runs as if unseen (the wanted level used to stay frozen for good).
+  this.standoff=this.seen&&!canArrest&&this.units.every(u=>Math.abs(u.speed||0)<.5)?(this.standoff||0)+dt:0;
+  this.escape=!this.seen||this.standoff>10?this.escape+dt:0;
   this.bust=canArrest&&Math.abs(player.speed)<1?this.bust+dt:0;
   // Hands-on arrest: a unit at the car (any side, no line of sight needed) and a stopped or crawling player.
   const atCar=this.units.some(u=>distance(u,player)<CONTACT_BUST.range);
