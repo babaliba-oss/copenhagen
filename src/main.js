@@ -232,14 +232,15 @@ const fpsMeter=createFpsMeter(renderer);
 // shader warm-up compiled every program at once, so it skips that bulk compile (programs then compile as things first appear).
 const gpuName=(()=>{try{const gl=renderer.getContext(),e=gl.getExtension('WEBGL_debug_renderer_info');return String(gl.getParameter(e?e.UNMASKED_RENDERER_WEBGL:gl.RENDERER));}catch{return '';}})();globalThis.__gpu=gpuName;
 const powerVR=/PowerVR|Imagination/i.test(gpuName);
-// After the graphics connection was lost (out of GPU memory on a phone), the next starts within 3 days run at the lowest
-// quality and resolution; ?quality= overrides it.
-const gpuLostRecently=(()=>{try{return Date.now()-Number(localStorage.getItem('gpu-lost')||0)<3*864e5&&!new URLSearchParams(location.search).has('quality');}catch{return false;}})();
-const maxPixelRatio=Math.min(devicePixelRatio,gpuLostRecently?1:1.5),resolution=createAdaptiveResolution({max:maxPixelRatio,min:Math.min(maxPixelRatio,.75)});
+// After the graphics connection was lost, starts in the next 30 days run without shadow maps (below); ?quality= overrides.
+const gpuLostRecently=(()=>{try{return Date.now()-Number(localStorage.getItem('gpu-lost')||0)<30*864e5&&!new URLSearchParams(location.search).has('quality');}catch{return false;}})();
+const maxPixelRatio=Math.min(devicePixelRatio,1.5),resolution=createAdaptiveResolution({max:maxPixelRatio,min:Math.min(maxPixelRatio,.75)});
 renderer.setPixelRatio(maxPixelRatio);
 if(FIXED){captureMode=true;resolution.lock(1);renderer.setPixelRatio(1);globalThis.__skyClock=()=>frameNow;} /* frame-by-frame capture: full quality at the window's size, clouds on the trailer's clock */
 renderer.setSize(captureFrame.w,captureFrame.h);
-renderer.shadowMap.enabled=!OFF.has('shadows');renderer.shadowMap.type=THREE.PCFShadowMap;renderer.shadowMap.autoUpdate=false; // updated from frame(): every frame when fast, every second frame when the frame budget is tight
+// Shadow maps lost the context on the Pixel 10's PowerVR driver while the first tiles drew (bisected on the device with
+// ?off=): off there, and after any GPU crash (Brave hides the GPU's name, so a crash is how it shows itself there).
+renderer.shadowMap.enabled=!(OFF.has('shadows')||powerVR||gpuLostRecently);renderer.shadowMap.type=THREE.PCFShadowMap;renderer.shadowMap.autoUpdate=false; // updated from frame(): every frame when fast, every second frame when the frame budget is tight
 renderer.outputColorSpace=THREE.SRGBColorSpace;
 renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=.85;
 const hemi=new THREE.HemisphereLight('#e6eef8','#68786f',1.4);scene.add(hemi);
@@ -262,7 +263,7 @@ const governor=createQualityGovernor([
  // and Strøget otherwise stay heavy whatever the resolution). Tiles pick it up on their next LOD pass.
  ()=>{Object.assign(TILE_LOD,{near:170,far:210,detail:130,shadow:70,building:100});if(farCity)farCity.visible=false;},
 ],{cpuStep:3}); // CPU-bound (draw calls): the LOD step first
-{const q=new URLSearchParams(location.search).get('quality'),n=q==='low'||gpuLostRecently?9:q==='high'?0:q!==null&&q!==''&&!isNaN(+q)?+q:(matchMedia('(pointer:coarse)').matches?3:0);for(let i=0;i<n;i++)governor.update(99,{atMin:true,smoothed:99});} // ?quality=low (or 1-3 steps, or high). Phones start without AO, bloom, MSAA and with 1024 shadows: at full desktop quality they spent their first 30-40 s stepping down (resolution first, then one effect every 4-7 s) at a choppy frame rate, just as the player pulled away
+{const q=new URLSearchParams(location.search).get('quality'),n=q==='low'?9:q==='high'?0:q!==null&&q!==''&&!isNaN(+q)?+q:(matchMedia('(pointer:coarse)').matches?3:0);for(let i=0;i<n;i++)governor.update(99,{atMin:true,smoothed:99});} // ?quality=low (or 1-3 steps, or high). Phones start without AO, bloom, MSAA and with 1024 shadows: at full desktop quality they spent their first 30-40 s stepping down (resolution first, then one effect every 4-7 s) at a choppy frame rate, just as the player pulled away
 let look=null;
 const ground=new THREE.Mesh(new THREE.PlaneGeometry(11000,11000),groundPatches(new THREE.MeshStandardMaterial({color:'#94988b',roughness:1})));ground.rotation.x=-Math.PI/2;ground.position.y=-.5;ground.receiveShadow=true;cityModel.add(ground);
 // Unmapped ground (yards, lots, verges): soft patches of worn grass and gravel instead of one flat grey.
@@ -1605,7 +1606,7 @@ async function boot(){
    transitQueue.splice(0).forEach(addTransit);mobility.attachTrams(tramSim);mobility.attachBuses(buses.simulation);buses.reset(car,tramSim.obstacles);mobility.externalBodies=transitBodies();mobility.reset(car);
    // Shader programs compile now, behind the loading screen (in parallel where the GPU offers it), instead of
    // stalling frames the first time each material comes into view while driving. Capped so a slow GPU still starts.
-   progress(98,'Warming up shaders');if(!powerVR&&!gpuLostRecently){const shown=[];scene.traverse(o=>{if(!o.visible){o.visible=true;shown.push(o);}}); /* hidden things too (night lamps, rain, far versions): compiled now, not mid-drive */await Promise.race([renderer.compileAsync(scene,camera).catch(()=>{}),new Promise(r=>setTimeout(r,6000))]);for(const o of shown)o.visible=false;}
+   progress(98,'Warming up shaders');{const shown=[];scene.traverse(o=>{if(!o.visible){o.visible=true;shown.push(o);}}); /* hidden things too (night lamps, rain, far versions): compiled now, not mid-drive */await Promise.race([renderer.compileAsync(scene,camera).catch(()=>{}),new Promise(r=>setTimeout(r,6000))]);for(const o of shown)o.visible=false;}
    progress(100,'Ready');
    ready=true;carGroup.visible=true;marker.visible=true;loadingScreen.ready(startPoint.name);
    if(CINEMATIC)setTimeout(()=>{start();camera.layers.disable(1);let steerFrom=null;cinematic=createCinematic({ground:(x,z)=>{const g=groundAt(x,z);if(!inWaterPolygons(data.water,x,z))return g;const w=waterAt(x,z)??seaLevel();return w!==null&&w>g?w:g;}, /* over water: heights from the surface, not the bed */setCamera:p=>{inspectionCamera=p;},loaded:()=>!loadingTiles.size&&!uploads.size&&!peopleLoading&&!bakesPending(), /* the people baked before a shot plays: a bake mid-shot is a hitch */era:city.era,shots:pickShots(city.era,location.search),roads:()=>mobility?.roads,cars:()=>cineObstacles(car),clear:(x,z)=>!world?.buildings?.at(x,z),

@@ -16,7 +16,7 @@ export function createGameResilience({win=window,doc=document,screen=createLoadi
   for(const stop of stopListeners){try{stop();}catch(e){log('Could not stop a game subsystem:',e);}}
   const where=[win.__bootStage&&!doc.body.classList.contains('driving')?`while loading: ${win.__bootStage}`:'while playing',win.__gpu].filter(Boolean).join(' · ');
   try{localStorage.setItem('gpu-lost-at',where);}catch{}
-  if(source==='graphics-lost')screen.error(`The browser lost its graphics connection (usually out of graphics memory on a phone). Close other tabs, then reload: the game will restart at a lighter quality. (${where})`,{title:'Graphics connection lost'});
+  if(source==='graphics-lost')screen.error(`The browser lost its graphics connection (usually out of graphics memory on a phone). Close other tabs, then reload: the game will restart without shadows, which some phone GPUs can't draw. (${where})`,{title:'Graphics connection lost'});
   else if(/webgl|graphics context/i.test(detail))screen.error('This browser could not start 3D graphics. On Android, Chrome and Brave block 3D for a site after a graphics crash: close the browser completely (swipe it away), open it again and reload. Otherwise enable hardware acceleration or try another browser.',{title:'3D graphics unavailable'});
   else if(source==='startup')screen.error('The game could not finish loading. Check your connection, then reload to try again.');
   else screen.error('The game stopped unexpectedly. Reload to restart from your chosen city.',{title:'The game stopped'});
