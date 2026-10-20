@@ -164,3 +164,5 @@ body.busted #radio-now,body.arrest-cinematic #radio-now{visibility:hidden}
 }
 @media(pointer:coarse) and (max-height:500px){body.mobile-controls-ready #radio-now{top:calc(var(--mobile-top) + 52px)}body.mobile-controls-ready #wanted:not([hidden])+#radio-now{top:calc(var(--mobile-top) + 104px)}}
 @media(prefers-reduced-motion:reduce){#radio-now.flash{animation:none}}
+/* Phone landscape: title, legend and buttons on one row so the map keeps the height. */
+@media (max-height:500px){#big-map{width:min(1400px,calc(100vw - 24px));height:calc(100dvh - 16px);padding:8px 12px 6px;gap:6px}#big-map .bm-top{flex-wrap:nowrap;gap:10px}#big-map .bm-top>div:first-child{flex:0 0 auto;min-width:0}#big-map .eyebrow{display:none}#big-map h2{font-size:18px}#big-map .bm-legend{display:flex;flex:1;gap:4px 9px;font-size:11px;justify-content:flex-end}#big-map .bm-tools button{height:34px;min-width:34px;padding:0 10px;font-size:13px}#big-map .bm-hint{font-size:11px}}
