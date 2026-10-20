@@ -66,7 +66,7 @@ export function driveStep(car,keys,dt,world) {
  const left=keys.has('KeyA')||keys.has('ArrowLeft'),right=keys.has('KeyD')||keys.has('ArrowRight'),brake=keys.has('Space');
  const onRoad=Boolean(world.roads.at(car.x,car.z));
  // Analog steering (thumb slider, tilt) eases off with speed, up to 45% at 65 km/h: full lock from a thumb at speed swerved.
- const targetSteer=left||right?(left?1:0)-(right?1:0):(keys.tilt||0)*(1-Math.min(.45,Math.max(0,car.speed)/40)); /* keys.tilt: analog steering from a tilted phone, -1…1, left positive */car.steer+=(targetSteer-car.steer)*Math.min(1,dt*(keys.gentle?5:10)); // keys.gentle: touch screens (main.js) steer in at half the rate
+ const targetSteer=left||right?(left?1:0)-(right?1:0):(keys.tilt||0)*(1-Math.min(.45,Math.max(0,car.speed)/40)); /* keys.tilt: analog steering from a tilted phone, -1…1, left positive */car.steer+=(targetSteer-car.steer)*Math.min(1,dt*(keys.gentle?7:10)); // keys.gentle: touch screens (main.js) steer in a little slower
  // Touch screens (keys.gentle): Go is full throttle, so the car pulls ~40% softer and tops out at 90 km/h; on a phone
  // 0-50 km/h in under 2 s set off a chain of crashes before the player had found the steering.
  const gentle=!!keys.gentle,topSpeed=gentle?GENTLE_MAX_SPEED:PLAYER_MAX_SPEED;
