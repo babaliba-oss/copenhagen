@@ -1,7 +1,7 @@
 import { insidePlayable, pointInPolygon, segmentDistance, inWaterPolygons } from './geo.js';
 import {groundPose,lakeAt} from './terrain.js';
 export const GRAVITY=9.81;
-export const PLAYER_MAX_SPEED=140/3.6;
+export const PLAYER_MAX_SPEED=140/3.6,GENTLE_MAX_SPEED=90/3.6;
 // Intentionally stylised HUD speed. Physics, collisions
 // and distance tracking continue to use true world metres / second.
 export const displayedSpeedKmh=speed=>Math.round(Math.abs(speed)*3.6*.7);
@@ -66,10 +66,13 @@ export function driveStep(car,keys,dt,world) {
  const left=keys.has('KeyA')||keys.has('ArrowLeft'),right=keys.has('KeyD')||keys.has('ArrowRight'),brake=keys.has('Space');
  const onRoad=Boolean(world.roads.at(car.x,car.z));
  // Analog steering (thumb slider, tilt) eases off with speed, up to 45% at 65 km/h: full lock from a thumb at speed swerved.
- const targetSteer=left||right?(left?1:0)-(right?1:0):(keys.tilt||0)*(1-Math.min(.45,Math.max(0,car.speed)/40)); /* keys.tilt: analog steering from a tilted phone, -1…1, left positive */car.steer+=(targetSteer-car.steer)*Math.min(1,dt*10);
- const launchAcceleration=8.4+1.8*Math.max(0,1-Math.max(0,car.speed)/(50/3.6));
+ const targetSteer=left||right?(left?1:0)-(right?1:0):(keys.tilt||0)*(1-Math.min(.45,Math.max(0,car.speed)/40)); /* keys.tilt: analog steering from a tilted phone, -1…1, left positive */car.steer+=(targetSteer-car.steer)*Math.min(1,dt*(keys.gentle?5:10)); // keys.gentle: touch screens (main.js) steer in at half the rate
+ // Touch screens (keys.gentle): Go is full throttle, so the car pulls ~40% softer and tops out at 90 km/h; on a phone
+ // 0-50 km/h in under 2 s set off a chain of crashes before the player had found the steering.
+ const gentle=!!keys.gentle,topSpeed=gentle?GENTLE_MAX_SPEED:PLAYER_MAX_SPEED;
+ const launchAcceleration=(8.4+1.8*Math.max(0,1-Math.max(0,car.speed)/(50/3.6)))*(gentle?.6:1);
  const roadDrag=.25+car.speed*car.speed*.002+(onRoad?0:2);
- const headroom=Math.max(0,Math.min(1,(PLAYER_MAX_SPEED-car.speed)/(PLAYER_MAX_SPEED-80/3.6)));
+ const headroom=Math.max(0,Math.min(1,(topSpeed-car.speed)/(topSpeed-(gentle?55:80)/3.6)));
  const acceleration=roadDrag+Math.max(0,launchAcceleration-roadDrag)*headroom;
  const flat=car.flat||0,power=flat?FLAT_TYRES.power:1;
  if(!brake&&throttle)car.speed+=(car.speed<-.5?24:acceleration*power)*dt;
@@ -79,7 +82,7 @@ export function driveStep(car,keys,dt,world) {
  // Slopes: gravity along the car's pitch slows it uphill and pulls it on downhill (or back, when stopped and let go).
  if(car.pitch)car.speed-=GRAVITY*Math.sin(car.pitch)*dt;
  // Arcade top-speed governor. Posted limits govern NPCs separately.
- car.speed=Math.max(-9,Math.min(PLAYER_MAX_SPEED,car.speed));
+ car.speed=Math.max(-9,Math.min(topSpeed,car.speed));
  // Preserve the first small powered step, especially reverse on pavement at
  // 60/120 Hz. The standstill dead zone is for coasting, not active throttle.
  if(Math.abs(car.speed)<.04&&!throttle&&!reverse)car.speed=0;

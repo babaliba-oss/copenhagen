@@ -949,6 +949,7 @@ function setStart(l){mobileControls?.release();if(started)cph?.teleported?.();pe
 function handleTileError(e){console.error(e);if(!document.body.classList.contains('booting'))toast('Some scenery could not load. Nearby streets will retry.');} // not over the welcome card
 const touchScreen=matchMedia('(pointer:coarse)').matches; // phones and tablets: no keyboard, so the HUD and touch buttons stay on
 if(touchScreen){document.body.classList.remove('clean-capture');document.body.classList.add('touch');}
+keys.gentle=touchScreen; // touch driving pulls softer, tops out at 90 km/h and steers in slower (physics.js driveStep)
 // Work that can wait until the player is in the city: run `fn` `ms` after the start (at once if already started).
 const startQueue=[];function afterStart(ms,fn){if(started)setTimeout(fn,ms);else startQueue.push([ms,fn]);}
 function start(){if(!ready)return;if(previewing){startAfterPreview=true;return;}if(!sound&&!CINEMATIC&&city?.id?.startsWith('copenhagen')){let on=true;try{on=localStorage.getItem('cph-sound')!=='0';}catch{}if(on)$('sound-btn').click();}started=true;touchTucks.showAll();for(const [ms,fn] of startQueue.splice(0))setTimeout(fn,ms);setTimeout(()=>prefetchOtherEra(),20000);paused=false;document.body.classList.add('driving');loadingScreen.enter();carGroup.visible=true;marker.visible=false;toast(touchScreen?'Slide to steer · Hold Go to move · Menu for the map and settings':city?.era===1760?'WASD or arrow keys to drive the coach · Space to rein in':'WASD or arrow keys to drive · Space to handbrake');$('world').focus();}

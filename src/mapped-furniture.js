@@ -28,6 +28,7 @@ export const POSTS={
  'park-lamp':{height:3.2,radius:.06,strength:1.4}, // short park lantern with stacked shades
  lantern:{height:3.1,radius:.07,strength:1.2}, // 1760 oil lantern on a wooden post
 };
+export const KNOCK_SOLID=new Set(['bollard','bench','bike-rack','hydrant','junction-box']);
 export const SOLIDS={bollard:[.22,.22,.95],'junction-box':[.85,.42,1.3],bench:[1.8,.6,.85],'bike-rack':[2.4,.55,.4],hydrant:[.36,.36,.8],shelter:[3.6,1.5,2.5],'hotdog-stand':[2.55,1.45,4.2]}; // width, depth, height
 // A stable id per object: Mapillary feature id, else its source and place in the file.
 const itemId=(it,i)=>`mapped-${it.k}-${it.mly?.[0]??`${it.src||'item'}-${i}`}`;
@@ -262,6 +263,12 @@ export function createMappedFurniture(layer,{player=()=>null,mobility=()=>null,c
  for(const [kind,size] of Object.entries(SOLIDS)){
   const list=items.filter(i=>i.k===kind);if(!list.length)continue;
   const g=models[kind]?models[kind].clone():mergeGeometries(solidParts[kind](size));if(!models[kind])g.computeVertexNormals();
+  // Street furniture is knocked flying, not a wall (Daniel: the car kept getting stuck on Copenhagen's 10k bike racks,
+  // benches and bollards; open-world driving games make roadside props break away and keep buildings, trees and
+  // landmarks solid). Shelters and hot-dog stands stay solid.
+  if(KNOCK_SOLID.has(kind)){const [w,d,h]=size;
+   const k=createKnockables(list.map((it,i)=>({id:itemId(it,i),x:it.x,z:it.z,yaw:it.yaw||0})),[{geometry:g,material:painted}],{radius:Math.min(.7,Math.max(.2,Math.max(w,d)*.3)),height:h,range:VIEW_RANGE});
+   k.group.name=`Mapped ${kind}s (knockable)`;group.add(k.group);knock.push(k);continue;}
   chunkedInstances(list,g,painted,`Mapped ${kind}`,it=>[it.x,it.z,it.yaw]);
   list.forEach((it,i)=>{const yaw=it.yaw||0;
    const [w,d]=size,c=Math.cos(yaw),s=Math.sin(yaw),ring=[[-w/2,-d/2],[w/2,-d/2],[w/2,d/2],[-w/2,d/2]].map(([a,b])=>[it.x+a*c+b*s,it.z-a*s+b*c]);

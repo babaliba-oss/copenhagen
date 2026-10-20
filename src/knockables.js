@@ -41,7 +41,7 @@ export function createKnockables(items,parts,{radius=.3,height=1.1,range=Infinit
     for(const b of bodies){
       if(b.playerTaken||b.disabled)continue;
       // Upright bollards are only struck when the car is actually moving into them; fallen ones get nudged along.
-      if(car&&b.y<.6&&Math.abs(car.speed)>.6){
+      if(car&&b.y<.6&&Math.abs(car.speed)>.6&&Math.abs(b.x-car.x)<5&&Math.abs(b.z-car.z)<5){ // cheap reject first: sets run to 10k bodies
         const contact=carContact(car,b.x,b.z,radius);
         if(contact&&(b.resting||Math.hypot(b.vx,b.vz)<Math.abs(car.speed)*.8)){if(!b.knocked)slowdown+=.012;kick(b,car,contact);}
       }
