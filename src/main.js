@@ -1150,6 +1150,10 @@ function cineObstacles(hero){
  for(const p of mobility?.people||[])if(p.edge!==null&&p.edge!==undefined&&Math.abs(p.x-hero.x)<25&&Math.abs(p.z-hero.z)<25)out.push({x:p.x,z:p.z,heading:p.heading||0,speed:0,hl:.35,hw:.35,near:7});
  return out;
 }
+// Lists rebuilt every physics step (people, the vehicles each system avoids): refilled in place instead of new spread
+// arrays every step (a dozen a step, the main source of per-frame garbage on phones). Each call site has its own.
+const SCRATCH={people:[],riders:[],hitCars:[],tram:[],bus:[],ext:[],npc:[],police:[],still:{}};
+function fillList(out,...lists){out.length=0;for(const l of lists)if(l)for(let i=0;i<l.length;i++)out.push(l[i]);return out;}
 function frame(now){
  if(gameIsStopped())return;
  if(!fixedCall){requestAnimationFrame(frame);if(FIXED){fixedNow=now;if(cinematic?.phase==='play')return;}} /* ?fixed: while a shot plays, only the capture script advances the world */frameNow=now;
@@ -1164,7 +1168,7 @@ function frame(now){
   camera.updateMatrixWorld();trafficFrustum.setFromProjectionMatrix(trafficProjection.multiplyMatrices(camera.projectionMatrix,camera.matrixWorldInverse));
   mobility.visibilityTest=trafficInView;if(buses)buses.simulation.visibilityTest=trafficInView;
   for(const step of steps){
-   impacts.step(step,world);crowd?.step(step);let before=null;const driving=travel.mode==='car',parked=travel.parked();
+   impacts.step(step,world);crowd?.step(step);let before=null;const driving=travel.mode==='car',parked=travel.parked(),people=fillList(SCRATCH.people,mobility.people,detailPeople);
    if(started&&cinematic?.driving)before={...car}; /* the trailer's car drives itself (cinematic.js) and hits nothing */
    else if(started){
     const previous=before={...car},r=driving?driveStep(car,keys,step,world):travel.step(keys,step,travelObstacles());
@@ -1174,25 +1178,26 @@ function frame(now){
     police.observeDriving(previous,car,step,{driving});
     const parkedHit=driving&&parked.find(p=>sweptContact(previous,car,p));
     if(parkedHit){Object.assign(car,{x:previous.x,z:previous.z,heading:previous.heading,speed:0});impacts.damage(car,Math.abs(previous.speed),'vehicle');police.report(parkedHit.travelMode==='car'?'vehicle':'property',`parked:${parkedHit.id}`,Math.abs(previous.speed));}
-    knockables?.step(step,driving?car:{...car,speed:0},world);
+    knockables?.step(step,driving?car:Object.assign(SCRATCH.still,car,{speed:0}),world);
     if(driving){
      police.observe(previous,car,mobility.cars,[]);
-     impacts.collide(previous,car,[...mobility.people,...detailPeople],[...cyclists.riders.filter(r=>!r.playerTaken),...npcScooters.riders],[...mobility.cars,...police.obstacles],police);
+     {const riders=SCRATCH.riders;riders.length=0;for(const c of cyclists.riders)if(!c.playerTaken)riders.push(c);for(const c of npcScooters.riders)riders.push(c);
+      impacts.collide(previous,car,people,riders,fillList(SCRATCH.hitCars,mobility.cars,police.obstacles),police);}
      if(r.collision==='building'){impacts.damage(car,Math.abs(previous.speed),'building');finale.buildingImpact({...car,speed:previous.speed},Math.abs(previous.speed),world,police);}
      else if(r.scrape>=2){impacts.damage(car,r.scrape,'building');finale.buildingImpact({...car,speed:r.scrape},r.scrape,world,police);} /* slid along a wall (physics.js): the speed that went into it still counts */
-    }else if(!r.crashed){const h=travel.hitPeople(previous,[...mobility.people,...detailPeople],impacts,{police,obstacles:travelObstacles()});
+    }else if(!r.crashed){const h=travel.hitPeople(previous,people,impacts,{police,obstacles:travelObstacles()});
      if(h?.fell){car=travel.actor;playerCars.sync(travel);toast(h.fell>5?'Ouch. You hit someone and went flying.':'You hit someone and came off. Press Enter to get back on.');lastToast=now;}else if(h?.bumped&&now-lastToast>1500){toast('Sorry!');lastToast=now;}}
     distance=car.distance;
     if(r.collision&&now-lastToast>2200){if(r.collision==='boundary')showEdgeInvite();if(r.collision==='water')toast('The water is best enjoyed from the shore.');lastToast=now;}
    }
    const beforeTransitImpact=Math.abs(car.speed);
-   tramSim.step(step,car,[...mobility.cars,...(buses?.obstacles||[]),...police.obstacles,...parked]);
-   buses?.step(step,car,[...mobility.cars,...tramSim.obstacles,...police.obstacles,...parked]);
+   tramSim.step(step,car,fillList(SCRATCH.tram,mobility.cars,buses?.obstacles,police.obstacles,parked));
+   buses?.step(step,car,fillList(SCRATCH.bus,mobility.cars,tramSim.obstacles,police.obstacles,parked));
    if(started&&driving&&beforeTransitImpact>=2&&car.speed===0){impacts.damage(car,beforeTransitImpact,'transit');finale.transitImpact(car,beforeTransitImpact,tramSim.trams,police);}
-   mobility.externalObstacles=[...impacts.obstacles(),...tramSim.obstacles,...(buses?.obstacles||[]),...police.obstacles,...parked];mobility.externalBodies=transitBodies();
+   mobility.externalObstacles=fillList(SCRATCH.ext,impacts.obstacles(),tramSim.obstacles,buses?.obstacles,police.obstacles,parked);mobility.externalBodies=transitBodies();
    mobility.step(step,car);angryDrivers.update(step,mobility.time,car);cyclists.step(step,car);marketLife.update(step,car);universityLife.update(step,car);terminalLife.update(step,car);
-   npcScooters.step(step,car,{people:[...mobility.people,...detailPeople],vehicles:[...mobility.cars,...tramSim.obstacles,...(buses?.obstacles||[]),...police.obstacles,...parked],impacts});
-   if(started)police.step(step,car,[...mobility.cars,...mobility.people,...detailPeople,...tramSim.obstacles,...(buses?.obstacles||[])]);
+   npcScooters.step(step,car,{people,vehicles:fillList(SCRATCH.npc,mobility.cars,tramSim.obstacles,buses?.obstacles,police.obstacles,parked),impacts});
+   if(started)police.step(step,car,fillList(SCRATCH.police,mobility.cars,mobility.people,detailPeople,tramSim.obstacles,buses?.obstacles));
    finale.step(step,car,{police,tramSim,knockables,started:started&&driving});
    roadblock?.step(step,car,before,{started:started&&driving,knockables,onBurst:()=>finale.offence('roadblock','Drove into a police roadblock')});
    if(police.busted){setBusted(true);break;}
