@@ -140,7 +140,8 @@
 @media(pointer:coarse){
  body.touch.driving .topbar .wordmark{display:none}
  body.touch #cph-hud .cph-money{font-size:12px!important;padding:1px 8px!important;gap:0 6px;opacity:.88;box-shadow:0 2px 8px rgba(30,30,28,.1)}
- body.touch #cph-hud .cph-money .cph-rank{font-size:8px;letter-spacing:.06em}body.touch #cph-hud .cph-money .cph-rank i{display:none}
+ body.touch #cph-hud .cph-money{flex-wrap:nowrap!important;width:max-content}body.touch #cph-hud .cph-money b{white-space:nowrap}
+ body.touch #cph-hud .cph-money .cph-rank{flex-basis:auto;white-space:nowrap;font-size:8px;letter-spacing:.06em}body.touch #cph-hud .cph-money .cph-rank i{display:none}
  body.touch .tuckable{pointer-events:auto;touch-action:pan-y;transition:transform .28s ease,opacity .28s ease}body.touch #cph-hud .tuckable{position:relative}
  body.touch .tuck-left.tucked{transform:translateX(calc(-100% - var(--mobile-left,12px) + 22px));opacity:.94}
  body.touch .tuck-right.tucked{transform:translateX(calc(100% + var(--mobile-right,12px) - 22px));opacity:.94}
