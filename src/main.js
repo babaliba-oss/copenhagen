@@ -164,7 +164,7 @@ const speedometer=createSpeedometer();
 let waterfrontLandmarks,palaceLife,cityHallFlag,sea,marketScene,marketLife,universityLife,stationStreetLife,terminalLife,knockables;
 let marketShop=null,marketShopRenderer=null; // buying at market stalls on foot (market-shop.js)
 const gullEncounter=new GullEncounter();
-let safeBirdFlight=null,wasReading=false,forgotAt=0;
+let safeBirdFlight=null,wasReading=false,forgotAt=0,hiddenAt=-1e9,hiddenList=[];
 let cph=null,harbourBath=null,periodLife=null,parkGeese=null,cafeGuests=null,carriage=null,coaches=null,parkedCars=null,boats=null,landmarks=null,trains=null,detailPeople=[],travel=null,peopleInteraction=null,staticCars=[],trafficCars=[],cameraTransition=null;
 
 const $=id=>document.getElementById(id);
@@ -216,6 +216,9 @@ const focus=new THREE.Vector3(0,0,85);
 // Math.hypot allocates in V8 (it copies its arguments into a fresh array on every call) and the game calls it
 // thousands of times a frame: the same result for the one to four arguments it is used with, without the garbage.
 {const native=Math.hypot;Math.hypot=function hypot(a,b,c,d){if(d!==undefined)return native(a,b,c,d);if(c!==undefined)return Math.sqrt(a*a+b*b+c*c);if(b!==undefined)return Math.sqrt(a*a+b*b);return a===undefined?0:Math.abs(a);};}
+// Diagnostics for one phone's GPU driver at a time: ?off=post,shadows skips the post pipeline / shadow maps, ?hide=<regex>
+// keeps every object whose name matches out of the frame (e.g. ?hide=Far city|Terrain).
+const OFF=new Set((new URLSearchParams(location.search).get('off')||'').split(',').filter(Boolean)),HIDE=(()=>{try{const h=new URLSearchParams(location.search).get('hide');return h?new RegExp(h,'i'):null;}catch{return null;}})();
 const renderer=new THREE.WebGLRenderer({canvas:$('world'),antialias:true,powerPreference:'high-performance'});
 // Instanced batches with nothing in them (no pedestrians on foot near the player, no trams, empty LOD levels:
 // ~50 at Nyhavn) still went through program and uniform setup every frame, in the main and shadow passes.
@@ -236,7 +239,7 @@ const maxPixelRatio=Math.min(devicePixelRatio,gpuLostRecently?1:1.5),resolution=
 renderer.setPixelRatio(maxPixelRatio);
 if(FIXED){captureMode=true;resolution.lock(1);renderer.setPixelRatio(1);globalThis.__skyClock=()=>frameNow;} /* frame-by-frame capture: full quality at the window's size, clouds on the trailer's clock */
 renderer.setSize(captureFrame.w,captureFrame.h);
-renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFShadowMap;renderer.shadowMap.autoUpdate=false; // updated from frame(): every frame when fast, every second frame when the frame budget is tight
+renderer.shadowMap.enabled=!OFF.has('shadows');renderer.shadowMap.type=THREE.PCFShadowMap;renderer.shadowMap.autoUpdate=false; // updated from frame(): every frame when fast, every second frame when the frame budget is tight
 renderer.outputColorSpace=THREE.SRGBColorSpace;
 renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=.85;
 const hemi=new THREE.HemisphereLight('#e6eef8','#68786f',1.4);scene.add(hemi);
@@ -248,7 +251,7 @@ const sky=createSky({renderer,scene,camera});sky.applyLighting(hemi,sun);
 // One sky PMREM shared by car paint/glass, chrome and tram glazing; rebuilt only when the sky changes.
 const skyEnvironment=createSkyEnvironment(renderer,sky.mesh);
 // Post pipeline (AO, bloom, grade) and the time-of-day/weather looks; `look` is attached to the road surface and sea below.
-let post=null;try{post=createPostPipeline(renderer);}catch(e){console.warn('Post pipeline unavailable, rendering directly:',e);}
+let post=null;if(!OFF.has('post'))try{post=createPostPipeline(renderer);}catch(e){console.warn('Post pipeline unavailable, rendering directly:',e);}
 // Past the lowest resolution: ambient occlusion, then bloom and a smaller shadow map, then MSAA, then building detail range.
 let farCity=null; // the far-city skyline group (createFarCity)
 const governor=createQualityGovernor([
@@ -1288,6 +1291,7 @@ function frame(now){
  look.update(dt,now/1000); // blends the active look and re-applies its sun offset after the shadow target above
  flushPeople(scene); // every crowd's instances into the shared person batches (person-model.js)
  const cpu1=performance.now();
+ if(HIDE){if(now-hiddenAt>1000){hiddenAt=now;hiddenList=[];scene.traverse(o=>{if(o.name&&HIDE.test(o.name))hiddenList.push(o);});}for(const o of hiddenList)o.visible=false;}
  if(!skipRender){if(post)post.render(scene,camera);else renderer.render(scene,camera);} /* ?fixed: __cineFrame(n,false) steps the world without drawing (scripts/cine-check) */
  const cpu2=performance.now();lastCpuMs=cpu2-cpu0;
  if(perfOverlay)perfOverlay.split(cpu1-cpu0,cpu2-cpu1); // game code vs. render submission: CPU- or GPU-bound
