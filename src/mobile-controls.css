@@ -112,7 +112,7 @@
  body.touch #cph-hud{left:var(--mobile-left,12px);width:min(280px,calc(100vw - 24px));gap:6px}
  body.touch #cph-hud .cph-money{font-size:16px;padding:4px 10px}
  body.touch #cph-hud .cph-card{padding:9px 12px}body.touch #cph-hud .cph-card h3{font-size:17px}
- body.touch #cph-hud .cph-card p:not(.cph-go):not(.cph-kick){display:none}body.touch #cph-hud .cph-saga ol{display:none}
+ body.touch #cph-hud .cph-card p:not(.cph-go):not(.cph-kick):not(.cph-timer):not(.cph-race-time){display:none}body.touch #cph-hud .cph-saga li:not(.c){display:none} /* timers and the current saga step stay */
  body.touch #cph-hud .cph-card-hint{pointer-events:auto;cursor:pointer;padding:9px 12px;line-height:1.35}
  body.touch #people-interaction{left:var(--mobile-left,12px)}
  body.touch .edge-invite{max-width:min(320px,calc(100% - 24px));padding:12px 40px 12px 14px}
@@ -154,3 +154,11 @@
  body.touch #cph-hud .cph-card-hint{display:none!important}
  .cph-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 }
+/* Phones: no keys, so no key hints (each of these has a tap now: Menu > Journal / Quit race, the saga card for its map, the
+   card buttons), and postcards (taken with N) are keyboard-only. */
+@media(pointer:coarse){
+ body.touch :is(#cph-hud,#cph-lore,#cph-tmap,#cph-journal,#cph-paper,#busted-overlay) kbd{display:none}
+ body.touch .cph-keyboard-only{display:none!important}
+ body.touch #cph-lore .cph-card,body.touch #cph-lore>div{max-height:calc(100dvh - 32px);overflow:auto}
+}
+@media(pointer:coarse){body.touch #help-dialog .help-grid{display:none}} /* a keyboard table; the copy above it explains the touch controls */

@@ -41,7 +41,7 @@ body:not(.driving) #cph-hud,body.busted #cph-hud,body.clean-capture #cph-hud{vis
 .cph-tmap-wrap{display:grid;gap:10px;justify-items:center;color:#f8f5ee;font-size:13px}
 .cph-tmap-wrap canvas{width:min(520px,calc(100vw - 32px),calc(100vh - 120px));height:auto;border-radius:6px;transform:rotate(1.2deg);box-shadow:0 18px 50px rgba(0,0,0,.5)}
 .cph-tmap-wrap p{margin:0}
-@media (max-width:760px){#cph-hud{top:calc(var(--mobile-top,12px) + 74px);left:12px;width:min(280px,calc(100vw - 24px))}.cph-card p:not(.cph-go):not(.cph-kick){display:none}.cph-saga ol{display:none}}
+@media (max-width:760px){#cph-hud{top:calc(var(--mobile-top,12px) + 74px);left:12px;width:min(280px,calc(100vw - 24px))}.cph-card p:not(.cph-go):not(.cph-kick):not(.cph-timer):not(.cph-race-time){display:none}.cph-saga li:not(.c){display:none}}
 #era-card{position:fixed;inset:0;z-index:60;display:grid;place-content:center;text-align:center;gap:6px;padding:24px;background:radial-gradient(circle at 50% 45%,rgba(44,33,22,.86),rgba(18,14,10,.96));color:#f3ead6;font-family:Manrope,sans-serif;opacity:0;pointer-events:none;transition:opacity .6s ease}
 #era-card.show{opacity:1}
 #era-card h2{margin:0;font-family:Spectral,Georgia,serif;font-weight:600;font-size:clamp(34px,7vw,64px);letter-spacing:-.01em}

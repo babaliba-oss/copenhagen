@@ -5,11 +5,13 @@ export const TUCK_AFTER=6000;
 export function createTouchTucks(doc=document,{after=TUCK_AFTER}={}){
  const touch=()=>doc.body.classList.contains('touch');
  // label(): the word written down the tab while tucked (JOB, SAGA, RADIO)
- function add(el,side,key=()=>el.textContent,label=()=>''){
+ // hold(): keep it out (a countdown on it) - it tucks once that ends.
+ function add(el,side,key=()=>el.textContent,label=()=>'',hold=()=>false){
   if(!el)return null;
   const it={el,side,timer:0,key:key(),start:null,swiped:0};
   el.classList.add('tuckable',`tuck-${side}`);
-  const tuck=on=>{if(on)el.dataset.tab=label();el.classList.toggle('tucked',on);clearTimeout(it.timer);if(!on)it.timer=setTimeout(()=>tuck(true),after);};
+  const later=()=>{it.timer=setTimeout(()=>{if(hold())later();else tuck(true);},after);};
+  const tuck=on=>{if(on)el.dataset.tab=label();el.classList.toggle('tucked',on);clearTimeout(it.timer);if(!on)later();};
   it.tuck=tuck;
   el.addEventListener('pointerdown',e=>{if(touch())it.start={x:e.clientX,y:e.clientY};},{passive:true});
   el.addEventListener('pointerup',e=>{const s=it.start;it.start=null;if(!s||!touch())return;const dx=e.clientX-s.x,dy=e.clientY-s.y;

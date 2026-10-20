@@ -35,7 +35,7 @@ export const SAGAS = [
       { at: [55.67942, 12.59045], name: 'Nyhavn 18', card: ['Nyhavn 18 · 1871–75', 'His last address on the canal. By now the tales are read in dozens of languages. He dies in August 1875, at a friend\'s villa called Rolighed. The whole city turns out for the funeral.'] },
       { at: [55.69292, 12.59920], name: 'Den Lille Havfrue', card: ['Den Lille Havfrue · 1913', 'Carl Jacobsen of Carlsberg saw a ballet of The Little Mermaid and paid for a statue. Edvard Eriksen made her. The ballerina Ellen Price posed for the head, his wife Eline for the rest. You leave the paper swan at her feet. Ugly ducklings, it turns out, do fine.'] }] },
   { id: 'gefion', era: 'm', title: 'Gefion\'s Plough', giver: 'aksel', pay: 500, limit: 240,
-    intro: 'Think you can plough like Gefion? Ride the furrow: Kastellet, Marmorkirken, Amalienborg and back to me. Four minutes. Her oxen had a day and a night. You have a bike.',
+    intro: 'Think you can plough like Gefion? Ride the furrow: Kastellet, Marmorkirken, Amalienborg and back to me. Four minutes. Her oxen had a day and a night. You have wheels.',
     go: 'Go! Kastellet first. Pull, oxen!',
     steps: [
       { at: [55.68880, 12.59330], name: 'Kastellet gate', toast: ['First furrow', 'The oxen strain. Marmorkirken next.'] },
@@ -71,8 +71,8 @@ export const SAGAS = [
       { at: [55.67650, 12.58280], name: 'Holmens Kirke', any: 1, nisse: 1, toast: ['Nisse fed', 'Holmens Kirke. A church nisse. Very formal.'] },
       { at: [55.69130, 12.59350], name: 'Kastellet', any: 1, nisse: 1, toast: ['Nisse fed', 'Kastellet. He salutes.'] }] },
   { id: 'holger', era: 'b', title: 'Holger Danske\'s Map', giver: 'ole', pay: 700,
-    intro: 'Found this in a herring barrel. A map torn in three, no street names on it. Old sailors say it leads to Holger Danske, the knight who sleeps until Denmark needs him. No beams, no GPS. Just the map. Press K to look at it.',
-    go: 'First piece. North is up. Find the X. Press K any time to look again.',
+    intro: 'Found this in a herring barrel. A map torn in three, no street names on it. Old sailors say it leads to Holger Danske, the knight who sleeps until Denmark needs him. No beams, no GPS. Just the map. Press K (or tap the saga card) to look at it.',
+    go: 'First piece. North is up. Find the X. Press K, or tap the saga card, to look again.',
     steps: [
       { at: [55.67560, 12.57790], name: 'The first X', clue: 1, r: 16, card: ['Slotsholmen · 1167', 'Bishop Absalon built a castle here in 1167, on a little island next to a fishing village called Havn. That is where Copenhagen starts. The ruins are still down there, under Christiansborg. Wedged between two stones: the second piece of the map.'] },
       { at: [55.67300, 12.59360], name: 'The second X', clue: 1, r: 16, card: ['Christianshavn · 1617', 'Christian IV had a new town built here on the shallows, canals and all, the Dutch way. Folded into the map is a note: Holger Danske rode with Charlemagne in the old French songs, and the Danes kept him anyway. Andersen wrote a tale about him in 1845. The third piece points north.'] },

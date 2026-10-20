@@ -17,7 +17,7 @@ import './copenhagen.css';
 const SAVE_KEY='cph-game-v1';
 const clamp=(v,a,b)=>v<a?a:v>b?b:v;
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-const fmtKr=n=>Math.round(n).toLocaleString('da-DK');let UNIT='kr'; // 1760: skilling (96 to the rigsdaler)
+const fmtKr=n=>Math.round(n).toLocaleString('en-GB'); /* English UI: 1,500 kr (da-DK wrote 1.500, read as 1.5) */let UNIT='kr'; // 1760: skilling (96 to the rigsdaler)
 const dist=(a,b)=>Math.hypot(a[0]-b[0],a[1]-b[1]);
 
 // ---------- routing (A* over the city's walk or road graph) ----------
@@ -88,6 +88,7 @@ export function createCopenhagenGame({scene,city,mobilityData,cityData,toast,sou
  const byId=Object.fromEntries(sagas.map(s=>[s.id,s]));
  const people=cast.map(c=>{const [x,z]=c.local||ll(c.at); /* local: a hand-placed spot in game metres */return {id:`cph-${c.id}`,script:c.id,x,z,heading:0,pose:'chat',walking:false,talkable:true,shirt:c.look.coat,coat:.7,...(c.look.height?{height:c.look.height}:{})};});
 
+ const TOUCH=typeof document!=='undefined'&&document.body.classList.contains('touch'); // phones: card hints without keys (Menu has Journal and Quit race)
  // ---- save ----
  let save={money:0,job:0,done:{},lore:[],active:null,nisser:[]};
  const KEY=SAVE_KEY+(ERA==='h'?'-1760':'');try{save={...save,...JSON.parse(localStorage.getItem(KEY)||'{}')};}catch{}
@@ -230,7 +231,7 @@ export function createCopenhagenGame({scene,city,mobilityData,cityData,toast,sou
   spend:n=>{if(save.money<n)return false;save.money-=n;persist();return true;},
   sagaChoice:id=>{const q=byId[id];if(!q||save.done[id]||save.active?.id===id)return [];return [{id:`saga:${id}`,label:`Saga: ${q.title}`}];},
   sagaIntro:id=>{const q=byId[id];if(save.active&&save.active.id!==id)return {response:`Finish what you started first. ${byId[save.active.id].title} is still waiting.`,choices:[{id:'bye',label:'Right'}],expression:'friendly'};
-   return {response:q.intro,choices:[{id:`accept:${id}`,label:`Accept · ${fmtKr(q.pay)} ${UNIT}${q.limit?` · ${Math.round(q.limit/60)} min`:''}`},{id:'bye',label:'Not now'}],expression:'friendly'};},
+   return {response:q.intro,choices:[{id:`accept:${id}`,label:`Accept · ${fmtKr(q.pay)} ${UNIT}${q.limit?` · ${Math.floor(q.limit/60)}:${String(q.limit%60).padStart(2,'0')} min`:''}`},{id:'bye',label:'Not now'}],expression:'friendly'};},
   sagaAccept:id=>{startSaga(id);return {response:byId[id].go,choices:[{id:'bye',label:'On my way'}],expression:'friendly'};},
  };
  connectCharacters(api);
@@ -261,7 +262,7 @@ export function createCopenhagenGame({scene,city,mobilityData,cityData,toast,sou
   const rows=sagas.map(q=>{const done=!!save.done[q.id],act=save.active?.id===q.id;const cards=q.steps.map((s,k)=>[s,k]).filter(([s,k])=>s.card&&save.lore.includes(q.id+':'+k));
    return `<article class="cph-jq${done?' done':''}${act?' act':''}"><div class="cph-jh"><span>${q.limit?'Timed · ':''}${fmtKr(q.pay)} ${UNIT}</span></div><h3>${esc(q.title)}</h3><p class="cph-js">${done?'Complete':act?`In progress · ${save.active.done.length}/${q.steps.length}`:`Ask ${esc(giverName(q))}`}</p>${cards.map(([s])=>`<details><summary>${esc(s.card[0])}</summary><p>${esc(s.card[1])}</p></details>`).join('')}${!done&&!act?`<button data-way="${q.giver}">Show me the way</button>`:''}${act?`<button data-abandon="1">Abandon</button>`:''}</article>`;}).join('');
   const album=postcards.map(c=>{const got=save.cards[c.id];return `<figure class="cph-pc${got?'':' empty'}">${got?.img?`<img src="${got.img}" alt="">`:`<div class="cph-pc-blank">?</div>`}<figcaption>${esc(c.title)}</figcaption></figure>`;}).join('');
-  journal.innerHTML=`<div class="cph-jcard" role="dialog"><div class="cph-jtop"><div><p class="cph-kick">Stories from Danish history and folklore</p><h2>Sagas</h2></div><button id="cph-jclose">Close <kbd>J</kbd></button></div><div class="cph-jlist">${rows}</div><h2 class="cph-album-h">Postcards · ${Object.keys(save.cards).length}/${postcards.length}</h2><p class="cph-js">Find a landmark, face it and press N.</p><div class="cph-album">${album}</div></div>`;
+  journal.innerHTML=`<div class="cph-jcard" role="dialog"><div class="cph-jtop"><div><p class="cph-kick">Stories from Danish history and folklore</p><h2>Sagas</h2></div><button id="cph-jclose">Close <kbd>J</kbd></button></div><div class="cph-jlist">${rows}</div><h2 class="cph-album-h cph-keyboard-only">Postcards · ${Object.keys(save.cards).length}/${postcards.length}</h2><p class="cph-js cph-keyboard-only">Find a landmark, face it and press N.</p><div class="cph-album cph-keyboard-only">${album}</div></div>`;
   $('cph-jclose').onclick=()=>toggleJournal(false);
   journal.querySelectorAll('[data-way]').forEach(b=>b.onclick=()=>{const c=people.find(p=>p.script===b.dataset.way);if(c){wayTo=[c.x,c.z];routeFor=null;toggleJournal(false);toast(`Route set to ${CHARACTERS.find(x=>x.id===c.script).name}`);}});
   journal.querySelectorAll('[data-abandon]').forEach(b=>b.onclick=()=>{save.active=null;persist();routeFor=null;renderJournal();});
@@ -288,7 +289,7 @@ export function createCopenhagenGame({scene,city,mobilityData,cityData,toast,sou
  function updateHud(){
   {const n=save.delivered||0,r=rankOf(n),next=RANKS[r+1],from=RANKS[r][1],pct=next?Math.round((n-from)/(next[1]-from)*100):100;
    setHtml($('cph-money'),`<b>${fmtKr(save.money)} ${UNIT}</b>${save.nisser?.length?` · nisser ${save.nisser.length}/${nisser.length}`:''}${save.pant?` · pant ${save.pant}`:''}<span class="cph-rank">${esc(RANKS[r][0])}${save.streak>1?` · streak ×${save.streak}`:''}<i style="--p:${pct}%"></i></span>`);}
-  if(race){const r=race.r,b=save.best[r.id];setHtml($('cph-job'),`<p class="cph-kick">Race · checkpoint ${Math.min(race.k+1,r.cps.length)}/${r.cps.length} · <kbd>X</kbd> quit</p><h3>${esc(r.title)}</h3><p class="cph-race-time">${race.countdown>0?Math.ceil(race.countdown):fmtT(race.t)}</p><p>Gold ${fmtT(r.par[0])} · silver ${fmtT(r.par[1])} · bronze ${fmtT(r.par[2])}${b!=null?` · best ${fmtT(b)}`:''}</p>`);}
+  if(race){const r=race.r,b=save.best[r.id];setHtml($('cph-job'),`<p class="cph-kick">Race · checkpoint ${Math.min(race.k+1,r.cps.length)}/${r.cps.length}${TOUCH?'':' · <kbd>X</kbd> quit'}</p><h3>${esc(r.title)}</h3><p class="cph-race-time">${race.countdown>0?Math.ceil(race.countdown):fmtT(race.t)}</p><p>Gold ${fmtT(r.par[0])} · silver ${fmtT(r.par[1])} · bronze ${fmtT(r.par[2])}${b!=null?` · best ${fmtT(b)}`:''}</p>`);}
   else{
   const j=job(),t=state==='a'?j.A:j.B,d=line.points&&target().kind==='job'?line.remaining():dist(t,[player.x,player.z]); // the line may lead to a saga step or a character instead
   setHtml($('cph-job'),`<p class="cph-kick">Job ${save.job%jobs.length+1}/${jobs.length}</p><h3>${esc(j.t)}</h3><p>${esc(j.d)}</p><p class="cph-go">${state==='a'?'Pick up at':'Deliver to'} <b>${esc(state==='a'?j.aName:j.bName)}</b> · ${d>1000?(d/1000).toFixed(1)+' km':Math.round(d/10)*10+' m'}${state==='b'?` · <span class="${timer<15?'cph-low':''}">${Math.max(0,timer).toFixed(0)} s</span>`:''}</p>`);
@@ -297,7 +298,7 @@ export function createCopenhagenGame({scene,city,mobilityData,cityData,toast,sou
    const h=$('cph-card-hint');if(h){h.hidden=!near;if(near)setHtml(h,document.body.classList.contains('touch')?`<span aria-hidden="true">📷</span><span class="cph-sr">Take a postcard of ${esc(near.title)}</span>`:`Postcard view nearby: <b>${esc(near.title)}</b> · face it and press <kbd>N</kbd>`);}}
   const sg=$('cph-saga');if(!save.active){sg.hidden=true;return;}sg.hidden=false;
   const q=byId[save.active.id],f=frontier();
-  setHtml(sg,`<p class="cph-kick">Saga · <kbd>J</kbd> journal${q.steps.some(s=>s.clue)?' · <kbd>K</kbd> map':''}</p><h3>${esc(q.title)}</h3><ol>${q.steps.map((s,k)=>{const dn=save.active.done.includes(k),c=f.includes(k),dd=dist(s.p,[player.x,player.z]);return `<li class="${dn?'d':c?'c':''}">${esc(s.name)}${c?` <span>${s.clue?warmth(dd):dd>1000?(dd/1000).toFixed(1)+' km':Math.round(dd/10)*10+' m'}</span>`:''}</li>`;}).join('')}</ol>${q.limit?`<p class="cph-timer ${save.active.t<30?'cph-low':''}">${Math.max(0,save.active.t).toFixed(0)} s</p>`:''}`);
+  setHtml(sg,`<p class="cph-kick">${TOUCH?`Saga${q.steps.some(s=>s.clue)?' · tap for the map':''}`:`Saga · <kbd>J</kbd> journal${q.steps.some(s=>s.clue)?' · <kbd>K</kbd> map':''}`}</p><h3>${esc(q.title)}</h3><ol>${q.steps.map((s,k)=>{const dn=save.active.done.includes(k),c=f.includes(k),dd=dist(s.p,[player.x,player.z]);return `<li class="${dn?'d':c?'c':''}">${esc(s.name)}${c?` <span>${s.clue?warmth(dd):dd>1000?(dd/1000).toFixed(1)+' km':Math.round(dd/10)*10+' m'}</span>`:''}</li>`;}).join('')}</ol>${q.limit?`<p class="cph-timer ${save.active.t<30?'cph-low':''}">${Math.max(0,save.active.t).toFixed(0)} s</p>`:''}`);
  }
 
  // The morning paper: once per session, the first time the game runs.

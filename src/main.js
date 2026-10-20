@@ -438,7 +438,7 @@ function updateCaptureBadge(){
 }
 // At the playable edge, invite the player to build the next streets (at most every 2 minutes).
 let edgeInviteAt=-Infinity;
-function showEdgeInvite(){const now=performance.now(),el=$('edge-invite');if(now-edgeInviteAt<120000){toast(`The edge of our ${city.name}. Turn back and keep exploring.`);return;}edgeInviteAt=now;el.hidden=false;clearTimeout(el.timer);el.timer=setTimeout(()=>{el.hidden=true;},12000);}
+function showEdgeInvite(){const now=performance.now(),el=$('edge-invite');if(now-edgeInviteAt<120000){toast('That’s the edge of the map. Turn back and keep exploring.');return;}edgeInviteAt=now;el.hidden=false;clearTimeout(el.timer);el.timer=setTimeout(()=>{el.hidden=true;},12000);}
 $('edge-invite').querySelector('button').addEventListener('click',()=>{$('edge-invite').hidden=true;});
 function toast(message,{important=false}={}){const el=$('toast');if(!important&&el.classList.contains('important')&&el.classList.contains('visible'))return;el.textContent=message;el.classList.toggle('important',important);el.classList.add('visible');clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.classList.remove('visible'),important?5000:2800);}
 function progress(n,message){globalThis.__bootStage=`${message} (${n}%)`;if(gameIsStopped())throw new Error('Startup stopped after a game failure');loadingScreen.progress(n,message);}
@@ -960,7 +960,7 @@ if(touchScreen){document.body.classList.remove('clean-capture');document.body.cl
 keys.gentle=touchScreen; // touch driving pulls softer, tops out at 90 km/h and steers in slower (physics.js driveStep)
 // Work that can wait until the player is in the city: run `fn` `ms` after the start (at once if already started).
 const startQueue=[];function afterStart(ms,fn){if(started)setTimeout(fn,ms);else startQueue.push([ms,fn]);}
-function start(){if(!ready)return;if(previewing){startAfterPreview=true;return;}if(!sound&&!CINEMATIC&&city?.id?.startsWith('copenhagen')){let on=true;try{on=localStorage.getItem('cph-sound')!=='0';}catch{}if(on)$('sound-btn').click();}started=true;touchTucks.showAll();for(const [ms,fn] of startQueue.splice(0))setTimeout(fn,ms);setTimeout(()=>prefetchOtherEra(),20000);paused=false;document.body.classList.add('driving');loadingScreen.enter();carGroup.visible=true;marker.visible=false;toast(touchScreen?'Slide to steer · Hold Go to move · Menu for the map and settings':city?.era===1760?'WASD or arrow keys to drive the coach · Space to rein in':'WASD or arrow keys to drive · Space to handbrake');$('world').focus();}
+function start(){if(!ready)return;if(previewing){startAfterPreview=true;return;}if(!sound&&!CINEMATIC&&city?.id?.startsWith('copenhagen')){let on=true;try{on=localStorage.getItem('cph-sound')!=='0';}catch{}if(on)$('sound-btn').click();}started=true;touchTucks.showAll();for(const [ms,fn] of startQueue.splice(0))setTimeout(fn,ms);setTimeout(()=>prefetchOtherEra(),20000);paused=false;document.body.classList.add('driving');loadingScreen.enter();carGroup.visible=true;marker.visible=false;toast(touchScreen?'Hold Go and follow the purple line to the beam: your first job. Slide to steer.':city?.era===1760?'WASD or arrow keys to drive the coach · Space to rein in':'WASD or arrow keys to drive · Space to handbrake');$('world').focus();}
 function focusWorldControls(){if(started&&!paused&&!mapOpen&&!police?.busted&&!gameIsStopped())$('world').focus({preventScroll:true});}
 let bigMap=null;
 async function travelTo(l){ /* big map: jump to a named place */
@@ -1006,6 +1006,8 @@ function restart(){if(!ready)return;setBusted(false);knockables?.resetAll();dist
 function continueDriving(){if(!ready)return;roadblock?.standDown();police?.reset();finale.resume();repairCar();tramSim?.clearAround(car);setBusted(false);toast('Back on the road — wanted level cleared.');}
 $('busted-restart').addEventListener('click',restart);$('busted-continue').addEventListener('click',continueDriving);
 function zoom(delta){desiredSpan=THREE.MathUtils.clamp(desiredSpan+delta*.35,36,240);}
+// Phones have no K: a tap on the saga card (out, not tucked) opens its treasure map, when it has one.
+document.addEventListener('click',e=>{const sg=e.target.closest?.('#cph-saga');if(!sg||!touchScreen||!started||paused||mapOpen||police?.busted||sg.classList.contains('tucked'))return;if(/map/i.test(sg.querySelector('.cph-kick')?.textContent||''))cph?.key('KeyK');});
 document.addEventListener('click',e=>{if(!e.target.closest?.('#cph-card-hint')||!cph?.photo||!started||paused||mapOpen||police?.busted)return;const d=camera.getWorldDirection(new THREE.Vector3());cph.photo({dir:[d.x,d.z],snap:snapPhoto});}); // touch: the postcard hint is the button (N on a keyboard)
 $('start-btn').addEventListener('click',start);$('map-btn').addEventListener('click',()=>showDialog('map-dialog'));$('minimap-btn').addEventListener('click',()=>showDialog('map-dialog'));$('help-btn').addEventListener('click',()=>showDialog('help-dialog'));$('sources-btn').addEventListener('click',()=>showDialog('sources-dialog'));$('zoom-in').addEventListener('click',()=>zoom(-40));$('zoom-out').addEventListener('click',()=>zoom(40));$('resume-btn').addEventListener('click',()=>setPaused(false));
 $('view-label').textContent='Drive';$('view-btn').title='C: cycle Drive, Follow and High cameras · Hold Q/E to look left/right';
@@ -1096,7 +1098,7 @@ mobileControls=createMobileControls({
  actions:{
   map:()=>showDialog('map-dialog'),camera:cycleCamera,
   weather:()=>{look.cycle();toast(look.label);},sound:()=>$('sound-btn').click(),
-  help:()=>showDialog('help-dialog'),reset:recoverCar,sources:()=>showDialog('sources-dialog'),era:()=>$('era-btn').click(), // phones have no top bar: the Menu carries the time travel
+  help:()=>showDialog('help-dialog'),reset:recoverCar,journal:()=>cph?.key('KeyJ'),quitRace:()=>cph?.key('KeyX'),racing:()=>!!cph?.debug?.()?.race, /* phones have no J or X key */sources:()=>showDialog('sources-dialog'),era:()=>$('era-btn').click(), // phones have no top bar: the Menu carries the time travel
  },
  notify:toast,
 });
@@ -1174,7 +1176,7 @@ function frame(now){
     const previous=before={...car},r=driving?driveStep(car,keys,step,world):travel.step(keys,step,travelObstacles());
     {const pressing=driving&&['KeyW','ArrowUp','KeyS','ArrowDown'].some(k=>keys.has(k)),stuck=stuckWatch.update(pressing,car.x,car.z,step); /* wedged: offer the reset (R / Menu) right away */
      mobileControls?.setStuck(stuck);if(stuck&&!stuckHinted&&!touchScreen){toast('Stuck? Press R to get back on the road.');stuckHinted=true;}if(!pressing)stuckHinted=false;}
-    if(r.crashed){car=travel.actor;playerCars.sync(travel);if(now-lastToast>1500){toast(r.crashed>5?'Ouch. That was a hard fall.':'You came off. Press Enter to get back on.');lastToast=now;}}
+    if(r.crashed){car=travel.actor;playerCars.sync(travel);if(now-lastToast>1500){toast(r.crashed>5?'Ouch. That was a hard fall.':touchScreen?'You came off. Tap the ride button to get back on.':'You came off. Press Enter to get back on.');lastToast=now;}}
     police.observeDriving(previous,car,step,{driving});
     const parkedHit=driving&&parked.find(p=>sweptContact(previous,car,p));
     if(parkedHit){Object.assign(car,{x:previous.x,z:previous.z,heading:previous.heading,speed:0});impacts.damage(car,Math.abs(previous.speed),'vehicle');police.report(parkedHit.travelMode==='car'?'vehicle':'property',`parked:${parkedHit.id}`,Math.abs(previous.speed));}
@@ -1186,7 +1188,7 @@ function frame(now){
      if(r.collision==='building'){impacts.damage(car,Math.abs(previous.speed),'building');finale.buildingImpact({...car,speed:previous.speed},Math.abs(previous.speed),world,police);}
      else if(r.scrape>=2){impacts.damage(car,r.scrape,'building');finale.buildingImpact({...car,speed:r.scrape},r.scrape,world,police);} /* slid along a wall (physics.js): the speed that went into it still counts */
     }else if(!r.crashed){const h=travel.hitPeople(previous,people,impacts,{police,obstacles:travelObstacles()});
-     if(h?.fell){car=travel.actor;playerCars.sync(travel);toast(h.fell>5?'Ouch. You hit someone and went flying.':'You hit someone and came off. Press Enter to get back on.');lastToast=now;}else if(h?.bumped&&now-lastToast>1500){toast('Sorry!');lastToast=now;}}
+     if(h?.fell){car=travel.actor;playerCars.sync(travel);toast(h.fell>5?'Ouch. You hit someone and went flying.':touchScreen?'You hit someone and came off. Tap the ride button to get back on.':'You hit someone and came off. Press Enter to get back on.');lastToast=now;}else if(h?.bumped&&now-lastToast>1500){toast('Sorry!');lastToast=now;}}
     distance=car.distance;
     if(r.collision&&now-lastToast>2200){if(r.collision==='boundary')showEdgeInvite();if(r.collision==='water')toast('The water is best enjoyed from the shore.');lastToast=now;}
    }
@@ -1627,7 +1629,7 @@ async function boot(){
    // stalling frames the first time each material comes into view while driving. Capped so a slow GPU still starts.
    progress(98,'Warming up shaders');{const shown=[];scene.traverse(o=>{if(!o.visible){o.visible=true;shown.push(o);}}); /* hidden things too (night lamps, rain, far versions): compiled now, not mid-drive */await Promise.race([renderer.compileAsync(scene,camera).catch(()=>{}),new Promise(r=>setTimeout(r,6000))]);for(const o of shown)o.visible=false;}
    progress(100,'Ready');
-   {const head=el=>()=>(el.querySelector('h3')?.textContent||'')+'|'+(el.querySelector('.cph-go')?.textContent.split('·')[0]||'');for(const id of ['cph-job','cph-saga']){const el=$(id);if(el)touchTucks.add(el,'left',head(el),()=>id==='cph-saga'?'SAGA':/race/i.test(el.querySelector('.cph-kick')?.textContent||'')?'RACE':'JOB');}touchTucks.add($('radio-now'),'right',()=>$('radio-station').textContent,()=>'RADIO');}
+   {const head=el=>()=>(el.querySelector('h3')?.textContent||'')+'|'+(el.querySelector('.cph-go')?.textContent.split('·')[0]||'');for(const id of ['cph-job','cph-saga']){const el=$(id);if(el)touchTucks.add(el,'left',head(el),()=>id==='cph-saga'?'SAGA':/race/i.test(el.querySelector('.cph-kick')?.textContent||'')?'RACE':'JOB',()=>!!el.querySelector('.cph-timer,.cph-race-time,.cph-low')||/Deliver to/.test(el.textContent));} /* a running clock keeps its card out */touchTucks.add($('radio-now'),'right',()=>$('radio-station').textContent,()=>'RADIO');}
    ready=true;carGroup.visible=true;marker.visible=true;loadingScreen.ready(startPoint.name);
    if(CINEMATIC)setTimeout(()=>{start();camera.layers.disable(1);let steerFrom=null;cinematic=createCinematic({ground:(x,z)=>{const g=groundAt(x,z);if(!inWaterPolygons(data.water,x,z))return g;const w=waterAt(x,z)??seaLevel();return w!==null&&w>g?w:g;}, /* over water: heights from the surface, not the bed */setCamera:p=>{inspectionCamera=p;},loaded:()=>!loadingTiles.size&&!uploads.size&&!peopleLoading&&!bakesPending(), /* the people baked before a shot plays: a bake mid-shot is a hitch */era:city.era,shots:pickShots(city.era,location.search),roads:()=>mobility?.roads,cars:()=>cineObstacles(car),clear:(x,z)=>!world?.buildings?.at(x,z),
     solid:(x,z,y)=>{const b=world?.cameraBuildings?.at(x,z);return !!b&&y<groundAt(x,z)+(b.height>2?Math.min(60,b.height):12)+.6;}, /* the lens stays out of houses (cinematic.js clearEye) */
@@ -1682,6 +1684,8 @@ async function boot(){
    {const a=document.createElement('a');a.href='/THIRD_PARTY_LICENSES.txt';a.textContent='Open-source software notices ↗';a.target='_blank';a.rel='noreferrer';document.querySelector('#sources-dialog .source-links').append(a);}
    $('world').setAttribute('aria-label',`3D view of ${city.name}, explored on foot, by car, bike or scooter`);
    document.querySelector('#help-dialog .dialog-copy').textContent=city.era===1760?`Explore ${city.name} by coach or on foot. Press F to step down, Enter to board your coach again, and G to greet someone. Hold Shift to run. Tap the small action buttons on a phone. The minimap stays north-up.`:`Explore ${city.name} by car, on foot, by bicycle or on a scooter. Press F to get out, Enter to use a nearby stopped car, bicycle or scooter, and G to greet someone. Hold Shift to run. Tap the small action buttons on a phone. The minimap stays north-up.`;
+   if(city.era===1760)for(const el of document.querySelectorAll('.help-grid span')){const t={'Handbrake / bike or scooter brake':'Rein in','Enter a nearby car / ride':'Board your coach','Recover car':'Recover coach','Get out / get off':'Step down','Accelerate / reverse':'Drive on / back up'}[el.textContent];if(t)el.textContent=t;} // 1760: a coach, no bikes or scooters
+   if(touchScreen)document.querySelector('#help-dialog .dialog-copy').textContent=`Steer with the slider (or arrows or tilt: Menu > Steering), hold Go, Brake to slow down and reverse. Stopped, the button above the controls gets you out${city.era===1760?' or back on your coach':', onto a bike or into a car'}. Walk up to someone and tap Say hello. Yellow beam: a pick-up. Teal: the drop-off. Red: a saga step. Purple: a race start. Menu has the city map, the journal and the camera.`;
    document.querySelector('#help-dialog .dialog-drive').firstChild.textContent='Keep exploring ';
    const helpGrid=document.querySelector('#help-dialog .help-grid');if(helpGrid)$('pause-controls').append(helpGrid.cloneNode(true));
    updateHUD(0);
