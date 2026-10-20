@@ -29,8 +29,11 @@ export function createRails(data){
  }
  const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(bed,3));g.setAttribute('uv',new THREE.Float32BufferAttribute(uv,2));g.computeVertexNormals();
  const bedMesh=new THREE.Mesh(g,new THREE.MeshStandardMaterial({map:sleeperTexture(),roughness:.95,polygonOffset:true,polygonOffsetFactor:-2}));bedMesh.receiveShadow=true;bedMesh.name='Track bed';group.add(bedMesh);
- // merge rails in batches (thousands of boxes)
- for(let i=0;i<steel.length;i+=4000){const m=new THREE.Mesh(mergeGeometries(steel.slice(i,i+4000).map(b=>b.toNonIndexed())),new THREE.MeshStandardMaterial({color:'#8d9294',metalness:.7,roughness:.35}));m.name='Rails';group.add(m);}
+ // Rails merged per 250 m cell: batches of 4000 boxes in track order each spanned the city, so none was ever frustum-culled
+ // and every rail in Copenhagen was drawn every frame (~130k triangles on a phone).
+ const railMaterial=new THREE.MeshStandardMaterial({color:'#8d9294',metalness:.7,roughness:.35}),cells=new Map();
+ for(const b of steel){b.computeBoundingBox();const c=b.boundingBox.getCenter(new THREE.Vector3()),k=Math.floor(c.x/250)+','+Math.floor(c.z/250);let l=cells.get(k);if(!l)cells.set(k,l=[]);l.push(b);}
+ for(const l of cells.values()){const m=new THREE.Mesh(mergeGeometries(l.map(b=>b.toNonIndexed())),railMaterial);m.name='Rails';group.add(m);}
  steel.forEach(b=>b.dispose());
  if(masts.length){
   const mg=mergeGeometries([new THREE.CylinderGeometry(.09,.12,7,6).translate(0,3.5,0),new THREE.BoxGeometry(.08,.08,2.8).translate(0,6.6,1.3).rotateY(Math.PI/2)].map(x=>x.toNonIndexed()));
