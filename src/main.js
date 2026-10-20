@@ -225,6 +225,10 @@ const renderer=new THREE.WebGLRenderer({canvas:$('world'),antialias:true,powerPr
  const shown=[];for(const g of loadedTiles.values())if(g.visible&&g.userData.level==='near')for(const c of g.userData.casters||[]){c.visible=true;shown.push(c);}
  try{return render.call(this,lights,sc,cam);}finally{for(const c of shown)c.visible=false;}};}
 const fpsMeter=createFpsMeter(renderer);
+// The GPU's name (shown on the error screen) and PowerVR (Pixel 10 and others): its driver lost the context while the start-up
+// shader warm-up compiled every program at once, so it skips that bulk compile (programs then compile as things first appear).
+const gpuName=(()=>{try{const gl=renderer.getContext(),e=gl.getExtension('WEBGL_debug_renderer_info');return String(gl.getParameter(e?e.UNMASKED_RENDERER_WEBGL:gl.RENDERER));}catch{return '';}})();globalThis.__gpu=gpuName;
+const powerVR=/PowerVR|Imagination/i.test(gpuName);
 // After the graphics connection was lost (out of GPU memory on a phone), the next starts within 3 days run at the lowest
 // quality and resolution; ?quality= overrides it.
 const gpuLostRecently=(()=>{try{return Date.now()-Number(localStorage.getItem('gpu-lost')||0)<3*864e5&&!new URLSearchParams(location.search).has('quality');}catch{return false;}})();
@@ -427,7 +431,7 @@ let edgeInviteAt=-Infinity;
 function showEdgeInvite(){const now=performance.now(),el=$('edge-invite');if(now-edgeInviteAt<120000){toast(`The edge of our ${city.name}. Turn back and keep exploring.`);return;}edgeInviteAt=now;el.hidden=false;clearTimeout(el.timer);el.timer=setTimeout(()=>{el.hidden=true;},12000);}
 $('edge-invite').querySelector('button').addEventListener('click',()=>{$('edge-invite').hidden=true;});
 function toast(message,{important=false}={}){const el=$('toast');if(!important&&el.classList.contains('important')&&el.classList.contains('visible'))return;el.textContent=message;el.classList.toggle('important',important);el.classList.add('visible');clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.classList.remove('visible'),important?5000:2800);}
-function progress(n,message){if(gameIsStopped())throw new Error('Startup stopped after a game failure');loadingScreen.progress(n,message);}
+function progress(n,message){globalThis.__bootStage=`${message} (${n}%)`;if(gameIsStopped())throw new Error('Startup stopped after a game failure');loadingScreen.progress(n,message);}
 // Static hosts answer a missing file with the app's index.html (200, text/html): treat that as a 404.
 async function json(url,{cache='default'}={}){const r=await fetch(url,{cache,headers:{Accept:'application/json'}});const missing=r.ok&&/text\/html/i.test(r.headers.get('content-type')||'');if(!r.ok||missing)throw Object.assign(Error(`Could not load ${url} (${missing?404:r.status})`),{status:missing?404:r.status});return r.json();}
 async function unpack(url){const r=await fetch(url);if(!r.ok||/text\/html/.test(r.headers.get('content-type')||''))throw Error(`Could not load ${url} (${r.ok?'a page came back, not the file':r.status})`);const bytes=await r.arrayBuffer();const magic=new Uint8Array(bytes,0,2);if(magic[0]===31&&magic[1]===139)return new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer();return bytes;}
@@ -1597,7 +1601,7 @@ async function boot(){
    transitQueue.splice(0).forEach(addTransit);mobility.attachTrams(tramSim);mobility.attachBuses(buses.simulation);buses.reset(car,tramSim.obstacles);mobility.externalBodies=transitBodies();mobility.reset(car);
    // Shader programs compile now, behind the loading screen (in parallel where the GPU offers it), instead of
    // stalling frames the first time each material comes into view while driving. Capped so a slow GPU still starts.
-   progress(98,'Warming up shaders');{const shown=[];scene.traverse(o=>{if(!o.visible){o.visible=true;shown.push(o);}}); /* hidden things too (night lamps, rain, far versions): compiled now, not mid-drive */await Promise.race([renderer.compileAsync(scene,camera).catch(()=>{}),new Promise(r=>setTimeout(r,6000))]);for(const o of shown)o.visible=false;}
+   progress(98,'Warming up shaders');if(!powerVR&&!gpuLostRecently){const shown=[];scene.traverse(o=>{if(!o.visible){o.visible=true;shown.push(o);}}); /* hidden things too (night lamps, rain, far versions): compiled now, not mid-drive */await Promise.race([renderer.compileAsync(scene,camera).catch(()=>{}),new Promise(r=>setTimeout(r,6000))]);for(const o of shown)o.visible=false;}
    progress(100,'Ready');
    ready=true;carGroup.visible=true;marker.visible=true;loadingScreen.ready(startPoint.name);
    if(CINEMATIC)setTimeout(()=>{start();camera.layers.disable(1);let steerFrom=null;cinematic=createCinematic({ground:(x,z)=>{const g=groundAt(x,z);if(!inWaterPolygons(data.water,x,z))return g;const w=waterAt(x,z)??seaLevel();return w!==null&&w>g?w:g;}, /* over water: heights from the surface, not the bed */setCamera:p=>{inspectionCamera=p;},loaded:()=>!loadingTiles.size&&!uploads.size&&!peopleLoading&&!bakesPending(), /* the people baked before a shot plays: a bake mid-shot is a hitch */era:city.era,shots:pickShots(city.era,location.search),roads:()=>mobility?.roads,cars:()=>cineObstacles(car),clear:(x,z)=>!world?.buildings?.at(x,z),
