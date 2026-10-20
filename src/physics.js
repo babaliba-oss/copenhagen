@@ -19,9 +19,12 @@ export const FLAT_TYRES={speed:3.2,drag:11,power:.3,wobble:.35};
 export function makeCar(x,z,heading=0){return settleOnGround({x,z,heading,speed:0,steer:0,distance:0});}
 // Height, pitch and roll from the ground under the wheels (all 0 in a flat city).
 export function settleOnGround(car){const p=groundPose(car.x,car.z,car.heading,1.4,.8);car.y=p.y;car.pitch=p.pitch;car.roll=p.roll;return car;}
-export function carSamples(car,x=car.x,z=car.z) {
+// out: an array of nine [x,z] pairs to fill instead of allocating them (the 10 cm substep loop below runs it 5-10 times a step).
+const SAMPLE_OFFSETS=[[0,0],[-.9,-2.15],[.9,-2.15],[-.9,2.15],[.9,2.15],[0,-2.3],[0,2.3],[-1,0],[1,0]],STEP_SAMPLES=SAMPLE_OFFSETS.map(()=>[0,0]);
+export function carSamples(car,x=car.x,z=car.z,out=null) {
  const s=Math.sin(car.heading),c=Math.cos(car.heading),f=(car.front??2.3)/2.3,b=(car.back??2.3)/2.3; // front/back: a longer vehicle (the 1760 coach and horses)
- return [[0,0],[-.9,-2.15],[.9,-2.15],[-.9,2.15],[.9,2.15],[0,-2.3],[0,2.3],[-1,0],[1,0]].map(([lx,lz])=>{lz*=lz<0?f:b;return [x+lx*c+lz*s,z-lx*s+lz*c];});
+ if(out){for(let i=0;i<9;i++){const lx=SAMPLE_OFFSETS[i][0],lz=SAMPLE_OFFSETS[i][1]*(SAMPLE_OFFSETS[i][1]<0?f:b),o=out[i];o[0]=x+lx*c+lz*s;o[1]=z-lx*s+lz*c;}return out;}
+ return SAMPLE_OFFSETS.map(([lx,lz])=>{lz*=lz<0?f:b;return [x+lx*c+lz*s,z-lx*s+lz*c];});
 }
 // Existing contact with a thin railing must allow retreat or sliding along it.
 // Each footprint sample may only retain/reduce its penetration, never enter a
@@ -95,9 +98,10 @@ export function driveStep(car,keys,dt,world) {
    const nx=car.x-Math.sin(car.heading)*travel/steps,nz=car.z-Math.cos(car.heading)*travel/steps;
    if(!insidePlayable(nx,nz,3)){collision='boundary';break;}
    const from={...car,heading:i?car.heading:oldHeading};let item=null;
-   const hit=next=>{const samples=carSamples(next);item=world.objects?.blocksStep(from,next)||null;
-    if(item||samples.some(([x,z])=>collisionBuildings.at(x,z))&&!canExitBuildings(from,next,collisionBuildings))return 'building';
-    if(samples.some(([x,z])=>!world.roads.at(x,z)&&!world.pavement.at(x,z)&&(inWaterPolygons(world.water,x,z)||lakeAt(x,z)!==null)))return 'water';
+   const hit=next=>{const samples=carSamples(next,next.x,next.z,STEP_SAMPLES);item=world.objects?.blocksStep(from,next)||null;
+    let inside=false;for(const p of samples)if(collisionBuildings.at(p[0],p[1])){inside=true;break;}
+    if(item||inside&&!canExitBuildings(from,next,collisionBuildings))return 'building';
+    for(const p of samples){const x=p[0],z=p[1];if(!world.roads.at(x,z)&&!world.pavement.at(x,z)&&(inWaterPolygons(world.water,x,z)||lakeAt(x,z)!==null))return 'water';}
     return null;};
    const next={...car,x:nx,z:nz};collision=hit(next);
    if(collision){
