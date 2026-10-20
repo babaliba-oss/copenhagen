@@ -176,7 +176,7 @@ export class ImpactSystem{
   }
  }
  // People down or getting up, as obstacles that traffic brakes for (mobility externalObstacles).
- obstacles(){const out=[];for(const a of this.actors){const k=a.knockdown;if(k?.body&&k.phase!=='return'&&k.phase!=='gesture')out.push({id:`down-${a.id}`,x:k.body.x,z:k.body.z,heading:k.body.heading,halfWidth:.55,halfLength:1,speed:0});}return out;}
+ obstacles(){const out=[];for(const a of this.actors){const k=a.knockdown;if(k?.body){const up=k.phase==='return'||k.phase==='gesture';out.push({id:`down-${a.id}`,x:k.body.x,z:k.body.z,heading:k.body.heading,halfWidth:up?.35:.55,halfLength:up?.35:1,speed:0});} /* standing again (walking back, gesturing) counts too: traffic drove through them */}return out;}
  snapshot(){return {events:this.events,fallen:[...this.actors].filter(a=>a.knockdown).map(a=>({id:a.id,x:a.x,z:a.z,elapsed:a.knockdown.elapsed,level:a.knockdown.level,phase:a.knockdown.phase,body:a.knockdown.body&&{x:+a.knockdown.body.x.toFixed(2),y:+a.knockdown.body.y.toFixed(2),z:+a.knockdown.body.z.toFixed(2)}})),
   hits:this.hits.slice(-5).map(h=>({id:h.actor.id,level:h.severity.level,energy:Math.round(h.severity.energy),kind:h.kind}))};}
 }
