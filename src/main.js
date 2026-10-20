@@ -166,7 +166,7 @@ const speedometer=createSpeedometer();
 let waterfrontLandmarks,palaceLife,cityHallFlag,sea,marketScene,marketLife,universityLife,stationStreetLife,terminalLife,knockables;
 let marketShop=null,marketShopRenderer=null; // buying at market stalls on foot (market-shop.js)
 const gullEncounter=new GullEncounter();
-let safeBirdFlight=null,wasReading=false,forgotAt=0,hiddenAt=-1e9,hiddenList=[];
+let safeBirdFlight=null,compassShown=null,compassSvg=null,wasReading=false,forgotAt=0,hiddenAt=-1e9,hiddenList=[];
 let cph=null,harbourBath=null,periodLife=null,parkGeese=null,cafeGuests=null,carriage=null,coaches=null,parkedCars=null,boats=null,landmarks=null,trains=null,detailPeople=[],travel=null,peopleInteraction=null,staticCars=[],trafficCars=[],cameraTransition=null;
 
 const $=id=>document.getElementById(id);
@@ -1254,7 +1254,7 @@ function frame(now){
   }
   marketShopRenderer?.update(started&&!paused&&!mapOpen?dt:0,{viewer:car,shop:marketShop,hand:police?.busted?null:travelRenderer.hand(),visible:!inspectionCamera,dropped:gullEncounter.snapshot().dropped});
 
- document.querySelector('.compass svg').style.transform=`rotate(${heading}rad)`;
+ {const r=Math.round(heading*200)/200;if(r!==compassShown){compassShown=r;compassSvg??=document.querySelector('.compass svg');compassSvg.style.transform=`rotate(${r}rad)`;}} /* only when it turns */
  // Fade only the buildings between the chase camera and the player, preserving a readable road view.
  if(car&&started){const target=new THREE.Vector3(car.x,1+groundAt(car.x,car.z),car.z),ray=new THREE.Ray(camera.position.clone(),target.clone().sub(camera.position).normalize()),hit=new THREE.Vector3(),limit=camera.position.distanceTo(target);
   // Blocks from the city model are large and L-shaped: a box test alone fades a whole block the car is merely
