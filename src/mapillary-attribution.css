@@ -4,7 +4,7 @@
 .mapillary-attribution img{display:block;width:57px;height:19px;border-radius:2px}
 .mapillary-source-logo img{display:block;width:120px;height:40px;border-radius:3px}
 /* Keep required data credit visible in the default minimal desktop HUD and captures. */
-body.driving:not(.booting):not(.busted) .mapillary-attribution{display:flex}
+/* No badge over the game (Daniel): Mapillary is credited in the Sources dialog (.mapillary-source-credit below). */
 .mapillary-source-credit{display:flex;align-items:center;gap:12px;font-size:11px;line-height:1.5;margin:18px 0 0}
 .mapillary-source-logo{flex:none;min-height:44px;display:flex;align-items:center}
 @media(pointer:coarse){

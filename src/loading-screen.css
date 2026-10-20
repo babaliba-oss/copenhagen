@@ -134,3 +134,6 @@ body.game-failed #intro{z-index:1000;pointer-events:auto}
  #intro.boot-screen .boot-brand{margin-bottom:var(--s-16)}#intro.boot-screen .boot-tagline{margin-bottom:var(--s-16)}
 }
 @media(prefers-reduced-motion:reduce){#intro.boot-screen,#intro #load-fill,.boot-help summary>span,#intro #boot-title{transition:none}#boot-title.slide-next,#boot-title.slide-prev{animation:none}}
+
+/* The game's logo (the trailer's title art) on the welcome and error card, in place of the globe and the name. */
+#intro.boot-screen .boot-brand .boot-logo{display:block;width:min(300px,100%);height:auto;margin:-6px 0 -4px -4px}

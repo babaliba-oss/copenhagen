@@ -150,7 +150,7 @@
  body.touch .tuck-left.tucked::after{right:5px}
  body.touch .tuck-right.tucked::after{left:5px;transform:translateY(-50%)}
  body.touch .tucked>*{opacity:0;transition:opacity .2s}
- /* postcard spot in view: just a round camera button (tap to take it) */
- body.touch #cph-hud .cph-card-hint{justify-self:start;display:grid;place-items:center;width:40px;height:40px;padding:0!important;border-radius:50%;font-size:19px;line-height:1}
+ /* no postcard prompt on phones (Daniel): one popup fewer; N takes them on a keyboard */
+ body.touch #cph-hud .cph-card-hint{display:none!important}
  .cph-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 }

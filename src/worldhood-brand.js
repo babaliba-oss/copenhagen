@@ -28,6 +28,7 @@ export function updateWorldhoodBrand(city,doc=document){
  // Copenhagen ships as its own game, Grand Tour Copenhagen (credited to worldhood and Lasse on the loading card and pause screen).
  const own=String(city.id||'').startsWith('copenhagen'),brand=own?'Grand Tour Copenhagen':'worldhood';
  for(const link of doc.querySelectorAll('.wordmark')){link.setAttribute('aria-label',own?brand:`worldhood · ${city.name}`);link.title=`You’re exploring ${city.name}`;const n=link.querySelector('.brand-name');if(n)n.textContent=brand;}
+ if(!own)doc.querySelector('.boot-logo')?.replaceWith(Object.assign(doc.createElement('span'),{className:'brand-name',textContent:brand})); // the logo is Copenhagen's
  let icon=doc.querySelector('link[rel="icon"]');if(!icon){icon=doc.createElement('link');icon.rel='icon';doc.head.append(icon);}
  icon.type='image/svg+xml';icon.href=`data:image/svg+xml,${encodeURIComponent(svg)}`;
  doc.title=own?(city.era===1760?'Grand Tour Copenhagen · 1760':'Grand Tour Copenhagen'):`worldhood · ${city.name}`;
