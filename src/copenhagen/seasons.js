@@ -40,7 +40,7 @@ function faceGeometry(){
 // a faint glow of its own, the `glow` part (the painted face of A, the candle-lit insides of B and C) is unlit.
 export const PUMPKIN_NEAR=40,PUMPKIN_FAR=260;
 const PUMPKIN_SHARE={A:.45,B:.35,C:.2};
-export function pumpkinPools(models,spots,scale,glowMaterial){
+export function pumpkinPools(models,spots,scale,glowMaterial,far=PUMPKIN_FAR){ /* far: phones draw them to 140 m (~180k triangles at 260) */
  const group=new THREE.Group();group.name='Halloween pumpkins (models)';
  const kinds=Object.keys(models).filter(k=>models[k]?.[0]?.body&&models[k]?.[1]?.body);if(!kinds.length||!spots.length)return null;
  const total=kinds.reduce((a,k)=>a+(PUMPKIN_SHARE[k]??.2),0);
@@ -56,7 +56,7 @@ export function pumpkinPools(models,spots,scale,glowMaterial){
  function update(dt,player){
   if(!player||(wait-=dt)>0)return;wait=.25;
   for(const st of sets){const n=[0,0];
-   for(let i=0;i<st.x.length;i++){const d=Math.hypot(st.x[i]-player.x,st.z[i]-player.z);let l=d<PUMPKIN_NEAR?0:d<PUMPKIN_FAR?1:-1;if(l<0)continue;if(!l&&n[0]>=st.cap)l=1; // a full near pool: the far model
+   for(let i=0;i<st.x.length;i++){const d=Math.hypot(st.x[i]-player.x,st.z[i]-player.z);let l=d<PUMPKIN_NEAR?0:d<far?1:-1;if(l<0)continue;if(!l&&n[0]>=st.cap)l=1; // a full near pool: the far model
     for(const im of st.lv[l])im.instanceMatrix.array.set(st.mats.subarray(i*16,i*16+16),n[l]*16);n[l]++;}
    st.lv.forEach((ims,l)=>{for(const im of ims){im.count=n[l];im.visible=n[l]>0;if(n[l])im.instanceMatrix.needsUpdate=true;}});}
  }
@@ -71,7 +71,7 @@ function treeGeometry(){
  return mergeGeometries(parts);
 }
 
-export function createSeasonalDecor(season,{buildings=[],world,places=[],cafes=[],walks=[],seed=1031,pumpkins=null}={}){
+export function createSeasonalDecor(season,{buildings=[],world,places=[],cafes=[],walks=[],seed=1031,pumpkins=null,phone=false}={}){
  const group=new THREE.Group();group.name=`Seasonal decorations (${season})`;
  if(!season||!world)return {group,update(){},season:null};
  const r=rnd(seed),m4=new THREE.Matrix4(),q=new THREE.Quaternion(),v=new THREE.Vector3(),s=new THREE.Vector3(1,1,1),UP=new THREE.Vector3(0,1,0);
@@ -99,7 +99,7 @@ export function createSeasonalDecor(season,{buildings=[],world,places=[],cafes=[
   // most pumpkins face the street (away from the wall); a few are turned
   for(const p of spots)if(p[3]===undefined)p[2]+=r()<.8?0:(r()-.5)*2;
   const sc=i=>(.8+((i*7919)%13)/13*.7)*(spots[i][3]===undefined?1:.6); // smaller on the café tables
-  pools=pumpkins?pumpkinPools(pumpkins,spots,sc,new THREE.MeshBasicMaterial({vertexColors:true,toneMapped:false,fog:true})):null;
+  pools=pumpkins?pumpkinPools(pumpkins,spots,sc,new THREE.MeshBasicMaterial({vertexColors:true,toneMapped:false,fog:true}),phone?140:PUMPKIN_FAR):null;
   if(pools)group.add(pools.group);
   else{ // the procedural pumpkin, lit from inside: a warm glow through the shell reads from any side at night (the face alone only shows head-on)
    instanced(pumpkinGeometry(),new THREE.MeshStandardMaterial({vertexColors:true,roughness:.7,emissive:'#6a2a08',emissiveIntensity:.9}),spots,'Halloween pumpkins',{scale:sc});

@@ -148,7 +148,7 @@ export function createSea(water,land={},{helsinkiHarbour=true,groundExtent=0,dec
  };
  if(geometries.length){
   // Hilly cities: each water body lies at its own surveyed level (src/terrain.js), stepping down at dams.
-  const sea=new THREE.Mesh(drapeGeometry(mergeGeometries(geometries),{water:true,lift:-WATER_LEVEL-.1}),material);sea.name='Sea surface';geometries.forEach(g=>g.dispose());
+  const sea=new THREE.Mesh(drapeGeometry(mergeGeometries(geometries),{water:true,lift:-WATER_LEVEL-.1,maxEdge:10}) /* flat water, no vertex waves: 10 m edges (4 m drew ~170k triangles on a phone) */,material);sea.name='Sea surface';geometries.forEach(g=>g.dispose());
   sea.onBeforeRender=followSky;
   group.add(sea);
   // Under the harbour polygons, one plane at the common water level: where the polygon triangulation leaves a

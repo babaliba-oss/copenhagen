@@ -109,7 +109,8 @@ function plateGeometry(size,rect){
  g.deleteAttribute('normal');g.computeVertexNormals();return g.toNonIndexed();
 }
 
-export function createMappedFurniture(layer,{player=()=>null,mobility=()=>null,canvas=globalThis.document,poleAllowed=()=>true,wallAt=null,rackBikes=null,models={}}={}){
+// rangeScale: phones draw the knockable sets nearer (0.55: bins, racks, benches, bikes cost ~150k triangles at full range)
+export function createMappedFurniture(layer,{rangeScale=1,player=()=>null,mobility=()=>null,canvas=globalThis.document,poleAllowed=()=>true,wallAt=null,rackBikes=null,models={}}={}){
  const group=new THREE.Group();group.name='Mapped street furniture';
  const items=layer?.items||[],obstacles=[],chunks=new Map(),lights=[];
  const painted=new THREE.MeshStandardMaterial({vertexColors:true,roughness:.6,metalness:.2});
@@ -198,7 +199,7 @@ export function createMappedFurniture(layer,{player=()=>null,mobility=()=>null,c
  if(lensCount){
   const g=new THREE.CircleGeometry(.08,10);lenses=new THREE.InstancedMesh(g,new THREE.MeshBasicMaterial(),lensCount);lenses.name='Mapped signal lenses';lenses.frustumCulled=false;group.add(lenses);
   let k=0;for(const l of lights){l.lens=k;l.shown=false;k+=LENSES[l.kind].length;}
-  m4.makeScale(0,0,0);for(let i=0;i<lensCount;i++)lenses.setMatrixAt(i,m4);
+  lenses.count=0;
  }
  let signalGrid=null;
  function signalEdge(l,roads){
@@ -214,19 +215,22 @@ export function createMappedFurniture(layer,{player=()=>null,mobility=()=>null,c
   return best;
  }
  const colour=new THREE.Color();
+ // Shown lenses are packed at the front of the instance buffer (count = shown): hidden ones were scaled to zero but still
+ // drawn, every lens in the city (~100k triangles a frame on a phone for the handful near the player).
  function updateLenses(p){
   if(!lenses)return;const sim=mobility();let moved=false,coloured=false;
+  for(const l of lights){const show=!!p&&l.post.state==='upright'&&Math.abs(l.x-p.x)<SIGNAL_RANGE&&Math.abs(l.z-p.z)<SIGNAL_RANGE;if(show!==l.shown){l.shown=show;moved=true;}}
+  if(moved){let n=0;for(const l of lights){if(!l.shown)continue;l.slot=n;
+    LENSES[l.kind].forEach(([y],j)=>{m4.compose(v.set(l.x+Math.sin(l.yaw)*.18,y+groundAt(l.x,l.z),l.z+Math.cos(l.yaw)*.18),q.setFromAxisAngle(UP,l.yaw),one);lenses.setMatrixAt(n+j,m4);});n+=LENSES[l.kind].length;}
+   lenses.count=n;lenses.instanceMatrix.needsUpdate=true;}
   for(const l of lights){
-   const show=!!p&&l.post.state==='upright'&&Math.abs(l.x-p.x)<SIGNAL_RANGE&&Math.abs(l.z-p.z)<SIGNAL_RANGE;
-   if(show!==l.shown){l.shown=show;moved=true;
-    LENSES[l.kind].forEach(([y],j)=>{m4.compose(v.set(l.x+Math.sin(l.yaw)*.18,y+groundAt(l.x,l.z),l.z+Math.cos(l.yaw)*.18),q.setFromAxisAngle(UP,l.yaw),show?one:zero);lenses.setMatrixAt(l.lens+j,m4);});}
-   if(!show)continue;
+   if(!l.shown)continue;
    if(l.edge===undefined&&sim?.roads)l.edge=signalEdge(l,sim.roads);
    // Vehicle heads show the approach's phase; pedestrian heads show the opposite.
    const green=l.edge&&sim?signalGreen(l.edge,sim.time):null,go=l.kind==='crossing-light'&&green!==null?!green:green;
-   LENSES[l.kind].forEach(([,c],j)=>{lenses.setColorAt(l.lens+j,colour.set((c==='red'&&go===false)||(c==='green'&&go===true)||(c==='amber'&&go===null)?LENS_ON[c]:LENS_OFF[c]));});coloured=true;
+   LENSES[l.kind].forEach(([,c],j)=>{lenses.setColorAt(l.slot+j,colour.set((c==='red'&&go===false)||(c==='green'&&go===true)||(c==='amber'&&go===null)?LENS_ON[c]:LENS_OFF[c]));});coloured=true;
   }
-  if(moved)lenses.instanceMatrix.needsUpdate=true;if(coloured&&lenses.instanceColor)lenses.instanceColor.needsUpdate=true;
+  if(coloured&&lenses.instanceColor)lenses.instanceColor.needsUpdate=true;
  }
 
  // Knockable light items and solid boxes.
@@ -237,7 +241,7 @@ export function createMappedFurniture(layer,{player=()=>null,mobility=()=>null,c
  for(const [kind,parts] of [['bin',binParts],['barrier',barrierParts],['cone',coneParts]]){
   const list=items.filter(i=>i.k===kind);if(!list.length)continue;
   const g=models[kind]?models[kind].clone():mergeGeometries(parts());if(!models[kind])g.computeVertexNormals();
-  const k=createKnockables(list.map((it,i)=>({id:itemId(it,i),x:it.x,z:it.z,yaw:it.yaw||0})),[{geometry:g,material:painted}],{...KNOCKABLE[kind],range:VIEW_RANGE});
+  const k=createKnockables(list.map((it,i)=>({id:itemId(it,i),x:it.x,z:it.z,yaw:it.yaw||0})),[{geometry:g,material:painted}],{...KNOCKABLE[kind],range:VIEW_RANGE*rangeScale});
   k.group.name=`Mapped ${kind}s`;group.add(k.group);knock.push(k);
  }
  const solidParts={bollard:([w,,h])=>[cyl(w*.45,w*.5,h,h/2,'#2f3436',8),cyl(w*.5,w*.5,.08,h*.82,'#c9a64a',8),cyl(w*.38,w*.45,.06,h+.03,'#2f3436',8)],'junction-box':([w,d,h])=>[box(w,h,d,0,h/2,0,'#8a9086'),box(w+.04,.05,d+.04,0,h+.02,0,'#6d736a')],
@@ -258,7 +262,7 @@ export function createMappedFurniture(layer,{player=()=>null,mobility=()=>null,c
   // A rack left without bikes has a cargo bike beside it one time in three (Daniel's Babboe scan, CC BY alban).
   racks.forEach((it,i)=>{if((i*7919)%10<1){if(models['cargo-bike']&&i%3===0)cargo.push([it.x,it.z,(it.yaw||0)+(i%2?Math.PI:0)]);return;}const c=Math.cos(it.yaw||0),sn=Math.sin(it.yaw||0);const slots=[-.9,-.3,.3,.9].filter((_,j)=>((i*13+j*7)%9)>2||j===1);for(const off of slots){const k=(i*31+n++)%bikes.length;lists[k].push([it.x+c*off,it.z-sn*off,(it.yaw||0)+(off>0?Math.PI:0)+((i%3)-1)*.06]);}});
   // Knockable too: with the racks knocked flying, bikes left standing in the air looked broken. Drawn to 230 m (small, many).
-  const bikeSet=(l,g,name)=>{const k=createKnockables(l.map(([x,z,yaw],i)=>({id:`${name}-${i}`,x,z,yaw})),[{geometry:g,material:painted}],{radius:.35,height:1,range:230,footprint:[.2,.85]});k.group.name=name;group.add(k.group);knock.push(k);};
+  const bikeSet=(l,g,name)=>{const k=createKnockables(l.map(([x,z,yaw],i)=>({id:`${name}-${i}`,x,z,yaw})),[{geometry:g,material:painted}],{radius:.35,height:1,range:230*rangeScale,footprint:[.2,.85]});k.group.name=name;group.add(k.group);knock.push(k);};
   lists.forEach((l,k)=>{if(l.length)bikeSet(l,bikes[k],`Parked bicycles ${k}`);});
   if(cargo.length)bikeSet(cargo,models['cargo-bike'],'Parked cargo bikes');
  }}
@@ -269,7 +273,7 @@ export function createMappedFurniture(layer,{player=()=>null,mobility=()=>null,c
   // benches and bollards; open-world driving games make roadside props break away and keep buildings, trees and
   // landmarks solid). Shelters and hot-dog stands stay solid.
   if(KNOCK_SOLID.has(kind)){const [w,d,h]=size;
-   const k=createKnockables(list.map((it,i)=>({id:itemId(it,i),x:it.x,z:it.z,yaw:it.yaw||0})),[{geometry:g,material:painted}],{radius:Math.min(.7,Math.max(.2,Math.max(w,d)*.3)),height:h,range:VIEW_RANGE,footprint:[w/2,d/2]});
+   const k=createKnockables(list.map((it,i)=>({id:itemId(it,i),x:it.x,z:it.z,yaw:it.yaw||0})),[{geometry:g,material:painted}],{radius:Math.min(.7,Math.max(.2,Math.max(w,d)*.3)),height:h,range:VIEW_RANGE*rangeScale,footprint:[w/2,d/2]});
    k.group.name=`Mapped ${kind}s (knockable)`;group.add(k.group);knock.push(k);continue;}
   chunkedInstances(list,g,painted,`Mapped ${kind}`,it=>[it.x,it.z,it.yaw]);
   list.forEach((it,i)=>{const yaw=it.yaw||0;
