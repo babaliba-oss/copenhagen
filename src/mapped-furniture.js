@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';
 import {createBreakableSigns} from './breakable-signs.js';
+import {releaseAfterUpload} from './release-cpu.js';
 import {createKnockables} from './knockables.js';
 import {signalGreen} from './mobility.js';
 import {groundAt} from './terrain.js';
@@ -116,7 +117,7 @@ export function createMappedFurniture(layer,{player=()=>null,mobility=()=>null,c
  const templates=new Map(),m4=new THREE.Matrix4(),q=new THREE.Quaternion(),UP=new THREE.Vector3(0,1,0),one=new THREE.Vector3(1,1,1),zero=new THREE.Vector3(),v=new THREE.Vector3();
  const chunkOf=(x,z)=>{const key=`${Math.floor(x/CHUNK)},${Math.floor(z/CHUNK)}`;
   if(!chunks.has(key)){const signs=createBreakableSigns(`Mapped furniture posts ${key}`),g=new THREE.Group();g.name='Mapped furniture chunk';group.add(g);
-   chunks.set(key,{key,group:g,signs,painted:[],plates:[],centre:[(Math.floor(x/CHUNK)+.5)*CHUNK,(Math.floor(z/CHUNK)+.5)*CHUNK]});}
+   chunks.set(key,{key,group:g,signs,recipes:[],meshes:[],centre:[(Math.floor(x/CHUNK)+.5)*CHUNK,(Math.floor(z/CHUNK)+.5)*CHUNK]});}
   return chunks.get(key);};
  const place=(geometry,x,z,yaw,chunk,i,list)=>{geometry.applyMatrix4(m4.compose(v.set(x,groundAt(x,z),z),q.setFromAxisAngle(UP,yaw),one));chunk.signs.tag(geometry,i);list.push(geometry);};
 
@@ -148,11 +149,15 @@ export function createMappedFurniture(layer,{player=()=>null,mobility=()=>null,c
   const layout=it.k==='sign'?plateLayout((it.faces||[]).map(face=>({face,code:layer.faces.find(f=>f.face===face)?.code})),it.yaws):[];
   if(layout.length)height=Math.max(...layout.map(p=>p.y+p.height/2))+.05;
   const i=chunk.signs.post({id:itemId(it,index),x:it.x,z:it.z,y:groundAt(it.x,it.z),yaw,height,radius:spec.radius,strength:spec.strength});
-  if(it.k==='sign')place(cyl(.031,.031,height,height/2,'#929b9d',6),it.x,it.z,0,chunk,i,chunk.painted);
-  else{if(!templates.has(it.k))templates.set(it.k,models[it.k]||mergeGeometries(postParts(it.k))); /* Blender model (scripts/blender/furniture.py) where loaded */place(templates.get(it.k).clone(),it.x,it.z,yaw,chunk,i,chunk.painted);}
+  // Geometry is placed only when the chunk is built near the player (buildChunk): a clone of every post city-wide held ~300 MB.
+  if(it.k!=='sign'&&!templates.has(it.k))templates.set(it.k,models[it.k]||mergeGeometries(postParts(it.k))); /* Blender model (scripts/blender/furniture.py) where loaded */
+  chunk.recipes.push(out=>{
+  if(it.k==='sign')place(cyl(.031,.031,height,height/2,'#929b9d',6),it.x,it.z,0,chunk,i,out.painted);
+  else place(templates.get(it.k).clone(),it.x,it.z,yaw,chunk,i,out.painted);
   for(const p of layout){const rect=atlas?.uv.get(`${p.face}:0`),back=atlas?.uv.get(`${p.face}:1`);if(!rect)continue;const size=Math.max(p.width,p.height);
-   const front=plateGeometry(size,rect);front.translate(0,p.y,.045);place(front,it.x,it.z,p.yaw,chunk,i,chunk.plates);
-   const rear=plateGeometry(size,back);rear.rotateY(Math.PI);rear.translate(0,p.y,.035);place(rear,it.x,it.z,p.yaw,chunk,i,chunk.plates);}
+   const front=plateGeometry(size,rect);front.translate(0,p.y,.045);place(front,it.x,it.z,p.yaw,chunk,i,out.plates);
+   const rear=plateGeometry(size,back);rear.rotateY(Math.PI);rear.translate(0,p.y,.035);place(rear,it.x,it.z,p.yaw,chunk,i,out.plates);}
+  });
   if(LENSES[it.k])lights.push({x:it.x,z:it.z,yaw,kind:it.k,post:chunk.signs.bodies[i],edge:undefined});
  });
  // Wire-hung lamps: the Copenhagen street light, a dark shade on a steel wire strung between facades
@@ -173,12 +178,16 @@ export function createMappedFurniture(layer,{player=()=>null,mobility=()=>null,c
  const wireMaterial=new THREE.LineBasicMaterial({color:'#1f2325'});
  for(const chunk of chunks.values()){
   if(chunk.wires?.length){const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(chunk.wires,3));const m=new THREE.LineSegments(g,wireMaterial);m.name='Lamp wires';chunk.group.add(m);chunk.wires=null;}
-  if(chunk.painted.length){const m=chunk.signs.mesh(mergeGeometries(chunk.painted),painted);m.name='Mapped furniture posts';chunk.group.add(m);}
-  if(chunk.plates.length){const m=chunk.signs.mesh(mergeGeometries(chunk.plates),plates,{castShadow:false});m.name='Mapped sign plates';chunk.group.add(m);}
-  [...chunk.painted,...chunk.plates].forEach(g=>g.dispose());chunk.painted=chunk.plates=null;
   chunk.group.add(chunk.signs.finish());
  }
- for(const g of templates.values())g.dispose();
+ function buildChunk(chunk){
+  const out={painted:[],plates:[]};for(const f of chunk.recipes)f(out);
+  if(out.painted.length){const m=chunk.signs.mesh(mergeGeometries(out.painted),painted);m.name='Mapped furniture posts';chunk.meshes.push(m);}
+  if(out.plates.length){const m=chunk.signs.mesh(mergeGeometries(out.plates),plates,{castShadow:false});m.name='Mapped sign plates';chunk.meshes.push(m);}
+  [...out.painted,...out.plates].forEach(g=>g.dispose());
+  for(const m of chunk.meshes){releaseAfterUpload(m);chunk.group.add(m);}chunk.built=true;
+ }
+ function dropChunk(chunk){for(const m of chunk.meshes){chunk.group.remove(m);m.geometry.dispose();}chunk.meshes=[];chunk.built=false;}
 
  // Signal lenses: one instanced disc per lens, lit from the nearest signalled approach the head faces.
  const lensCount=lights.reduce((n,l)=>n+LENSES[l.kind].length,0);let lenses=null;
@@ -284,7 +293,11 @@ export function createMappedFurniture(layer,{player=()=>null,mobility=()=>null,c
  // Distance culling for post chunks; lenses follow the player.
  function update(){
   const p=player();updateLights(p);if(!p)return;
-  for(const c of chunks.values()){const d=Math.hypot(c.centre[0]-p.x,c.centre[1]-p.z);c.group.visible=d<VIEW_RANGE+CHUNK*.71;}
+  // Built a little before they show, freed well after they hide (a hysteresis band, so the edge does not rebuild).
+  const show=VIEW_RANGE+CHUNK*.71;
+  for(const c of chunks.values()){const d=Math.hypot(c.centre[0]-p.x,c.centre[1]-p.z);
+   if(!c.built&&d<show+150)buildChunk(c);else if(c.built&&d>show+450)dropChunk(c);
+   c.group.visible=d<show;}
   refillPools(p);
   updateLenses(p);
  }

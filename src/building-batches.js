@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import {facadeGrain} from './facade-grain.js';
 import {litWindows} from './night-windows.js';
 import {signMaterial} from './shop-signs.js';
+import {releaseAfterUpload} from './release-cpu.js';
 
 // A near tile's detailed buildings as a few merged batches, one per material look (atlas, colours, finish, shader
 // variant), instead of one to three meshes per building: 50-70 draw calls at Nyhavn became a handful. The worker's
@@ -39,10 +40,10 @@ const vertexCount=s=>s.index?s.index.length:s.attributes.position.array.length/s
 export const CELL=64;
 // buildings: the worker's output for one tile; partOf(building) -> part index in the tile mask (or -1).
 export function createBuildingBatches(buildings,textures,partOf){
- const data=new Float32Array(256),uniforms={uDetail:{value:data}},groups=new Map(),placed=new Map(); // placed: source mesh -> [batch, first vertex]
+ const data=new Float32Array(256),uniforms={uDetail:{value:data}},groups=new Map(),placed=new Map(),taken=new WeakSet(); // placed: source mesh -> [batch, first vertex], until it lands
  for(const b of buildings)for(const s of b.meshes){if(!batched(s))continue;const q=b.part.bbox,cell=Math.floor((q[0]+q[2])/2/CELL)+','+Math.floor((q[1]+q[3])/2/CELL);
   const key=batchKey(b.part,s)+cell;let g=groups.get(key);if(!g)groups.set(key,g={part:b.part,source:s,count:0,list:[],parts:new Set()});
-  placed.set(s,[g,g.count]);g.list.push([b,s]);g.count+=vertexCount(s);const i=partOf(b);g.parts.add(i>=0&&i<256?i:-1);}
+  placed.set(s,[g,g.count]);taken.add(s);g.list.push([b,s]);g.count+=vertexCount(s);const i=partOf(b);g.parts.add(i>=0&&i<256?i:-1);}
  const meshes=[],box=new THREE.Box3(),corner=new THREE.Vector3();
  for(const g of groups.values()){
   const geometry=new THREE.BufferGeometry();
@@ -54,7 +55,7 @@ export function createBuildingBatches(buildings,textures,partOf){
   geometry.boundingBox=box.clone();geometry.boundingSphere=box.getBoundingSphere(new THREE.Sphere());
   for(const a of Object.values(geometry.attributes))a.setUsage(THREE.StaticDrawUsage);
   const mesh=new THREE.Mesh(geometry,batchMaterial(g.part,g.source,textures,uniforms));mesh.name='Detailed buildings';mesh.castShadow=false;mesh.receiveShadow=true;mesh.userData.batch=true;
-  g.mesh=mesh;g.shown=0;g.always=g.parts.has(-1);meshes.push(mesh);
+  g.mesh=mesh;g.waiting=g.list.length;g.list=g.source=null;g.shown=0;g.always=g.parts.has(-1);meshes.push(mesh);
  }
  // Which batches hold each part, and how many of a batch's parts are shown: a batch draws only while one is.
  const list=[...groups.values()],ofPart=new Map();for(const g of list)for(const i of g.parts)if(i>=0){let l=ofPart.get(i);if(!l)ofPart.set(i,l=[]);l.push(g);}
@@ -67,9 +68,11 @@ export function createBuildingBatches(buildings,textures,partOf){
    for(const [name,a] of Object.entries(s.attributes)){const dst=geometry.attributes[name];if(!dst)continue;const k=a.itemSize;
     if(s.index){const idx=s.index;for(let v=0;v<n;v++){const from=idx[v]*k,to=(first+v)*k;for(let c=0;c<k;c++)dst.array[to+c]=a.array[from+c];}}
     else dst.array.set(a.array.subarray(0,n*k),first*k);
-    dst.addUpdateRange(first*k,n*k);dst.needsUpdate=true;}}
+    dst.addUpdateRange(first*k,n*k);dst.needsUpdate=true;}
+   // Landed: the worker's copy can go, and a batch whose last building is in frees its own CPU arrays after upload.
+   placed.delete(s);if(--g.waiting===0)releaseAfterUpload(g.mesh);}
  }
- return {meshes,data,land,batched:s=>placed.has(s),
+ return {meshes,data,land,batched:s=>taken.has(s),
   set(i,v){if(!(i>=0&&i<256))return;const was=data[i]>0;data[i]=v;if(was!==(v>0))for(const g of ofPart.get(i)||[]){g.shown+=v>0?1:-1;show(g);}},get(i){return data[i];},
   setNear(on){near=on;for(const g of list)show(g);},
   // Camera fade: switch every batch of the tile to the dithering variant while any part fades.
