@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import zlib from 'node:zlib';
 const {SpatialIndex}=await import('../src/geo.js');
-const {driveStep,makeCar}=await import('../src/physics.js');
+const {driveStep,makeCar,carSamples}=await import('../src/physics.js');
 
 const list=JSON.parse(fs.readFileSync('public/cities/copenhagen/kk-footprints.json','utf8'));
 const raw=fs.readFileSync('public/cities/copenhagen/city.pack'),city=JSON.parse(raw[0]===31&&raw[1]===139?zlib.gunzipSync(raw):raw);
@@ -25,6 +25,7 @@ test('the car stops at one instead of driving in', () => {
  let sx=cx+12,sz=cz;for(let k=0;k<40&&inside(sx,sz);k++)sx+=3; // outside it, on its east side
  const car=makeCar(sx,sz);car.heading=Math.PI/2; // heading pi/2 drives towards -x
  const everywhere={at:()=>({})},world={roads:everywhere,pavement:everywhere,water:[],buildings:index,collisionBuildings:index};
- let hit=null;for(let i=0;i<600&&!hit;i++){const r=driveStep(car,new Set(['KeyW']),1/60,world);if(r.collision)hit=r.collision;}
- assert.equal(hit,'building');assert.equal(inside(car.x,car.z),false,'the car stays outside');
+ // head on it stops; at a slanted wall it slides along (physics.js SLIDE). Either way it never gets inside.
+ let hit=null,entered=false;for(let i=0;i<600&&!hit;i++){const r=driveStep(car,new Set(['KeyW']),1/60,world);if(r.collision)hit=r.collision;if(carSamples(car).some(([x,z])=>inside(x,z)))entered=true;}
+ assert.ok(hit==='building'||Math.abs(car.z-sz)>.5||car.x>sx-1,'it stopped or slid along the wall');assert.equal(entered,false,'the car never gets inside');
 });

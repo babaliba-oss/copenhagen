@@ -53,7 +53,7 @@ test('a car at 100 km/h stops at a trunk without passing through it',()=>{
  const z=car.z;for(let i=0;i<30;i++)driveStep(car,new Set(['KeyS']),1/30,worldFor(objects));assert.ok(car.z>z+.2);
 });
 
-test('a scooter that hits a trunk at speed crashes; a walker is blocked by it',()=>{
+test('a scooter that hits a trunk at speed crashes; a walker never walks through it',()=>{
  const tree=trunkObstacle({p:[0,-12],size:'30 - 50 cm'}),world=worldFor(new WorldObjects([tree]));
  const travel=new PlayerTravel(makeCar(30,10,0),world);travel.interact();assert.equal(travel.mode,'walk');
  const scooter=travel.rides.find(r=>r.mode==='scooter');Object.assign(travel.actor,{x:scooter.x,z:scooter.z});assert.ok(travel.interact(scooter.id).ok);
@@ -62,9 +62,11 @@ test('a scooter that hits a trunk at speed crashes; a walker is blocked by it',(
  assert.ok(crashed>=CRASH_SPEED,'the scooter crashed into the trunk');assert.equal(travel.mode,'walk');assert.ok(scooter.fallen,'the scooter tipped over');
  for(let i=0;i<60*6;i++)travel.step(new Set(),1/60);assert.ok(!travel.actor.knockdown);
  Object.assign(travel.actor,{x:0,z:-9,heading:0,speed:0});
- for(let i=0;i<60*4;i++)travel.step(new Set(['KeyW','ShiftLeft']),1/60);
- assert.ok(travel.actor.z>-12+tree.radius+.28-.02,`walker stopped at the trunk (z ${travel.actor.z.toFixed(2)})`);
- assert.equal(world.objects.overlap(travel.actor,{halfWidth:.28,halfLength:.28}),null);
+ for(let i=0;i<60*4;i++){travel.step(new Set(['KeyW','ShiftLeft']),1/60);assert.equal(world.objects.overlap(travel.actor,{halfWidth:.28,halfLength:.28}),null,'never inside the trunk');}
+ // in clear space a walker pushing straight at a trunk goes round it instead of sticking to it
+ const clear=worldFor(new WorldObjects([tree])),walker=new PlayerTravel(makeCar(30,10,0),clear);walker.interact();Object.assign(walker.actor,{x:0,z:-9,heading:0,speed:0});
+ for(let i=0;i<60*4;i++)walker.step(new Set(['KeyW','ShiftLeft']),1/60);
+ assert.ok(walker.actor.z<-12-tree.radius,`walked round the trunk (z ${walker.actor.z.toFixed(2)})`);
 });
 
 test('NPC scooters that follow mapped paths can opt out of trunks',()=>{

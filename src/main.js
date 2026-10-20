@@ -146,6 +146,10 @@ import {PlayerTravel,TRAVEL_MODES,STARTER_VISUALS} from './player-travel.js';
 import {createPlayerTravelRenderer,travelCameraPose} from './player-travel-renderer.js';
 import {createTravelUI} from './player-travel-ui.js';
 import {createMobileControls} from './mobile-controls.js';
+import {createStuckWatch} from './stuck.js';
+import {createTouchDocks} from './touch-docks.js';
+const touchDocks=createTouchDocks();
+const stuckWatch=createStuckWatch();let stuckHinted=false;
 import {updateWorldhoodBrand} from './worldhood-brand.js';
 import {installMapillaryAttribution} from './mapillary-attribution.js';
 import './worldhood-brand.css';
@@ -968,6 +972,7 @@ function restart(){if(!ready)return;setBusted(false);knockables?.resetAll();dist
 function continueDriving(){if(!ready)return;roadblock?.standDown();police?.reset();finale.resume();repairCar();tramSim?.clearAround(car);setBusted(false);toast('Back on the road — wanted level cleared.');}
 $('busted-restart').addEventListener('click',restart);$('busted-continue').addEventListener('click',continueDriving);
 function zoom(delta){desiredSpan=THREE.MathUtils.clamp(desiredSpan+delta*.35,36,240);}
+document.addEventListener('click',e=>{if(!e.target.closest?.('#cph-card-hint')||!cph?.photo)return;const d=camera.getWorldDirection(new THREE.Vector3());cph.photo({dir:[d.x,d.z],snap:snapPhoto});}); // touch: the postcard hint is the button (N on a keyboard)
 $('start-btn').addEventListener('click',start);$('map-btn').addEventListener('click',()=>showDialog('map-dialog'));$('minimap-btn').addEventListener('click',()=>showDialog('map-dialog'));$('help-btn').addEventListener('click',()=>showDialog('help-dialog'));$('sources-btn').addEventListener('click',()=>showDialog('sources-dialog'));$('zoom-in').addEventListener('click',()=>zoom(-40));$('zoom-out').addEventListener('click',()=>zoom(40));$('resume-btn').addEventListener('click',()=>setPaused(false));
 $('view-label').textContent='Drive';$('view-btn').title='C: cycle Drive, Follow and High cameras · Hold Q/E to look left/right';
 function cycleCamera(){if(chaseCamera){chaseCamera=false;highCamera=false;}else if(!highCamera)highCamera=true;else {chaseCamera=true;highCamera=false;}$('view-label').textContent=chaseCamera?'Drive':highCamera?'High':'Follow';}
@@ -1061,6 +1066,7 @@ function currentLocation(){
   cameraPosition:camera.position.toArray(),cameraDirection:camera.getWorldDirection(new THREE.Vector3()).toArray(),fov:camera.fov,origin:data.originGK25});
 }
 function updateHUD(now){
+ touchDocks.update(now);
  const wanted=police?.snapshot();$('wanted').hidden=!started||!wanted?.level;
  $('wanted').classList.toggle('searching',wanted?.status==='SEARCHING');$('wanted').classList.toggle('seen',!!wanted?.seen);
  if(wanted?.level){$('wanted-stars').innerHTML='<span class="on">★</span>'.repeat(wanted.level)+'<span class="off">★</span>'.repeat(5-wanted.level);$('wanted-stars').setAttribute('aria-label',`${wanted.level} of 5 wanted stars`);$('wanted-status').textContent=wanted.bustProgress?`BEING ARRESTED · ${wanted.bustSeconds}s`:wanted.status==='SEARCHING'?'SEARCHING — STAY OUT OF SIGHT':`POLICE PURSUIT · ${wanted.units.length} UNIT${wanted.units.length===1?'':'S'}`;}
@@ -1118,6 +1124,8 @@ function frame(now){
    if(started&&cinematic?.driving)before={...car}; /* the trailer's car drives itself (cinematic.js) and hits nothing */
    else if(started){
     const previous=before={...car},r=driving?driveStep(car,keys,step,world):travel.step(keys,step,travelObstacles());
+    {const pressing=driving&&['KeyW','ArrowUp','KeyS','ArrowDown'].some(k=>keys.has(k)),stuck=stuckWatch.update(pressing,car.x,car.z,step); /* wedged: offer the reset (R / Menu) right away */
+     mobileControls?.setStuck(stuck);if(stuck&&!stuckHinted&&!touchScreen){toast('Stuck? Press R to get back on the road.');stuckHinted=true;}if(!pressing)stuckHinted=false;}
     if(r.crashed){car=travel.actor;playerCars.sync(travel);if(now-lastToast>1500){toast(r.crashed>5?'Ouch. That was a hard fall.':'You came off. Press Enter to get back on.');lastToast=now;}}
     police.observeDriving(previous,car,step,{driving});
     const parkedHit=driving&&parked.find(p=>sweptContact(previous,car,p));

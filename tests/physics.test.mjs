@@ -89,3 +89,10 @@ test('steering turns the car: keys left/right, and analog tilt (keys win over ti
  assert.equal(straight,0);assert.ok(left>.05&&right<-.05,'arrow keys steer both ways');
  assert.ok(tiltLeft>0&&tiltLeft<tiltFull,'tilt steers in proportion');assert.ok(Math.abs(run(['ArrowRight'],1)-right)<1e-9,'a held key overrides tilt');
 });
+test('a car brushing a wall at a shallow angle slides along it instead of sticking',()=>{
+ // a long wall along x = 3.2..4, the car heading 15 degrees into it (towards -z, drifting +x)
+ const w=world([rect(3.2,-200,.8,200)]),car=makeCar(1.2,0,-.26);car.speed=12;
+ for(let i=0;i<120;i++)driveStep(car,new Set(['KeyW']),1/60,w);
+ assert.ok(car.z<-12,`it kept going along the wall (z ${car.z.toFixed(1)})`);assert.ok(car.speed>5,`and kept most of its speed (${car.speed.toFixed(1)})`);
+ assert.ok(carSamples(car).every(([x])=>x<3.2),'never inside the wall');
+});

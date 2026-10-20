@@ -202,7 +202,19 @@ export class PlayerTravel{
   for(let i=0;i<n;i++){
    const heading=p.heading+turn/n,q={...p,heading,x:p.x-Math.sin(heading)*travel/n,z:p.z-Math.cos(heading)*travel/n};
    collision=travelCollision(q,this.mode,this.world,[...this.parked(),...obstacles],[],p);
-   if(collision){p.speed=0;break;}
+   if(collision){
+    // Slide along what was hit (a wall, a bench, a parked bike) rather than stopping dead; a turn alone is always
+    // tried, so someone pressed against a wall can still turn away. Head on, stop as before.
+    const step=travel/n,turned={...p,heading};
+    const blocked=c=>travelCollision(c,this.mode,this.world,[...this.parked(),...obstacles],[],p);
+    // the slide backs off a hair (2.5 cm) so a body already touching the wall can move along it; it slides only when
+    // one side is free and the other is not (a glancing push), never when both are (pushing straight at it)
+    const back=Math.sign(step)*.025,at=(a,k)=>({...p,heading,x:p.x-Math.sin(heading+a)*step*Math.cos(a)*k+Math.sin(heading)*back*k,z:p.z-Math.cos(heading+a)*step*Math.cos(a)*k+Math.cos(heading)*back*k,f:Math.cos(a)});
+    const free=a=>!blocked(at(a,.5))&&!blocked(at(a,1));
+    let alt=null;for(const [i,a] of (walk?[.25,.5,.75,1,1.2]:Math.abs(p.speed)<CRASH_SPEED?[.3,.6]:[.3]).entries()){const l=free(a),r=free(-a);if(l!==r){alt=at(l?a:-a,1);break;}if(l&&r){if(i===0&&(walk||Math.abs(p.speed)<CRASH_SPEED))alt=at(p.steer<-.05?-a:a,1);break;}} /* both sides open at once: something narrow (a post), go round it on the steered side */ // a rider at crash speed slides off only a glancing scrape; anything squarer is a crash
+    if(alt){const {f,...c}=alt;p.distance+=gap(p,c);Object.assign(p,{x:c.x,z:c.z,heading:c.heading});p.speed*=Math.max(.4,f);collision=null;continue;}
+    if(turn&&!travelCollision(turned,this.mode,this.world,[...this.parked(),...obstacles],[],p))p.heading=heading;
+    p.speed=0;break;}
    p.distance+=gap(p,q);Object.assign(p,{x:q.x,z:q.z,heading:q.heading});
   }
   if(this.riding)Object.assign(this.riding,p);

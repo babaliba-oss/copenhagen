@@ -130,3 +130,11 @@ test('walking, cycling and scooting feel the slope: slower uphill, a little fast
  assert.equal(slopeFactor('walk',0),1);assert.ok(slopeFactor('walk',-.05)>1&&slopeFactor('walk',-.25)<.6,'a gentle descent is easiest, a steep one is careful');assert.ok(slopeFactor('bike',-1)<=1.35&&slopeFactor('scooter',-1)<=1.15&&slopeFactor('bike',1)>=.3,'capped');
  assert.equal(slopeFactor('car',.2),1);
 });
+test('walking into a wall at an angle slides along it; straight on stops',()=>{
+ const w=world({walls:[rect(-50,-3,100,.4)]}),travel=new PlayerTravel(makeCar(20,20),w);travel.interact();
+ Object.assign(travel.actor,{x:0,z:0,heading:-.5,speed:2}); // heading 30 degrees off the wall's normal
+ for(let i=0;i<40;i++)travel.step(press('KeyW'),.1);
+ assert.ok(travel.actor.x>2.5,`slid along the wall (x ${travel.actor.x.toFixed(2)})`);assert.ok(travel.actor.z>-3);
+ Object.assign(travel.actor,{x:0,z:0,heading:0,speed:2});for(let i=0;i<40;i++)travel.step(press('KeyW'),.1);
+ assert.ok(Math.abs(travel.actor.x)<.3&&travel.actor.speed===0,'head on it stops');
+});

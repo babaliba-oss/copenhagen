@@ -45,6 +45,7 @@ export function canExitBuildings(from,to,buildings){
  }
  return contact&&Math.hypot(to.x-from.x,to.z-from.z)>1e-9;
 }
+const SLIDE=[.15,.3,.45,.6]; // radians off the heading a blocked step may slide (smallest first): glancing contact only, head on stops
 export function driveStep(car,keys,dt,world) {
  const collisionBuildings=world.collisionBuildings||world.buildings;
  const distanceBefore=car.distance;
@@ -77,10 +78,23 @@ export function driveStep(car,keys,dt,world) {
  for(let i=0;i<steps;i++){
    const nx=car.x-Math.sin(car.heading)*travel/steps,nz=car.z-Math.cos(car.heading)*travel/steps;
    if(!insidePlayable(nx,nz,3)){collision='boundary';break;}
-   const samples=carSamples(car,nx,nz);
-   const from={...car,heading:i?car.heading:oldHeading},next={...car,x:nx,z:nz};
-   if(world.objects?.blocksStep(from,next)||samples.some(([x,z])=>collisionBuildings.at(x,z))&&!canExitBuildings(from,next,collisionBuildings)){collision='building';break;}
-   if(samples.some(([x,z])=>!world.roads.at(x,z)&&!world.pavement.at(x,z)&&(inWaterPolygons(world.water,x,z)||lakeAt(x,z)!==null))){collision='water';break;}
+   const from={...car,heading:i?car.heading:oldHeading};
+   const hit=next=>{const samples=carSamples(next);
+    if(world.objects?.blocksStep(from,next)||samples.some(([x,z])=>collisionBuildings.at(x,z))&&!canExitBuildings(from,next,collisionBuildings))return 'building';
+    if(samples.some(([x,z])=>!world.roads.at(x,z)&&!world.pavement.at(x,z)&&(inWaterPolygons(world.water,x,z)||lakeAt(x,z)!==null)))return 'water';
+    return null;};
+   const next={...car,x:nx,z:nz};collision=hit(next);
+   if(collision){
+    // Glancing contact slides along it instead of pinning the car (scraping a wall, a kerb-side bollard): the rest of
+    // the step goes up to 35 degrees off the heading, the car turns a little into the slide and loses the speed that
+    // went into the wall. Head on (nothing free within 35 degrees) it stops as before.
+    const slide=SLIDE.map(a=>a*(car.steer>.05?1:car.steer<-.05?-1:1)).flatMap(a=>[a,-a]).find(a=>{
+     const h=car.heading+a,at=k=>({...car,heading:car.heading+a*.35*k,x:car.x-Math.sin(h)*travel/steps*Math.cos(a)*k,z:car.z-Math.cos(h)*travel/steps*Math.cos(a)*k});
+     return !hit(at(.5))&&!hit(at(1));});
+    if(slide===undefined)break;
+    const h=car.heading+slide,f=Math.cos(slide),sx=car.x-Math.sin(h)*travel/steps*f,sz=car.z-Math.cos(h)*travel/steps*f;
+    car.distance+=Math.hypot(sx-car.x,sz-car.z);car.x=sx;car.z=sz;car.heading+=slide*.35;car.speed*=Math.max(.35,f);car.scraping=collision;collision=null;continue;
+   }
    car.distance+=Math.hypot(nx-car.x,nz-car.z);car.x=nx;car.z=nz;
  }
  if(collision){if(car.distance===distanceBefore)car.heading=oldHeading;car.speed=0;}
