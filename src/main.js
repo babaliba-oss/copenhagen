@@ -221,7 +221,7 @@ const focus=new THREE.Vector3(0,0,85);
 // Diagnostics for one phone's GPU driver at a time: ?off=post,shadows skips the post pipeline / shadow maps, ?hide=<regex>
 // keeps every object whose name matches out of the frame (e.g. ?hide=Far city|Terrain).
 const OFF=new Set((new URLSearchParams(location.search).get('off')||'').split(',').filter(Boolean)),HIDE=(()=>{try{const h=new URLSearchParams(location.search).get('hide');return h?new RegExp(h,'i'):null;}catch{return null;}})();
-const renderer=new THREE.WebGLRenderer({canvas:$('world'),antialias:true,powerPreference:'high-performance'});
+const renderer=new THREE.WebGLRenderer({canvas:$('world'),antialias:OFF.has('post'), /* the post pipeline has its own MSAA target: a multisampled canvas too was memory and a resolve a frame for nothing */powerPreference:'high-performance'});
 // Instanced batches with nothing in them (no pedestrians on foot near the player, no trams, empty LOD levels:
 // ~50 at Nyhavn) still went through program and uniform setup every frame, in the main and shadow passes.
 {const direct=renderer.renderBufferDirect;renderer.renderBufferDirect=function(cam,sc,geometry,material,object,group){if(object.isInstancedMesh&&object.count===0)return;return direct.call(this,cam,sc,geometry,material,object,group);};}
@@ -248,13 +248,17 @@ renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=.8
 const hemi=new THREE.HemisphereLight('#e6eef8','#68786f',1.4);scene.add(hemi);
 const sun=new THREE.DirectionalLight('#fff4e2',2.0);sun.position.set(-160,260,-120);sun.castShadow=true;
 // 400 m box, biased ahead of the car: 2048 texels give 20 cm shadows where the camera looks.
-sun.shadow.mapSize.set(2048,2048);Object.assign(sun.shadow.camera,{left:-150,right:150,top:150,bottom:-150,near:1,far:750}); // 300 m square: fewer casters per frame, sharper shadowssun.shadow.bias=-.0002;sun.shadow.normalBias=.3;
+sun.shadow.mapSize.set(2048,2048);Object.assign(sun.shadow.camera,{left:-150,right:150,top:150,bottom:-150,near:1,far:750}); /* 300 m square: fewer casters per frame, sharper shadows */
+sun.shadow.bias=-.0002;sun.shadow.normalBias=.3; // was swallowed by the comment above: no bias at all (acne)
 scene.add(sun,sun.target);
 const sky=createSky({renderer,scene,camera});sky.applyLighting(hemi,sun);
 // One sky PMREM shared by car paint/glass, chrome and tram glazing; rebuilt only when the sky changes.
 const skyEnvironment=createSkyEnvironment(renderer,sky.mesh);
 // Post pipeline (AO, bloom, grade) and the time-of-day/weather looks; `look` is attached to the road surface and sea below.
-let post=null;if(!OFF.has('post'))try{post=createPostPipeline(renderer);}catch(e){console.warn('Post pipeline unavailable, rendering directly:',e);}
+// Half-float targets need EXT_color_buffer_(half_)float: without it the framebuffer is incomplete (no error, a black
+// screen), so such GPUs render directly.
+const hdrTargets=renderer.extensions.has('EXT_color_buffer_float')||renderer.extensions.has('EXT_color_buffer_half_float');
+let post=null;if(!OFF.has('post')&&hdrTargets)try{post=createPostPipeline(renderer);}catch(e){console.warn('Post pipeline unavailable, rendering directly:',e);}
 // Past the lowest resolution: ambient occlusion, then bloom and a smaller shadow map, then MSAA, then building detail range.
 let farCity=null; // the far-city skyline group (createFarCity)
 const governor=createQualityGovernor([
@@ -698,14 +702,14 @@ async function compileBatches(obj,meshes){
 // street furniture no longer draw into the shadow map, and far-city chunks wholly inside the measured tiles
 // (where their fragments are all discarded anyway) are skipped. Checked twice a second.
 const NO_SHADOW=/traffic fleet|person|cyclist|ladcykel|city b|bus|parked|boat|furniture|bench|bike|bollard|sign plate|junction|lamp|post|tram|scooter|stall|umbrella|cafe|crowd/i;
-let trimAt=0,shadowTick=0,keptPrograms=0,lastCpuMs=0;
+let trimAt=0,shadowTick=0,preShadow=0,keptPrograms=0,lastCpuMs=0;
 // Street surfaces stay loaded out to 1-1.7 km, but past ~1 km (two thirds into the fog, behind the buildings from
 // street level) a tile no longer earns its draw call: 40+ surface draws at Rådhuspladsen, about half of them out there.
 const surfaceMeshes=new Set(),SURFACE_RANGE=1000;
 function trimDraws(now){
  if(now<trimAt)return;trimAt=now+500;
  {const c=camera.position,range=SURFACE_RANGE+Math.max(0,c.y-30)*3;for(const m of surfaceMeshes){const b=m.geometry.boundingSphere;if(b)m.visible=Math.hypot(b.center.x-c.x,b.center.z-c.z)-b.radius<range;}} // further from high up (aerial shots)
- scene.traverse(o=>{if(o.castShadow&&(o.isMesh||o.isInstancedMesh)){let n=o.name,p=o.parent;while(!n&&p){n=p.name;p=p.parent;}if(n&&NO_SHADOW.test(n)&&!o.userData.keepShadow)o.castShadow=false;}});
+ scene.traverse(o=>{if(o.castShadow&&(o.isMesh||o.isInstancedMesh)){let n=o.name,p=o.parent;while(!n&&p){n=p.name;p=p.parent;}if(n&&NO_SHADOW.test(n)&&!o.userData.keepShadow){o.castShadow=false;o.userData.castShadowWanted=false;}}}); /* castShadowWanted: the tile shadow culler turned them back on between trims */
  if(farCity){const cx=camera.position.x,cz=camera.position.z;for(const m of farCity.children){const b=m.geometry.boundingBox||(m.geometry.computeBoundingBox(),m.geometry.boundingBox);
   const fx=Math.max(Math.abs(b.min.x-cx),Math.abs(b.max.x-cx)),fz=Math.max(Math.abs(b.min.z-cz),Math.abs(b.max.z-cz));m.visible=Math.hypot(fx,fz)>FAR_START;}}
 }
@@ -1226,7 +1230,7 @@ function frame(now){
  }else{camera.position.set(focus.x+Math.sin(heading)*behind,height,focus.z+Math.cos(heading)*behind);camera.lookAt(focus);}
  trimDraws(now);
  {const progs=renderer.info.programs;if(progs&&progs.length!==keptPrograms){for(const pr of progs)if(!pr.__kept){pr.__kept=true;pr.usedTimes++;}keptPrograms=progs.length;}} // compiled shaders are never released: a bus sign, a tile or a landmark leaving and coming back no longer recompiles (100-300 ms stall each)
- {shadowTick=(shadowTick+1)%2;renderer.shadowMap.needsUpdate=!started||captureMode||resolution.smoothed<40||shadowTick===0;} // every frame (alternating heavy and light frames paced unevenly: 1 then 2 vsyncs); every second frame only below ~25 fps
+ {shadowTick=(shadowTick+1)%2;renderer.shadowMap.needsUpdate=started?(captureMode||resolution.smoothed<40||shadowTick===0):(preShadow++%30===0);} /* while loading: every 30th frame, not every frame while tiles and programs land (a GPU-watchdog risk on phones) */ // every frame (alternating heavy and light frames paced unevenly: 1 then 2 vsyncs); every second frame only below ~25 fps
  if(inspectionCamera){camera.position.set(...inspectionCamera.eye);camera.lookAt(...inspectionCamera.target);}
  {const pose=roadblock?.cameraPose()||finale.cameraPose(car);if(pose){camera.position.set(...pose.position);camera.lookAt(...pose.target);}} // arrest cinematic orbit
  const wantFov=chaseCamera&&started&&!inspectionCamera?cameraFov:DRIVE_FOV.min;if(camera.fov!==wantFov){camera.fov=wantFov;camera.updateProjectionMatrix();}
