@@ -28,7 +28,7 @@ export function createBreakableSigns(name='Breakable signs',{register=true}={}){
  const group=new THREE.Group();group.name=name;
  const posts=[],attached=[],materials=new Map(),uniforms=[],pending=new Map();
  group.worldObjects=posts;
- let texture=null,data=null,stumps=null,dirty=true,hits=0;
+ let texture=null,data=null,stumps=null,depthMaterial=null,dirty=true,hits=0;
  const m4=new THREE.Matrix4(),t1=new THREE.Matrix4(),v1=new THREE.Vector3(),v2=new THREE.Vector3(),q1=new THREE.Quaternion(),q2=new THREE.Quaternion(),box=new THREE.Box3();
 
  // Register a post. x/z are world coordinates for contact; pivot is the base in the meshes' frame
@@ -71,7 +71,8 @@ export function createBreakableSigns(name='Breakable signs',{register=true}={}){
  // A merged sign mesh: patched material plus a matching shadow depth material.
  function mesh(geometry,base,{castShadow=true,receiveShadow=true}={}){
   const m=new THREE.Mesh(geometry,material(base));m.castShadow=castShadow;m.receiveShadow=receiveShadow;
-  const depth=new THREE.MeshDepthMaterial({depthPacking:THREE.RGBADepthPacking});depth.onBeforeCompile=s=>{ensureTexture();patchShader(s,texture,uniforms);};depth.customProgramCacheKey=()=>'breakable-sign-depth';m.customDepthMaterial=depth;
+  // One depth material per set: a new one per mesh (furniture chunks rebuild as you drive) compiled again and again.
+  const depth=depthMaterial??=(()=>{const d=new THREE.MeshDepthMaterial({depthPacking:THREE.RGBADepthPacking});d.onBeforeCompile=s=>{ensureTexture();patchShader(s,texture,uniforms);};d.customProgramCacheKey=()=>'breakable-sign-depth';return d;})();m.customDepthMaterial=depth;
   // Broken signs fly a few metres beyond their rest bounds.
   geometry.computeBoundingSphere();geometry.boundingSphere.radius+=12;return m;
  }

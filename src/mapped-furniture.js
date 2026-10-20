@@ -185,7 +185,7 @@ export function createMappedFurniture(layer,{player=()=>null,mobility=()=>null,c
   const t0=performance.now(),out=chunk.out??={painted:[],plates:[],next:0};
   while(out.next<chunk.recipes.length){chunk.recipes[out.next++](out);if(performance.now()-t0>budget)return false;}
   const t1=performance.now();
-  if(out.painted.length){const m=chunk.signs.mesh(mergeGeometries(out.painted),painted);m.name='Mapped furniture posts';chunk.meshes.push(m);}
+  if(out.painted.length){const m=chunk.signs.mesh(mergeGeometries(out.painted),painted,{castShadow:false});m.name='Mapped furniture posts';chunk.meshes.push(m);}
   if(out.plates.length){const m=chunk.signs.mesh(mergeGeometries(out.plates),plates,{castShadow:false});m.name='Mapped sign plates';chunk.meshes.push(m);}
   [...out.painted,...out.plates].forEach(g=>g.dispose());chunk.out=null;chunk.mergeMs=performance.now()-t1;
   for(const m of chunk.meshes){releaseAfterUpload(m);chunk.group.add(m);}chunk.built=true;return true;

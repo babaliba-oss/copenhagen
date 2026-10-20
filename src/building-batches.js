@@ -70,7 +70,7 @@ export function createBuildingBatches(buildings,textures,partOf){
     else dst.array.set(a.array.subarray(0,n*k),first*k);
     dst.addUpdateRange(first*k,n*k);dst.needsUpdate=true;}
    // Landed: the worker's copy can go, and a batch whose last building is in frees its own CPU arrays after upload.
-   placed.delete(s);if(--g.waiting===0)releaseAfterUpload(g.mesh);}
+   placed.delete(s);if(--g.waiting===0){releaseAfterUpload(g.mesh);g.mesh.geometry.attributes.aBid.needsUpdate=true;}} // aBid is not re-uploaded by landing: one more upload frees it too
  }
  return {meshes,data,land,batched:s=>taken.has(s),
   set(i,v){if(!(i>=0&&i<256))return;const was=data[i]>0;data[i]=v;if(was!==(v>0))for(const g of ofPart.get(i)||[]){g.shown+=v>0?1:-1;show(g);}},get(i){return data[i];},

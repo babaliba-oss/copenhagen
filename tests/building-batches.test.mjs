@@ -50,7 +50,7 @@ test('batches split into cells and draw only while one of their parts is shown',
 
 test('a batch frees its CPU arrays after the upload that follows its last building landing',()=>{
  const buildings=[0,1].map(i=>({part:part(i),windows:0,meshes:[mesh(i,{})]}));
- const b=createBuildingBatches(buildings,new Map(),x=>buildings.indexOf(x)),g=b.meshes[0].geometry,up=()=>{for(const a of Object.values(g.attributes))a.onUploadCallback();};
+ const b=createBuildingBatches(buildings,new Map(),x=>buildings.indexOf(x)),g=b.meshes[0].geometry,seen=new Map(),up=()=>{for(const a of Object.values(g.attributes))if(a.version!==(seen.get(a)??0)){seen.set(a,a.version);a.onUploadCallback();}}; // like WebGLAttributes: only changed attributes upload
  b.land(buildings[0]);up();assert.ok(g.attributes.position.array,'kept while a building is still to land');
  b.land(buildings[1]);assert.equal(b.batched(buildings[1].meshes[0]),true,'still known as batched after landing');
  assert.equal(g.attributes.position.array[9],1,'the last building is copied before anything is freed');
