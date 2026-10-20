@@ -180,14 +180,17 @@ export function createMappedFurniture(layer,{player=()=>null,mobility=()=>null,c
   if(chunk.wires?.length){const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(chunk.wires,3));const m=new THREE.LineSegments(g,wireMaterial);m.name='Lamp wires';chunk.group.add(m);chunk.wires=null;}
   chunk.group.add(chunk.signs.finish());
  }
- function buildChunk(chunk){
-  const out={painted:[],plates:[]};for(const f of chunk.recipes)f(out);
+ // Placed a few milliseconds a frame (the chunk starts 150 m before it shows), then merged in one go.
+ function buildChunk(chunk,budget=Infinity){
+  const t0=performance.now(),out=chunk.out??={painted:[],plates:[],next:0};
+  while(out.next<chunk.recipes.length){chunk.recipes[out.next++](out);if(performance.now()-t0>budget)return false;}
+  const t1=performance.now();
   if(out.painted.length){const m=chunk.signs.mesh(mergeGeometries(out.painted),painted);m.name='Mapped furniture posts';chunk.meshes.push(m);}
   if(out.plates.length){const m=chunk.signs.mesh(mergeGeometries(out.plates),plates,{castShadow:false});m.name='Mapped sign plates';chunk.meshes.push(m);}
-  [...out.painted,...out.plates].forEach(g=>g.dispose());
-  for(const m of chunk.meshes){releaseAfterUpload(m);chunk.group.add(m);}chunk.built=true;
+  [...out.painted,...out.plates].forEach(g=>g.dispose());chunk.out=null;chunk.mergeMs=performance.now()-t1;
+  for(const m of chunk.meshes){releaseAfterUpload(m);chunk.group.add(m);}chunk.built=true;return true;
  }
- function dropChunk(chunk){for(const m of chunk.meshes){chunk.group.remove(m);m.geometry.dispose();}chunk.meshes=[];chunk.built=false;}
+ function dropChunk(chunk){for(const m of chunk.meshes){chunk.group.remove(m);m.geometry.dispose();}chunk.meshes=[];chunk.built=false;chunk.out=null;}
 
  // Signal lenses: one instanced disc per lens, lit from the nearest signalled approach the head faces.
  const lensCount=lights.reduce((n,l)=>n+LENSES[l.kind].length,0);let lenses=null;
@@ -294,10 +297,11 @@ export function createMappedFurniture(layer,{player=()=>null,mobility=()=>null,c
  function update(){
   const p=player();updateLights(p);if(!p)return;
   // Built a little before they show, freed well after they hide (a hysteresis band, so the edge does not rebuild).
-  const show=VIEW_RANGE+CHUNK*.71;
-  for(const c of chunks.values()){const d=Math.hypot(c.centre[0]-p.x,c.centre[1]-p.z);
-   if(!c.built&&d<show+150)buildChunk(c);else if(c.built&&d>show+450)dropChunk(c);
-   c.group.visible=d<show;}
+  const show=VIEW_RANGE+CHUNK*.71;let next=null,nd=Infinity;
+  for(const c of chunks.values()){const d=Math.hypot(c.centre[0]-p.x,c.centre[1]-p.z);c.group.visible=d<show;
+   if(!c.built&&d<show+150&&d<nd){next=c;nd=d;}else if((c.built||c.out)&&d>show+450)dropChunk(c);}
+  // The nearest chunk only: sliced while it is still out of sight, at once if it is about to show (start, teleport).
+  if(next)buildChunk(next,nd<show+20?Infinity:4);
   refillPools(p);
   updateLenses(p);
  }
