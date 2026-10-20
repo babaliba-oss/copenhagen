@@ -30,15 +30,15 @@ export function setEnvironment(texture){
 // prefiltered cubemap the exact gradient, sun glow and clouds the player sees.
 export function createSkyEnvironment(renderer,skyMesh,{listen=true}={}){
  const pmrem=new THREE.PMREMGenerator(renderer),stage=new THREE.Scene(),SKY_FAR=5000;
- let texture=null,pending=false;
+ let texture=null,target=null,pending=false;
  function regenerate(){
   pending=false;
   if(!skyMesh)return texture;
   const parentBefore=skyMesh.parent;
   stage.add(skyMesh);
-  const next=pmrem.fromScene(stage,0,.1,SKY_FAR).texture;
+  const rt=pmrem.fromScene(stage,0,.1,SKY_FAR),next=rt.texture;
   if(parentBefore)parentBefore.add(skyMesh);else stage.remove(skyMesh);
-  const old=texture;texture=next;setEnvironment(texture);old?.dispose();
+  const old=target;texture=next;target=rt;setEnvironment(texture);old?.dispose(); // the whole render target: disposing only its texture left the framebuffer and depth buffer (~3 MB a rebuild, several a weather change)
   return texture;
  }
  regenerate();
@@ -52,5 +52,5 @@ export function createSkyEnvironment(renderer,skyMesh,{listen=true}={}){
  let lastPoll=-Infinity,lastSignature=signature();
  return {get texture(){return texture;},regenerate,
   update(seconds){if(!(seconds-lastPoll>=.5))return;lastPoll=seconds;const s=signature();if(s!==lastSignature){lastSignature=s;onSkyChange();}},
-  dispose(){if(listen&&typeof window!=='undefined')window.removeEventListener('skychange',onSkyChange);pmrem.dispose();texture?.dispose();setEnvironment(null);}};
+  dispose(){if(listen&&typeof window!=='undefined')window.removeEventListener('skychange',onSkyChange);pmrem.dispose();target?.dispose();setEnvironment(null);}};
 }

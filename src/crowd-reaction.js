@@ -10,7 +10,7 @@ export const REACTION={radius:{stumble:9,down:24,thrown:34},flinch:.55,help:4.5,
 
 function rng(seed=97){return()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296;};}
 
-export function createCrowdReaction({sight=null,scare=null,hold=null,random=rng()}={}){
+export function createCrowdReaction({sight=null,scare=null,hold=null,random=rng(),phones=true}={}){ // phones: false in 1760 (filmers just stare)
  const reacting=new Set();let time=0;
  // Line of sight: sample the segment every metre against mapped buildings.
  function sees(a,p){
@@ -48,7 +48,7 @@ export function createCrowdReaction({sight=null,scare=null,hold=null,random=rng(
   const r=a.reaction;if(!r)return null;const t=time-r.start,face=Math.atan2(-(r.at.x-a.x),-(r.at.z-a.z));
   if(t<REACTION.flinch&&r.kind!=='flee')return {pose:'flinch',heading:face};
   if(r.kind==='flee')return t<REACTION.flinch*.6?{pose:'flinch',heading:null}:null;
-  if(r.kind==='film')return {pose:'phone',heading:face};
+  if(r.kind==='film')return {pose:phones?'phone':null,heading:face};
   if(r.kind==='shout')return {pose:t%3<1.6?'wave':null,heading:face};
   if(r.kind==='help'){const down=r.victim.knockdown?.body;return {pose:down&&Math.hypot(down.x-a.x,down.z-a.z)<2.2?'grabLow':null,heading:down?Math.atan2(-(down.x-a.x),-(down.z-a.z)):face};}
   return {pose:null,heading:face};

@@ -63,7 +63,7 @@ export function periodRoof(array,part,{maxRise=4.2}={}){
 let worker=null,jobs=new Map(),nextJob=0;
 export function roofsInWorker(array,parts){
  if(typeof Worker==='undefined')return Promise.resolve(parts.map(p=>({colour:p.roofColor,positions:periodRoof(array,p)})).filter(r=>r.positions));
- if(!worker){worker=new Worker(new URL('./period-roof-worker.js',import.meta.url),{type:'module'});worker.onmessage=({data})=>{const j=jobs.get(data.id);if(j){jobs.delete(data.id);j(data.roofs);}};}
+ if(!worker){worker=new Worker(new URL('./period-roof-worker.js',import.meta.url),{type:'module'});worker.onmessage=({data})=>{const j=jobs.get(data.id);if(j){jobs.delete(data.id);j(data.roofs);}};worker.onerror=()=>{for(const j of jobs.values())j([]);jobs.clear();worker=null;};} // a dead worker: flat roofs, and the next tile starts a new one
  const id=nextJob++,copy=array.slice(),list=parts.map(p=>({start:p.start,count:p.count,roofColor:p.roofColor}));
  return new Promise(resolve=>{jobs.set(id,resolve);worker.postMessage({id,array:copy,parts:list},[copy.buffer]);});
 }

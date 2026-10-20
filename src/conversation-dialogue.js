@@ -50,7 +50,7 @@ const DETAILS={
 };
 const itemDetail=item=>Object.hasOwn(DETAILS,item.id)?DETAILS[item.id]:`${item.note}.`;
 
-export function beginDialogue(person,memory,context={}){
+function beginToday(person,memory,context={}){
  if(isAuthored(person))return authoredBegin(person,memory,context);
  const c=characterFor(person),menu=menuFor(person);memory.visits=(memory.visits||0)+1;memory.topics??=[];
  if(menu){
@@ -62,7 +62,7 @@ export function beginDialogue(person,memory,context={}){
  return turn(memory.visits>1?`Oh, hello again! ${revisit}`:`Hi! I’m ${c.name}. ${context.cityName?`Taking a look around ${context.cityName}?`:'Out exploring?'}`,[choice('hello',memory.visits>1?'Nice to see you again':'Hi! Yes, I’m exploring'),...mainChoices()]);
 }
 
-export function nextDialogue(id,person,memory,context={}){
+function nextToday(id,person,memory,context={}){
  if(isAuthored(person))return authoredNext(id,person,memory,context);
  const c=characterFor(person),menu=menuFor(person),repeat=memory.topics.includes(id);
  if(!repeat)memory.topics.push(id);
@@ -115,3 +115,11 @@ export function nextDialogue(id,person,memory,context={}){
  if(id==='bike'){memory.preference='bike';return turn('That gives you more room to wander. Walk up to a parked bike or scooter and use the ride action. You can get off again whenever a corner deserves a closer look.',[choice('notice','What should I keep an eye out for?'),choice('explore','Remind me where to head'),BYE]);}
  return null;
 }
+
+// Copenhagen 1760 (context.era): the passers-by talk about carts and coaches, not bikes and scooters.
+const PERIOD=[['I fix old bikes for fun. A short ride to test a repair','I mend cart wheels for fun. A short drive to test a repair'],['a crossing, a bike rack, a bench','a crossing, a pump, a bench'],
+ ['put the bike aside','leave the cart'],['The ride there is only half of it.','Getting there is only half of it.'],['tinkering with a bike','mending a cart wheel'],['How was the ride?','How was the drive?'],
+ ['I’ll take a bike','I’ll take the coach'],['Walk up to a parked bike or scooter and use the ride action. You can get off again','Your coach waits where you stepped down: board it and drive on. You can step down again']];
+const period=(t,context)=>{if(!t||context?.era!==1760)return t;const fix=x=>PERIOD.reduce((s,[a,b])=>s.split(a).join(b),x);return {...t,response:fix(t.response),choices:t.choices?.map(c=>({...c,label:fix(c.label)}))};};
+export function beginDialogue(person,memory,context={}){return period(beginToday(person,memory,context),context);}
+export function nextDialogue(id,person,memory,context={}){return period(nextToday(id,person,memory,context),context);}

@@ -15,7 +15,7 @@ export function createTravelUI({interact,toggleRun,focusWorld=()=>{},doc=documen
   action.textContent=travel.mode==='walk'?nearest?`${coarse?'':'Enter · '}${nearest.mode==='car'?(doc.body.classList.contains('era-1760')?'Board the coach':'Enter car'):`Ride ${nearest.label.toLowerCase()}`}`:'':`${coarse?'':'F · '}${travel.mode==='car'?(doc.body.classList.contains('era-1760')?'Step down':'Get out'):'Get off'}`;
   action.hidden=travel.mode==='walk'?!nearest:!stopped||(!coarse&&!showHint);action.disabled=false;
   run.hidden=!coarse||travel.mode!=='walk';run.textContent=travel.sprint?'Running':'Run';run.setAttribute('aria-pressed',String(!!travel.sprint));
-  hint.textContent=coarse?'':travel.mode==='walk'?'WASD · Shift to run':travel.mode==='car'?'F to get out when stopped':'W / ↑ to ride · Space to brake · F to get off';hint.hidden=!showHint||coarse;
+  hint.textContent=coarse?'':travel.mode==='walk'?'WASD · Shift to run':travel.mode==='car'?(doc.body.classList.contains('era-1760')?'F to step down when stopped':'F to get out when stopped'):'W / ↑ to ride · Space to brake · F to get off';hint.hidden=!showHint||coarse;
   root.hidden=!started||paused||mapOpen||busted||hidden||(action.hidden&&run.hidden&&hint.hidden);
  }};
 }

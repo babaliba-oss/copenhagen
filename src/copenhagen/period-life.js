@@ -30,7 +30,8 @@ const rnd=seed=>()=>{seed=(seed*16807)%2147483647;return (seed-1)/2147483646;};
 export function createPeriodLife({city,world,water=[],squares=[],gates=[],animalModels={},propModels={}}){ // animalModels: Blender pig/hen/goose (scripts/blender/animals.py) where loaded; propModels: farm-wagon, covered-wagon (CC BY agt14032013), and Daniel's barrel and crate (CC BY RipeR / SomeKevin) for the cargo on the quays
  const group=new THREE.Group();group.name='1760 street life';const r=rnd(1760);
  const wet=(x,z)=>water.some(w=>{const b=w.bbox;return (!b||x>=b[0]&&x<=b[2]&&z>=b[1]&&z<=b[3])&&pointInPolygon(x,z,w.rings);});
- const free=(x,z,rad=.6)=>!world.buildings.at(x,z)&&!wet(x,z)&&!world.buildings.at(x+rad,z)&&!world.buildings.at(x-rad,z)&&!world.buildings.at(x,z+rad)&&!world.buildings.at(x,z-rad);
+ // off the roads too: wagons, crowds and pigs stood in the coaches' lanes, and nothing there collides with them
+ const free=(x,z,rad=.6)=>!world.roads.at(x,z)&&!world.buildings.at(x,z)&&!wet(x,z)&&!world.buildings.at(x+rad,z)&&!world.buildings.at(x-rad,z)&&!world.buildings.at(x,z+rad)&&!world.buildings.at(x,z-rad);
  const crowds=new Map(),props={},animals=[];
  const cellOf=(x,z)=>`${Math.floor(x/350)},${Math.floor(z/350)}`;
  const person=(x,z,extra={})=>{if(!free(x,z))return false;const k=cellOf(x,z);if(!crowds.has(k))crowds.set(k,[]);crowds.get(k).push({x,z,heading:r()*Math.PI*2,pose:r()<.6?'chat':'browse',walking:false,...extra});return true;};

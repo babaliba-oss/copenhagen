@@ -111,7 +111,14 @@ export class PlayerTravel{
  constructor(car,world,{cars=()=>[],rides=()=>[],obstacles=()=>[]}={}){this.carSources=cars;this.rideSources=rides;this.obstacles=obstacles;this.reset(car,world);}
  reset(car,world){
   for(const source of this.claimedSources||[])source.release?.();
-  this.claimedSources=[];this.world=world;this.car=car;this.homeCar=car;car.travelMode='car';car.id='car';this.cars=[car];this.actor=car;this.mode='car';this.rides=starterRides(car,world);this.riding=null;this.transition=null;this.sprint=false;
+  this.claimedSources=[];this.taken=new Map();this.world=world;this.car=car;this.homeCar=car;car.travelMode='car';car.id='car';this.cars=[car];this.actor=car;this.mode='car';this.rides=starterRides(car,world);this.riding=null;this.transition=null;this.sprint=false;
+ }
+ // Cars, bikes and scooters taken from traffic and left over `range` behind go back to it (each one taken was a
+ // traffic car gone for good, and a full model kept and updated). The last car driven stays, to walk back to.
+ forgetFar(x,z,range=300){
+  for(const list of [this.cars,this.rides])for(let i=list.length-1;i>=0;i--){const a=list[i],s=this.taken.get(a);
+   if(!s||a===this.actor||a===this.car||a===this.homeCar||a===this.riding||Math.hypot(a.x-x,a.z-z)<=range)continue;
+   list.splice(i,1);this.taken.delete(a);s.release?.();this.claimedSources=this.claimedSources.filter(c=>c!==s);}
  }
  parked(){return [...this.cars.filter(c=>c!==this.actor),...this.rides.filter(r=>r!==this.riding)];}
  parkedBodies(){return this.parked().map(p=>({...p,hw:p.halfWidth??.98,hl:p.halfLength??2.36,ref:{...p,parked:true}}));}
@@ -145,7 +152,7 @@ export class PlayerTravel{
    const taken=choice.source.claim?.();if(taken===false)return {ok:false,message:'Wait for the ride to stop.'};
    target=choice.mode==='car'?{...makeCar(target.x,target.z,target.heading),travelMode:'car'}:{...makeActor(choice.mount,choice.mode),mode:choice.mode,parked:false};
    Object.assign(target,{id:choice.id,label:choice.label,visual:choice.source.visual});
-   (choice.mode==='car'?this.cars:this.rides).push(target);this.claimedSources.push(choice.source);
+   (choice.mode==='car'?this.cars:this.rides).push(target);this.claimedSources.push(choice.source);this.taken.set(target,choice.source);
   }else if(choice.mount){
    Object.assign(target,choice.mount);
   }

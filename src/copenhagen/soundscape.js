@@ -90,7 +90,7 @@ export function createSoundscape(ac,{era=null}={}){
   else eG.gain.setTargetAtTime(0,t,.1);
   tG.gain.setTargetAtTime(mode==='car'?Math.min(.03,v*.0018):mode==='bike'?Math.min(.012,v*.002):0,t,.1);tBp.frequency.setTargetAtTime(500+v*30,t,.2);
   if(coach&&v>.6){stepT-=dt*Math.min(4.5,v*.8);if(stepT<=0){stepT=1;hoof(.12);setTimeout(()=>hoof(.09),110);}}
-  bellT-=dt;if(bellT<=0){bellT=10+Math.random()*25;bell();}
+  bellT-=dt;if(bellT<=0){bellT=10+Math.random()*25;if(era!==1760)bell();} // no bicycles in 1760
   lastSpeed=v;
   mus.gain.setTargetAtTime(musicOn&&!musicOff?.42:0,t,.8);if(musicOn&&!musicOff)scheduleFolk();
  }

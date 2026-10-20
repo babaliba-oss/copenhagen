@@ -14,8 +14,8 @@ export function createGameResilience({win=window,doc=document,screen=createLoadi
   doc.body.classList.add('game-failed');
   for(const dialog of doc.querySelectorAll('dialog[open]'))dialog.close();
   for(const stop of stopListeners){try{stop();}catch(e){log('Could not stop a game subsystem:',e);}}
-  if(source==='graphics-lost')screen.error('The browser lost its graphics connection. Close other graphics-heavy tabs, then reload to restart.',{title:'Graphics connection lost'});
-  else if(/webgl|graphics context/i.test(detail))screen.error('This browser could not start 3D graphics. Enable hardware acceleration or try another browser, then reload.',{title:'3D graphics unavailable'});
+  if(source==='graphics-lost')screen.error('The browser lost its graphics connection (usually out of graphics memory on a phone). Close other tabs, then reload: the game will restart at a lighter quality.',{title:'Graphics connection lost'});
+  else if(/webgl|graphics context/i.test(detail))screen.error('This browser could not start 3D graphics. On Android, Chrome and Brave block 3D for a site after a graphics crash: close the browser completely (swipe it away), open it again and reload. Otherwise enable hardware acceleration or try another browser.',{title:'3D graphics unavailable'});
   else if(source==='startup')screen.error('The game could not finish loading. Check your connection, then reload to try again.');
   else screen.error('The game stopped unexpectedly. Reload to restart from your chosen city.',{title:'The game stopped'});
   log(`Worldhood ${source} failure:`,error);
@@ -23,6 +23,7 @@ export function createGameResilience({win=window,doc=document,screen=createLoadi
   return true;
  };
  listen(canvas,'webglcontextlost',event=>{
+  try{localStorage.setItem('gpu-lost',String(Date.now()));}catch{} // the next start begins at the lowest quality (main.js)
   event.preventDefault(); // Allow the browser to restore the context, without an automatic reload loop.
   fail(new Error('WebGL context lost'),'graphics-lost');
  });

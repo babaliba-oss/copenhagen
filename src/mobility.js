@@ -178,7 +178,7 @@ export class Mobility {
  // What lies under a point (0 building, 1 road, 2 pavement, 3 neither), memoised on a 25 cm grid: walkers ask
  // this for every 25 cm of every step, and three polygon lookups each was the biggest cost in a frame.
  groundKind(x,z){
-  const w=this.world;if(this._kindOf!==w.buildings||this._kindRoads!==w.roads||this._kindPave!==w.pavement||this._kinds.size>500000){this._kinds=new Map();this._kindOf=w.buildings;this._kindRoads=w.roads;this._kindPave=w.pavement;}
+  const w=this.world;if(this._kindOf!==w.buildings||this._kindRoads!==w.roads||this._kindPave!==w.pavement||this._kinds.size>80000){this._kinds=new Map(); /* 80k: a 500k map (~20 MB) freed at once stalled phones */this._kindOf=w.buildings;this._kindRoads=w.roads;this._kindPave=w.pavement;}
   const X=Math.round(x*4),Z=Math.round(z*4),k=(X+60000)*120000+(Z+60000);let v=this._kinds.get(k);
   if(v===undefined){const px=X/4,pz=Z/4;v=w.buildings.at(px,pz)?0:w.roads.at(px,pz)?1:w.pavement?.at(px,pz)?2:3;this._kinds.set(k,v);}
   return v;

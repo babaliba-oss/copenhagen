@@ -20,8 +20,8 @@ export function makeCar(x,z,heading=0){return settleOnGround({x,z,heading,speed:
 // Height, pitch and roll from the ground under the wheels (all 0 in a flat city).
 export function settleOnGround(car){const p=groundPose(car.x,car.z,car.heading,1.4,.8);car.y=p.y;car.pitch=p.pitch;car.roll=p.roll;return car;}
 export function carSamples(car,x=car.x,z=car.z) {
- const s=Math.sin(car.heading),c=Math.cos(car.heading);
- return [[0,0],[-.9,-2.15],[.9,-2.15],[-.9,2.15],[.9,2.15],[0,-2.3],[0,2.3],[-1,0],[1,0]].map(([lx,lz])=>[x+lx*c+lz*s,z-lx*s+lz*c]);
+ const s=Math.sin(car.heading),c=Math.cos(car.heading),f=(car.front??2.3)/2.3,b=(car.back??2.3)/2.3; // front/back: a longer vehicle (the 1760 coach and horses)
+ return [[0,0],[-.9,-2.15],[.9,-2.15],[-.9,2.15],[.9,2.15],[0,-2.3],[0,2.3],[-1,0],[1,0]].map(([lx,lz])=>{lz*=lz<0?f:b;return [x+lx*c+lz*s,z-lx*s+lz*c];});
 }
 // Existing contact with a thin railing must allow retreat or sliding along it.
 // Each footprint sample may only retain/reduce its penetration, never enter a

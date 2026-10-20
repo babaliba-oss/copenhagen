@@ -164,7 +164,7 @@ const speedometer=createSpeedometer();
 let waterfrontLandmarks,palaceLife,cityHallFlag,sea,marketScene,marketLife,universityLife,stationStreetLife,terminalLife,knockables;
 let marketShop=null,marketShopRenderer=null; // buying at market stalls on foot (market-shop.js)
 const gullEncounter=new GullEncounter();
-let safeBirdFlight=null,wasReading=false;
+let safeBirdFlight=null,wasReading=false,forgotAt=0;
 let cph=null,harbourBath=null,periodLife=null,parkGeese=null,cafeGuests=null,carriage=null,coaches=null,parkedCars=null,boats=null,landmarks=null,trains=null,detailPeople=[],travel=null,peopleInteraction=null,staticCars=[],trafficCars=[],cameraTransition=null;
 
 const $=id=>document.getElementById(id);
@@ -225,7 +225,10 @@ const renderer=new THREE.WebGLRenderer({canvas:$('world'),antialias:true,powerPr
  const shown=[];for(const g of loadedTiles.values())if(g.visible&&g.userData.level==='near')for(const c of g.userData.casters||[]){c.visible=true;shown.push(c);}
  try{return render.call(this,lights,sc,cam);}finally{for(const c of shown)c.visible=false;}};}
 const fpsMeter=createFpsMeter(renderer);
-const maxPixelRatio=Math.min(devicePixelRatio,1.5),resolution=createAdaptiveResolution({max:maxPixelRatio,min:Math.min(maxPixelRatio,.75)});
+// After the graphics connection was lost (out of GPU memory on a phone), the next starts within 3 days run at the lowest
+// quality and resolution; ?quality= overrides it.
+const gpuLostRecently=(()=>{try{return Date.now()-Number(localStorage.getItem('gpu-lost')||0)<3*864e5&&!new URLSearchParams(location.search).has('quality');}catch{return false;}})();
+const maxPixelRatio=Math.min(devicePixelRatio,gpuLostRecently?1:1.5),resolution=createAdaptiveResolution({max:maxPixelRatio,min:Math.min(maxPixelRatio,.75)});
 renderer.setPixelRatio(maxPixelRatio);
 if(FIXED){captureMode=true;resolution.lock(1);renderer.setPixelRatio(1);globalThis.__skyClock=()=>frameNow;} /* frame-by-frame capture: full quality at the window's size, clouds on the trailer's clock */
 renderer.setSize(captureFrame.w,captureFrame.h);
@@ -252,7 +255,7 @@ const governor=createQualityGovernor([
  // and Strøget otherwise stay heavy whatever the resolution). Tiles pick it up on their next LOD pass.
  ()=>{Object.assign(TILE_LOD,{near:170,far:210,detail:130,shadow:70,building:100});if(farCity)farCity.visible=false;},
 ],{cpuStep:3}); // CPU-bound (draw calls): the LOD step first
-{const q=new URLSearchParams(location.search).get('quality'),n=q==='low'?9:q==='high'?0:q!==null&&q!==''&&!isNaN(+q)?+q:(matchMedia('(pointer:coarse)').matches?3:0);for(let i=0;i<n;i++)governor.update(99,{atMin:true,smoothed:99});} // ?quality=low (or 1-3 steps, or high). Phones start without AO, bloom, MSAA and with 1024 shadows: at full desktop quality they spent their first 30-40 s stepping down (resolution first, then one effect every 4-7 s) at a choppy frame rate, just as the player pulled away
+{const q=new URLSearchParams(location.search).get('quality'),n=q==='low'||gpuLostRecently?9:q==='high'?0:q!==null&&q!==''&&!isNaN(+q)?+q:(matchMedia('(pointer:coarse)').matches?3:0);for(let i=0;i<n;i++)governor.update(99,{atMin:true,smoothed:99});} // ?quality=low (or 1-3 steps, or high). Phones start without AO, bloom, MSAA and with 1024 shadows: at full desktop quality they spent their first 30-40 s stepping down (resolution first, then one effect every 4-7 s) at a choppy frame rate, just as the player pulled away
 let look=null;
 const ground=new THREE.Mesh(new THREE.PlaneGeometry(11000,11000),groundPatches(new THREE.MeshStandardMaterial({color:'#94988b',roughness:1})));ground.rotation.x=-Math.PI/2;ground.position.y=-.5;ground.receiveShadow=true;cityModel.add(ground);
 // Unmapped ground (yards, lots, verges): soft patches of worn grass and gravel instead of one flat grey.
@@ -783,12 +786,15 @@ function updateTiles(){
  tilePass=(async()=>{try{do{tilePassAgain=false;await runTilePass();}while(tilePassAgain);}finally{tilePass=null;}})();
  return tilePass;
 }
+const tileFailedAt=new Map();
 async function runTilePass(){
  if(!roofIndex)return;
  // Tiles where the car is heading load as early as tiles where it is.
  const range=430,ahead=aheadPoint(car),priority=t=>tilePriority(t,focus,ahead);
  const near=roofIndex.tiles.filter(t=>priority(t)<range).sort((a,b)=>priority(a)-priority(b));
- await pool(near,4,loadRoof);
+ // One tile that fails (a dropped fetch on 4G, a decode error) used to reject the pass before the unload/LOD loop
+ // below, freezing both for as long as it stayed near; it is now skipped for 20 s and retried.
+ const now=performance.now();await pool(near.filter(t=>!(now-(tileFailedAt.get(t.file)??-1e9)<20000)),4,t=>loadRoof(t).catch(e=>{tileFailedAt.set(t.file,performance.now());handleTileError(e);}));
  for(const t of roofIndex.tiles){const m=loadedTiles.get(t.file);if(!m)continue;
   const d=tileDistance(t);
   if(d>1000){detailScheduler.cancel(t.file);cityModel.remove(m);m.children.forEach(c=>{c.geometry.dispose();disposeMaterial(c.material);disposeMaterial(c.customDepthMaterial);});m.userData.textures.forEach(x=>{x.image?.close?.();x.dispose();});loadedTiles.delete(t.file);continue;}
@@ -924,13 +930,15 @@ function showEraCard(era,hold=false){
  el.innerHTML=era==='1760'?'<p>Travelling back to</p><h2>Copenhagen, 1760</h2><p>Frederik V is king. The city ends at the ramparts. Mind the horses.</p>':'<p>Back to</p><h2>Copenhagen, today</h2><p>Bikes, harbour baths and rød pølse.</p>';
  el.className='show';if(!hold)return;setTimeout(()=>{el.className='';},3200);
 }
-function setStart(l){mobileControls?.release();if(started)cph?.teleported?.();peopleInteraction?.reset(world);marketShop?.reset();gullEncounter.reset();birds?.clearEncounter();cameraTransition=null;impacts.reset();crowd?.reset();finale.reset();startPoint=l;car=makeCar(l.x,l.z,l.heading??(l.name==='Senate Square'?0:-Math.PI/2+.17));car.distance=distance;if(travel)travel.reset(car,world);else travel=new PlayerTravel(car,world,{cars:()=>[...staticCars,...trafficCars],rides:()=>[...(knockables?.rideSources||[]),...(cyclists?.rideSources||[]),...(npcScooters?.rideSources||[])],obstacles:travelObstacles});peopleInteraction??=new PeopleInteraction(world,{context:()=>({cityName:city.name,landmarks:data?.landmarks||[]}),voiceEnabled:sound});playerCars.sync(travel);focus.set(car.x,0,car.z);cameraHeading=car.heading;tramSim?.reset(car);buses?.reset(car,tramSim?.obstacles);if(mobility){mobility.externalBodies=transitBodies();mobility.reset(car);}npcScooters?.reset(car);roadblock?.reset();police?.reset();marketLife?.reset();universityLife?.reset();terminalLife?.reset();$('district-label').textContent=(l.district||city.name||'').toUpperCase();carGroup.position.set(car.x,.1+groundAt(car.x,car.z),car.z);carGroup.rotation.y=car.heading;if(ready)updateTiles().catch(handleTileError);drawMinimap();}
+// An era arrival is named after the nearest place: the URL (?start=) and "Back on the road at …" need a real start, not "1760".
+const nearestPlaceName=(list=[],p)=>list.reduce((best,l)=>!best||Math.hypot(l.x-p.x,l.z-p.z)<Math.hypot(best.x-p.x,best.z-p.z)?l:best,null)?.name;
+function setStart(l){mobileControls?.release();if(started)cph?.teleported?.();peopleInteraction?.reset(world);marketShop?.reset();gullEncounter.reset();birds?.clearEncounter();cameraTransition=null;impacts.reset();crowd?.reset();finale.reset();startPoint=l;car=makeCar(l.x,l.z,l.heading??(l.name==='Senate Square'?0:-Math.PI/2+.17));if(city?.era===1760){car.front=3.3;car.back=3;} /* the coach and horses are 6.3 m: the horses' heads went into walls */car.distance=distance;if(travel)travel.reset(car,world);else travel=new PlayerTravel(car,world,{cars:()=>[...staticCars,...trafficCars],rides:()=>[...(knockables?.rideSources||[]),...(cyclists?.rideSources||[]),...(npcScooters?.rideSources||[])],obstacles:travelObstacles});peopleInteraction??=new PeopleInteraction(world,{context:()=>({cityName:city.name,era:city.era,landmarks:data?.landmarks||[]}),voiceEnabled:sound});playerCars.sync(travel);focus.set(car.x,0,car.z);cameraHeading=car.heading;tramSim?.reset(car);buses?.reset(car,tramSim?.obstacles);if(mobility){mobility.externalBodies=transitBodies();mobility.reset(car);}npcScooters?.reset(car);roadblock?.reset();police?.reset();marketLife?.reset();universityLife?.reset();terminalLife?.reset();$('district-label').textContent=(l.district||city.name||'').toUpperCase();carGroup.position.set(car.x,.1+groundAt(car.x,car.z),car.z);carGroup.rotation.y=car.heading;if(ready)updateTiles().catch(handleTileError);drawMinimap();}
 function handleTileError(e){console.error(e);if(!document.body.classList.contains('booting'))toast('Some scenery could not load. Nearby streets will retry.');} // not over the welcome card
 const touchScreen=matchMedia('(pointer:coarse)').matches; // phones and tablets: no keyboard, so the HUD and touch buttons stay on
 if(touchScreen){document.body.classList.remove('clean-capture');document.body.classList.add('touch');}
 // Work that can wait until the player is in the city: run `fn` `ms` after the start (at once if already started).
 const startQueue=[];function afterStart(ms,fn){if(started)setTimeout(fn,ms);else startQueue.push([ms,fn]);}
-function start(){if(!ready)return;if(previewing){startAfterPreview=true;return;}if(!sound&&!CINEMATIC&&city?.id?.startsWith('copenhagen')){let on=true;try{on=localStorage.getItem('cph-sound')!=='0';}catch{}if(on)$('sound-btn').click();}started=true;for(const [ms,fn] of startQueue.splice(0))setTimeout(fn,ms);setTimeout(()=>prefetchOtherEra(),20000);paused=false;document.body.classList.add('driving');loadingScreen.enter();carGroup.visible=true;marker.visible=false;toast(touchScreen?'Slide to steer · Hold Go to move · Menu for the map and settings':'WASD or arrow keys to drive · Space to handbrake');$('world').focus();}
+function start(){if(!ready)return;if(previewing){startAfterPreview=true;return;}if(!sound&&!CINEMATIC&&city?.id?.startsWith('copenhagen')){let on=true;try{on=localStorage.getItem('cph-sound')!=='0';}catch{}if(on)$('sound-btn').click();}started=true;for(const [ms,fn] of startQueue.splice(0))setTimeout(fn,ms);setTimeout(()=>prefetchOtherEra(),20000);paused=false;document.body.classList.add('driving');loadingScreen.enter();carGroup.visible=true;marker.visible=false;toast(touchScreen?'Slide to steer · Hold Go to move · Menu for the map and settings':city?.era===1760?'WASD or arrow keys to drive the coach · Space to rein in':'WASD or arrow keys to drive · Space to handbrake');$('world').focus();}
 function focusWorldControls(){if(started&&!paused&&!mapOpen&&!police?.busted&&!gameIsStopped())$('world').focus({preventScroll:true});}
 let bigMap=null;
 async function travelTo(l){ /* big map: jump to a named place */
@@ -1007,7 +1015,7 @@ window.addEventListener('keydown',e=>{
  if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space'].includes(e.code)&&!mapOpen)e.preventDefault();
  if(e.repeat)return;
  if(police?.busted){if(finale.ended&&e.code==='Tab')return;e.preventDefault();if(!finale.ended)return;if(e.code==='Enter'||e.code==='Escape')continueDriving();else if(e.code==='KeyR')restart();return;} // BUSTED screen: Enter/Esc continue, R restarts; Tab moves between its two buttons (the HUD is inert)
- if(!started){if(!ready)return;if(e.code==='Enter'){e.preventDefault();start();return;}if(!['KeyW','KeyA','KeyS','KeyD','ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.code))return;}
+ if(!started){if(!ready)return;if(e.code==='Enter'){e.preventDefault();start();return;}if(e.code==='KeyY'&&city?.id?.startsWith('copenhagen')){e.preventDefault();eraJump();return;} /* the welcome card says Press Y */if(!['KeyW','KeyA','KeyS','KeyD','ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.code))return;}
  if(e.code==='Escape'&&cph?.blocking?.()&&cph.key(e.code)){e.preventDefault();return;}
  if(e.code==='Escape'){if(marketShop?.close()){refreshMarketUI();return;}if(peopleInteraction?.close())return;if(!mapOpen)setPaused(!paused);return;}
  if(mapOpen)return;
@@ -1043,12 +1051,14 @@ window.addEventListener('keydown',e=>{
  if(!paused)keys.add(e.code);
 });
 window.addEventListener('keyup',e=>{keys.delete(e.code);if(e.code.startsWith('Meta'))keys.clear();});window.addEventListener('blur',()=>{keys.clear();if(!perfOverlay&&!CINEMATIC)setPaused(true);}); // ?perf: no pause on blur, so a screenshot tool can be opened mid-stall
-document.addEventListener('visibilitychange',()=>{if(document.hidden){keys.clear();setPaused(true);}});
+document.addEventListener('visibilitychange',()=>{if(document.hidden){keys.clear();setPaused(true);}}); // perf mode keeps the blur off, not this
+// Hidden tab or locked phone: frames stop, so the engine hum, city bed and radio would play on at their last level.
+document.addEventListener('visibilitychange',()=>{if(document.hidden){audioContext?.suspend?.().catch?.(()=>{});radio?.update(10,{on:false});}else if(sound)audioContext?.resume?.().catch?.(()=>{});});
 // iOS suspends audio when the app is backgrounded or a call comes in ('interrupted'), and a context created outside a
 // tap starts suspended: the next touch or key brings it back (the sound button only toggles).
 for(const type of ['pointerdown','keydown'])window.addEventListener(type,()=>{if(sound&&audioContext&&audioContext.state!=='running')audioContext.resume().catch(()=>{});},{capture:true,passive:true});
 $('world').addEventListener('wheel',e=>{e.preventDefault();zoom(Math.sign(e.deltaY)*22);},{passive:false});
-$('sound-btn').addEventListener('click',async()=>{sound=!sound;peopleInteraction?.setVoiceEnabled(sound);if(sound&&!audioContext){audioContext=new AudioContext();oscillator=audioContext.createOscillator();gain=audioContext.createGain();oscillator.type='triangle';gain.gain.value=0;oscillator.connect(gain);gain.connect(audioContext.destination);oscillator.start();}if(sound&&!soundscape&&city?.id?.startsWith('copenhagen'))soundscape=createSoundscape(audioContext,{era:city.era});try{localStorage.setItem('cph-sound',sound?'1':'0');}catch{}if(sound)await audioContext.resume().catch(()=>{}); /* a refused resume only means silence, never a stopped game */$('sound-btn').setAttribute('aria-label',sound?'Mute sound':'Enable sound');$('sound-btn').title=sound?'Mute sound':'Enable sound';$('sound-btn').querySelector('.mute-slash').hidden=sound;});
+$('sound-btn').addEventListener('click',async()=>{sound=!sound;peopleInteraction?.setVoiceEnabled(sound);if(sound&&!audioContext){audioContext=new AudioContext();oscillator=audioContext.createOscillator();gain=audioContext.createGain();oscillator.type='triangle';gain.gain.value=0;oscillator.connect(gain);gain.connect(audioContext.destination);oscillator.start();}if(sound&&!soundscape&&city?.id?.startsWith('copenhagen'))soundscape=createSoundscape(audioContext,{era:city.era});try{localStorage.setItem('cph-sound',sound?'1':'0');}catch{}if(!sound)audioContext?.suspend().catch(()=>{}); /* muted: the oscillators and noise loops stop working too */if(sound)await audioContext.resume().catch(()=>{}); /* a refused resume only means silence, never a stopped game */$('sound-btn').setAttribute('aria-label',sound?'Mute sound':'Enable sound');$('sound-btn').title=sound?'Mute sound':'Enable sound';$('sound-btn').querySelector('.mute-slash').hidden=sound;});
 // After a HUD action, the next movement/interaction key belongs to the game.
 for(const id of ['view-btn','look-btn','sound-btn','zoom-in','zoom-out'])$(id).addEventListener('click',focusWorldControls);
 // Car radio: L (Shift+L back), the top-bar button, or a click or tap on the now-playing card (on touch screens the only way).
@@ -1167,11 +1177,11 @@ function frame(now){
   }
   knockables?.update(car);streetLife.update(dt,car);tramRenderer.update(car);cyclistRenderer.update(car);npcScooterRenderer.update(car,dt);policeRenderer.update(dt);roadblock?.update(dt,car);
   if(police.message){toast(police.message);police.message=null;}
-  if(cph&&car)cph.update(dt,car,travel.mode,{running:started,cinematic:!!cinematic});if(carriage&&car)carriage.userData.update(car.speed||0,dt);coaches?.update(groundAt,dt,camera.position.z!==undefined?{x:camera.position.x,z:camera.position.z}:null);parkedCars?.update(car);seasonal?.update(dt,car);boats?.update(dt,car);harbourBath?.update(dt,car);landmarks?.update(dt);trains?.update(dt);cafeGuests?.update(dt,car);periodLife?.update(dt,car);parkGeese?.update(dt,car);
+  if(cph&&car)cph.update(dt,car,travel.mode,{running:started,cinematic:!!cinematic});if(carriage&&car)carriage.userData.update(travel.mode==='car'?car.speed||0:0,dt); /* on foot, car is the walker: the parked team stands */coaches?.update(groundAt,dt,camera.position.z!==undefined?{x:camera.position.x,z:camera.position.z}:null);parkedCars?.update(car);seasonal?.update(dt,car);boats?.update(dt,car);harbourBath?.update(dt,car);landmarks?.update(dt);trains?.update(dt);cafeGuests?.update(dt,car);periodLife?.update(dt,car);parkGeese?.update(dt,car);
  }else if(ready&&police?.busted){policeRenderer.update(dt);roadblock?.update(dt,car);if(finale.cinematicStep(dt,roadblock?.playing)){$('busted-overlay').classList.toggle('live',!!roadblock?.active);$('busted-overlay').hidden=false;$('busted-continue').focus();}} // arrest cinematic: strobes keep flashing, then the end screen
  if(car){
    speedometer.update(car,dt,{mode:travel.mode});
-   travel.advanceTransition(paused||mapOpen?0:dt);playerCars.sync(travel,dt);const vehicle=travel.car;
+   travel.advanceTransition(paused||mapOpen?0:dt);if(car&&now-forgotAt>2000){forgotAt=now;travel.forgetFar(car.x,car.z);}playerCars.sync(travel,dt);const vehicle=travel.car;
    treeFocus.value.set(car.x,car.z);
    treeFade.value=chaseCamera&&started?0:1;
    surfaceNow=world?surfaceDetailAt(world,car.x,car.z):surfaceNow;rumbleNow=rumbleFor(travel.mode==='car'&&started&&!paused&&!mapOpen&&!cinematic?.driving?surfaceNow.surface:'asphalt',travel.mode==='car'?car.speed:0,paused||mapOpen?0:dt,roadRumble,surfaceNow.roughness);
@@ -1347,8 +1357,9 @@ async function boot(){
    if(helsinki)data.landmarks.push({...HARBOUR_START});
    for(const e of extensions)data.landmarks.push(...(e.starts||[]));
    areaLabel=areaCaption(helsinki?[...HELSINKI_AREAS,...extensions.flatMap(e=>e.starts||[])]:data.landmarks,city.name);
+   if(city.era===1760)for(const l of data.landmarks||[])if(l.name==='Little Mermaid')l.name='Langelinie'; // the statue is from 1913: in 1760 the start is the promenade
    let eraArrival=null;try{eraArrival=JSON.parse(sessionStorage.getItem('era-jump')||'null');sessionStorage.removeItem('era-jump');}catch{} // Y in Copenhagen: same spot, other century
-   const requestedStart=new URLSearchParams(location.search).get('start'),firstStart=(eraArrival?.to===city.id&&Number.isFinite(eraArrival.x)?{name:city.era===1760?'1760':'Today',district:city.name,x:eraArrival.x,z:eraArrival.z,heading:eraArrival.heading}:null)||pickStart(data.landmarks,requestedStart)||pickStart(data.landmarks,city.defaultStart)||(helsinki?HARBOUR_START:data.landmarks[0]);
+   const requestedStart=new URLSearchParams(location.search).get('start'),firstStart=(eraArrival?.to===city.id&&Number.isFinite(eraArrival.x)?{name:nearestPlaceName(data.landmarks,eraArrival)||'Copenhagen',district:city.name,x:eraArrival.x,z:eraArrival.z,heading:eraArrival.heading}:null)||pickStart(data.landmarks,requestedStart)||pickStart(data.landmarks,city.defaultStart)||(helsinki?HARBOUR_START:data.landmarks[0]);
    treeTrunks=createTreeTrunks({lanes:mobilityData.roads.edges});
    const regionStages=new Map(),transitQueue=[],addTransit=e=>{if(!tramSim||!buses)transitQueue.push(e);else installTransit(e.transitLines,{trams:tramSim,tramRenderer,buses:buses.simulation});};
    extensionStreamer=createExtensionStreamer({entries:extensions,load:e=>loadExtension(e,json,unpack),onError:handleTileError,install:async e=>{
@@ -1548,7 +1559,7 @@ async function boot(){
    if(city.era===1760){const here=city;Promise.all([json(dataUrl('cannons.json')).catch(()=>null),loadColouredModel('/models/props/cannon.glb')]).then(([list,g])=>{if(!list?.length||!g||city!==here){g?.dispose();return;}
     const im=new THREE.InstancedMesh(g,new THREE.MeshStandardMaterial({vertexColors:true,roughness:.6,metalness:.3}),list.length),m=new THREE.Matrix4(),q=new THREE.Quaternion(),v=new THREE.Vector3(),one=new THREE.Vector3(1,1,1),UP=new THREE.Vector3(0,1,0);
     list.forEach(([x,y,z,yaw],i)=>im.setMatrixAt(i,m.compose(v.set(x,y,z),q.setFromAxisAngle(UP,yaw),one)));im.name='Rampart cannons';im.castShadow=true;im.receiveShadow=true;im.computeBoundingSphere();cityModel.add(im);}).catch(e=>console.warn('Cannons:',e.message));}
-   if(city.era===1760){const gateNames=/Vesterport|Nørreport|Østerport/,lm=data.landmarks||[];periodLife=createPeriodLife({city,world,animalModels:await loadColouredModels('/models/animals/',['pig','hen','goose']),propModels:await loadColouredModels('/models/props/',['farm-wagon','covered-wagon','barrel','crate','watchman','spinner']),water:data.water,squares:lm.filter(l=>!gateNames.test(l.name)&&l.name!=='Little Mermaid'),gates:lm.filter(l=>gateNames.test(l.name))});cityModel.add(periodLife.group);console.info('1760 life',periodLife.group.userData);}
+   if(city.era===1760){const gateNames=/Vesterport|Nørreport|Østerport/,lm=data.landmarks||[];periodLife=createPeriodLife({city,world,animalModels:await loadColouredModels('/models/animals/',['pig','hen','goose']),propModels:await loadColouredModels('/models/props/',['farm-wagon','covered-wagon','barrel','crate','watchman','spinner']),water:data.water,squares:lm.filter(l=>!gateNames.test(l.name)&&!/^(Little Mermaid|Langelinie)$/.test(l.name)),gates:lm.filter(l=>gateNames.test(l.name))});cityModel.add(periodLife.group);console.info('1760 life',periodLife.group.userData);}
    else if(city.id==='copenhagen'){periodLife=createSquareCrowds({world,water:data.water,places:data.landmarks||[]});cityModel.add(periodLife.group);const cc=createCycleCrossings({pavement:data.pavement,world});cityModel.add(cc);console.info('Blue cycle crossings',cc.userData.crossings);}
    if(city.id.startsWith('copenhagen')){parkGeese=createParkGeese({parks:data.parks||[],water:data.water||[],clear:(x,z)=>!world.roads.at(x,z)&&!world.buildings.at(x,z)&&!inWaterPolygons(data.water||[],x,z),model:blenderLoads?await loadColouredModel('/models/animals/goose.glb'):null,count:city.era===1760?6:14,seed:city.era===1760?17:7});cityModel.add(parkGeese.group);console.info('Park geese',parkGeese.count);} // geese on the park lawns (park-geese.js)
    world.cameraBuildings=new SpatialIndex(data.buildings);world.sightBuildings=world.cameraBuildings; // mapped buildings only: the camera boom and the police surge's line of sight ignore street furniture
@@ -1579,7 +1590,7 @@ async function boot(){
    safeBirdFlight=createBirdFlightClearance({buildings:world.cameraBuildings,stalls:market.stalls||[],water:world.water});
    marketShop=new MarketShop({stalls:market.stalls||[]});if(marketShop.stalls.length)marketShopRenderer=createMarketShopRenderer(cityModel,marketShop.stalls); // only where the city has market stalls
    // Bystanders react to a pedestrian hit: graph walkers through mobility, free crowds directly (crowd-reaction.js).
-   {const walkers=new Set(mobility.people);crowd=createCrowdReaction({sight:world.sightBuildings,scare:(a,from,s)=>walkers.has(a)?mobility.scare(a,from,s):a.scared={x:from.x,z:from.z,left:s},hold:(a,s)=>walkers.has(a)?mobility.hold(a,s):a.heldFor=s});
+   {const walkers=new Set(mobility.people);crowd=createCrowdReaction({phones:city.era!==1760,sight:world.sightBuildings,scare:(a,from,s)=>walkers.has(a)?mobility.scare(a,from,s):a.scared={x:from.x,z:from.z,left:s},hold:(a,s)=>walkers.has(a)?mobility.hold(a,s):a.heldFor=s});
     impacts.onHit=e=>crowd.alarm(e,[mobility.people,detailPeople]);}
    progress(94,'Preparing buses');buses=await createBusSystem(scene,world,car);
    // Lanes know the tram tracks and buses the junction signals; respawn traffic clear of trams and buses.
@@ -1620,10 +1631,10 @@ async function boot(){
     const sourceLinks=document.querySelector('#sources-dialog .source-links');sourceLinks.replaceChildren();
     for(const [label,href]of [['OpenStreetMap','https://www.openstreetmap.org/copyright'],['Data and asset credits','https://github.com/worldhood/worldhood/blob/main/NOTICE.md']]){const a=document.createElement('a');a.textContent=label+' ↗';a.href=href;a.target='_blank';a.rel='noreferrer';sourceLinks.append(a);}
     document.querySelector('#map-dialog .map-caption').firstChild.textContent=`${city.name.toUpperCase()} FROM OPEN DATA `;
-    document.querySelector('#help-dialog .help-note').textContent='Explore this single-player city playground on foot, by car, bicycle or scooter. Share the streets with simulated traffic and pedestrians. Available rides start near each starting point; buildings and water constrain movement.';
+    document.querySelector('#help-dialog .help-note').textContent=city.era===1760?'Explore this single-player city playground on foot or by coach. Share the streets with other coaches and townsfolk; buildings, ramparts and water constrain movement.':'Explore this single-player city playground on foot, by car, bicycle or scooter. Share the streets with simulated traffic and pedestrians. Available rides start near each starting point; buildings and water constrain movement.';
     $('district-label').textContent=city.name.toUpperCase();
     document.querySelector('#pause-overlay h2').textContent=`${city.name} can wait.`;
-    $('sources-btn').firstChild.textContent=`Map data © OpenStreetMap contributors · ODbL${city.furniture?' · Mapillary':''}${/Digiroad/.test(city.attribution)?' · Digiroad CC BY':''}${city.terrain?/National Land Survey/.test(city.terrain.source)?' · NLS elevation CC BY':' · Mapterhorn elevation':''} `;
+    $('sources-btn').firstChild.textContent=`Map data © OpenStreetMap contributors · ODbL${city.furniture&&/Mapillary/i.test(city.attribution||'')?' · Mapillary':''}${/Digiroad/.test(city.attribution)?' · Digiroad CC BY':''}${city.terrain?/National Land Survey/.test(city.terrain.source)?' · NLS elevation CC BY':' · Mapterhorn elevation':''} `;
     document.querySelector('.minimap-caption').firstChild.textContent=`${city.name.toUpperCase()} CENTRE `;const cathedralLabel=$('cathedral-label');if(cathedralLabel)cathedralLabel.hidden=true;
    }
    if(extensions.length){
@@ -1634,13 +1645,13 @@ async function boot(){
     note.textContent=`Map extensions: ${extensions.map(e=>`${e.title} — ${e.provenance.note||`City of Helsinki data fetched ${e.provenance.fetchedAt} (CC BY 4.0); ${e.counts.inferredForestTrees.toLocaleString('en')} forest trees are inferred inside mapped forest areas`}`).join('; ')}. Route crop outlines © OpenStreetMap contributors (ODbL). Seurasaari is car-free in reality.`;
     $('data-counts').after(note);
    }
-   if(city.id.startsWith('copenhagen')&&CITIES[city.id==='copenhagen'?'copenhagen-1760':'copenhagen']){const b=$('era-btn');b.hidden=false;$('era-label').textContent=city.id==='copenhagen'?'1760':'Today';{const m=document.querySelector('[data-action="era"]');if(m){m.hidden=false;$('mobile-era-value').textContent=city.id==='copenhagen'?'1760':'Today';}}b.addEventListener('click',()=>{if(!started)return;eraJump();$('world').focus();});}
+   if(city.id.startsWith('copenhagen')&&CITIES[city.id==='copenhagen'?'copenhagen-1760':'copenhagen']){const b=$('era-btn');b.hidden=false;$('era-label').textContent=city.id==='copenhagen'?'1760':'Today';{const m=document.querySelector('[data-action="era"]');if(m){m.hidden=false;$('mobile-era-value').textContent=city.id==='copenhagen'?'1760':'Today';}}b.addEventListener('click',()=>{if(!ready||police?.busted||started&&paused)return;eraJump();$('world').focus();});} // also from the welcome card, which says "Press Y"
    if(eraArrival?.to===city.id){showEraCard(city.era===1760?'1760':'today',true);setTimeout(()=>{if(!started)start();},300);} // arriving from the other century: straight into the game
    if(requestedStart&&!pickStart(data.landmarks,requestedStart))toast(`No start called “${requestedStart}”. Starting at ${firstStart.name}.`);
    installMapillaryAttribution(city);
    {const a=document.createElement('a');a.href='/THIRD_PARTY_LICENSES.txt';a.textContent='Open-source software notices ↗';a.target='_blank';a.rel='noreferrer';document.querySelector('#sources-dialog .source-links').append(a);}
    $('world').setAttribute('aria-label',`3D view of ${city.name}, explored on foot, by car, bike or scooter`);
-   document.querySelector('#help-dialog .dialog-copy').textContent=`Explore ${city.name} by car, on foot, by bicycle or on a scooter. Press F to get out, Enter to use a nearby stopped car, bicycle or scooter, and G to greet someone. Hold Shift to run. Tap the small action buttons on a phone. The minimap stays north-up.`;
+   document.querySelector('#help-dialog .dialog-copy').textContent=city.era===1760?`Explore ${city.name} by coach or on foot. Press F to step down, Enter to board your coach again, and G to greet someone. Hold Shift to run. Tap the small action buttons on a phone. The minimap stays north-up.`:`Explore ${city.name} by car, on foot, by bicycle or on a scooter. Press F to get out, Enter to use a nearby stopped car, bicycle or scooter, and G to greet someone. Hold Shift to run. Tap the small action buttons on a phone. The minimap stays north-up.`;
    document.querySelector('#help-dialog .dialog-drive').firstChild.textContent='Keep exploring ';
    const helpGrid=document.querySelector('#help-dialog .help-grid');if(helpGrid)$('pause-controls').append(helpGrid.cloneNode(true));
    updateHUD(0);
