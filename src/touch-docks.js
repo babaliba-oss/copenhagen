@@ -17,7 +17,7 @@ export function stack(items,fixed,top,bottom){
  return out;
 }
 const SELECTORS=['#wanted','#toast.important.visible','#people-interaction','#cph-hud','#market-prompt','#market-card','#radio-now','.edge-invite'];
-const OBSTACLES=['.topbar .wordmark','#touch-aux','#travel-controls','#touch-controls','.dashboard'];
+const OBSTACLES=['.topbar .wordmark','.mapillary-attribution','#touch-aux','#travel-controls','#touch-controls','.dashboard'];
 export function createTouchDocks(doc=document,win=window){
  let last=0;const styled=new Set(); // elements this pass has moved: put back when they leave it (the toast turns ordinary, touch ends)
  const restore=el=>{el.style.top='';el.style.bottom='';el.classList.remove('dock-wait');styled.delete(el);};
@@ -31,8 +31,10 @@ export function createTouchDocks(doc=document,win=window){
    for(const el of els){el.style.top='';el.style.bottom='auto';} // measure from the CSS anchor, not last frame's top
    const rects=els.map(el=>el.getBoundingClientRect());
    const fixed=OBSTACLES.map(s=>doc.querySelector(s)).filter(shown).map(el=>el.getBoundingClientRect()).filter(r=>r.width>0&&r.height>0);
-   const top=Math.max(8,...fixed.filter(r=>r.top<80).map(r=>r.bottom+GAP));
-   const tops=stack(rects.map(r=>({left:r.left,right:r.right,height:r.height})),fixed.filter(r=>r.top>=80),top,win.innerHeight-8);
+   // The free band starts at the top row's top (the safe area), and the top-row buttons (Menu) are obstacles like the
+   // controls: with no wordmark on phones, the left column rises to the top instead of starting under the Menu row.
+   const row=fixed.filter(r=>r.top<80),top=row.length?Math.max(8,Math.min(...row.map(r=>r.top))):8;
+   const tops=stack(rects.map(r=>({left:r.left,right:r.right,height:r.height})),fixed,top,win.innerHeight-8);
    els.forEach((el,i)=>{const offset=win.getComputedStyle(el).position==='fixed'||!el.offsetParent?0:el.offsetParent.getBoundingClientRect().top;
     if(tops[i]===null){el.classList.add('dock-wait');return;}
     el.classList.remove('dock-wait');el.style.top=`${Math.round(tops[i]-offset)}px`;});

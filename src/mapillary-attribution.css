@@ -9,6 +9,7 @@ body.driving:not(.booting):not(.busted) .mapillary-attribution{display:flex}
 .mapillary-source-logo{flex:none;min-height:44px;display:flex;align-items:center}
 @media(pointer:coarse){
  .mapillary-attribution{left:var(--mobile-left,12px);bottom:auto;top:calc(var(--mobile-top,12px) + 51px)}
+ body.touch.driving .mapillary-attribution{top:var(--mobile-top,12px)} /* no wordmark while driving: the credit takes its corner, and touch-docks stacks the cards below it */
  .mapillary-attribution img{width:51px;height:17px}
  .mapillary-source-credit{align-items:flex-start;flex-wrap:wrap}
 }

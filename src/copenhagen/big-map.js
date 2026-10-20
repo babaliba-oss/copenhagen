@@ -8,6 +8,7 @@ export function createBigMap({base,view,landmarks,player,targets,route,onTravel,
  <canvas id="bm-canvas"></canvas><p class="bm-hint">${matchMedia('(pointer:coarse)').matches?'Drag to move · pinch to zoom · tap a place to travel there':'Drag to move · scroll to zoom · click a place to travel there · <kbd>M</kbd> / <kbd>ESC</kbd> to close'}</p>`;
  document.body.appendChild(dlg);
  const cv=dlg.querySelector('canvas'),ctx=cv.getContext('2d');
+ cv.tabIndex=-1;cv.addEventListener('pointerdown',()=>cv.focus({preventScroll:true})); // a click kept focus on the body, outside the dialog, so M and +/- stopped reaching its key handler
  let zoom=1,cx=0,cz=0,hover=null,drag=null,raf=0;
  const size=()=>{const r=cv.getBoundingClientRect(),d=Math.min(2,devicePixelRatio||1);cv.width=Math.max(10,r.width*d);cv.height=Math.max(10,r.height*d);};
  const fitScale=()=>Math.min(cv.width,cv.height)/(radius()*2.15); // px per metre with the whole playable city in view

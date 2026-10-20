@@ -148,7 +148,9 @@ import {createTravelUI} from './player-travel-ui.js';
 import {createMobileControls} from './mobile-controls.js';
 import {createStuckWatch} from './stuck.js';
 import {createTouchDocks} from './touch-docks.js';
+import {createTouchTucks} from './touch-tuck.js';
 const touchDocks=createTouchDocks();
+const touchTucks=createTouchTucks(); // phones: job/saga and radio cards tuck to the edges (touch-tuck.js)
 const stuckWatch=createStuckWatch();let stuckHinted=false;
 import {updateWorldhoodBrand} from './worldhood-brand.js';
 import {installMapillaryAttribution} from './mapillary-attribution.js';
@@ -653,7 +655,9 @@ function addShadowCasters(group,positions=null){
 async function detailTile(group){
  // Two overlapping tile passes can both queue the same tile; only the first gets the work.
  const {tile:t,pending,textures}=group.userData;if(!pending)return;group.userData.pending=null;
- const buildings=await buildTileInWorker(pending.array,pending.parts,pending.images);
+ // The tile's data went to the worker (transferred): if the worker fails, the tile is dropped and loads again on a
+ // later pass (it stayed merged shells for good before).
+ let buildings;try{buildings=await buildTileInWorker(pending.array,pending.parts,pending.images);}catch(e){if(loadedTiles.get(t.file)===group){dropTile(t,group);tileFailedAt.set(t.file,performance.now());}throw e;}
  if(loadedTiles.get(t.file)!==group)return;
  // Nearest buildings land first; each lands on its own (no walk over the whole tile).
  const dist=b=>{const q=b.part.bbox;return Math.hypot((q[0]+q[2])/2-focus.x,(q[1]+q[3])/2-focus.z);};
@@ -794,6 +798,7 @@ function updateTiles(){
  tilePass=(async()=>{try{do{tilePassAgain=false;await runTilePass();}while(tilePassAgain);}finally{tilePass=null;}})();
  return tilePass;
 }
+function dropTile(t,m){detailScheduler.cancel(t.file);cityModel.remove(m);m.children.forEach(c=>{c.geometry.dispose();disposeMaterial(c.material);disposeMaterial(c.customDepthMaterial);});m.userData.textures.forEach(x=>{x.image?.close?.();x.dispose();});loadedTiles.delete(t.file);}
 const tileFailedAt=new Map();
 async function runTilePass(){
  if(!roofIndex)return;
@@ -805,7 +810,7 @@ async function runTilePass(){
  const now=performance.now();await pool(near.filter(t=>!(now-(tileFailedAt.get(t.file)??-1e9)<20000)),4,t=>loadRoof(t).catch(e=>{tileFailedAt.set(t.file,performance.now());handleTileError(e);}));
  for(const t of roofIndex.tiles){const m=loadedTiles.get(t.file);if(!m)continue;
   const d=tileDistance(t);
-  if(d>1000){detailScheduler.cancel(t.file);cityModel.remove(m);m.children.forEach(c=>{c.geometry.dispose();disposeMaterial(c.material);disposeMaterial(c.customDepthMaterial);});m.userData.textures.forEach(x=>{x.image?.close?.();x.dispose();});loadedTiles.delete(t.file);continue;}
+  if(d>1000){dropTile(t,m);continue;}
   const level=applyTileLod(m,tileLevel(m.userData.level,d),focus);
   // Only near-level tiles are worth the worker's time, nearest first.
   if(level==='near'&&m.userData.pending)detailScheduler.request(t.file,priority(t),()=>detailTile(m),handleTileError);
@@ -929,7 +934,7 @@ async function prefetchOtherEra(){
 }
 function eraJump(){
  const to=city.id==='copenhagen'?'copenhagen-1760':'copenhagen';if(!CITIES[to]||!car)return;
- try{sessionStorage.setItem('era-jump',JSON.stringify({to,x:car.x,z:car.z,heading:car.heading}));}catch{}
+ try{sessionStorage.setItem('era-jump',JSON.stringify({to,x:car.x,z:car.z,heading:car.heading,look:look?.name}));}catch{}
  showEraCard(to==='copenhagen'?'today':'1760');
  const u=new URL(location.href);u.searchParams.set('city',to);u.searchParams.delete('start');setTimeout(()=>{location.href=u.href;},450);
 }
@@ -946,7 +951,7 @@ const touchScreen=matchMedia('(pointer:coarse)').matches; // phones and tablets:
 if(touchScreen){document.body.classList.remove('clean-capture');document.body.classList.add('touch');}
 // Work that can wait until the player is in the city: run `fn` `ms` after the start (at once if already started).
 const startQueue=[];function afterStart(ms,fn){if(started)setTimeout(fn,ms);else startQueue.push([ms,fn]);}
-function start(){if(!ready)return;if(previewing){startAfterPreview=true;return;}if(!sound&&!CINEMATIC&&city?.id?.startsWith('copenhagen')){let on=true;try{on=localStorage.getItem('cph-sound')!=='0';}catch{}if(on)$('sound-btn').click();}started=true;for(const [ms,fn] of startQueue.splice(0))setTimeout(fn,ms);setTimeout(()=>prefetchOtherEra(),20000);paused=false;document.body.classList.add('driving');loadingScreen.enter();carGroup.visible=true;marker.visible=false;toast(touchScreen?'Slide to steer · Hold Go to move · Menu for the map and settings':city?.era===1760?'WASD or arrow keys to drive the coach · Space to rein in':'WASD or arrow keys to drive · Space to handbrake');$('world').focus();}
+function start(){if(!ready)return;if(previewing){startAfterPreview=true;return;}if(!sound&&!CINEMATIC&&city?.id?.startsWith('copenhagen')){let on=true;try{on=localStorage.getItem('cph-sound')!=='0';}catch{}if(on)$('sound-btn').click();}started=true;touchTucks.showAll();for(const [ms,fn] of startQueue.splice(0))setTimeout(fn,ms);setTimeout(()=>prefetchOtherEra(),20000);paused=false;document.body.classList.add('driving');loadingScreen.enter();carGroup.visible=true;marker.visible=false;toast(touchScreen?'Slide to steer · Hold Go to move · Menu for the map and settings':city?.era===1760?'WASD or arrow keys to drive the coach · Space to rein in':'WASD or arrow keys to drive · Space to handbrake');$('world').focus();}
 function focusWorldControls(){if(started&&!paused&&!mapOpen&&!police?.busted&&!gameIsStopped())$('world').focus({preventScroll:true});}
 let bigMap=null;
 async function travelTo(l){ /* big map: jump to a named place */
@@ -1021,7 +1026,7 @@ window.addEventListener('keydown',e=>{
  if(e.code!=='Escape'&&e.target.closest?.('button,a,summary,input,select,textarea,[contenteditable="true"]'))return;
  if(e.metaKey||e.ctrlKey){if(e.code.startsWith('Meta'))keys.clear();return;} // browser shortcuts (Cmd+A, Ctrl+R): macOS sends no keyup for keys let go under Cmd
  if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space'].includes(e.code)&&!mapOpen)e.preventDefault();
- if(e.repeat)return;
+ if(e.repeat){if(started&&!paused&&!mapOpen&&!police?.busted&&/^(Key[WASD]|Arrow|Space|Shift)/.test(e.code))keys.add(e.code);return;} // a key still held after unpausing (its first press was dropped) drives again on its repeat
  if(police?.busted){if(finale.ended&&e.code==='Tab')return;e.preventDefault();if(!finale.ended)return;if(e.code==='Enter'||e.code==='Escape')continueDriving();else if(e.code==='KeyR')restart();return;} // BUSTED screen: Enter/Esc continue, R restarts; Tab moves between its two buttons (the HUD is inert)
  if(!started){if(!ready)return;if(e.code==='Enter'){e.preventDefault();start();return;}if(e.code==='KeyY'&&city?.id?.startsWith('copenhagen')){e.preventDefault();eraJump();return;} /* the welcome card says Press Y */if(!['KeyW','KeyA','KeyS','KeyD','ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.code))return;}
  if(e.code==='Escape'&&cph?.blocking?.()&&cph.key(e.code)){e.preventDefault();return;}
@@ -1608,6 +1613,7 @@ async function boot(){
    // stalling frames the first time each material comes into view while driving. Capped so a slow GPU still starts.
    progress(98,'Warming up shaders');{const shown=[];scene.traverse(o=>{if(!o.visible){o.visible=true;shown.push(o);}}); /* hidden things too (night lamps, rain, far versions): compiled now, not mid-drive */await Promise.race([renderer.compileAsync(scene,camera).catch(()=>{}),new Promise(r=>setTimeout(r,6000))]);for(const o of shown)o.visible=false;}
    progress(100,'Ready');
+   {const head=el=>()=>(el.querySelector('h3')?.textContent||'')+'|'+(el.querySelector('.cph-go')?.textContent.split('·')[0]||'');for(const id of ['cph-job','cph-saga']){const el=$(id);if(el)touchTucks.add(el,'left',head(el),()=>id==='cph-saga'?'SAGA':/race/i.test(el.querySelector('.cph-kick')?.textContent||'')?'RACE':'JOB');}touchTucks.add($('radio-now'),'right',()=>$('radio-station').textContent,()=>'RADIO');}
    ready=true;carGroup.visible=true;marker.visible=true;loadingScreen.ready(startPoint.name);
    if(CINEMATIC)setTimeout(()=>{start();camera.layers.disable(1);let steerFrom=null;cinematic=createCinematic({ground:(x,z)=>{const g=groundAt(x,z);if(!inWaterPolygons(data.water,x,z))return g;const w=waterAt(x,z)??seaLevel();return w!==null&&w>g?w:g;}, /* over water: heights from the surface, not the bed */setCamera:p=>{inspectionCamera=p;},loaded:()=>!loadingTiles.size&&!uploads.size&&!peopleLoading&&!bakesPending(), /* the people baked before a shot plays: a bake mid-shot is a hitch */era:city.era,shots:pickShots(city.era,location.search),roads:()=>mobility?.roads,cars:()=>cineObstacles(car),clear:(x,z)=>!world?.buildings?.at(x,z),
     solid:(x,z,y)=>{const b=world?.cameraBuildings?.at(x,z);return !!b&&y<groundAt(x,z)+(b.height>2?Math.min(60,b.height):12)+.6;}, /* the lens stays out of houses (cinematic.js clearEye) */
@@ -1655,6 +1661,7 @@ async function boot(){
     $('data-counts').after(note);
    }
    if(city.id.startsWith('copenhagen')&&CITIES[city.id==='copenhagen'?'copenhagen-1760':'copenhagen']){const b=$('era-btn');b.hidden=false;$('era-label').textContent=city.id==='copenhagen'?'1760':'Today';{const m=document.querySelector('[data-action="era"]');if(m){m.hidden=false;$('mobile-era-value').textContent=city.id==='copenhagen'?'1760':'Today';}}b.addEventListener('click',()=>{if(!ready||police?.busted||started&&paused)return;eraJump();$('world').focus();});} // also from the welcome card, which says "Press Y"
+   if(eraArrival?.to===city.id&&eraArrival.look){try{look.set(eraArrival.look,{instant:true});}catch{}} // the time of day and weather carry over
    if(eraArrival?.to===city.id){showEraCard(city.era===1760?'1760':'today',true);setTimeout(()=>{if(!started)start();},300);} // arriving from the other century: straight into the game
    if(requestedStart&&!pickStart(data.landmarks,requestedStart))toast(`No start called “${requestedStart}”. Starting at ${firstStart.name}.`);
    installMapillaryAttribution(city);
