@@ -904,6 +904,7 @@ async function previewStart(destination){
 let eraPrefetched=false;
 async function prefetchOtherEra(){
  if(eraPrefetched||!city?.id?.startsWith('copenhagen')||!car)return;eraPrefetched=true;
+ const net=navigator.connection;if(net&&(net.saveData||net.type==='cellular'||/2g|3g/.test(net.effectiveType||'')))return; // 15-20 MB for a switch the player may never make: not on Data Saver, mobile data or a slow link (browsers that report it)
  const other=CITIES[city.id==='copenhagen'?'copenhagen-1760':'copenhagen'];if(!other?.dataRoot)return;
  const get=f=>fetch(`${other.dataRoot}/${f}`,{priority:'low'}).then(r=>r.ok?r:null).catch(()=>null);
  const files=['city.pack','mobility.json','surface-index.json','landcover.json','trams.json','terrain.pack','anchors.json','boats.json','furniture.json','bus-corridors.json','duplicates.json','insets.json','recolour.json',...(other.era===1760?['era.json','stalls.json']:['parked.json','cafes.json','facades.json','rails.json'])]; // only what that era has (no 404s)
@@ -927,7 +928,9 @@ function setStart(l){mobileControls?.release();peopleInteraction?.reset(world);m
 function handleTileError(e){console.error(e);if(!document.body.classList.contains('booting'))toast('Some scenery could not load. Nearby streets will retry.');} // not over the welcome card
 const touchScreen=matchMedia('(pointer:coarse)').matches; // phones and tablets: no keyboard, so the HUD and touch buttons stay on
 if(touchScreen){document.body.classList.remove('clean-capture');document.body.classList.add('touch');}
-function start(){if(!ready)return;if(previewing){startAfterPreview=true;return;}if(!sound&&!CINEMATIC&&city?.id?.startsWith('copenhagen')){let on=true;try{on=localStorage.getItem('cph-sound')!=='0';}catch{}if(on)$('sound-btn').click();}started=true;setTimeout(()=>prefetchOtherEra(),20000);paused=false;document.body.classList.add('driving');loadingScreen.enter();carGroup.visible=true;marker.visible=false;toast(touchScreen?'Slide to steer · Hold Go to move · Menu for the map and settings':'WASD or arrow keys to drive · Space to handbrake');$('world').focus();}
+// Work that can wait until the player is in the city: run `fn` `ms` after the start (at once if already started).
+const startQueue=[];function afterStart(ms,fn){if(started)setTimeout(fn,ms);else startQueue.push([ms,fn]);}
+function start(){if(!ready)return;if(previewing){startAfterPreview=true;return;}if(!sound&&!CINEMATIC&&city?.id?.startsWith('copenhagen')){let on=true;try{on=localStorage.getItem('cph-sound')!=='0';}catch{}if(on)$('sound-btn').click();}started=true;for(const [ms,fn] of startQueue.splice(0))setTimeout(fn,ms);setTimeout(()=>prefetchOtherEra(),20000);paused=false;document.body.classList.add('driving');loadingScreen.enter();carGroup.visible=true;marker.visible=false;toast(touchScreen?'Slide to steer · Hold Go to move · Menu for the map and settings':'WASD or arrow keys to drive · Space to handbrake');$('world').focus();}
 function focusWorldControls(){if(started&&!paused&&!mapOpen&&!police?.busted&&!gameIsStopped())$('world').focus({preventScroll:true});}
 let bigMap=null;
 async function travelTo(l){ /* big map: jump to a named place */
@@ -1447,8 +1450,8 @@ async function boot(){
    // harbour. Moored boats in her berth go; she loads after the city, out of the start-up path.
    const GORM={x:1468,z:-256,yaw:1.134,half:[39,9]},gc=Math.cos(GORM.yaw),gs=Math.sin(GORM.yaw),inBerth=(x,z)=>{const dx=x-GORM.x,dz=z-GORM.z;return Math.abs(dx*gc-dz*gs)<GORM.half[0]+3&&Math.abs(dx*gs+dz*gc)<GORM.half[1]+3;};
    {const bd=boatData&&await boatData;if(bd){if(city.id==='copenhagen'&&Array.isArray(bd.boats))bd.boats=bd.boats.filter(b=>!inBerth(b[0],b[1]));boats=createBoats(bd,{waterY:CPH_WATER+(sea?.group?.position?.y||0),era:city.era,models:blenderLoads?await blenderLoads.boats:{},wet:(x,z)=>inWaterPolygons(data.water,x,z),bridge:city.era===1760?(()=>{const r=new SpatialIndex((data.roads||[]).filter(r=>r?.rings?.length));return (x,z)=>!!r.at(x,z);})():null /* the big 1760 ships keep clear of bridges */});cityModel.add(boats.group);}}
-   if(city.id==='copenhagen'){const here=city;loadColouredModel('/models/boats/hdms-gorm.glb').then(g=>{if(!g||city!==here){g?.dispose();return;}const m=new THREE.Mesh(g,new THREE.MeshStandardMaterial({vertexColors:true,roughness:.55,metalness:.15}));m.name='HDMS Gorm (easter egg)';
-    m.position.set(GORM.x,(waterAt(GORM.x,GORM.z)??CPH_WATER)-.1,GORM.z);m.rotation.y=GORM.yaw;m.castShadow=true;m.receiveShadow=true;cityModel.add(m);}).catch(e=>console.warn('HDMS Gorm:',e.message));}
+   if(city.id==='copenhagen'){const here=city;afterStart(8000,()=>city===here&&loadColouredModel('/models/boats/hdms-gorm.glb').then(g=>{if(!g||city!==here){g?.dispose();return;}const m=new THREE.Mesh(g,new THREE.MeshStandardMaterial({vertexColors:true,roughness:.55,metalness:.15}));m.name='HDMS Gorm (easter egg)';
+    m.position.set(GORM.x,(waterAt(GORM.x,GORM.z)??CPH_WATER)-.1,GORM.z);m.rotation.y=GORM.yaw;m.castShadow=true;m.receiveShadow=true;cityModel.add(m);}).catch(e=>console.warn('HDMS Gorm:',e.message)));} /* 2 MB, uncompressed: after the start, not competing with the city's download */
    harbourBath=city.id==='copenhagen'?createHarbourBath({createPeople:createInstancedPeople}):null;if(harbourBath)cityModel.add(harbourBath.group);
    {const cd=cafeData&&await cafeData;if(cd){const c=createCafes(cd);cityModel.add(c.group);streetObstacles.push(...(c.obstacles||[]));
     // Guests standing at the café tables, chatting (two at most tables).
