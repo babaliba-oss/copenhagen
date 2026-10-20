@@ -94,10 +94,10 @@ export class Finale{
  // objects or furniture hit elsewhere by NPCs. One continuous row of objects
  // is one crash; separated impacts can escalate normally.
  sampleFurniture(car,knockables,police,started){
-  const bodies=knockables?.bodies||[];
-  if(!this.furnitureFrom){for(const b of bodies)if(b?.knocked)this.knockedBodies.add(b);this.furnitureFrom={...car};this.furnitureAt=this.time+.15;return;}
+  if(!this.furnitureFrom){for(const b of knockables?.bodies||[])if(b?.knocked)this.knockedBodies.add(b);this.furnitureFrom={...car};this.furnitureAt=this.time+.15;return;}
   this.furnitureSpeed=Math.max(this.furnitureSpeed,Math.abs(car.speed||0));
   if(this.time<this.furnitureAt)return;this.furnitureAt=this.time+.15;
+  const bodies=knockables?.bodies||[]; // read only when sampling: a getter that gathers the knocked items of every set
   let hit=null;
   for(const b of bodies){
    if(!b)continue;

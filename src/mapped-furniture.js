@@ -317,7 +317,7 @@ export function createMappedFurniture(layer,{player=()=>null,mobility=()=>null,c
  const counts={};for(const it of items)counts[it.k]=(counts[it.k]||0)+1;
  group.userData={source:layer?.source,licence:layer?.licence,counts,chunks:chunks.size,lights:lights.length};
  // Knockables-compatible: main.js steps and updates it with the rest (posts step through breakableSigns).
- const knockables={near(x,z,r){const out=[];for(const k of knock)k.near?.(x,z,r,out);return out;},get bodies(){return knock.flatMap(k=>k.bodies);},step(dt,car,world){for(const k of knock)k.step(dt,car,world);},update(focus){for(const k of knock)k.update(focus);update(focus);},
+ const knockables={near(x,z,r){const out=[];for(const k of knock)k.near?.(x,z,r,out);return out;},get bodies(){return knock.flatMap(k=>k.knocked?k.knocked():k.bodies);}, // only knocked ones: the finale looks for new knock-downs, and the sets total ~70kstep(dt,car,world){for(const k of knock)k.step(dt,car,world);},update(focus){for(const k of knock)k.update(focus);update(focus);},
   resetAll(){for(const k of knock)k.resetAll();}, // posts reset with every other breakable sign set
   snapshot(){const s=knock.map(k=>k.snapshot()),posts=[...chunks.values()].map(c=>c.signs.snapshot()),sum=(l,k)=>l.reduce((n,x)=>n+x[k],0);
    return {count:sum(s,'count'),knocked:sum(s,'knocked'),hits:sum(s,'hits'),posts:{count:sum(posts,'count'),knocked:sum(posts,'knocked'),bent:sum(posts,'bent'),broken:sum(posts,'broken')}};}};

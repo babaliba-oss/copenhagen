@@ -24,6 +24,10 @@ export function createKnockables(items,parts,{radius=.3,height=1.1,range=Infinit
     tilt:0,tiltRate:0,axis:new THREE.Vector3(1,0,0),knocked:false,resting:true,restTime:0,rand:randomFor(i+1)}));
   const qYaw=new THREE.Quaternion(),qTilt=new THREE.Quaternion(),up=new THREE.Vector3(0,1,0),matrix=new THREE.Matrix4(),pos=new THREE.Vector3(),one=new THREE.Vector3(1,1,1);
   let hits=0;
+  // Sets run to ~30k items (racks, their bikes, benches): a step looks only at the 3x3 grid cells (8 m) around the car,
+  // plus `touched` (kicked, tumbling or lying knocked until they respawn), instead of every body several times a frame.
+  const CELL=8,cellKey=(x,z)=>Math.floor(x/CELL)*100003+Math.floor(z/CELL),grid=new Map(),touched=new Set(),seen=new Set();
+  for(const b of bodies){const k=cellKey(b.home.x,b.home.z);let l=grid.get(k);if(!l)grid.set(k,l=[]);l.push(b);}
 
   function kick(b,car,contact){
     const speed=Math.abs(car.speed),dir=Math.sign(car.speed)||1,fx=-Math.sin(car.heading)*dir,fz=-Math.cos(car.heading)*dir;
@@ -40,13 +44,14 @@ export function createKnockables(items,parts,{radius=.3,height=1.1,range=Infinit
 
   let moving=true; // anything kicked, tumbling or sliding: the packing below runs every frame only then
   function step(dt,car,world){
-    let slowdown=0,live=false;
-    for(const b of bodies){
+    let slowdown=0,live=false;seen.clear();for(const b of touched)seen.add(b);
+    if(car&&Math.abs(car.speed)>.6){const cx=Math.floor(car.x/CELL),cz=Math.floor(car.z/CELL);for(let i=-1;i<=1;i++)for(let j=-1;j<=1;j++){const l=grid.get((cx+i)*100003+cz+j);if(l)for(const b of l)seen.add(b);}}
+    for(const b of seen){
       if(b.playerTaken||b.disabled)continue;
       // Upright bollards are only struck when the car is actually moving into them; fallen ones get nudged along.
       if(car&&b.y<.6&&Math.abs(car.speed)>.6&&Math.abs(b.x-car.x)<5&&Math.abs(b.z-car.z)<5){ // cheap reject first: sets run to 10k bodies
         const contact=carContact(car,b.x,b.z,radius);
-        if(contact&&(b.resting||Math.hypot(b.vx,b.vz)<Math.abs(car.speed)*.8)){if(!b.knocked)slowdown+=.012;kick(b,car,contact);}
+        if(contact&&(b.resting||Math.hypot(b.vx,b.vz)<Math.abs(car.speed)*.8)){if(!b.knocked)slowdown+=.012;kick(b,car,contact);touched.add(b);}
       }
       if(b.resting){
         if(b.knocked&&car&&(b.restTime+=dt)>RESPAWN_AFTER&&Math.hypot(car.x-b.home.x,car.z-b.home.z)>clear&&Math.hypot(car.x-b.x,car.z-b.z)>clear){reset(b);moving=true;}
@@ -75,7 +80,7 @@ export function createKnockables(items,parts,{radius=.3,height=1.1,range=Infinit
     if(live)moving=true;
   }
 
-  function reset(b){Object.assign(b,{x:b.home.x,z:b.home.z,yaw:b.home.yaw,y:0,vx:0,vy:0,vz:0,spin:0,tilt:0,tiltRate:0,knocked:false,resting:true,restTime:0});}
+  function reset(b){touched.delete(b);Object.assign(b,{x:b.home.x,z:b.home.z,yaw:b.home.yaw,y:0,vx:0,vy:0,vz:0,spin:0,tilt:0,tiltRate:0,knocked:false,resting:true,restTime:0});}
 
   // Instances are packed: only items within `range` of the focus (the player) are drawn, so a city-wide set
   // (thousands of bins) costs only the nearby few in triangles and shadow passes.
@@ -100,6 +105,7 @@ export function createKnockables(items,parts,{radius=.3,height=1.1,range=Infinit
 
   update();
   // Upright items within r of (x,z) as boxes: a walker or rider can't pass through a bench (only the moving car kicks them).
-  function near(x,z,r,out=[]){const [hw,hl]=footprint||[radius,radius];for(const b of bodies){if(b.knocked||b.playerTaken||b.disabled||Math.abs(b.x-x)>r||Math.abs(b.z-z)>r)continue;out.push({x:b.x,z:b.z,heading:b.yaw,halfWidth:hw,halfLength:hl});}return out;}
-  return {group,bodies,step,update,near,resetBody(body){if(!bodies.includes(body))return false;reset(body);update(lastFocus,true);return true;},resetAll(){for(const b of bodies)if(!b.playerTaken)reset(b);update(lastFocus,true);},snapshot:()=>({count:bodies.length,knocked:bodies.filter(b=>b.knocked&&!b.playerTaken).length,hits})};
+  function near(x,z,r,out=[]){const [hw,hl]=footprint||[radius,radius],n=Math.ceil(r/CELL),cx=Math.floor(x/CELL),cz=Math.floor(z/CELL);
+   for(let i=-n;i<=n;i++)for(let j=-n;j<=n;j++){const l=grid.get((cx+i)*100003+cz+j);if(l)for(const b of l){if(b.knocked||b.playerTaken||b.disabled||Math.abs(b.x-x)>r||Math.abs(b.z-z)>r)continue;out.push({x:b.x,z:b.z,heading:b.yaw,halfWidth:hw,halfLength:hl});}}return out;}
+  return {group,bodies,step,update,near,knocked:()=>[...touched],resetBody(body){if(!bodies.includes(body))return false;reset(body);update(lastFocus,true);return true;},resetAll(){for(const b of bodies)if(!b.playerTaken)reset(b);update(lastFocus,true);},snapshot:()=>({count:bodies.length,knocked:bodies.filter(b=>b.knocked&&!b.playerTaken).length,hits})};
 }
