@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';
 import {gaitMaterial,gaitDepthMaterial,horseGeometry,wheelGeometry,stepMotion,withAttributes} from './gait.js';
+import {MeshoptSimplifier} from 'meshoptimizer';
+let simplifier=null;MeshoptSimplifier.ready.then(()=>{simplifier=MeshoptSimplifier;}).catch(()=>{});
 
 // A two-horse town coach for Copenhagen 1760, swapped in for the player's car (same physics, forward is -Z).
 // Procedural geometry, vertex-coloured: lacquered body with gilt trim, coachman's box, big rear wheels,
@@ -59,6 +61,22 @@ function gaitCoach(){
  for(const grp of g.groups)grp.materialIndex=grp.materialIndex===0?0:1;
  return {geometry:g,materials:[gaitMaterial(new THREE.MeshStandardMaterial({map:BROUGHAM.texture,roughness:.42,metalness:.15})),coloured]};
 }
+// The far coach: the same model at about a quarter of its 38,000 triangles (the coachman alone is 15,700), for the
+// coaches beyond COACH_NEAR. Each material group is welded on position, uv, colour and gait data (normals are not
+// compared, or the flat-shaded parts would have nothing to collapse) and simplified on its own; the kept vertices
+// carry their gait attributes, so the horses still trot. Null until the simplifier is ready.
+export const COACH_NEAR=50;
+export function farCoachGeometry(g,ratio=.25){
+ if(!simplifier||g.index)return null;
+ const at=g.attributes,keys=['position','uv','color','anim','pivot'].filter(k=>at[k]),n=at.position.count,seen=new Map(),remap=new Uint32Array(n),rep=[];
+ for(let i=0;i<n;i++){let k='';for(const a of keys){const A=at[a];for(let c=0;c<A.itemSize;c++)k+=A.array[i*A.itemSize+c].toFixed(4)+',';}let r=seen.get(k);if(r===undefined){seen.set(k,r=rep.length);rep.push(i);}remap[i]=r;}
+ const pos=new Float32Array(rep.length*3);rep.forEach((v,j)=>{pos[j*3]=at.position.array[v*3];pos[j*3+1]=at.position.array[v*3+1];pos[j*3+2]=at.position.array[v*3+2];});
+ const out=new THREE.BufferGeometry(),index=[];
+ for(const [k,a] of Object.entries(at)){if(a.isInstancedBufferAttribute)continue;const s=a.itemSize,arr=new a.array.constructor(rep.length*s);rep.forEach((v,j)=>{for(let c=0;c<s;c++)arr[j*s+c]=a.array[v*s+c];});out.setAttribute(k,new THREE.BufferAttribute(arr,s,a.normalized));}
+ for(const grp of (g.groups.length?g.groups:[{start:0,count:n,materialIndex:0}])){const idx=new Uint32Array(grp.count);for(let i=0;i<grp.count;i++)idx[i]=remap[grp.start+i];
+  const [cut]=simplifier.simplify(idx,pos,3,Math.max(3,Math.floor(grp.count*ratio/3)*3),.02,[]);out.addGroup(index.length,cut.length,grp.materialIndex);for(const v of cut)index.push(v);}
+ out.setIndex(index);out.computeBoundingSphere();return out;
+}
 function gaitMesh({geometry,materials},count){
  const motion=new THREE.InstancedBufferAttribute(new Float32Array(count*3),3);motion.setUsage(THREE.DynamicDrawUsage);geometry.setAttribute('motion',motion);
  const mesh=new THREE.InstancedMesh(geometry,materials,count);
@@ -100,14 +118,24 @@ export function createCarriage(){
 // NPC coaches for 1760 traffic: the coach and horse bodies as one merged geometry instanced over the mobility cars,
 // and the horses' legs as two instanced batches (one per coat) that swing with each coach's own pace, so a coach
 // at rest stands still and a moving one walks or trots instead of sliding along with frozen legs.
+export const COACH_RANGE=350; // metres from the camera: farther coaches are a few pixels
 export const COACH_HALF_LENGTH=3.4,COACH_HALF_WIDTH=.95; // horses' noses to the rear wheels, about 6.6 m (traffic spacing)
 export function createCarriageTraffic(actors){
  const gait=gaitCoach();
  if(gait){const count=Math.max(1,actors.length),{mesh,motion}=gaitMesh(gait,count);mesh.name='Coaches';const group=new THREE.Group();group.name='Coach traffic';group.add(mesh);
   const m4=new THREE.Matrix4(),ahead=new THREE.Matrix4().makeTranslation(0,0,1.2),q=new THREE.Quaternion(),v=new THREE.Vector3(),one=new THREE.Vector3(1,1,1),zero=new THREE.Vector3(0,0,0),UP=new THREE.Vector3(0,1,0);
   const states=Array.from({length:count},(_,i)=>({phase:i*1.7,amp:0,roll:i*3.3}));
-  return {group,update(groundAt,dt=1/60){actors.forEach((a,i)=>{if(i>=count)return;const on=!!a.edge&&!a.playerTaken;m4.compose(v.set(a.x||0,on?groundAt(a.x,a.z):-100,a.z||0),q.setFromAxisAngle(UP,a.heading||0),on?one:zero).multiply(ahead);mesh.setMatrixAt(i,m4);
-    const s=stepMotion(states[i],on?a.speed||0:0,dt);motion.setXYZ(i,s.phase,s.amp,s.roll);});mesh.instanceMatrix.needsUpdate=true;motion.needsUpdate=true;}};}
+  // Only the coaches within RANGE of the camera are drawn, packed to the front of the batch: every coach (a full
+  // horse-and-carriage model) used to go through the main and shadow passes, the ones a kilometre off and the ones
+  // parked out of play at scale 0 included: 1.6M of the 5.4M triangles of a 1760 frame.
+  // Beyond COACH_NEAR, the simplified coach (farCoachGeometry), made once the simplifier is ready.
+  let far=null;const lod=()=>{if(far!==null||!simplifier)return far;const g=farCoachGeometry(gait.geometry);if(!g){far=false;return far;}
+   const f=gaitMesh({geometry:g,materials:gait.materials},count);f.mesh.name='Coaches (far)';f.mesh.count=0;group.add(f.mesh);far=f;return far;};
+  return {group,update(groundAt,dt=1/60,focus=null){let n=0,nf=0;const f=lod();actors.forEach((a,i)=>{if(i>=count)return;const on=!!a.edge&&!a.playerTaken;
+    const s=stepMotion(states[i],on?a.speed||0:0,dt),d=focus?Math.hypot((a.x||0)-focus.x,(a.z||0)-focus.z):0;if(!on||d>COACH_RANGE)return;
+    m4.compose(v.set(a.x||0,groundAt(a.x,a.z),a.z||0),q.setFromAxisAngle(UP,a.heading||0),one).multiply(ahead);
+    if(f&&d>COACH_NEAR){f.mesh.setMatrixAt(nf,m4);f.motion.setXYZ(nf,s.phase,s.amp,s.roll);nf++;}else{mesh.setMatrixAt(n,m4);motion.setXYZ(n,s.phase,s.amp,s.roll);n++;}});
+   mesh.count=n;mesh.instanceMatrix.needsUpdate=true;motion.needsUpdate=true;if(f){f.mesh.count=nf;f.mesh.instanceMatrix.needsUpdate=true;f.motion.needsUpdate=true;}}};}
  const c=createCarriage();c.position.z=1.2;c.updateMatrixWorld(true);const gs=[],im=new THREE.Matrix4();
  c.traverse(o=>{if(!o.isMesh||o.name==='Horse legs')return;const n=o.isInstancedMesh?o.count:1;for(let i=0;i<n;i++){const g=o.geometry.clone();if(o.isInstancedMesh){o.getMatrixAt(i,im);g.applyMatrix4(im.premultiply(o.matrixWorld));}else g.applyMatrix4(o.matrixWorld);gs.push(g.index?g.toNonIndexed():g);}});
  const shared=new Set();c.traverse(o=>{if(o.isMesh){shared.add(o.geometry);shared.add(o.material);}});shared.forEach(x=>x.dispose());
