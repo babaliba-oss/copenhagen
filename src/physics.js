@@ -93,7 +93,7 @@ export function driveStep(car,keys,dt,world) {
      return !hit(at(.5))&&!hit(at(1));});
     if(slide===undefined)break;
     const h=car.heading+slide,f=Math.cos(slide),sx=car.x-Math.sin(h)*travel/steps*f,sz=car.z-Math.cos(h)*travel/steps*f;
-    car.distance+=Math.hypot(sx-car.x,sz-car.z);car.x=sx;car.z=sz;car.heading+=slide*.35;car.speed*=Math.max(.35,f);car.scraping=collision;collision=null;continue;
+    car.distance+=Math.hypot(sx-car.x,sz-car.z);car.x=sx;car.z=sz;car.heading+=slide*.35;car.speed*=Math.max(.35,f);collision=null;continue;
    }
    car.distance+=Math.hypot(nx-car.x,nz-car.z);car.x=nx;car.z=nz;
  }

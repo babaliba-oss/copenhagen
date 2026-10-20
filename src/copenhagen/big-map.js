@@ -5,7 +5,7 @@ export function createBigMap({base,view,landmarks,player,targets,route,onTravel,
  dlg.innerHTML=`<div class="bm-top"><div><p class="eyebrow">THE CITY</p><h2 id="bm-title"></h2></div>
  <div class="bm-legend"><span><i class="bm-you"></i>You</span><span><i style="background:#f2b134"></i>Pick-up</span><span><i style="background:#46c2b0"></i>Drop-off</span><span><i style="background:#9b5de5"></i>Race</span><span><i style="background:#7b3fe4;border-radius:2px"></i>Route</span></div>
  <div class="bm-tools"><button data-z="1.4" aria-label="Zoom in">+</button><button data-z="0.714" aria-label="Zoom out">−</button><button data-fit aria-label="Whole city">Whole city</button><button class="close-btn" aria-label="Close map">×</button></div></div>
- <canvas id="bm-canvas"></canvas><p class="bm-hint">Drag to move · scroll to zoom · click a place to travel there · <kbd>M</kbd> / <kbd>ESC</kbd> to close</p>`;
+ <canvas id="bm-canvas"></canvas><p class="bm-hint">${matchMedia('(pointer:coarse)').matches?'Drag to move · pinch to zoom · tap a place to travel there':'Drag to move · scroll to zoom · click a place to travel there · <kbd>M</kbd> / <kbd>ESC</kbd> to close'}</p>`;
  document.body.appendChild(dlg);
  const cv=dlg.querySelector('canvas'),ctx=cv.getContext('2d');
  let zoom=1,cx=0,cz=0,hover=null,drag=null,raf=0;
@@ -40,9 +40,18 @@ export function createBigMap({base,view,landmarks,player,targets,route,onTravel,
  const local=e=>{const r=cv.getBoundingClientRect(),d=cv.width/r.width;return [(e.clientX-r.left)*d,(e.clientY-r.top)*d];};
  const setZoom=(z,at)=>{const [wx,wz]=at?toWorld(...at):[cx,cz];zoom=Math.max(1,Math.min(10,z));if(at){const [nx,nz]=toWorld(...at);cx+=wx-nx;cz+=wz-nz;}clamp();};
  const clamp=()=>{const R=radius()*1.1;cx=Math.max(-R,Math.min(R,cx));cz=Math.max(-R,Math.min(R,cz));};
- cv.addEventListener('pointerdown',e=>{drag={at:local(e),cx,cz,moved:false};cv.setPointerCapture(e.pointerId);});
- cv.addEventListener('pointermove',e=>{const [px,py]=local(e);if(drag){const dx=px-drag.at[0],dy=py-drag.at[1];if(Math.hypot(dx,dy)>4)drag.moved=true;cx=drag.cx-dx/S();cz=drag.cz-dy/S();clamp();}else{hover=pick(px,py);cv.style.cursor=hover?'pointer':'grab';}});
- cv.addEventListener('pointerup',e=>{const d=drag;drag=null;if(d&&!d.moved){const l=pick(...local(e));if(l){close();onTravel(l);}}});
+ // Two fingers: pinch to zoom about their midpoint (and pan with it); the drag below is for one.
+ const fingers=new Map();let pinch=null;
+ const spread=()=>{const [a,b]=[...fingers.values()];return {d:Math.hypot(a[0]-b[0],a[1]-b[1]),mid:[(a[0]+b[0])/2,(a[1]+b[1])/2]};};
+ cv.addEventListener('pointerdown',e=>{fingers.set(e.pointerId,local(e));cv.setPointerCapture(e.pointerId);
+  if(fingers.size===2){const s0=spread();pinch={d:s0.d,zoom,mid:s0.mid};drag=null;return;}
+  if(fingers.size===1)drag={at:local(e),cx,cz,moved:false};});
+ const lift=e=>{fingers.delete(e.pointerId);if(fingers.size<2)pinch=null;};
+ cv.addEventListener('pointercancel',e=>{lift(e);drag=null;});
+ cv.addEventListener('pointermove',e=>{const [px,py]=local(e);if(fingers.has(e.pointerId))fingers.set(e.pointerId,[px,py]);
+  if(pinch&&fingers.size===2){const s1=spread();const [wx,wz]=toWorld(...pinch.mid);setZoom(pinch.zoom*s1.d/Math.max(1,pinch.d));const [nx,nz]=toWorld(...s1.mid);cx+=wx-nx;cz+=wz-nz;clamp();pinch.mid=s1.mid;return;}
+  if(drag){const dx=px-drag.at[0],dy=py-drag.at[1];if(Math.hypot(dx,dy)>4)drag.moved=true;cx=drag.cx-dx/S();cz=drag.cz-dy/S();clamp();}else{hover=pick(px,py);cv.style.cursor=hover?'pointer':'grab';}});
+ cv.addEventListener('pointerup',e=>{const wasPinch=fingers.size>1||pinch;lift(e);const d=drag;drag=null;if(wasPinch)return;if(d&&!d.moved){const l=pick(...local(e));if(l){close();onTravel(l);}}});
  cv.addEventListener('wheel',e=>{e.preventDefault();setZoom(zoom*(e.deltaY<0?1.2:1/1.2),local(e));},{passive:false});
  dlg.querySelectorAll('[data-z]').forEach(b=>b.addEventListener('click',()=>setZoom(zoom*+b.dataset.z)));
  dlg.querySelector('[data-fit]').addEventListener('click',()=>{zoom=1;cx=cz=0;});

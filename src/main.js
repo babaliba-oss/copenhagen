@@ -252,7 +252,7 @@ const governor=createQualityGovernor([
  // and Strøget otherwise stay heavy whatever the resolution). Tiles pick it up on their next LOD pass.
  ()=>{Object.assign(TILE_LOD,{near:170,far:210,detail:130,shadow:70,building:100});if(farCity)farCity.visible=false;},
 ],{cpuStep:3}); // CPU-bound (draw calls): the LOD step first
-{const q=new URLSearchParams(location.search).get('quality'),n=q==='low'?9:+q||0;for(let i=0;i<n;i++)governor.update(99,{atMin:true,smoothed:99});} // ?quality=low (or 1-3 steps)
+{const q=new URLSearchParams(location.search).get('quality'),n=q==='low'?9:q==='high'?0:+q||(matchMedia('(pointer:coarse)').matches?3:0);for(let i=0;i<n;i++)governor.update(99,{atMin:true,smoothed:99});} // ?quality=low (or 1-3 steps, or high). Phones start without AO, bloom, MSAA and with 1024 shadows: at full desktop quality they spent their first 30-40 s stepping down (resolution first, then one effect every 4-7 s) at a choppy frame rate, just as the player pulled away
 let look=null;
 const ground=new THREE.Mesh(new THREE.PlaneGeometry(11000,11000),groundPatches(new THREE.MeshStandardMaterial({color:'#94988b',roughness:1})));ground.rotation.x=-Math.PI/2;ground.position.y=-.5;ground.receiveShadow=true;cityModel.add(ground);
 // Unmapped ground (yards, lots, verges): soft patches of worn grass and gravel instead of one flat grey.
