@@ -12,7 +12,7 @@ test('runtime: plates stack by facing; posts are breakable, bins and junction bo
  const before=breakableSigns.snapshot().count;
  const m=createMappedFurniture(layer,{canvas:null});
  assert.equal(breakableSigns.snapshot().count-before,3,'lamp, sign and signal posts join the breakable sets');
- assert.equal(m.obstacles.length,1,'the shelter stays solid');assert.equal(m.knockables.snapshot().count,2,'the bin and the junction box are knocked over');assert.equal(m.lights.length,1);
+ assert.equal(m.obstacles.length,1,'the shelter stays solid');for(const f of ['step','update','near','snapshot','resetAll'])assert.equal(typeof m.knockables[f],'function',`knockables.${f}`);m.knockables.update({x:0,z:0});m.knockables.step(1/60,makeCar(0,0,0),null);assert.equal(m.knockables.snapshot().count,2,'the bin and the junction box are knocked over');assert.equal(m.lights.length,1);
  // Drive into the lamp at 10 m/s: it bends or snaps and the hit counts.
  const car=makeCar(0,0,0);car.speed=10;const hits=breakableSigns.snapshot().hits;
  for(let i=0;i<60;i++){car.z-=car.speed/60;breakableSigns.step(1/60,car,null);}
