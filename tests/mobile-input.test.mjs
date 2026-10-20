@@ -5,7 +5,7 @@ import {createTouchInput,thumbSteering} from '../src/mobile-input.js';
 test('thumb steering is proportional, centred and bounded',()=>{
  assert.equal(thumbSteering(80,10,140),0);
  assert.equal(thumbSteering(81,10,140),0,'small thumb jitter has a dead zone');
- assert.ok(thumbSteering(60,10,140)>.3&&thumbSteering(60,10,140)<.6,'a gentle turn stays below full lock');
+ assert.ok(thumbSteering(60,10,140)>.08&&thumbSteering(60,10,140)<.3,'a gentle slide is a gentle turn (squared response)');
  assert.equal(thumbSteering(-100,10,140),1);assert.equal(thumbSteering(250,10,140),-1);
 });
 test('steering and acceleration belong to separate fingers and release independently',()=>{

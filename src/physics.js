@@ -65,7 +65,8 @@ export function driveStep(car,keys,dt,world) {
  const reverse=keys.has('KeyS')||keys.has('ArrowDown');
  const left=keys.has('KeyA')||keys.has('ArrowLeft'),right=keys.has('KeyD')||keys.has('ArrowRight'),brake=keys.has('Space');
  const onRoad=Boolean(world.roads.at(car.x,car.z));
- const targetSteer=left||right?(left?1:0)-(right?1:0):keys.tilt||0; /* keys.tilt: analog steering from a tilted phone, -1…1, left positive */car.steer+=(targetSteer-car.steer)*Math.min(1,dt*10);
+ // Analog steering (thumb slider, tilt) eases off with speed, up to 45% at 65 km/h: full lock from a thumb at speed swerved.
+ const targetSteer=left||right?(left?1:0)-(right?1:0):(keys.tilt||0)*(1-Math.min(.45,Math.max(0,car.speed)/40)); /* keys.tilt: analog steering from a tilted phone, -1…1, left positive */car.steer+=(targetSteer-car.steer)*Math.min(1,dt*10);
  const launchAcceleration=8.4+1.8*Math.max(0,1-Math.max(0,car.speed)/(50/3.6));
  const roadDrag=.25+car.speed*car.speed*.002+(onRoad?0:2);
  const headroom=Math.max(0,Math.min(1,(PLAYER_MAX_SPEED-car.speed)/(PLAYER_MAX_SPEED-80/3.6)));

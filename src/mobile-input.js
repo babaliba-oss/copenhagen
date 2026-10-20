@@ -17,5 +17,6 @@ export function createTouchInput(keys){
 
 export function thumbSteering(x,left,width){
  const half=Math.max(1,(width-52)/2),value=Math.max(-1,Math.min(1,(left+width/2-x)/half));
- const dead=.06;return Math.abs(value)<=dead?0:Math.sign(value)*(Math.abs(value)-dead)/(1-dead);
+ // Full lock is only ~45 px of slide: a squared curve keeps the first part for small corrections (it was linear, and twitchy).
+ const dead=.1,v=Math.abs(value)<=dead?0:(Math.abs(value)-dead)/(1-dead);return v&&Math.sign(value)*v*v;
 }
