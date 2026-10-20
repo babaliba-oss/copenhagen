@@ -96,3 +96,20 @@ test('a car brushing a wall at a shallow angle slides along it instead of sticki
  assert.ok(car.z<-12,`it kept going along the wall (z ${car.z.toFixed(1)})`);assert.ok(car.speed>5,`and kept most of its speed (${car.speed.toFixed(1)})`);
  assert.ok(carSamples(car).every(([x])=>x<3.2),'never inside the wall');
 });
+test('into a wall: slides off below about 35 degrees, stops (a crash) above it, at any speed, never inside',()=>{
+ const wall=rect(5,-400,.8,800),w=world([wall]); // a wall along x = 5..5.8
+ for(const kmh of [30,60,140])for(const deg of [10,20,30,45,60,75,89]){
+  const a=deg*Math.PI/180,car=makeCar(2.6,0,-a);car.speed=kmh/3.6; // heading 0 drives to -z; -a turns it towards +x, into the wall
+  let hit=null,scrape=0;for(let i=0;i<90&&!hit;i++){const r=driveStep(car,new Set(['KeyW']),1/60,w);hit=r.collision;scrape=Math.max(scrape,r.scrape||0);}
+  assert.ok(carSamples(car).every(([x])=>x<5),`${kmh} km/h at ${deg} degrees: never inside`);
+  if(deg<=30)assert.equal(hit,null,`${kmh} km/h at ${deg} degrees slides`);
+  else assert.equal(hit,'building',`${kmh} km/h at ${deg} degrees is a crash`);
+  if(deg<=30&&kmh>=60)assert.ok(scrape>=2,`${kmh} km/h at ${deg} degrees reports the scrape (${scrape.toFixed(1)} m/s)`);
+ }
+});
+test('a slide never hops a thin wall',()=>{
+ const w=world([rect(5,-400,.1,800)]);let through=0;
+ for(const kmh of [30,60,100,140])for(let deg=0;deg<90;deg+=3){const a=deg*Math.PI/180,car=makeCar(2.6,0,-a);car.speed=kmh/3.6;
+  for(let i=0;i<120;i++)driveStep(car,new Set(['KeyW']),1/60,w);if(carSamples(car).some(([x])=>x>5.1))through++;}
+ assert.equal(through,0);
+});

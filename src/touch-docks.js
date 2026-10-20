@@ -19,12 +19,15 @@ export function stack(items,fixed,top,bottom){
 const SELECTORS=['#wanted','#toast.important.visible','#people-interaction','#cph-hud','#market-prompt','#market-card','#radio-now','.edge-invite'];
 const OBSTACLES=['.topbar .wordmark','#touch-aux','#travel-controls','#touch-controls','.dashboard'];
 export function createTouchDocks(doc=document,win=window){
- let last=0;
+ let last=0;const styled=new Set(); // elements this pass has moved: put back when they leave it (the toast turns ordinary, touch ends)
+ const restore=el=>{el.style.top='';el.style.bottom='';el.classList.remove('dock-wait');styled.delete(el);};
  const shown=el=>el&&!el.hidden&&el.getClientRects().length>0&&el.offsetHeight>0&&win.getComputedStyle(el).visibility!=='hidden'; // fixed elements have no offsetParent
  return {
   update(now=performance.now()){
-   if(!doc.body.classList.contains('touch')||now-last<120)return;last=now;
+   if(!doc.body.classList.contains('touch')){for(const el of [...styled])restore(el);return;}
+   if(now-last<120)return;last=now;
    const els=SELECTORS.map(s=>doc.querySelector(s)).filter(shown);
+   for(const el of [...styled])if(!els.includes(el))restore(el);for(const el of els)styled.add(el);
    for(const el of els){el.style.top='';el.style.bottom='auto';} // measure from the CSS anchor, not last frame's top
    const rects=els.map(el=>el.getBoundingClientRect());
    const fixed=OBSTACLES.map(s=>doc.querySelector(s)).filter(shown).map(el=>el.getBoundingClientRect()).filter(r=>r.width>0&&r.height>0);

@@ -43,11 +43,13 @@ export function createBigMap({base,view,landmarks,player,targets,route,onTravel,
  // Two fingers: pinch to zoom about their midpoint (and pan with it); the drag below is for one.
  const fingers=new Map();let pinch=null;
  const spread=()=>{const [a,b]=[...fingers.values()];return {d:Math.hypot(a[0]-b[0],a[1]-b[1]),mid:[(a[0]+b[0])/2,(a[1]+b[1])/2]};};
- cv.addEventListener('pointerdown',e=>{fingers.set(e.pointerId,local(e));cv.setPointerCapture(e.pointerId);
+ cv.addEventListener('pointerdown',e=>{fingers.set(e.pointerId,local(e));try{cv.setPointerCapture(e.pointerId);}catch{/* a pointer already lifted or cancelled by the OS has nothing to capture */}
   if(fingers.size===2){const s0=spread();pinch={d:s0.d,zoom,mid:s0.mid};drag=null;return;}
   if(fingers.size===1)drag={at:local(e),cx,cz,moved:false};});
  const lift=e=>{fingers.delete(e.pointerId);if(fingers.size<2)pinch=null;};
  cv.addEventListener('pointercancel',e=>{lift(e);drag=null;});
+ cv.addEventListener('lostpointercapture',e=>{lift(e);if(!fingers.size)drag=null;});
+ const resetPointers=()=>{fingers.clear();pinch=null;drag=null;}; // a finger still down when the map closed never lifts here
  cv.addEventListener('pointermove',e=>{const [px,py]=local(e);if(fingers.has(e.pointerId))fingers.set(e.pointerId,[px,py]);
   if(pinch&&fingers.size===2){const s1=spread();const [wx,wz]=toWorld(...pinch.mid);setZoom(pinch.zoom*s1.d/Math.max(1,pinch.d));const [nx,nz]=toWorld(...s1.mid);cx+=wx-nx;cz+=wz-nz;clamp();pinch.mid=s1.mid;return;}
   if(drag){const dx=px-drag.at[0],dy=py-drag.at[1];if(Math.hypot(dx,dy)>4)drag.moved=true;cx=drag.cx-dx/S();cz=drag.cz-dy/S();clamp();}else{hover=pick(px,py);cv.style.cursor=hover?'pointer':'grab';}});
@@ -59,8 +61,8 @@ export function createBigMap({base,view,landmarks,player,targets,route,onTravel,
  dlg.addEventListener('keydown',e=>{if(e.code==='KeyM'||e.code==='Escape'){e.preventDefault();e.stopPropagation();close();}else if(e.code==='Equal'||e.code==='NumpadAdd')setZoom(zoom*1.4);else if(e.code==='Minus'||e.code==='NumpadSubtract')setZoom(zoom/1.4);});
  dlg.addEventListener('cancel',e=>{e.preventDefault();close();});
  let onClose=null;
- function open(title,closed){onClose=closed;dlg.querySelector('#bm-title').textContent=title;dlg.showModal();size();const p=player();zoom=2.2;cx=p?.x||0;cz=p?.z||0;clamp();cancelAnimationFrame(raf);loop();}
- function close(){if(!dlg.open)return;dlg.close();cancelAnimationFrame(raf);onClose?.();}
+ function open(title,closed){resetPointers();onClose=closed;dlg.querySelector('#bm-title').textContent=title;dlg.showModal();size();const p=player();zoom=2.2;cx=p?.x||0;cz=p?.z||0;clamp();cancelAnimationFrame(raf);loop();}
+ function close(){if(!dlg.open)return;resetPointers();dlg.close();cancelAnimationFrame(raf);onClose?.();}
  addEventListener('resize',()=>{if(dlg.open)size();});
  return {open,close,get open_(){return dlg.open;},element:dlg};
 }

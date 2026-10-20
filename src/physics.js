@@ -45,7 +45,19 @@ export function canExitBuildings(from,to,buildings){
  }
  return contact&&Math.hypot(to.x-from.x,to.z-from.z)>1e-9;
 }
-const SLIDE=[.15,.3,.45,.6]; // radians off the heading a blocked step may slide (smallest first): glancing contact only, head on stops
+export const SLIDE_MAX=.6; // radians: the steepest angle of incidence the car slides off (about 35 degrees); squarer is a crash
+// The direction of whatever the car ran into, at the contact: a round object's tangent, or the nearest edge of the
+// building, footprint or water polygon one of the car's sample points went into. Null when there is no edge to slide
+// along (a lake from the elevation model).
+function contactTangent(world,buildings,car,item,kind){
+ const samples=carSamples(car),edge=rings=>{let best=null,d=Infinity;for(const [x,z] of samples)for(const r of rings)for(let i=1;i<r.length;i++){const e=segmentDistance(x,z,r[i-1],r[i]);if(e<d){d=e;best=[r[i-1],r[i]];}}
+  if(!best)return null;const ex=best[1][0]-best[0][0],ez=best[1][1]-best[0][1],l=Math.hypot(ex,ez)||1;return [ex/l,ez/l];};
+ if(item){if(item.radius>0&&!item.rings){let s=samples[0],d=Infinity;for(const p of samples){const e=Math.hypot(p[0]-item.x,p[1]-item.z);if(e<d){d=e;s=p;}}const nx=s[0]-item.x,nz=s[1]-item.z,l=Math.hypot(nx,nz)||1;return [-nz/l,nx/l];}
+  return item.rings?edge(item.rings):null;}
+ if(kind==='building'){for(const [x,z] of samples){const b=buildings.at(x,z);if(b?.rings)return edge(b.rings);}return null;}
+ const wet=(world.water||[]).filter(w=>w?.rings&&samples.some(([x,z])=>pointInPolygon(x,z,w.rings)));
+ return wet.length?edge(wet.flatMap(w=>w.rings)):null;
+}
 export function driveStep(car,keys,dt,world) {
  const collisionBuildings=world.collisionBuildings||world.buildings;
  const distanceBefore=car.distance;
@@ -73,33 +85,39 @@ export function driveStep(car,keys,dt,world) {
  const oldHeading=car.heading;
  car.heading+=car.steer*car.speed/2.8*(.43/(1+Math.abs(car.speed)*.055))*dt*(brake?1.5:1);
  if(flat)car.heading+=flat*FLAT_TYRES.wobble*Math.sin(car.distance*1.3)*Math.min(1,Math.abs(car.speed)/4)*dt;
- const travel=car.speed*dt, steps=Math.max(1,Math.ceil(Math.abs(travel)/.4));
- let collision=null;
+ const travel=car.speed*dt, steps=Math.max(1,Math.ceil(Math.abs(travel)/.1)); // 10 cm: a 0.4 m step let a corner sample hop the thinnest footprints (about 10 cm)
+ let collision=null,scrape=0;
  for(let i=0;i<steps;i++){
    const nx=car.x-Math.sin(car.heading)*travel/steps,nz=car.z-Math.cos(car.heading)*travel/steps;
    if(!insidePlayable(nx,nz,3)){collision='boundary';break;}
-   const from={...car,heading:i?car.heading:oldHeading};
-   const hit=next=>{const samples=carSamples(next);
-    if(world.objects?.blocksStep(from,next)||samples.some(([x,z])=>collisionBuildings.at(x,z))&&!canExitBuildings(from,next,collisionBuildings))return 'building';
+   const from={...car,heading:i?car.heading:oldHeading};let item=null;
+   const hit=next=>{const samples=carSamples(next);item=world.objects?.blocksStep(from,next)||null;
+    if(item||samples.some(([x,z])=>collisionBuildings.at(x,z))&&!canExitBuildings(from,next,collisionBuildings))return 'building';
     if(samples.some(([x,z])=>!world.roads.at(x,z)&&!world.pavement.at(x,z)&&(inWaterPolygons(world.water,x,z)||lakeAt(x,z)!==null)))return 'water';
     return null;};
    const next={...car,x:nx,z:nz};collision=hit(next);
    if(collision){
-    // Glancing contact slides along it instead of pinning the car (scraping a wall, a kerb-side bollard): the rest of
-    // the step goes up to 35 degrees off the heading, the car turns a little into the slide and loses the speed that
-    // went into the wall. Head on (nothing free within 35 degrees) it stops as before.
-    const slide=SLIDE.map(a=>a*(car.steer>.05?1:car.steer<-.05?-1:1)).flatMap(a=>[a,-a]).find(a=>{
-     const h=car.heading+a,at=k=>({...car,heading:car.heading+a*.35*k,x:car.x-Math.sin(h)*travel/steps*Math.cos(a)*k,z:car.z-Math.cos(h)*travel/steps*Math.cos(a)*k});
-     return !hit(at(.5))&&!hit(at(1));});
-    if(slide===undefined)break;
-    const h=car.heading+slide,f=Math.cos(slide),sx=car.x-Math.sin(h)*travel/steps*f,sz=car.z-Math.cos(h)*travel/steps*f;
-    car.distance+=Math.hypot(sx-car.x,sz-car.z);car.x=sx;car.z=sz;car.heading+=slide*.35;car.speed*=Math.max(.35,f);collision=null;continue;
+    // Glancing contact slides along what was hit instead of pinning the car (a wall, a quay edge, a bollard): the wall's
+    // own direction there (contactTangent) gives the angle of incidence; up to SLIDE_MAX the car carries on along it
+    // with the part of its speed that was parallel to it, turning into it a little. Squarer than that it stops (a
+    // crash, as before). The slide path is checked every 10 cm, and against the map edge, so it cannot hop a thin wall.
+    const tan=contactTangent(world,collisionBuildings,next,item,collision);if(!tan)break;
+    const sign=Math.sign(travel)||1,dx=-Math.sin(car.heading)*sign,dz=-Math.cos(car.heading)*sign;
+    let [tx,tz]=tan;if(tx*dx+tz*dz<0){tx=-tx;tz=-tz;}
+    const along=tx*dx+tz*dz,incidence=Math.acos(Math.min(1,along));if(incidence>SLIDE_MAX)break;
+    const len=Math.abs(travel/steps)*along,target=sign>0?Math.atan2(-tx,-tz):Math.atan2(tx,tz),turn=Math.atan2(Math.sin(target-car.heading),Math.cos(target-car.heading))*.35;
+    const n=Math.max(1,Math.ceil(len/.1)),path=t=>k=>({...car,heading:car.heading+t*k/n,x:car.x+tx*len*k/n,z:car.z+tz*len*k/n});
+    const free=pose=>{for(let k=1;k<=n;k++){const q=pose(k);if(!insidePlayable(q.x,q.z,3)||hit(q))return false;}return true;};
+    const pose=[path(turn),path(0)].find(free); // turning into the wall swings the tail towards it: else slide straight
+    if(!pose)break;
+    const q=pose(n);car.distance+=len;car.x=q.x;car.z=q.z;car.heading=q.heading;
+    scrape=Math.max(scrape,Math.abs(car.speed)*Math.sin(incidence));car.speed*=along;collision=null;continue;
    }
    car.distance+=Math.hypot(nx-car.x,nz-car.z);car.x=nx;car.z=nz;
  }
  if(collision){if(car.distance===distanceBefore)car.heading=oldHeading;car.speed=0;}
  settleOnGround(car);
- return {collision,onRoad};
+ return {collision,onRoad,scrape}; // scrape: speed (m/s) that went into what the car slid along, for damage
 }
 export function nearestRoadPoint(x,z,roads,buildings) {
  let best=null,d=Infinity;

@@ -27,5 +27,5 @@ test('the car stops at one instead of driving in', () => {
  const everywhere={at:()=>({})},world={roads:everywhere,pavement:everywhere,water:[],buildings:index,collisionBuildings:index};
  // head on it stops; at a slanted wall it slides along (physics.js SLIDE). Either way it never gets inside.
  let hit=null,entered=false;for(let i=0;i<600&&!hit;i++){const r=driveStep(car,new Set(['KeyW']),1/60,world);if(r.collision)hit=r.collision;if(carSamples(car).some(([x,z])=>inside(x,z)))entered=true;}
- assert.ok(hit==='building'||Math.abs(car.z-sz)>.5||car.x>sx-1,'it stopped or slid along the wall');assert.equal(entered,false,'the car never gets inside');
+ assert.ok(hit==='building'||Math.hypot(car.x-sx,car.z-sz)>2,'it stopped at the house or slid along it');assert.equal(entered,false,'the car never gets inside');
 });
