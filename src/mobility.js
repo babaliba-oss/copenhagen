@@ -227,7 +227,7 @@ export class Mobility {
    if(this.world.buildings.at(p.x,p.z)||(a.walking?!this.walkable(p.x,p.z,a.edge):!vehicleFitsRoad(p,this.world)))continue;
    // A long straight main road is almost always in view; corridor cars may appear there, but only in the far haze.
    const distance=Math.hypot(p.x-player.x,p.z-player.z);
-   if(distance<12||(!a.walking&&this.visibilityTest?.(p)&&!(a.corridorOnly&&distance>300)))continue;
+   if(distance<12||(this.visibilityTest?.(p)&&(a.walking?this.time>3&&distance<70:!(a.corridorOnly&&distance>300))))continue; // walkers too: people appeared on the pavement ahead
    if(!a.walking){const dx=p.x-player.x,dz=p.z-player.z,along=-dx*Math.sin(player.heading||0)-dz*Math.cos(player.heading||0),side=Math.abs(dx*Math.cos(player.heading||0)-dz*Math.sin(player.heading||0));if(along>-24&&along<(this.time<3?95:45)&&side<4.5)continue;} // a clear first 95 m when the drive starts
    if(!a.walking&&this.cars.some(b=>b!==a&&b.edge&&Math.hypot(p.x-b.x,p.z-b.z)<8))continue;
    Object.assign(a,p);a.offset=undefined;a.prevDir=undefined;a.speed=edgeCruise(a.edge,a.cruise);a.waiting=0;a.passing=null;a.unjam=null;a.gridlock=0;a.hold=null;a.holdBy=null;a.deadlocked=false;a.hiddenFor=0;a.panicUntil=0;a.running=false;a.stuck=0;a.progressPoint={x:p.x,z:p.z};return;
@@ -286,7 +286,7 @@ export class Mobility {
   if(Math.hypot(behind.x-from.x,behind.z-from.z)>Math.hypot(ahead.x-from.x,ahead.z-from.z)+.2){const reverse=this.walks.outgoing[a.edge.to].find(e=>e.to===a.edge.from&&Math.abs(e.length-a.edge.length)<.8);if(reverse){a.s=reverse.length-a.s;a.edge=reverse;}}
   a.panicUntil=this.time+seconds;a.turnAfter=this.time+Math.min(2,seconds);a.holdUntil=0;
  }
- hold(a,seconds){if(a.walking)a.holdUntil=this.time+seconds;}
+ hold(a,seconds){if(a.walking&&!a.edge?.crossing)a.holdUntil=this.time+seconds;} // never frozen on a zebra crossing (cars queued behind them)
  flee(a,player){
   const threatened=threatens(a,player,this.world.roads);
   if(threatened){

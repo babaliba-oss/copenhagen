@@ -15,7 +15,9 @@ export function carContact(car,x,z,radius){
   return Math.abs(lateral)<CAR_HALF_WIDTH+radius&&Math.abs(longitudinal)<CAR_HALF_LENGTH+radius?{lateral,longitudinal}:null;
 }
 
-export function createKnockables(items,parts,{radius=.3,height=1.1,range=Infinity}={}){
+// footprint [halfWidth, halfLength]: the upright item's box for walkers and riders (near()); range: drawn out to this.
+export function createKnockables(items,parts,{radius=.3,height=1.1,range=Infinity,footprint=null}={}){
+  const clear=Number.isFinite(range)?range+20:RESPAWN_CLEAR; // back home only out of sight: the set is drawn out to `range`
   const group=new THREE.Group();group.name='Knockable street furniture';
   const meshes=parts.map(({geometry,material})=>{const m=new THREE.InstancedMesh(geometry,material,items.length);m.castShadow=true;m.receiveShadow=true;m.frustumCulled=false;group.add(m);return m;});
   const bodies=items.map((p,i)=>({id:p.id??i,home:{x:p.x,z:p.z,yaw:p.yaw},x:p.x,y:0,z:p.z,yaw:p.yaw,vx:0,vy:0,vz:0,spin:0,
@@ -36,8 +38,9 @@ export function createKnockables(items,parts,{radius=.3,height=1.1,range=Infinit
     b.knocked=true;b.resting=false;b.restTime=0;hits++;
   }
 
+  let moving=true; // anything kicked, tumbling or sliding: the packing below runs every frame only then
   function step(dt,car,world){
-    let slowdown=0;
+    let slowdown=0,live=false;
     for(const b of bodies){
       if(b.playerTaken||b.disabled)continue;
       // Upright bollards are only struck when the car is actually moving into them; fallen ones get nudged along.
@@ -46,9 +49,10 @@ export function createKnockables(items,parts,{radius=.3,height=1.1,range=Infinit
         if(contact&&(b.resting||Math.hypot(b.vx,b.vz)<Math.abs(car.speed)*.8)){if(!b.knocked)slowdown+=.012;kick(b,car,contact);}
       }
       if(b.resting){
-        if(b.knocked&&car&&(b.restTime+=dt)>RESPAWN_AFTER&&Math.hypot(car.x-b.home.x,car.z-b.home.z)>RESPAWN_CLEAR)reset(b);
+        if(b.knocked&&car&&(b.restTime+=dt)>RESPAWN_AFTER&&Math.hypot(car.x-b.home.x,car.z-b.home.z)>clear&&Math.hypot(car.x-b.x,car.z-b.z)>clear){reset(b);moving=true;}
         continue;
       }
+      live=true;
       b.vy-=GRAVITY*dt;
       const nx=b.x+b.vx*dt,nz=b.z+b.vz*dt;
       if(world?.buildings?.at(nx,nz)){b.vx*=-.35;b.vz*=-.35;}else{b.x=nx;b.z=nz;}
@@ -68,15 +72,20 @@ export function createKnockables(items,parts,{radius=.3,height=1.1,range=Infinit
       if(!airborne&&b.vy===0&&Math.hypot(b.vx,b.vz)<.08&&Math.abs(Math.abs(b.tilt%Math.PI)-Math.PI/2)<.02){b.vx=b.vz=b.spin=0;b.resting=true;}
     }
     if(car&&slowdown)car.speed*=1-Math.min(.06,slowdown);
+    if(live)moving=true;
   }
 
   function reset(b){Object.assign(b,{x:b.home.x,z:b.home.z,yaw:b.home.yaw,y:0,vx:0,vy:0,vz:0,spin:0,tilt:0,tiltRate:0,knocked:false,resting:true,restTime:0});}
 
   // Instances are packed: only items within `range` of the focus (the player) are drawn, so a city-wide set
   // (thousands of bins) costs only the nearby few in triangles and shadow passes.
-  let lastFocus=null;
-  function update(focus=lastFocus){
-    if(focus)lastFocus={x:focus.x,z:focus.z};
+  // Sets reach 10-30k items (bike racks and their bikes): repacked only when the player has moved 25 m or something moves,
+  // not every frame (a matrix and a ground lookup per item in range, and the whole buffer uploaded).
+  let lastFocus=null,packedAt=null;
+  function update(focus,force=focus===undefined){ // a bare update() (a ride taken or given back, a reset) always repacks
+    focus=focus??lastFocus;if(focus)lastFocus={x:focus.x,z:focus.z};
+    if(!force&&!moving&&packedAt&&lastFocus&&Math.hypot(lastFocus.x-packedAt.x,lastFocus.z-packedAt.z)<25)return;
+    packedAt=lastFocus&&{...lastFocus};moving=false;
     let n=0;
     for(const b of bodies){
       if(b.playerTaken||b.disabled){if(range===Infinity){matrix.makeScale(0,0,0);for(const m of meshes)m.setMatrixAt(n,matrix);n++;}continue;} // unpacked sets keep instance i = item i (per-item colours)
@@ -90,5 +99,7 @@ export function createKnockables(items,parts,{radius=.3,height=1.1,range=Infinit
   }
 
   update();
-  return {group,bodies,step,update,resetBody(body){if(!bodies.includes(body))return false;reset(body);update();return true;},resetAll(){for(const b of bodies)if(!b.playerTaken)reset(b);update();},snapshot:()=>({count:bodies.length,knocked:bodies.filter(b=>b.knocked&&!b.playerTaken).length,hits})};
+  // Upright items within r of (x,z) as boxes: a walker or rider can't pass through a bench (only the moving car kicks them).
+  function near(x,z,r,out=[]){const [hw,hl]=footprint||[radius,radius];for(const b of bodies){if(b.knocked||b.playerTaken||b.disabled||Math.abs(b.x-x)>r||Math.abs(b.z-z)>r)continue;out.push({x:b.x,z:b.z,heading:b.yaw,halfWidth:hw,halfLength:hl});}return out;}
+  return {group,bodies,step,update,near,resetBody(body){if(!bodies.includes(body))return false;reset(body);update(lastFocus,true);return true;},resetAll(){for(const b of bodies)if(!b.playerTaken)reset(b);update(lastFocus,true);},snapshot:()=>({count:bodies.length,knocked:bodies.filter(b=>b.knocked&&!b.playerTaken).length,hits})};
 }

@@ -169,7 +169,9 @@ export class PoliceSimulation{
   candidates.sort((a,b)=>a.score-b.score);if(!candidates.length)return;
   // Surge: among the nearest few by driving distance, prefer a spot the player
   // cannot see (behind them or behind a building) so the unit does not pop into view.
-  if(surge){const few=candidates.slice(0,8);for(const c of few)if(c.ahead>0&&this.clearSight(c,player))c.score+=40;few.sort((a,b)=>a.score-b.score);candidates[0]=few[0];}
+  // Every level now (an interceptor used to appear 65-150 m up the street the player was looking down): a spot in plain
+  // sight ahead loses to any hidden one among the few best.
+  {const few=candidates.slice(0,8);for(const c of few)if(c.ahead>0&&this.clearSight(c,player))c.score+=surge?40:200;few.sort((a,b)=>a.score-b.score);candidates[0]=few[0];}
   this.units.push({...candidates[0],id:`police-${this.serial++}`,role,speed:0,stuck:0});
  }
  // Surge backup: one unit pulls up close to a stopped player, out of their

@@ -257,8 +257,10 @@ export function createMappedFurniture(layer,{player=()=>null,mobility=()=>null,c
   const lists=bikes.map(()=>[]),cargo=[];let n=0;
   // A rack left without bikes has a cargo bike beside it one time in three (Daniel's Babboe scan, CC BY alban).
   racks.forEach((it,i)=>{if((i*7919)%10<1){if(models['cargo-bike']&&i%3===0)cargo.push([it.x,it.z,(it.yaw||0)+(i%2?Math.PI:0)]);return;}const c=Math.cos(it.yaw||0),sn=Math.sin(it.yaw||0);const slots=[-.9,-.3,.3,.9].filter((_,j)=>((i*13+j*7)%9)>2||j===1);for(const off of slots){const k=(i*31+n++)%bikes.length;lists[k].push([it.x+c*off,it.z-sn*off,(it.yaw||0)+(off>0?Math.PI:0)+((i%3)-1)*.06]);}});
-  lists.forEach((l,k)=>{if(l.length)chunkedInstances(l,bikes[k],painted,'Parked bicycles',b=>b,{shadow:false,range:230});}); // small and many: bikes stop at a shorter range
-  if(cargo.length)chunkedInstances(cargo,models['cargo-bike'],painted,'Parked cargo bikes',b=>b,{shadow:false,range:230});
+  // Knockable too: with the racks knocked flying, bikes left standing in the air looked broken. Drawn to 230 m (small, many).
+  const bikeSet=(l,g,name)=>{const k=createKnockables(l.map(([x,z,yaw],i)=>({id:`${name}-${i}`,x,z,yaw})),[{geometry:g,material:painted}],{radius:.35,height:1,range:230,footprint:[.2,.85]});k.group.name=name;group.add(k.group);knock.push(k);};
+  lists.forEach((l,k)=>{if(l.length)bikeSet(l,bikes[k],`Parked bicycles ${k}`);});
+  if(cargo.length)bikeSet(cargo,models['cargo-bike'],'Parked cargo bikes');
  }}
  for(const [kind,size] of Object.entries(SOLIDS)){
   const list=items.filter(i=>i.k===kind);if(!list.length)continue;
@@ -267,7 +269,7 @@ export function createMappedFurniture(layer,{player=()=>null,mobility=()=>null,c
   // benches and bollards; open-world driving games make roadside props break away and keep buildings, trees and
   // landmarks solid). Shelters and hot-dog stands stay solid.
   if(KNOCK_SOLID.has(kind)){const [w,d,h]=size;
-   const k=createKnockables(list.map((it,i)=>({id:itemId(it,i),x:it.x,z:it.z,yaw:it.yaw||0})),[{geometry:g,material:painted}],{radius:Math.min(.7,Math.max(.2,Math.max(w,d)*.3)),height:h,range:VIEW_RANGE});
+   const k=createKnockables(list.map((it,i)=>({id:itemId(it,i),x:it.x,z:it.z,yaw:it.yaw||0})),[{geometry:g,material:painted}],{radius:Math.min(.7,Math.max(.2,Math.max(w,d)*.3)),height:h,range:VIEW_RANGE,footprint:[w/2,d/2]});
    k.group.name=`Mapped ${kind}s (knockable)`;group.add(k.group);knock.push(k);continue;}
   chunkedInstances(list,g,painted,`Mapped ${kind}`,it=>[it.x,it.z,it.yaw]);
   list.forEach((it,i)=>{const yaw=it.yaw||0;
@@ -315,7 +317,7 @@ export function createMappedFurniture(layer,{player=()=>null,mobility=()=>null,c
  const counts={};for(const it of items)counts[it.k]=(counts[it.k]||0)+1;
  group.userData={source:layer?.source,licence:layer?.licence,counts,chunks:chunks.size,lights:lights.length};
  // Knockables-compatible: main.js steps and updates it with the rest (posts step through breakableSigns).
- const knockables={get bodies(){return knock.flatMap(k=>k.bodies);},step(dt,car,world){for(const k of knock)k.step(dt,car,world);},update(focus){for(const k of knock)k.update(focus);update(focus);},
+ const knockables={near(x,z,r){const out=[];for(const k of knock)k.near?.(x,z,r,out);return out;},get bodies(){return knock.flatMap(k=>k.bodies);},step(dt,car,world){for(const k of knock)k.step(dt,car,world);},update(focus){for(const k of knock)k.update(focus);update(focus);},
   resetAll(){for(const k of knock)k.resetAll();}, // posts reset with every other breakable sign set
   snapshot(){const s=knock.map(k=>k.snapshot()),posts=[...chunks.values()].map(c=>c.signs.snapshot()),sum=(l,k)=>l.reduce((n,x)=>n+x[k],0);
    return {count:sum(s,'count'),knocked:sum(s,'knocked'),hits:sum(s,'hits'),posts:{count:sum(posts,'count'),knocked:sum(posts,'knocked'),bent:sum(posts,'bent'),broken:sum(posts,'broken')}};}};
