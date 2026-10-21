@@ -117,9 +117,10 @@ export function createMappedFurniture(layer,{rangeScale=1,player=()=>null,mobili
  const atlas=canvas&&layer.faces?.length?signAtlas(layer.faces):null;layer.faces??=[];
  const plates=new THREE.MeshStandardMaterial({map:atlas?.texture||null,alphaTest:.5,roughness:.55,side:THREE.FrontSide});
  const templates=new Map(),m4=new THREE.Matrix4(),q=new THREE.Quaternion(),UP=new THREE.Vector3(0,1,0),one=new THREE.Vector3(1,1,1),zero=new THREE.Vector3(),v=new THREE.Vector3();
- const chunkOf=(x,z)=>{const key=`${Math.floor(x/CHUNK)},${Math.floor(z/CHUNK)}`;
+ const C=rangeScale<1?250:CHUNK; /* phones: 250 m post chunks shown to the shorter range (posts were drawn ~560 m out, 170k triangles) */
+ const chunkOf=(x,z)=>{const key=`${Math.floor(x/C)},${Math.floor(z/C)}`;
   if(!chunks.has(key)){const signs=createBreakableSigns(`Mapped furniture posts ${key}`),g=new THREE.Group();g.name='Mapped furniture chunk';group.add(g);
-   chunks.set(key,{key,group:g,signs,recipes:[],meshes:[],centre:[(Math.floor(x/CHUNK)+.5)*CHUNK,(Math.floor(z/CHUNK)+.5)*CHUNK]});}
+   chunks.set(key,{key,group:g,signs,recipes:[],meshes:[],centre:[(Math.floor(x/C)+.5)*C,(Math.floor(z/C)+.5)*C]});}
   return chunks.get(key);};
  const place=(geometry,x,z,yaw,chunk,i,list)=>{geometry.applyMatrix4(m4.compose(v.set(x,groundAt(x,z),z),q.setFromAxisAngle(UP,yaw),one));chunk.signs.tag(geometry,i);list.push(geometry);};
 
@@ -310,7 +311,7 @@ export function createMappedFurniture(layer,{rangeScale=1,player=()=>null,mobili
  function update(){
   const p=player();updateLights(p);if(!p)return;
   // Built a little before they show, freed well after they hide (a hysteresis band, so the edge does not rebuild).
-  const show=VIEW_RANGE+CHUNK*.71;let next=null,nd=Infinity;
+  const show=Math.max(VIEW_RANGE*rangeScale,SIGNAL_RANGE)+C*.71; /* never short of the signal lenses' range: no lit lens without its post */let next=null,nd=Infinity;
   for(const c of chunks.values()){const d=Math.hypot(c.centre[0]-p.x,c.centre[1]-p.z);c.group.visible=d<show;
    if(!c.built&&d<show+150&&d<nd){next=c;nd=d;}else if((c.built||c.out)&&d>show+450)dropChunk(c);}
   // The nearest chunk only: sliced while it is still out of sight, at once if it is about to show (start, teleport).
