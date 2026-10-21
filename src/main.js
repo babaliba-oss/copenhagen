@@ -552,7 +552,7 @@ function createFallbackBuildings(buildings=data.buildings){
 // extruded stand-in, drawn only past that distance (fragment discard nearer the camera), no shadows, flat
 // colours, merged per 800 m chunk. Built a chunk per idle slice after the drive starts. Fog runs further out
 // to show it.
-if(matchMedia('(pointer:coarse)').matches)Object.assign(TILE_LOD,{near:180,far:220,building:95}); /* phones: detailed buildings (windows, reveals) within 95 m, tiles' detail fetched within 180 m */
+if(matchMedia('(pointer:coarse)').matches)Object.assign(TILE_LOD,{near:110,far:140,building:95}); /* phones: detailed buildings (windows, reveals) within 95 m, so tiles are detailed only within 110 m (180 m held ~250 MB of detail never shown) */
 const FAR_START=TILE_LOD.visible-15;
 function createFarCity(buildings){
  if(!buildings.length)return;

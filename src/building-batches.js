@@ -59,7 +59,7 @@ export function createBuildingBatches(buildings,textures,partOf){
  }
  // Which batches hold each part, and how many of a batch's parts are shown: a batch draws only while one is.
  const list=[...groups.values()],ofPart=new Map();for(const g of list)for(const i of g.parts)if(i>=0){let l=ofPart.get(i);if(!l)ofPart.set(i,l=[]);l.push(g);}
- let near=true;const show=g=>{g.mesh.visible=near&&(g.shown>0||g.always&&g.landedAlways);};
+ let near=true;const show=g=>{g.mesh.visible=!!g.upload||near&&(g.shown>0||g.always&&g.landedAlways);};
  for(const g of list)show(g);
  // Copy one building's batched meshes into place (vertices and part ids), marking just those ranges for upload.
  function land(b){
@@ -70,7 +70,10 @@ export function createBuildingBatches(buildings,textures,partOf){
     else dst.array.set(a.array.subarray(0,n*k),first*k);
     dst.addUpdateRange(first*k,n*k);dst.needsUpdate=true;}
    // Landed: the worker's copy can go, and a batch whose last building is in frees its own CPU arrays after upload.
-   placed.delete(s);if(--g.waiting===0){releaseAfterUpload(g.mesh);g.mesh.geometry.attributes.aBid.needsUpdate=true;}} // aBid is not re-uploaded by landing: one more upload frees it too
+   placed.delete(s);if(--g.waiting===0){releaseAfterUpload(g.mesh);g.mesh.geometry.attributes.aBid.needsUpdate=true;
+    // A batch only uploads (and frees its arrays) when drawn: one beyond the detail range never was, and its arrays
+    // stayed in memory (272 MB on a phone at Nyhavn). Drawn once now with every part masked (nothing reaches the screen).
+    if(!g.mesh.visible){const mesh=g.mesh;g.upload=true;mesh.frustumCulled=false;mesh.onAfterRender=()=>{g.upload=false;mesh.frustumCulled=true;mesh.onAfterRender=()=>{};show(g);};show(g);}}} // aBid is not re-uploaded by landing: one more upload frees it too
  }
  return {meshes,data,land,batched:s=>taken.has(s),
   set(i,v){if(!(i>=0&&i<256))return;const was=data[i]>0;data[i]=v;if(was!==(v>0))for(const g of ofPart.get(i)||[]){g.shown+=v>0?1:-1;show(g);}},get(i){return data[i];},
