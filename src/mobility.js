@@ -391,8 +391,9 @@ export class Mobility {
  step(dt,player){
   this.time+=dt;this.dt=dt;let spawns=0;
   // Per step rather than per car: who is on which edge, and everything a car must not drive into.
-  this.edgeCars.clear();this.boxCars.clear();this.approaching.clear();
-  const add=(map,key,c)=>{const list=map.get(key);if(list)list.push(c);else map.set(key,[c]);};
+  // The per-key lists go back to a pool instead of being dropped (a few hundred fresh arrays a step).
+  const pool=this.listPool??=[];for(const m of [this.edgeCars,this.boxCars,this.approaching]){for(const l of m.values()){l.length=0;pool.push(l);}m.clear();}
+  const add=(map,key,c)=>{const list=map.get(key);if(list)list.push(c);else{const l=pool.pop()||[];l.push(c);map.set(key,l);}};
   for(let ci=0;ci<this.cars.length;ci++){const c=this.cars[ci];if(!c.edge||c.knocked)continue;add(this.edgeCars,c.edge,c);const e=c.edge,remaining=e.length-c.s;
    // Junction boxes: cars inside one (front past the stop line, or rear not yet out), and cars about to enter.
    if(e.junction&&remaining<e.stopGap-.3)add(this.boxCars,e.to,c);else if(e.junction&&remaining<e.stopGap+5)add(this.approaching,e.to,c);
