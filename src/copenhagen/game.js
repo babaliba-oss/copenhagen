@@ -94,7 +94,7 @@ export function createCopenhagenGame({scene,city,mobilityData,cityData,toast,sou
  const KEY=SAVE_KEY+(ERA==='h'?'-1760':'');try{save={...save,...JSON.parse(localStorage.getItem(KEY)||'{}')};}catch{}
  { // an old or hand-edited save: wrong types here threw inside update() on every frame
   const obj=v=>!!v&&typeof v==='object'&&!Array.isArray(v);
-  for(const k of ['money','job'])if(!Number.isFinite(save[k]))save[k]=0;
+  for(const k of ['money','job','delivered','streak','pant'])if(save[k]!==undefined&&!Number.isFinite(save[k]))save[k]=0;save.job=Math.max(0,Math.floor(save.job||0)); // a fractional or negative job index threw every frame
   for(const k of ['done','cards','best'])if(k in save&&!obj(save[k]))save[k]=k==='done'?{}:undefined;
   for(const k of ['lore','nisser'])if(!Array.isArray(save[k]))save[k]=[];
   if(save.active&&(!obj(save.active)||!Array.isArray(save.active.done)))save.active=null;
@@ -211,7 +211,7 @@ export function createCopenhagenGame({scene,city,mobilityData,cityData,toast,sou
  const fmtT=t=>`${Math.floor(t/60)}:${String(Math.floor(t%60)).padStart(2,'0')}.${Math.floor(t%1*10)}`;
  function startRace(r){race={r,k:0,t:0,countdown:3.4};routeFor=null;banner(r.title,`${r.cps.length} checkpoints · ${(r.len/1000).toFixed(1)} km · gold ${fmtT(r.par[0])}`,'pick');}
  function finishRace(){const r=race.r,t=race.t,medal=t<=r.par[0]?0:t<=r.par[1]?1:t<=r.par[2]?2:3;const names=['Gold','Silver','Bronze'];
-  const prev=save.best[r.id],best=prev==null||t<prev;if(best)save.best[r.id]=t;
+  const prev=save.best[r.id],best=medal<3&&(prev==null||t<prev);if(best)save.best[r.id]=t; // a 'too slow' run is not a best time
   if(medal<3){const pay=Math.round(r.pay*[1,.6,.35][medal]*payBonus());save.money+=pay;banner(`${names[medal]}!`,`${esc(r.title)} · ${fmtT(t)}${best?' · new best':''} · +${fmtKr(pay)} ${UNIT}`,medal===0?'rank':'pass');}
   else banner('Too slow',`${esc(r.title)} · ${fmtT(t)} · bronze is ${fmtT(r.par[2])}`,'fail');
   race=null;races.forEach(r=>r.armed=false);persist();routeFor=null;}
@@ -253,7 +253,7 @@ export function createCopenhagenGame({scene,city,mobilityData,cityData,toast,sou
   g.fillStyle='#3a2410';g.font='bold 18px Georgia,serif';g.textAlign='center';g.fillText('N ↑',510,46);g.textAlign='left';g.font='italic 20px Georgia,serif';g.fillText(`Part ${k+1} of ${q.steps.length}`,30,540);
   return cv;
  }
- function showTreasure(){const a=save.active;if(!a||!byId[a.id].steps.some(s=>s.clue)){toast('No treasure map yet. Ole at Gammel Strand has one.');return;}const q=byId[a.id],f=frontier().filter(k=>q.steps[k].clue);if(!f.length)return;const box=$('cph-tmap-canvas');box.replaceChildren(drawClue(q,f[0]));tmapOpen=true;tmap.hidden=false;}
+ function showTreasure(){const a=save.active;if(!a||!byId[a.id].steps.some(s=>s.clue)){toast(save.done?.holger?'You have already followed Ole\'s map.':'No treasure map yet. Ole at Gammel Strand has one.');return;}const q=byId[a.id],f=frontier().filter(k=>q.steps[k].clue);if(!f.length)return;const box=$('cph-tmap-canvas');box.replaceChildren(drawClue(q,f[0]));tmapOpen=true;tmap.hidden=false;}
  const closeTreasure=()=>{tmapOpen=false;tmap.hidden=true;};$('cph-tmap-close').onclick=closeTreasure;
  const warmth=d=>d<35?'hot!':d<100?'warm':d<250?'lukewarm':d<600?'cold':'freezing';
 
@@ -265,7 +265,7 @@ export function createCopenhagenGame({scene,city,mobilityData,cityData,toast,sou
   journal.innerHTML=`<div class="cph-jcard" role="dialog"><div class="cph-jtop"><div><p class="cph-kick">Stories from Danish history and folklore</p><h2>Sagas</h2></div><button id="cph-jclose">Close <kbd>J</kbd></button></div><div class="cph-jlist">${rows}</div><h2 class="cph-album-h cph-keyboard-only">Postcards · ${Object.keys(save.cards).length}/${postcards.length}</h2><p class="cph-js cph-keyboard-only">Find a landmark, face it and press N.</p><div class="cph-album cph-keyboard-only">${album}</div></div>`;
   $('cph-jclose').onclick=()=>toggleJournal(false);
   journal.querySelectorAll('[data-way]').forEach(b=>b.onclick=()=>{const c=people.find(p=>p.script===b.dataset.way);if(c){wayTo=[c.x,c.z];routeFor=null;toggleJournal(false);toast(`Route set to ${CHARACTERS.find(x=>x.id===c.script).name}`);}});
-  journal.querySelectorAll('[data-abandon]').forEach(b=>b.onclick=()=>{save.active=null;persist();routeFor=null;renderJournal();});
+  journal.querySelectorAll('[data-abandon]').forEach(b=>b.onclick=()=>{save.active=null;wayTo=null;persist();routeFor=null;renderJournal();});
  }
  function toggleJournal(v){journalOpen=v??!journalOpen;journal.hidden=!journalOpen;if(journalOpen)renderJournal();}
  let wayTo=null;
@@ -357,7 +357,7 @@ export function createCopenhagenGame({scene,city,mobilityData,cityData,toast,sou
     const base=j.pay+(hopped?0:timer*4),streakBonus=save.streak>=3?Math.round(base*.25):0,pay=Math.round(base*payBonus())+streakBonus;save.money+=pay;save.job++;state='a';persist();routeFor=null;
     const after=rankOf(save.delivered);
     if(after>before)banner(`Promoted: ${RANKS[after][0]}`,`+${fmtKr(pay)} ${UNIT} · jobs now pay +${after*10}%${RANKS[after+1]?` · next: ${esc(RANKS[after+1][0])} at ${RANKS[after+1][1]} deliveries`:''}`,'rank');
-    else banner('Delivered!',`+${fmtKr(pay)} ${UNIT}${streakBonus?` · streak ×${save.streak} bonus +${fmtKr(streakBonus)}`:''}${timer>20?' · fast':''}`,'pass');}
+    else banner('Delivered!',`+${fmtKr(pay)} ${UNIT}${streakBonus?` · streak ×${save.streak} bonus +${fmtKr(streakBonus)}`:''}${timer>20&&!hopped?' · fast':''}`,'pass');}
   }
   mkA.visible=state==='a';mkB.visible=state==='b';mkA.position.set(j.A[0],groundAt(...j.A),j.A[1]);mkB.position.set(j.B[0],groundAt(...j.B),j.B[1]);
   }
@@ -403,6 +403,6 @@ export function createCopenhagenGame({scene,city,mobilityData,cityData,toast,sou
   banner:(title,sub,kind)=>banner(title,sub,kind),
   end(){if(!trailer)return;try{save=JSON.parse(trailerSave);}catch{}trailer=false;trailerSave=null;routeFor=null;ban.hidden=true;}};
  // A map jump, reset or restart (main.js setStart): a race can't go on from somewhere else, and a delivery reached that way earns no time bonus.
- function teleported(){if(race){race=null;races.forEach(r=>r.armed=false);routeFor=null;}if(state==='b')hopped=true;}
+ function teleported(){if(race){banner('Race abandoned',esc(race.r.title),'fail');race=null;races.forEach(r=>r.armed=false);routeFor=null;}if(wayTo){wayTo=null;routeFor=null;}if(state==='b')hopped=true;}
  return {teleported,setFurniture,trailer:trailerApi,paper:()=>{try{sessionStorage.removeItem('cph-paper-'+ERA);}catch{}showPaper();},photo,debug:()=>({race:race&&{id:race.r.id,k:race.k,t:race.t,c:race.countdown},armed:races.map(r=>r.armed),state,started,player:player&&[player.x,player.z]}),update,key,blocking,people,api,minimapTargets:()=>{const out=[];if(race){out.push({p:race.r.cps[race.k],color:'#ff4fd8'});return out;}for(const r of races)if(state!=='b')out.push({p:r.start,color:'#9b5de5',small:true});const j=job();out.push({p:state==='a'?j.A:j.B,color:state==='a'?'#f2b134':'#46c2b0'});if(save.active){const q=byId[save.active.id];for(const k of frontier())if(!q.steps[k].clue)out.push({p:q.steps[k].p,color:'#e0313e'});}return out;},route:()=>line.ahead()};
 }
