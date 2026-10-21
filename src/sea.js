@@ -172,7 +172,7 @@ export function createSea(water,land={},{helsinkiHarbour=true,groundExtent=0,dec
   // street. The foot and the waterline band follow the real water instead.
   if(hasTerrain()){const lvl=seaLevel(),p=draped.attributes.position;for(let i=0;i<p.count;i++){const x=p.getX(i),z=p.getZ(i),local=p.getY(i)-groundAt(x,z);
    if(local<QUAY_FOOT+.05)p.setY(i,Math.min(p.getY(i),lvl-.8));else if(Math.abs(local-(WATER_LEVEL+.22))<.03)p.setY(i,Math.min(p.getY(i),lvl+.22));}p.needsUpdate=true;draped.computeVertexNormals();}
-  for(const g of splitByCell(draped,1400)){const quay=new THREE.Mesh(g,quayMaterial);quay.name='Granite quay walls';quay.receiveShadow=true;group.add(quay);}
+  for(const g of splitByCell(draped,500)){const quay=new THREE.Mesh(g,quayMaterial);quay.name='Granite quay walls';quay.receiveShadow=true;group.add(quay);}
   const shade=new THREE.Mesh(drapeGeometry(skirt,{water:true,lift:-WATER_LEVEL-.1}),new THREE.MeshBasicMaterial({color:'#ffffff',vertexColors:true,transparent:true,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-1,polygonOffsetUnits:-2}));
   shade.name='Quay shade on water';shade.renderOrder=1;group.add(shade);
  }
@@ -182,6 +182,11 @@ export function createSea(water,land={},{helsinkiHarbour=true,groundExtent=0,dec
   const d=new THREE.Mesh(deckGeo,(()=>{const m=new THREE.MeshStandardMaterial({color:deckColor,roughness:.9,side:THREE.DoubleSide});if(deckTexture&&typeof document!=='undefined'){const t=new THREE.TextureLoader().load(`/materials/${deckTexture}-color.jpg`);t.wrapS=t.wrapT=THREE.RepeatWrapping;t.colorSpace=THREE.SRGBColorSpace;m.map=t;m.color.set('#ffffff').lerp(new THREE.Color(deckColor),.25);}return m;})() /* deck in the street's own surface: scanned asphalt today, setts in 1760 */);d.name='Bridge decks';d.receiveShadow=true;group.add(d);}console.info('Bridge railings',rails.userData.runs);}}
  const groundGeometry=createGroundGeometry(water,groundSizeForExtent(groundExtent));
  const kinds={};for(const e of edges)kinds[e.kind]=(kinds[e.kind]||0)+1;
+ // The railings and the wall shade were one city-wide mesh each (84k and 57k triangles), never frustum-culled: cut into 500 m cells.
+ for(const m of [...group.children])if(m.isMesh&&/^(Bridge railings|Quay shade on water)$/.test(m.name)&&(m.geometry.index?.count??m.geometry.attributes.position.count)>60000){
+  const parts=splitByCell(m.geometry,500);if(parts.length<2){parts.forEach(g=>g.dispose());continue;}
+  for(const g of parts){const c=new THREE.Mesh(g,m.material);c.name=m.name;c.castShadow=m.castShadow;c.receiveShadow=m.receiveShadow;c.renderOrder=m.renderOrder;group.add(c);}
+  group.remove(m);m.geometry.dispose();}
  group.userData={polygons:geometries.length,surfaceHeight:WATER_LEVEL,animated:true,quayEdges:edges.length,quayKinds:kinds,drawCalls:group.children.length,bridges}; // bridges: the deck plates drawn over the water (main.js raises the ground under them)
  return {group,groundGeometry,edges,material,
   update(seconds){if(Number.isFinite(seconds))time.value=seconds;},
