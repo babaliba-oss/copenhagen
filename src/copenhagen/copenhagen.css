@@ -1,6 +1,6 @@
 /* Copenhagen game layer: same paper/ink language as the rest of the HUD (Spectral headings, Manrope text). */
 #cph-hud{position:fixed;top:96px;left:38px;z-index:30;display:grid;gap:10px;width:min(340px,calc(100vw - 76px));pointer-events:none;font-family:Manrope,sans-serif;color:#30312e}
-body:not(.driving) #cph-hud,body.busted #cph-hud,body.clean-capture #cph-hud{visibility:hidden}
+body:not(.driving) #cph-hud,body.busted #cph-hud{visibility:hidden} /* the game cards stay with the extra HUD off (H): on desktop they were hidden by default */
 .cph-money{justify-self:start;padding:6px 12px;border-radius:999px;background:rgba(248,245,238,.94);box-shadow:0 4px 18px rgba(30,30,28,.14);font-family:Spectral,Georgia,serif;font-weight:600;font-size:20px;font-variant-numeric:tabular-nums}
 .cph-card{padding:12px 15px;border-radius:14px;background:rgba(248,245,238,.94);box-shadow:0 6px 24px rgba(30,30,28,.16)}
 .cph-card h3{margin:2px 0 4px;font-family:Spectral,Georgia,serif;font-weight:600;font-size:21px;line-height:1.1;letter-spacing:-.01em}
