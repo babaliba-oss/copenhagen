@@ -3,6 +3,8 @@ import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';
 import {groundAt} from '../terrain.js';
 import {pointInPolygon} from '../geo.js';
 import {createInstancedPeople} from '../market-life.js';
+import {solidBox} from '../world-objects.js';
+const WAGONS=/^(handcart|haywagon|farm-wagon|covered-wagon)$/;
 
 // Copenhagen 1760 street life the traffic simulation does not give: crowds on the squares, sailors and
 // dock hands on the quays among barrels, crates and sacks, soldiers at the city gates, handcarts and hay
@@ -71,7 +73,12 @@ export function createPeriodLife({city,world,water=[],squares=[],gates=[],animal
  // props (one instanced mesh per kind per 400 m chunk)
  const mat=new THREE.MeshStandardMaterial({vertexColors:true,roughness:.85});const m4=new THREE.Matrix4(),q=new THREE.Quaternion(),v=new THREE.Vector3(),one=new THREE.Vector3(1,1,1),UP=new THREE.Vector3(0,1,0);
  const chunks=[];
+ const bodies=[]; // the market's carts and wagons are solid (main.js gathers group.worldObjects): you drove through them
  for(const [kind,list] of Object.entries(props)){const geo=propModels[kind]||PROPS[kind]?.();if(!geo)continue;const by=new Map();
+  if(WAGONS.test(kind)){if(!geo.boundingBox)geo.computeBoundingBox();const {min,max}=geo.boundingBox,cx=(min.x+max.x)/2,cz=(min.z+max.z)/2;
+   const kept=list.filter(([x,z,yaw],i)=>{const c=Math.cos(yaw),s=Math.sin(yaw),b=solidBox({id:`1760-${kind}-${i}`,name:kind.replace('-',' '),x:x+cx*c+cz*s,z:z-cx*s+cz*c,width:max.x-min.x,depth:max.z-min.z,yaw});
+    if(b.rings[0].some(([px,pz])=>world.roads.at(px,pz)||world.buildings.at(px,pz)))return false;bodies.push(b);return true;}); // only its middle was checked: wagons stood half in a house wall or out in the lane
+   list.splice(0,list.length,...kept);}
   for(const it of list){const k=`${Math.floor(it[0]/400)},${Math.floor(it[1]/400)}`;if(!by.has(k))by.set(k,[]);by.get(k).push(it);}
   for(const its of by.values()){const im=new THREE.InstancedMesh(geo,mat,its.length);im.name=`1760 ${kind}`;im.castShadow=true;im.receiveShadow=true;
    its.forEach(([x,z,yaw],i)=>im.setMatrixAt(i,m4.compose(v.set(x,groundAt(x,z),z),q.setFromAxisAngle(UP,yaw),one)));im.computeBoundingSphere();group.add(im);
@@ -96,6 +103,7 @@ export function createPeriodLife({city,world,water=[],squares=[],gates=[],animal
    f.im.visible=any;if(any)f.im.instanceMatrix.needsUpdate=true;}
  }
  const people=[...crowds.values()].reduce((n,l)=>n+l.length,0);
+ group.worldObjects=bodies;
  group.userData={people,props:Object.fromEntries(Object.entries(props).map(([k,l])=>[k,l.length])),animals:flocks.reduce((n,f)=>n+f.members.length,0),batches:batches.length};
  return {group,update};
 }
