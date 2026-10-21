@@ -128,6 +128,7 @@ export function createCarriageTraffic(actors){
  if(gait){const count=Math.max(1,actors.length),{mesh,motion}=gaitMesh(gait,count);mesh.name='Coaches';const group=new THREE.Group();group.name='Coach traffic';group.add(mesh);
   const m4=new THREE.Matrix4(),ahead=new THREE.Matrix4().makeTranslation(0,0,1.2),q=new THREE.Quaternion(),v=new THREE.Vector3(),one=new THREE.Vector3(1,1,1),zero=new THREE.Vector3(0,0,0),UP=new THREE.Vector3(0,1,0);
   const states=Array.from({length:count},(_,i)=>({phase:i*1.7,amp:0,roll:i*3.3}));
+  const EU=new THREE.Euler(0,0,0,'YXZ'),PITCH_REACH=2.2; // heading, then pitch (as the player's coach)
   // Only the coaches within RANGE of the camera are drawn, packed to the front of the batch: every coach (a full
   // horse-and-carriage model) used to go through the main and shadow passes, the ones a kilometre off and the ones
   // parked out of play at scale 0 included: 1.6M of the 5.4M triangles of a 1760 frame.
@@ -136,7 +137,8 @@ export function createCarriageTraffic(actors){
    const f=gaitMesh({geometry:g,materials:gait.materials},count);f.mesh.name='Coaches (far)';f.mesh.count=0;group.add(f.mesh);far=f;return far;};
   return {group,update(groundAt,dt=1/60,focus=null){let n=0,nf=0;const f=lod();actors.forEach((a,i)=>{if(i>=count)return;const on=!!a.edge&&!a.playerTaken;
     const s=stepMotion(states[i],on?a.speed||0:0,dt),d=focus?Math.hypot((a.x||0)-focus.x,(a.z||0)-focus.z):0;if(!on||d>COACH_RANGE)return;
-    m4.compose(v.set(a.x||0,groundAt(a.x,a.z),a.z||0),q.setFromAxisAngle(UP,a.heading||0),one).multiply(ahead);
+    const x=a.x||0,z=a.z||0,h=a.heading||0,fx=Math.sin(h)*PITCH_REACH,fz=Math.cos(h)*PITCH_REACH,fr=groundAt(x-fx,z-fz),bk=groundAt(x+fx,z+fz); /* pitched to the ground under the horses and the rear wheels: level, a coach on a rampart slope or a bridge ramp had its horses in the bank (up to 2.3 m) */
+    m4.compose(v.set(x,Math.max(groundAt(x,z),(fr+bk)/2),z),q.setFromEuler(EU.set(Math.atan2(fr-bk,2*PITCH_REACH),h,0)),one).multiply(ahead);
     if(f&&d>COACH_NEAR){f.mesh.setMatrixAt(nf,m4);f.motion.setXYZ(nf,s.phase,s.amp,s.roll);nf++;}else{mesh.setMatrixAt(n,m4);motion.setXYZ(n,s.phase,s.amp,s.roll);n++;}});
    mesh.count=n;mesh.instanceMatrix.needsUpdate=true;motion.needsUpdate=true;if(f){f.mesh.count=nf;f.mesh.instanceMatrix.needsUpdate=true;f.motion.needsUpdate=true;}}};}
  const c=createCarriage(),bodyGeo=c.getObjectByName('Coach body').geometry.clone();bodyGeo.deleteAttribute('motion'); // the coach body with its turning wheels (createCarriage); placed 1.2 m ahead per coach, as the gait coaches are
