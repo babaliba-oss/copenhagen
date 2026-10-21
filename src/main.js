@@ -1014,7 +1014,9 @@ async function travelTo(l){ /* big map: jump to a named place */
 function showDialog(id){if(!ready||police?.busted)return;
  if(id==='map-dialog'&&bigMap&&started){peopleInteraction?.close();mobileControls?.release();keys.clear();mapOpen=true;bigMap.open(city.name,()=>{mapOpen=!!document.querySelector('dialog[open]');$('world').focus();});return;}peopleInteraction?.close();mobileControls?.release();keys.clear();$(id).showModal();mapOpen=true;if(id==='map-dialog')drawCityMap();}
 function closeDialogs(){if($('map-dialog').open)startVisitVersion++;document.querySelectorAll('dialog[open]').forEach(d=>d.close());mapOpen=!!document.querySelector('dialog[open]');mobileControls?.release();keys.clear();focusWorldControls();}
-function setPaused(value){if(value)peopleInteraction?.close();if(!started||mapOpen||police?.busted)return;paused=value;mobileControls?.release();keys.clear();$('pause-overlay').hidden=!paused;if(!paused)focusWorldControls();}
+function setPaused(value){if(value)peopleInteraction?.close();if(!started||mapOpen||police?.busted)return;paused=value;mobileControls?.release();keys.clear();$('pause-overlay').hidden=!paused;if(!paused)focusWorldControls();else $('resume-btn').focus({preventScroll:true});}
+// The pause card is modal: Tab and Shift+Tab cycle its own buttons and links (they reached the top bar and menus behind it).
+window.addEventListener('keydown',e=>{if(e.key!=='Tab'||!paused||$('pause-overlay').hidden)return;const f=[...$('pause-overlay').querySelectorAll('button,a[href],input,select,[tabindex]:not([tabindex="-1"])')].filter(n=>!n.disabled&&n.getClientRects().length);e.preventDefault();if(!f.length)return;const i=f.indexOf(document.activeElement);f[e.shiftKey?(i<=0?f.length-1:i-1):(i<0||i===f.length-1?0:i+1)].focus();},true);
 function setBusted(active){
  // The arrest starts with a short cinematic (finale.cameraPose); the end screen appears when finale.cinematicStep says so.
  if(!active)$('busted-overlay').hidden=true;document.body.classList.toggle('busted',active);mobileControls?.release();keys.clear();
