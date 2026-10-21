@@ -857,14 +857,31 @@ function mapPolice(ctx,project,scale){
  ctx.canvas.dataset.policeMarkers=String(state.units.length);
  ctx.canvas.setAttribute('aria-label',`City map${state.level?` — ${state.units.length} police units, ${state.status.toLowerCase()}`:''}`);
 }
-function drawMinimap(){if(!car)return;const canvas=$('minimap'),ctx=canvas.getContext('2d');const span=police?.level?420:1250,s=mapCache.width/mapView.size;const cx=mapCache.width/2+(car.x-mapView.cx)*s,cz=mapCache.height/2+(car.z-mapView.cz)*s;const sw=span*s,sh=sw*canvas.height/canvas.width;ctx.fillStyle='#b3ced0';ctx.fillRect(0,0,canvas.width,canvas.height);ctx.drawImage(mapCache,cx-sw/2,cz-sh/2,sw,sh,0,0,canvas.width,canvas.height);mapPolice(ctx,p=>[canvas.width/2+(p.x-car.x)*canvas.width/span,canvas.height/2+(p.z-car.z)*canvas.width/span],canvas.width/span);if(cph){const P=p=>[canvas.width/2+(p[0]-car.x)*canvas.width/span,canvas.height/2+(p[1]-car.z)*canvas.width/span],r=cph.route?.();ctx.save();
+// The minimap's map, labels, route and police are drawn around an anchor into a larger offscreen canvas at the HUD's pace
+// (every 140 ms, or sooner when the car has used up most of the margin); each frame only copies the window around the car
+// and draws the targets and the player's arrow, so the map slides with the car instead of jumping seven times a second.
+const minimapBase=document.createElement('canvas'),MINIMAP_MARGIN=80;let minimapAnchor=null;
+function drawMinimapBase(canvas,span){const M=MINIMAP_MARGIN,W=canvas.width,H=canvas.height;if(minimapBase.width!==W+2*M||minimapBase.height!==H+2*M){minimapBase.width=W+2*M;minimapBase.height=H+2*M;}
+ const ctx=minimapBase.getContext('2d'),BW=minimapBase.width,BH=minimapBase.height,ax=car.x,az=car.z,s=mapCache.width/mapView.size,cx=mapCache.width/2+(ax-mapView.cx)*s,cz=mapCache.height/2+(az-mapView.cz)*s,k=W/span,sw=BW/k*s,sh=BH/k*s;
+ ctx.fillStyle='#b3ced0';ctx.fillRect(0,0,BW,BH);ctx.drawImage(mapCache,cx-sw/2,cz-sh/2,sw,sh,0,0,BW,BH);
+ const P=p=>[BW/2+(p[0]-ax)*k,BH/2+(p[1]-az)*k];mapPolice(ctx,p=>P([p.x,p.z]),k);
+ if(minimapBase.dataset.policeMarkers!==undefined)canvas.dataset.policeMarkers=minimapBase.dataset.policeMarkers;{const label=minimapBase.getAttribute('aria-label');if(label&&canvas.getAttribute('aria-label')!==label)canvas.setAttribute('aria-label',label);}
+ if(cph){const r=cph.route?.();ctx.save();
   // Named places (the start points) as small labels, so you always know what is near.
-  ctx.font='600 10px Manrope,sans-serif';ctx.textAlign='center';for(const l of data?.landmarks||[]){const [x,y]=P([l.x,l.z]);if(x<8||y<8||x>canvas.width-8||y>canvas.height-8)continue;ctx.fillStyle='#2b2d2f';ctx.beginPath();ctx.arc(x,y,2.6,0,Math.PI*2);ctx.fill();ctx.lineWidth=3;ctx.strokeStyle='rgba(248,245,238,.9)';ctx.strokeText(l.name,x,y-6);ctx.fillText(l.name,x,y-6);}
+  ctx.font='600 10px Manrope,sans-serif';ctx.textAlign='center';for(const l of data?.landmarks||[]){const [x,y]=P([l.x,l.z]);if(x<8||y<8||x>BW-8||y>BH-8)continue;ctx.fillStyle='#2b2d2f';ctx.beginPath();ctx.arc(x,y,2.6,0,Math.PI*2);ctx.fill();ctx.lineWidth=3;ctx.strokeStyle='rgba(248,245,238,.9)';ctx.strokeText(l.name,x,y-6);ctx.fillText(l.name,x,y-6);}
   if(r?.length>1){ctx.strokeStyle=city?.era===1760?'#c08a2a':'#7b3fe4';ctx.lineWidth=5;ctx.lineJoin=ctx.lineCap='round';ctx.beginPath();r.forEach((p,i)=>{const [x,y]=P(Array.isArray(p)?p:[p.x,p.z]);i?ctx.lineTo(x,y):ctx.moveTo(x,y);});ctx.stroke();}
-  for(const t of cph.minimapTargets()){let [x,y]=P(t.p);const m=12,cx=canvas.width/2,cy=canvas.height/2,dx=x-cx,dy=y-cy,k=Math.min(1,(cx-m)/Math.max(1e-6,Math.abs(dx)),(cy-m)/Math.max(1e-6,Math.abs(dy)));if(t.small&&k<1)continue;x=cx+dx*k;y=cy+dy*k;
-   ctx.fillStyle=t.color;ctx.strokeStyle='#fff';ctx.lineWidth=2.5;ctx.beginPath();ctx.arc(x,y,k<1?6:8,0,Math.PI*2);ctx.fill();ctx.stroke();}
   ctx.restore();}
- mapCar(ctx,canvas.width/2,canvas.height/2,car.heading,1.25);ctx.fillStyle='#34483d';ctx.font='18px sans-serif';ctx.fillText('N',canvas.width-26,25);}
+ minimapAnchor={x:ax,z:az,span,w:W,h:H};
+}
+// rebuild: the HUD tick (labels, route and police markers refreshed); otherwise only when the window would run out.
+function drawMinimap(rebuild=false){if(!car)return;const canvas=$('minimap'),ctx=canvas.getContext('2d'),span=police?.level?420:1250,W=canvas.width,H=canvas.height,M=MINIMAP_MARGIN,k=W/span;
+ let a=minimapAnchor;if(rebuild||!a||a.span!==span||a.w!==W||a.h!==H||Math.abs(car.x-a.x)*k>M*.8||Math.abs(car.z-a.z)*k>M*.8){drawMinimapBase(canvas,span);a=minimapAnchor;}
+ ctx.drawImage(minimapBase,M+(car.x-a.x)*k,M+(car.z-a.z)*k,W,H,0,0,W,H);
+ if(cph){const P=p=>[W/2+(p[0]-car.x)*k,H/2+(p[1]-car.z)*k];
+  for(const t of cph.minimapTargets()){let [x,y]=P(t.p);const m=12,cx=W/2,cy=H/2,dx=x-cx,dy=y-cy,f=Math.min(1,(cx-m)/Math.max(1e-6,Math.abs(dx)),(cy-m)/Math.max(1e-6,Math.abs(dy)));if(t.small&&f<1)continue;x=cx+dx*f;y=cy+dy*f;
+   ctx.fillStyle=t.color;ctx.strokeStyle='#fff';ctx.lineWidth=2.5;ctx.beginPath();ctx.arc(x,y,f<1?6:8,0,Math.PI*2);ctx.fill();ctx.stroke();}}
+ mapCar(ctx,W/2,H/2,car.heading,1.25);ctx.fillStyle='#34483d';ctx.font='18px sans-serif';ctx.textAlign='start';ctx.fillText('N',W-26,25);
+}
 function drawCityMap(){const canvas=$('city-map'),ctx=canvas.getContext('2d');const side=canvas.height;ctx.fillStyle='#b3ced0';ctx.fillRect(0,0,canvas.width,canvas.height);const offset=(canvas.width-side)/2;ctx.drawImage(mapCache,offset,0,side,side);const s=side/mapView.size,mx=x=>canvas.width/2+(x-mapView.cx)*s,mz=z=>canvas.height/2+(z-mapView.cz)*s;for(const [i,l] of data.landmarks.entries()){const x=mx(l.x),z=mz(l.z);ctx.fillStyle='#f8f5eb';ctx.strokeStyle='#758670';ctx.lineWidth=1.5;ctx.beginPath();ctx.arc(x,z,11,0,Math.PI*2);ctx.fill();ctx.stroke();ctx.fillStyle='#34483d';ctx.font='600 11px sans-serif';ctx.textAlign='center';ctx.fillText(String(i+1),x,z+4);}mapPolice(ctx,p=>[mx(p.x),mz(p.z)],s);mapCar(ctx,mx(car.x),mz(car.z),car.heading,1.35);}
 // Tram sections and bus bodies: cars never drive or spawn into them (mobility.js).
 const transitBodies=()=>[...(tramSim?.bodies||[]),...(buses?.bodies||[]),...(travel?.parkedBodies()||[]),...(parkedCars?.movedBodies()||[])]; // pushed parked cars: traffic stops for one shoved into its lane
@@ -1145,7 +1162,7 @@ function updateHUD(now){
  if(areaLabel){const caption=document.querySelector('.minimap-caption')?.firstChild,text=`${areaLabel(car.x,car.z,now)} `;if(caption&&caption.textContent!==text)caption.textContent=text;}
  const location=currentLocation();locationReadout.update(location);
  $('coordinates').textContent=`${location.coordinates.latitude.toFixed(6)}° N · ${location.coordinates.longitude.toFixed(6)}° E`;
- drawMinimap();
+ drawMinimap(true); /* the map layer: labels, route, police (it slides every frame from the render loop) */
  if(mapOpen&&$('map-dialog').open)drawCityMap();
 }
 // ?cinematic: a shot can switch today's seasonal decorations (seasons.js) mid-run, show the radio card tuning through the
@@ -1188,7 +1205,7 @@ function frame(now){
  if(cinematic){if(paused)setPaused(false);if(!started)start();cinematic.update(Math.min(.5,frameMs/1000));} // wall-clock pacing; the trailer never waits on a pause or a start-point preview. Before the car model is placed (below): placed after it, the car was drawn a frame behind the camera that tracked it and shook whenever frame times varied
  if(ready&&!paused&&!mapOpen&&!reading&&!police?.busted){
   camera.updateMatrixWorld();trafficFrustum.setFromProjectionMatrix(trafficProjection.multiplyMatrices(camera.projectionMatrix,camera.matrixWorldInverse));
-  mobility.visibilityTest=trafficInView;if(buses)buses.simulation.visibilityTest=trafficInView;
+  mobility.visibilityTest=trafficInView;if(buses)buses.simulation.visibilityTest=trafficInView;if(cyclists)cyclists.visibilityTest=trafficInView; /* riders re-spawn only out of sight */
   for(const step of steps){
    impacts.step(step,world);crowd?.step(step);let before=null;const driving=travel.mode==='car',parked=travel.parked(),people=fillList(SCRATCH.people,mobility.people,detailPeople);
    if(started&&cinematic?.driving)before={...car}; /* the trailer's car drives itself (cinematic.js) and hits nothing */
@@ -1306,6 +1323,7 @@ function frame(now){
   if(Math.abs(sun.shadow.camera.top-sf.halfHeight)>.5||Math.abs(sun.shadow.camera.right-sf.halfWidth)>.5){Object.assign(sun.shadow.camera,{left:-sf.halfWidth,right:sf.halfWidth,top:sf.halfHeight,bottom:-sf.halfHeight});sun.shadow.camera.updateProjectionMatrix();sun.shadow.normalBias=sf.normalBias;}
   stableShadowTarget({x:focus.x-Math.sin(cameraHeading)*50,y:groundAt(focus.x,focus.z),z:focus.z-Math.cos(cameraHeading)*50},{width:sf.halfWidth*2,height:sf.halfHeight*2},sun.shadow.mapSize.x,sun.target.position,sunOffset);sun.position.copy(sun.target.position).add(sunOffset);}
  const cp=new THREE.Vector3(0,photoMode?0:65,-31).project(camera);$('cathedral-label').style.left=`${(cp.x*.5+.5)*captureFrame.w}px`;$('cathedral-label').style.top=`${(-cp.y*.5+.5)*captureFrame.h-15}px`;$('cathedral-label').style.opacity=car&&Math.hypot(car.x,car.z+31)<280&&cp.x>-1&&cp.x<1&&cp.y>-.65&&cp.y<.8&&cp.z<1?1:0;
+ if(ready&&now-lastUI<=140)drawMinimap(); /* between HUD ticks: slide the minimap with the car every frame */
  if(now-lastUI>140&&ready){updateHUD(now);travelUI.update(travel,{started,paused,mapOpen,busted:police?.busted,hidden:captureMode});peopleUI.update(peopleInteraction?.snapshot(),{hidden:!canTalk()||captureMode||gullEncounter.snapshot().phase==='chase'});refreshMarketUI();noticeGulls();lastUI=now;}
  uploads.step(); // rationed GPU uploads for streamed tiles
  if(ready)speciesTrees?.update(focus,{high:camera.position.y-groundAt(focus.x,focus.z)>22}); // every frame (cheap until the focus moves 8 m): waiting for tile loads made near trees pop in late

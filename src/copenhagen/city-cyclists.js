@@ -25,6 +25,7 @@ export class CityCyclists{
    const e=E[Math.floor(this.random()*E.length)];if(e.length<15||e.crossing)continue;
    const m=e.points[Math.floor(e.points.length/2)],d=Math.hypot(m[0]-player.x,m[1]-player.z);if(d<40||d>340)continue;
    if(d<160&&player.heading!==undefined){const fx=-Math.sin(player.heading),fz=-Math.cos(player.heading);if(((m[0]-player.x)*fx+(m[1]-player.z)*fz)/d>.2)continue;} // not popping up ahead
+   if(this.visibilityTest&&d<260&&tries<30&&this.visibilityTest({x:m[0],z:m[1]}))continue; // nor anywhere else the camera looks
    if(this.offset(e)===null)continue;
    const route=[e];let total=e.length,cur=e;
    while(total<700){const next=(this.roads.outgoing[cur.to]||[]).map(i=>typeof i==='number'?E[i]:i).filter(n=>n.to!==cur.from&&n.length>4&&!n.crossing&&this.offset(n)!==null);if(!next.length)break;cur=next[Math.floor(this.random()*next.length)];route.push(cur);total+=cur.length;}
@@ -32,6 +33,10 @@ export class CityCyclists{
   }
   r.route=null;return false;
  }
+ // visibilityTest: set by main.js (the camera frustum, as for the traffic); without one, anything within 160 m counts as seen.
+ visible(r,player){const d=Math.hypot(r.x-player.x,r.z-player.z);return d<RANGE&&(this.visibilityTest?d<12||this.visibilityTest(r):d<160);}
+ extend(r){const E=this.roads.edges,cur=r.route.at(-1),out=(this.roads.outgoing[cur.to]||[]).map(i=>typeof i==='number'?E[i]:i).filter(n=>n.length>4&&!n.crossing),on=out.filter(n=>n.to!==cur.from),usual=on.filter(n=>this.offset(n)!==null);
+  const list=usual.length?usual:on.length?on:out;if(!list.length)return false;r.route.push(list[Math.floor(this.random()*list.length)]);return true;}
  snapshot(){return this.riders.filter(r=>!r.playerTaken&&r.route).map(({id,x,z,heading,speed})=>({id,x,z,heading,speed}));}
  step(dt,player){
   if(!player)return;
@@ -42,7 +47,9 @@ export class CityCyclists{
    const ahead=routePoint(e,Math.min(e.length,r.s+4),o),blocked=Math.hypot(ahead.x-player.x,ahead.z-player.z)<3;
    r.speed+=Math.max(-5*dt,Math.min(1.5*dt,(blocked?0:r.cruise)-r.speed));
    r.s+=r.speed*dt;
-   if(r.s>=e.length){r.s-=e.length;r.leg++;if(r.leg>=r.route.length){r.route=null;continue;}}
+   // End of the route: out of sight the rider is re-spawned elsewhere; in sight it rides on (the route is extended), so
+   // nobody vanishes in the middle of a junction. A dead end in sight: wait there until the camera has turned away.
+   if(r.s>=e.length){if(r.leg+1>=r.route.length&&(this.visible(r,player)?!this.extend(r):true)){if(this.visible(r,player)){r.s=e.length;r.speed=0;}else{r.route=null;continue;}}else{r.s-=e.length;r.leg++;if(r.leg>8){r.route.splice(0,r.leg);r.leg=0;}}}
    const cur=r.route[r.leg],p=routePoint(cur,r.s,this.offset(cur)??cur.lane+1.7);r.x=p.x;r.z=p.z;r.heading=p.heading;r.phase+=r.speed*dt*2.2;
   }
  }
