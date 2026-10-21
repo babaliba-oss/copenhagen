@@ -5,3 +5,4 @@
 body:not(.booting) #boot-art,#boot-art.aside{opacity:0;visibility:hidden}
 @keyframes boot-art-drift{from{transform:scale(1.04) translate(0,0)}to{transform:scale(1.1) translate(-1.5%,-1%)}}
 @media (prefers-reduced-motion:reduce){#boot-art .boot-art-layer{animation:none}}
+body:not(.booting) #boot-art .boot-art-layer{animation:none} /* hidden in play: no drift animation left running */

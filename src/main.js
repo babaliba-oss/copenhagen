@@ -234,6 +234,7 @@ const renderer=new THREE.WebGLRenderer({canvas:$('world'),antialias:OFF.has('pos
  const shown=[];for(const g of loadedTiles.values())if(g.visible&&g.userData.level==='near')for(const c of g.userData.casters||[]){c.visible=true;shown.push(c);}
  try{return render.call(this,lights,sc,cam);}finally{for(const c of shown)c.visible=false;}};}
 renderer.debug.checkShaderErrors=!!import.meta.env?.DEV; /* the error check reads every shader's info log, which waits for the compile: a stall each time a new material first draws (boot and play) */
+const bootArtEl=document.getElementById('boot-art');let coveredDrawAt=0;
 const fpsMeter=createFpsMeter(renderer,()=>`${pacer.half?' · 30 cap':''} · ×${renderer.getPixelRatio().toFixed(2)} · q${governor?.level??'-'}${renderer.shadowMap.enabled?' · shadows':''}${post?' · post':''}`);
 // The GPU's name (shown on the error screen) and PowerVR (Pixel 10 and others): its driver lost the context while the start-up
 // shader warm-up compiled every program at once, so it skips that bulk compile (programs then compile as things first appear).
@@ -1324,7 +1325,10 @@ function frame(now){
  flushPeople(scene); // every crowd's instances into the shared person batches (person-model.js)
  const cpu1=performance.now();
  if(HIDE){if(now-hiddenAt>1000){hiddenAt=now;hiddenList=[];scene.traverse(o=>{if(o.name&&HIDE.test(o.name))hiddenList.push(o);});}for(const o of hiddenList)o.visible=false;}
- if(!skipRender){if(post)post.render(scene,camera);else renderer.render(scene,camera);} /* ?fixed: __cineFrame(n,false) steps the world without drawing (scripts/cine-check) */
+ // Behind the opaque title art (loading and the start card, until the art is set aside) a frame every 400 ms is enough:
+ // it still compiles and uploads what appears, without drawing the whole city 60 times a second under a picture.
+ const covered=bootArtEl&&document.body.classList.contains('booting')&&!bootArtEl.classList.contains('aside')&&!CINEMATIC;
+ if(!skipRender&&!(covered&&now-coveredDrawAt<400)){coveredDrawAt=now;if(post)post.render(scene,camera);else renderer.render(scene,camera);} /* ?fixed: __cineFrame(n,false) steps the world without drawing (scripts/cine-check) */
  const cpu2=performance.now();lastCpuMs=cpu2-cpu0;
  if(perfOverlay)perfOverlay.split(cpu1-cpu0,cpu2-cpu1); // game code vs. render submission: CPU- or GPU-bound
 }
