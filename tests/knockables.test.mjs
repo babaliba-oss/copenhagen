@@ -35,3 +35,11 @@ test('buildings stop sliding bollards and fallen ones respawn once the player is
   const b=k.bodies[0];assert.ok(b.z>=-8.5);assert.ok(b.resting&&b.knocked);
   car.x=500;simulate(k,car,null,61);assert.equal(b.knocked,false);assert.equal(b.z,-4);
 });
+
+test('an item off the paving stands at its drop below groundAt, and lies at groundAt once knocked away',()=>{
+  const k=createKnockables([{x:0,z:-4,yaw:0,drop:-.5},{x:3,z:-4,yaw:0}],parts()),m=k.group.children[0];k.update();
+  const y=i=>m.instanceMatrix.array[i*16+13];assert.ok(Math.abs(y(0)-(y(1)-.5))<1e-6,'set down onto the bare ground drawn there');
+  const car=makeCar(0,0,0);car.speed=12;simulate(k,car,null,1);car.speed=0;simulate(k,car,null,6);
+  assert.ok(Math.abs(k.bodies[0].z+4)>1);k.update({x:0,z:0},true);const i=[...Array(m.count).keys()].find(n=>Math.abs(m.instanceMatrix.array[n*16+12])<.5&&m.instanceMatrix.array[n*16+14]<-6);
+  assert.ok(i!==undefined&&m.instanceMatrix.array[i*16+13]>-.1,'away from its spot it rests on the ground under it');
+});

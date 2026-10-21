@@ -43,7 +43,7 @@ export function bringAshore(items,{wet,deck=()=>false,blocked=()=>false,reach=3,
   for(let r=.4;r<=reach+1e-9&&!to;r+=.4)for(const [dx,dz] of dirs){const x=it.x+dx*r,z=it.z+dz*r;if(wet(x,z)||blocked(x,z))continue;
    for(const k of [inland,inland/2,0]){const fx=x+dx*k,fz=z+dz*k;if(!wet(fx,fz)&&!blocked(fx,fz)&&!wet(x+dx*k/2,z+dz*k/2)){to=[fx,fz];break;}}if(to)break;}
   if(!to){dropped++;continue;}
-  it.x=+to[0].toFixed(2);it.z=+to[1].toFixed(2);moved++;out.push(it);}
+  it.x=+to[0].toFixed(2);it.z=+to[1].toFixed(2);it.bare=undefined;moved++;out.push(it);} // bare (furniture.json) held for the mapped spot
  return {items:out,moved,dropped};
 }
 // Benches are photo detections placed to within a few metres, and 920 came with no heading (all faced north). One
@@ -63,7 +63,7 @@ export function placeBenches(items,{houses,wheels,walk}){
  let moved=0,turned=0,dropped=0,parked=0;items=items.filter(it=>{if(it.k!=='bench')return true;const e=kerb(it.x,it.z);
   if(!e||e.d>7){if(it.yaw)return true;const w=edgeOf(walk,it.x,it.z,6);if(w&&w.d>.05){const on=!!walk.at(it.x,it.z),sx=(it.x-w.x)/w.d,sz=(it.z-w.z)/w.d;it.yaw=on?Math.atan2(sx,sz):Math.atan2(-sx,-sz);parked++;}return true;}
   const inside=!!wheels.at(it.x,it.z);let ux=it.x-e.x,uz=it.z-e.z;const l=Math.hypot(ux,uz);if(l<.01)return false;ux/=l;uz/=l;if(inside){ux=-ux;uz=-uz;} // (ux,uz): from the kerb into the pavement
-  if(inside||e.d<.9){const x=e.x+ux*.9,z=e.z+uz*.9;if(wheels.at(x,z)||houses.at(x,z)){dropped++;return false;}it.x=x;it.z=z;moved++;}
+  if(inside||e.d<.9){const x=e.x+ux*.9,z=e.z+uz*.9;if(wheels.at(x,z)||houses.at(x,z)){dropped++;return false;}it.x=x;it.z=z;it.bare=undefined;moved++;}
   it.yaw=Math.atan2(-ux,-uz);turned++;return true;}); // the seat faces +Z in the bench model: towards the street
  // One bench seen from several photos lands as two or three a metre or two apart, and the kerb snap above lines them
  // up on the same spot (end to end and through each other on Langebro): the first stays, one overlapping it is dropped.
@@ -165,6 +165,7 @@ function plateGeometry(size,rect){
 export function createMappedFurniture(layer,{rangeScale=1,player=()=>null,mobility=()=>null,canvas=globalThis.document,poleAllowed=()=>true,wallAt=null,rackBikes=null,models={}}={}){
  const group=new THREE.Group();group.name='Mapped street furniture';
  const items=layer?.items||[],obstacles=[],chunks=new Map(),lights=[];
+ const baseY=it=>groundAt(it.x,it.z)+(it.drop||0); // drop (main.js, from furniture.json's bare flag): off the paving the ground is drawn under the height field, and an item at groundAt floated
  const painted=new THREE.MeshStandardMaterial({vertexColors:true,roughness:.6,metalness:.2});
  const atlas=canvas&&layer.faces?.length?signAtlas(layer.faces):null;layer.faces??=[];
  const plates=new THREE.MeshStandardMaterial({map:atlas?.texture||null,alphaTest:.5,roughness:.55,side:THREE.FrontSide});
@@ -174,7 +175,7 @@ export function createMappedFurniture(layer,{rangeScale=1,player=()=>null,mobili
   if(!chunks.has(key)){const signs=createBreakableSigns(`Mapped furniture posts ${key}`),g=new THREE.Group();g.name='Mapped furniture chunk';group.add(g);
    chunks.set(key,{key,group:g,signs,recipes:[],meshes:[],centre:[(Math.floor(x/C)+.5)*C,(Math.floor(z/C)+.5)*C]});}
   return chunks.get(key);};
- const place=(geometry,x,z,yaw,chunk,i,list)=>{geometry.applyMatrix4(m4.compose(v.set(x,groundAt(x,z),z),q.setFromAxisAngle(UP,yaw),one));chunk.signs.tag(geometry,i);list.push(geometry);};
+ const place=(geometry,x,z,yaw,chunk,i,list,y=groundAt(x,z))=>{geometry.applyMatrix4(m4.compose(v.set(x,y,z),q.setFromAxisAngle(UP,yaw),one));chunk.signs.tag(geometry,i);list.push(geometry);};
 
  // Instanced items: one batch per kind for the whole city, holding only the instances near the player and
  // refilled as the player moves (pools, refillPools below). They used to be one batch per kind per 250 m chunk:
@@ -184,7 +185,7 @@ export function createMappedFurniture(layer,{rangeScale=1,player=()=>null,mobili
  function chunkedInstances(list,geometry,material,name,pose,{shadow=true,range=VIEW_RANGE+70}={}){
   if(!list.length)return;
   const n=list.length,mats=new Float32Array(n*16),cells=new Map();
-  list.forEach((it,i)=>{const [x,z,yaw]=pose(it);m4.compose(v.set(x,groundAt(x,z),z),q.setFromAxisAngle(UP,yaw||0),one).toArray(mats,i*16);
+  list.forEach((it,i)=>{const [x,z,yaw]=pose(it);m4.compose(v.set(x,groundAt(x,z)+(it.drop||0),z),q.setFromAxisAngle(UP,yaw||0),one).toArray(mats,i*16);
    const k=Math.floor(x/POOL_CELL)*100000+Math.floor(z/POOL_CELL);let l=cells.get(k);if(!l)cells.set(k,l=[]);l.push(i);});
   const mesh=new THREE.InstancedMesh(geometry,material,n);mesh.name=name;mesh.castShadow=shadow;mesh.receiveShadow=true;mesh.count=0;mesh.frustumCulled=false;
   mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);pooled.add(mesh);pools.push({mesh,mats,cells,range,at:null});
@@ -203,17 +204,17 @@ export function createMappedFurniture(layer,{rangeScale=1,player=()=>null,mobili
   const chunk=chunkOf(it.x,it.z),yaw=it.yaw||0;let height=spec.height;
   const layout=it.k==='sign'?plateLayout((it.faces||[]).map(face=>({face,code:layer.faces.find(f=>f.face===face)?.code})),it.yaws):[];
   if(layout.length)height=Math.max(...layout.map(p=>p.y+p.height/2))+.05;
-  const i=chunk.signs.post({id:itemId(it,index),x:it.x,z:it.z,y:groundAt(it.x,it.z),yaw,height,radius:spec.radius,strength:spec.strength});
+  const i=chunk.signs.post({id:itemId(it,index),x:it.x,z:it.z,y:baseY(it),yaw,height,radius:spec.radius,strength:spec.strength});
   // Geometry is placed only when the chunk is built near the player (buildChunk): a clone of every post city-wide held ~300 MB.
   if(it.k!=='sign'&&!templates.has(it.k))templates.set(it.k,models[it.k]||mergeGeometries(postParts(it.k))); /* Blender model (scripts/blender/furniture.py) where loaded */
   chunk.recipes.push(out=>{
-  if(it.k==='sign')place(cyl(.031,.031,height,height/2,'#929b9d',6),it.x,it.z,0,chunk,i,out.painted);
-  else place(templates.get(it.k).clone(),it.x,it.z,yaw,chunk,i,out.painted);
+  if(it.k==='sign')place(cyl(.031,.031,height,height/2,'#929b9d',6),it.x,it.z,0,chunk,i,out.painted,baseY(it));
+  else place(templates.get(it.k).clone(),it.x,it.z,yaw,chunk,i,out.painted,baseY(it));
   for(const p of layout){const rect=atlas?.uv.get(`${p.face}:0`),back=atlas?.uv.get(`${p.face}:1`);if(!rect)continue;const size=Math.max(p.width,p.height);
-   const front=plateGeometry(size,rect);front.translate(0,p.y,.045);place(front,it.x,it.z,p.yaw,chunk,i,out.plates);
-   const rear=plateGeometry(size,back);rear.rotateY(Math.PI);rear.translate(0,p.y,.035);place(rear,it.x,it.z,p.yaw,chunk,i,out.plates);}
+   const front=plateGeometry(size,rect);front.translate(0,p.y,.045);place(front,it.x,it.z,p.yaw,chunk,i,out.plates,baseY(it));
+   const rear=plateGeometry(size,back);rear.rotateY(Math.PI);rear.translate(0,p.y,.035);place(rear,it.x,it.z,p.yaw,chunk,i,out.plates,baseY(it));}
   });
-  if(LENSES[it.k])lights.push({x:it.x,z:it.z,yaw,kind:it.k,post:chunk.signs.bodies[i],edge:undefined});
+  if(LENSES[it.k])lights.push({x:it.x,z:it.z,gy:baseY(it),yaw,kind:it.k,post:chunk.signs.bodies[i],edge:undefined});
  });
  // Wire-hung lamps: the Copenhagen street light, a dark shade on a steel wire strung between facades
  // (register span to the nearest wall on each side; a slim pole where no wall is in reach).
@@ -274,7 +275,7 @@ export function createMappedFurniture(layer,{rangeScale=1,player=()=>null,mobili
   if(!lenses)return;const sim=mobility();let moved=false,coloured=false;
   for(const l of lights){const show=!!p&&l.post.state==='upright'&&Math.abs(l.x-p.x)<SIGNAL_RANGE&&Math.abs(l.z-p.z)<SIGNAL_RANGE;if(show!==l.shown){l.shown=show;moved=true;}}
   if(moved){let n=0;for(const l of lights){if(!l.shown)continue;l.slot=n;
-    LENSES[l.kind].forEach(([y],j)=>{m4.compose(v.set(l.x+Math.sin(l.yaw)*.18,y+groundAt(l.x,l.z),l.z+Math.cos(l.yaw)*.18),q.setFromAxisAngle(UP,l.yaw),one);lenses.setMatrixAt(n+j,m4);});n+=LENSES[l.kind].length;}
+    LENSES[l.kind].forEach(([y],j)=>{m4.compose(v.set(l.x+Math.sin(l.yaw)*.18,y+l.gy,l.z+Math.cos(l.yaw)*.18),q.setFromAxisAngle(UP,l.yaw),one);lenses.setMatrixAt(n+j,m4);});n+=LENSES[l.kind].length;}
    lenses.count=n;lenses.instanceMatrix.needsUpdate=true;}
   for(const l of lights){
    if(!l.shown)continue;
@@ -294,7 +295,7 @@ export function createMappedFurniture(layer,{rangeScale=1,player=()=>null,mobili
  for(const [kind,parts] of [['bin',binParts],['barrier',barrierParts],['cone',coneParts]]){
   const list=items.filter(i=>i.k===kind);if(!list.length)continue;
   const g=models[kind]?models[kind].clone():mergeGeometries(parts());if(!models[kind])g.computeVertexNormals();
-  const k=createKnockables(list.map((it,i)=>({id:itemId(it,i),x:it.x,z:it.z,yaw:it.yaw||0})),[{geometry:g,material:painted}],{...KNOCKABLE[kind],range:VIEW_RANGE*rangeScale});
+  const k=createKnockables(list.map((it,i)=>({id:itemId(it,i),x:it.x,z:it.z,yaw:it.yaw||0,drop:it.drop})),[{geometry:g,material:painted}],{...KNOCKABLE[kind],range:VIEW_RANGE*rangeScale});
   k.group.name=`Mapped ${kind}s`;group.add(k.group);knock.push(k);
  }
  const solidParts={bollard:([w,,h])=>[cyl(w*.45,w*.5,h,h/2,'#2f3436',8),cyl(w*.5,w*.5,.08,h*.82,'#c9a64a',8),cyl(w*.38,w*.45,.06,h+.03,'#2f3436',8)],'junction-box':([w,d,h])=>[box(w,h,d,0,h/2,0,'#8a9086'),box(w+.04,.05,d+.04,0,h+.02,0,'#6d736a')],
@@ -313,9 +314,9 @@ export function createMappedFurniture(layer,{rangeScale=1,player=()=>null,mobili
   const bikes=rackBikes?.length?rackBikes:['#1d1f22','#2d4f7a','#7a2a20','#3f5d45','#c9c4b8'].map(c=>mergeGeometries([T(.33,0,-.55,'#1a1a1a'),T(.33,0,.55,'#1a1a1a'),bar([0,.36,.55],[0,.82,.22],c),bar([0,.36,.55],[0,.38,.05],c),bar([0,.82,.22],[0,.38,.05],c),bar([0,.38,.05],[0,.92,-.42],c),bar([0,.82,.22],[0,.92,-.42],c),bar([0,.92,-.42],[0,.36,-.55],c),bar([-.26,1.05,-.45],[.26,1.05,-.45],'#2a2a2a'),bar([0,.92,-.42],[0,1.05,-.45],'#555'),paint(new THREE.BoxGeometry(.12,.05,.26).translate(0,.92,.24),'#222')]));
   const lists=bikes.map(()=>[]),cargo=[];let n=0;
   // A rack left without bikes has a cargo bike beside it one time in three (Daniel's Babboe scan, CC BY alban).
-  racks.forEach((it,i)=>{if((i*7919)%10<1){if(models['cargo-bike']&&i%3===0)cargo.push([it.x,it.z,(it.yaw||0)+(i%2?Math.PI:0)]);return;}const c=Math.cos(it.yaw||0),sn=Math.sin(it.yaw||0);const slots=[-.9,-.3,.3,.9].filter((_,j)=>((i*13+j*7)%9)>2||j===1);for(const off of slots){const k=(i*31+n++)%bikes.length;lists[k].push([it.x+c*off,it.z-sn*off,(it.yaw||0)+(off>0?Math.PI:0)+((i%3)-1)*.06]);}});
+  racks.forEach((it,i)=>{if((i*7919)%10<1){if(models['cargo-bike']&&i%3===0)cargo.push([it.x,it.z,(it.yaw||0)+(i%2?Math.PI:0),it.drop]);return;}const c=Math.cos(it.yaw||0),sn=Math.sin(it.yaw||0);const slots=[-.9,-.3,.3,.9].filter((_,j)=>((i*13+j*7)%9)>2||j===1);for(const off of slots){const k=(i*31+n++)%bikes.length;lists[k].push([it.x+c*off,it.z-sn*off,(it.yaw||0)+(off>0?Math.PI:0)+((i%3)-1)*.06,it.drop]);}});
   // Knockable too: with the racks knocked flying, bikes left standing in the air looked broken. Drawn to 230 m (small, many).
-  const bikeSet=(l,g,name)=>{const k=createKnockables(l.map(([x,z,yaw],i)=>({id:`${name}-${i}`,x,z,yaw})),[{geometry:g,material:painted}],{radius:.35,height:1,range:230*rangeScale,footprint:[.2,.85]});k.group.name=name;group.add(k.group);knock.push(k);};
+  const bikeSet=(l,g,name)=>{const k=createKnockables(l.map(([x,z,yaw,drop],i)=>({id:`${name}-${i}`,x,z,yaw,drop})),[{geometry:g,material:painted}],{radius:.35,height:1,range:230*rangeScale,footprint:[.2,.85]});k.group.name=name;group.add(k.group);knock.push(k);};
   lists.forEach((l,k)=>{if(l.length)bikeSet(l,bikes[k],`Parked bicycles ${k}`);});
   if(cargo.length)bikeSet(cargo,models['cargo-bike'],'Parked cargo bikes');
  }}
@@ -326,7 +327,7 @@ export function createMappedFurniture(layer,{rangeScale=1,player=()=>null,mobili
   // benches and bollards; open-world driving games make roadside props break away and keep buildings, trees and
   // landmarks solid). Shelters and hot-dog stands stay solid.
   if(KNOCK_SOLID.has(kind)){const [w,d,h]=size;
-   const k=createKnockables(list.map((it,i)=>({id:itemId(it,i),x:it.x,z:it.z,yaw:it.yaw||0})),[{geometry:g,material:painted}],{radius:Math.min(.7,Math.max(.2,Math.max(w,d)*.3)),height:h,range:VIEW_RANGE*rangeScale,footprint:[w/2,d/2]});
+   const k=createKnockables(list.map((it,i)=>({id:itemId(it,i),x:it.x,z:it.z,yaw:it.yaw||0,drop:it.drop})),[{geometry:g,material:painted}],{radius:Math.min(.7,Math.max(.2,Math.max(w,d)*.3)),height:h,range:VIEW_RANGE*rangeScale,footprint:[w/2,d/2]});
    k.group.name=`Mapped ${kind}s (knockable)`;group.add(k.group);knock.push(k);continue;}
   chunkedInstances(list,g,painted,`Mapped ${kind}`,it=>[it.x,it.z,it.yaw]);
   list.forEach((it,i)=>{const yaw=it.yaw||0;
@@ -336,7 +337,7 @@ export function createMappedFurniture(layer,{rangeScale=1,player=()=>null,mobili
 
  // Lamp light after dark (weather.js night look): a bright head that blooms and a warm pool on the ground.
  const HEAD={lantern:[0,2.62,.42],lamp:[0,8.2,1.5],'mast-lamp':[0,5.42,0],'park-lamp':[0,2.85,0],'wire-lamp':[0,7.28,0]};
- const hungLamps=new Set(wireLamps),heads=items.filter(it=>HEAD[it.k]&&(it.k!=='wire-lamp'||hungLamps.has(it))).map(it=>{const [hx,hy,hz]=HEAD[it.k],yaw=it.yaw||0,x=it.x+Math.sin(yaw)*hz,z=it.z+Math.cos(yaw)*hz;return {x,z,y:groundAt(it.x,it.z)+hy,k:it.k};});
+ const hungLamps=new Set(wireLamps),heads=items.filter(it=>HEAD[it.k]&&(it.k!=='wire-lamp'||hungLamps.has(it))).map(it=>{const [hx,hy,hz]=HEAD[it.k],yaw=it.yaw||0,x=it.x+Math.sin(yaw)*hz,z=it.z+Math.cos(yaw)*hz;return {x,z,y:baseY(it)+hy,g:baseY(it),k:it.k};});
  // Chunked (300 m) so only lights near the player are drawn after dark.
  const lightChunks=[];let glowMat=null,poolMat=null;
  if(heads.length){
@@ -349,7 +350,7 @@ export function createMappedFurniture(layer,{rangeScale=1,player=()=>null,mobili
   for(const h of heads){const k=`${Math.floor(h.x/300)},${Math.floor(h.z/300)}`;if(!by.has(k))by.set(k,[]);by.get(k).push(h);}
   for(const list of by.values()){
    const glow=new THREE.InstancedMesh(sphere,glowMat,list.length),pools=new THREE.InstancedMesh(plane,poolMat,list.length);glow.name='Lamp heads lit';pools.name='Lamp light pools';pools.renderOrder=2;
-   let cx=0,cz=0;list.forEach((h,i)=>{glow.setMatrixAt(i,m4.compose(v.set(h.x,h.y,h.z),q.identity(),h.k==='park-lamp'?sc.set(.8,.8,.8):one));const r=R[h.k];pools.setMatrixAt(i,m4.compose(v.set(h.x,groundAt(h.x,h.z)+.32,h.z),q.identity(),sc.set(r,1,r)));cx+=h.x;cz+=h.z;});
+   let cx=0,cz=0;list.forEach((h,i)=>{glow.setMatrixAt(i,m4.compose(v.set(h.x,h.y,h.z),q.identity(),h.k==='park-lamp'?sc.set(.8,.8,.8):one));const r=R[h.k];pools.setMatrixAt(i,m4.compose(v.set(h.x,h.g+.32,h.z),q.identity(),sc.set(r,1,r)));cx+=h.x;cz+=h.z;});
    glow.computeBoundingSphere();pools.computeBoundingSphere();glow.visible=pools.visible=false;group.add(glow,pools);lightChunks.push({glow,pools,x:cx/list.length,z:cz/list.length});
   }
  }

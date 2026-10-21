@@ -20,7 +20,7 @@ export function createKnockables(items,parts,{radius=.3,height=1.1,range=Infinit
   const clear=Number.isFinite(range)?range+20:RESPAWN_CLEAR,long=footprint&&footprint[1]>radius*1.5?footprint[1]-radius*.5:0; // back home only out of sight: the set is drawn out to `range`
   const group=new THREE.Group();group.name='Knockable street furniture';
   const meshes=parts.map(({geometry,material})=>{const m=new THREE.InstancedMesh(geometry,material,items.length);m.castShadow=true;m.receiveShadow=true;m.frustumCulled=false;group.add(m);return m;});
-  const bodies=items.map((p,i)=>({id:p.id??i,home:{x:p.x,z:p.z,yaw:p.yaw},x:p.x,y:0,z:p.z,yaw:p.yaw,vx:0,vy:0,vz:0,spin:0,
+  const bodies=items.map((p,i)=>({id:p.id??i,home:{x:p.x,z:p.z,yaw:p.yaw,drop:p.drop||0},x:p.x,y:0,z:p.z,yaw:p.yaw,vx:0,vy:0,vz:0,spin:0,
     tilt:0,tiltRate:0,axis:new THREE.Vector3(1,0,0),knocked:false,resting:true,restTime:0,rand:randomFor(i+1)}));
   const qYaw=new THREE.Quaternion(),qTilt=new THREE.Quaternion(),up=new THREE.Vector3(0,1,0),matrix=new THREE.Matrix4(),pos=new THREE.Vector3(),one=new THREE.Vector3(1,1,1);
   let hits=0;
@@ -98,7 +98,7 @@ export function createKnockables(items,parts,{radius=.3,height=1.1,range=Infinit
       if(focus&&range<Infinity&&Math.abs(b.x-focus.x)+Math.abs(b.z-focus.z)>range*1.3&&Math.hypot(b.x-focus.x,b.z-focus.z)>range)continue;
       qYaw.setFromAxisAngle(up,b.yaw);qTilt.setFromAxisAngle(b.axis,b.tilt).multiply(qYaw);
       // Lying bollards rest on their side, lifted by half the board thickness so they do not sink into the road.
-      pos.set(b.x,b.y+Math.abs(Math.sin(b.tilt))*.05+groundAt(b.x,b.z),b.z);matrix.compose(pos,qTilt,one);
+      pos.set(b.x,b.y+Math.abs(Math.sin(b.tilt))*.05+groundAt(b.x,b.z)+(b.home.drop&&Math.abs(b.x-b.home.x)+Math.abs(b.z-b.home.z)<1?b.home.drop:0),b.z); /* home.drop: an item off the paving stands on the bare ground drawn under the field (mapped-furniture.js) */matrix.compose(pos,qTilt,one);
       for(const m of meshes)m.setMatrixAt(n,matrix);n++;
     }
     for(const m of meshes){m.count=n;m.instanceMatrix.needsUpdate=true;}
