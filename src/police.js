@@ -41,6 +41,8 @@ export const heatForLevel=level=>[0,3,6,10,16,24][Math.max(0,Math.min(5,Math.rou
 // seconds and no unit has reached arrest range (the first wave is boxed in by
 // traffic at a junction, as happens at Lasipalatsi), one unit pulls up 26–42 m
 // away out of the player's view – behind them or behind a building.
+// Route field reach in metres of road (units are retired 450 m out; spawn and backup points are well inside).
+export const ROUTE_REACH=1500;
 export const SURGE={spawn:[60,110],dispatch:.7,minUnits:3,bustTime:2,arrestRange:40,sight:220,escapeScale:3,cruise:6,duration:40,backupAfter:2,backupSpawn:[26,42]};
 export const BUST_TIME=4;
 // Hands-on arrest, everywhere: a unit physically at the car (centre to centre
@@ -69,7 +71,7 @@ export class PoliceSimulation{
   graph.edges.forEach(e=>this.incoming[e.to].push(e));this.reset();
  }
  // Extension edges retain their IDs; wanted state and units are left intact.
- refreshGraph(){
+ refreshGraph(){this.grid=null;
   this.incoming=Array.from({length:this.graph.nodes.length},()=>[]);
   for(const e of this.graph.edges)this.incoming[e.to].push(e);
   this.costs=[];this.target=null;this.intercept=null;this.predicted=null;this.repath=0;
@@ -135,20 +137,27 @@ export class PoliceSimulation{
    if(moving)this.report('police',unit.id,closingSpeed(from,unit));player.x=from.x;player.z=from.z;player.heading=from.heading;player.speed=0;break;
   }
  }
+ sampleGrid(){
+  if(this.grid?.edges===this.graph.edges.length)return this.grid.cells;
+  const cells=new Map();for(const e of this.graph.edges)for(let s=0;s<=e.length;s+=Math.max(5,e.length/12)){const p=routePoint(e,s),k=Math.floor(p.x/40)*100003+Math.floor(p.z/40);let a=cells.get(k);if(!a)cells.set(k,a=[]);a.push({edge:e,s,x:p.x,z:p.z,heading:p.heading});}
+  this.grid={edges:this.graph.edges.length,cells};return cells;
+ }
  plan(player){const f=this.field(player);this.target=f.target;this.costs=f.costs;}
  // One reverse-Dijkstra route field towards a point. Chase units use the last
  // seen position; interceptors use a field towards where the player is heading.
  field(player){
   let nearest=Infinity;let target=null;
-  for(const e of this.graph.edges)for(let s=0;s<=e.length;s+=Math.max(5,e.length/12)){
-   const p=routePoint(e,s),d=distance(p,player);if(d<nearest&&vehicleFitsRoad(p,this.world)){nearest=d;target={edge:e,s};}
+  // Sample points sit in a 40 m grid (built once): search rings outwards instead of every edge in the city (44k edges in Copenhagen took ~90 ms, twice every 2 s at high wanted levels).
+  const grid=this.sampleGrid(),gx=Math.floor(player.x/40),gz=Math.floor(player.z/40);
+  for(let r=0;r<=40&&(r-1)*40<nearest;r++)for(let i=gx-r;i<=gx+r;i++)for(let j=gz-r;j<=gz+r;j++){if(Math.max(Math.abs(i-gx),Math.abs(j-gz))!==r)continue;
+   const cell=grid.get(i*100003+j);if(cell)for(const c of cell){const d=Math.hypot(c.x-player.x,c.z-player.z);if(d<nearest&&vehicleFitsRoad(c,this.world)){nearest=d;target={edge:c.edge,s:c.s};}}
   }
   // Long harbour edges can be hundreds of metres: the coarse graph search
   // alone stops a patrol 10–15 m short of the actual car. Refine its stop point.
   if(target){const {edge,s:centre}=target,radius=Math.max(5,edge.length/12);for(let s=Math.max(0,centre-radius);s<=Math.min(edge.length,centre+radius);s+=.5){const p=routePoint(edge,s),d=distance(p,player);if(d<nearest&&vehicleFitsRoad(p,this.world)){nearest=d;target={edge,s};}}}
   const costs=Array(this.graph.nodes.length).fill(Infinity),field={target,costs};if(!target)return field;
   const {edge,s}=target,heap=[];costs[edge.from]=s;push(heap,[s,edge.from]);
-  while(heap.length){const [cost,node]=pop(heap);if(cost!==costs[node])continue;
+  while(heap.length){const [cost,node]=pop(heap);if(cost!==costs[node])continue;if(cost>ROUTE_REACH)break; /* units live within 450 m of the player: the rest of the city is never driven */
    for(const e of this.incoming[node]){if((this.blocked.get(e.id)||0)>this.time)continue;const next=cost+e.length;if(next<costs[e.from]){costs[e.from]=next;push(heap,[next,e.from]);}}
   }
   return field;
@@ -161,7 +170,7 @@ export class PoliceSimulation{
    if(d<near||d>far||(this.blocked.get(edge.id)||0)>this.time)continue;
    // Surge: score by driving distance to the player, not as the crow flies, so the unit really arrives in seconds.
    const route=edge===this.target.edge?Math.max(0,this.target.s-s):edge.length-s+this.costs[edge.to];
-   if(!vehicleFitsRoad(p,this.world)||[...traffic,...this.units].some(a=>a.edge!==null&&distance(p,a)<12))continue;
+   if(!vehicleFitsRoad(p,this.world)||traffic.some(a=>a.edge!==null&&distance(p,a)<12)||this.units.some(a=>a.edge!==null&&distance(p,a)<12))continue;
    const ahead=-(p.x-player.x)*Math.sin(player.heading)-(p.z-player.z)*Math.cos(player.heading);
    // Chase cars arrive from behind; every second unit tries to head the player off.
    candidates.push({edge,s,...p,ahead,route,score:(surge?Math.min(route,far*2):d)+((ahead>0)!==(role==='intercept')?50:0)});
@@ -182,7 +191,7 @@ export class PoliceSimulation{
    if(edge.points.every(q=>Math.hypot(q[0]-player.x,q[1]-player.z)>far+edge.length))continue;
    for(let s=4;s<=edge.length-4;s+=6){
     const p=routePoint(edge,s),d=distance(p,player);if(d<near||d>far)continue;
-    if(!vehicleFitsRoad(p,this.world)||[...traffic,...this.units].some(a=>a.edge!==null&&distance(p,a)<9))continue;
+    if(!vehicleFitsRoad(p,this.world)||traffic.some(a=>a.edge!==null&&distance(p,a)<9)||this.units.some(a=>a.edge!==null&&distance(p,a)<9))continue;
     const ahead=-(p.x-player.x)*Math.sin(player.heading)-(p.z-player.z)*Math.cos(player.heading),visible=ahead>-6&&this.clearSight(p,player);
     candidates.push({edge,s,...p,score:d+(visible?60:0)+(Number.isFinite(this.costs[edge.to])?0:10)});
    }
@@ -255,7 +264,7 @@ export class PoliceSimulation{
     for(const offset of [edge.lane+2.7,0]){const q=routePoint(edge,s,offset);if(safeVehicleSegment(unit,q,this.world)&&!obstacles.some(a=>a!==unit&&a.edge!==null&&trafficFootprintsOverlap(q,a))){p=q;break;}}
    }
    if(!safeVehicleSegment(unit,p,this.world)||obstacles.some(a=>a!==unit&&a.edge!==null&&trafficFootprintsOverlap(p,a))){
-    unit.speed=0;unit.stuck+=dt;if(unit.stuck>2){this.blocked.set(edge.id,this.time+8);this.repath=0;}continue;
+    unit.speed=0;unit.stuck+=dt;if(unit.stuck>2&&!((this.blocked.get(edge.id)||0)>this.time)){this.blocked.set(edge.id,this.time+8);this.repath=Math.min(this.repath,this.time+.5);} /* once per blocked edge: this used to re-plan every frame while a unit sat stuck */continue;
    }
    if(!unit.progressPoint||distance(p,unit.progressPoint)>.5){unit.stuck=0;unit.progressPoint={x:p.x,z:p.z};}else if(gap>14)unit.stuck+=dt;
    Object.assign(unit,p,{edge,s});
