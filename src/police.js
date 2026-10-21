@@ -242,6 +242,7 @@ export class PoliceSimulation{
   this.stopped=Math.abs(player.speed)<1?this.stopped+dt:0;
   if(surge&&this.stopped>=SURGE.backupAfter&&this.time-this.backupAt>8&&!this.units.some(u=>distance(u,player)<SURGE.arrestRange&&this.clearSight(u,player)))this.backup(player,traffic);
   const cruise=24+this.level*2.6+(surge?SURGE.cruise:0),accel=8+this.level*.6;
+  const obstacles=this.obstacleList||=[];obstacles.length=0;obstacles.push(player);for(const a of traffic)obstacles.push(a);for(const a of this.units)obstacles.push(a); // one list per step (was a ~400-item spread per unit per frame)
   for(const unit of this.units){
    if(unit.parked)continue;
    const field=this.fieldFor(unit);
@@ -249,8 +250,8 @@ export class PoliceSimulation{
    const gap=distance(unit,player);if(gap<18)desired=Math.min(desired,Math.max(0,(gap-5)*1.6));
    // Surge: a unit that has a stopped player within arrest range creeps up to the car and makes the arrest, instead of driving on to the lane target and looping the block.
    if(surge&&gap<SURGE.arrestRange&&Math.abs(player.speed)<1&&this.clearSight(unit,player))desired=Math.min(desired,unit.backup?0:Math.max(0,(gap-10)*.6)); // a backup unit has pulled up: it holds there
-   const obstacles=[player,...traffic,...this.units];
-   for(const a of obstacles){if(a===unit||a.edge===null)continue;const dx=a.x-unit.x,dz=a.z-unit.z,forward=-dx*Math.sin(unit.heading)-dz*Math.cos(unit.heading),side=Math.abs(dx*Math.cos(unit.heading)-dz*Math.sin(unit.heading));if(forward>0&&forward<24&&side<2.3)desired=Math.min(desired,Math.max(0,(forward-6)*1.4));}
+   const sh=Math.sin(unit.heading),ch=Math.cos(unit.heading);
+   for(const a of obstacles){if(a===unit||a.edge===null)continue;const dx=a.x-unit.x,dz=a.z-unit.z;if(dx*dx+dz*dz>676)continue;const forward=-dx*sh-dz*ch,side=Math.abs(dx*ch-dz*sh);if(forward>0&&forward<24&&side<2.3)desired=Math.min(desired,Math.max(0,(forward-6)*1.4));}
    const previousSpeed=unit.speed;
    unit.speed+=Math.max(-18*dt,Math.min(accel*dt,desired-unit.speed));
    unit.braking=unit.speed<previousSpeed-.01;
