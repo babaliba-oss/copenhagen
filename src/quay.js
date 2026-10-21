@@ -41,10 +41,16 @@ function subdivide(r,step){const out=[];for(let i=0;i<r.length;i++){const a=r[i]
 // the map boundary, edges shared with other water, and edges hidden under
 // paved quays mapped over the water are skipped. Paved (non-bridge) surfaces
 // that extend over the water get their own walls along their water edges.
+// Under a bridge deck the shoreline gets a 'deck' wall: its top stays under the deck's paving. Draped on the
+// ground like the others, a granite coping or rock edge lay 13 cm proud across the bridge's carriageway (Langebro's
+// Islands Brygge end: a 36 m bar across both carriageways and the island between them).
 export function extractQuayEdges(water,land={},{extent=WORLD_EXTENT}={}){
  const inWater=waterLocator(water);
  const paved=[...(land.roads||[]),...(land.pavement||[])].filter(p=>p.rings?.[0]?.length>2&&!BRIDGE.test(`${p.kind||''} ${p.name||''}`));
- const bridgeIndex=new SpatialIndex([...(land.roads||[]),...(land.pavement||[])].filter(p=>p.rings?.[0]?.length>2&&BRIDGE.test(`${p.kind||''} ${p.name||''}`)));
+ const decks=[...(land.roads||[]),...(land.pavement||[])].filter(p=>p.rings?.[0]?.length>2&&BRIDGE.test(`${p.kind||''} ${p.name||''}`)),deckIndex=new SpatialIndex(decks),bridgeIndex=deckIndex;
+ // Shore segments passing under a deck are cut every 2 m, so the part under the deck changes kind where the deck ends.
+ const nearDeck=(a,b)=>{const x0=Math.min(a[0],b[0]),x1=Math.max(a[0],b[0]),z0=Math.min(a[1],b[1]),z1=Math.max(a[1],b[1]);for(const d of decks){const q=d.bbox;if(q[0]<=x1&&q[2]>=x0&&q[1]<=z1&&q[3]>=z0)return true;}return false;};
+ const refine=r=>{if(!decks.length)return r;const out=[];for(let i=0;i<r.length;i++){const a=r[i],b=r[(i+1)%r.length];out.push(a);if(!nearDeck(a,b))continue;const m=Math.ceil(Math.hypot(b[0]-a[0],b[1]-a[1])/2);for(let k=1;k<m;k++)out.push([a[0]+(b[0]-a[0])*k/m,a[1]+(b[1]-a[1])*k/m]);}return out;};
  const pavedIndex=new SpatialIndex(paved),buildIndex=new SpatialIndex((land.buildings||[]).filter(p=>p.rings?.[0]?.length>2)),parkIndex=new SpatialIndex((land.parks||[]).filter(p=>p.rings?.[0]?.length>2));
  const classify=(x,z,nx,nz)=>{
   let park=false;
@@ -72,13 +78,14 @@ export function extractQuayEdges(water,land={},{extent=WORLD_EXTENT}={}){
  };
 
  for(const {rings} of water)(rings||[]).forEach((ring,ri)=>{
-  const r=openRing(ring);if(r.length<3)return;
+  const r=refine(openRing(ring));if(r.length<3)return;
   // Outer ring: land is outside it; island holes: land is inside them.
   emit(r,ringNormals(r,ri?1:-1),(a,b,n)=>{
    if(Math.hypot(b[0]-a[0],b[1]-a[1])<.02||onBoundary(a,b,extent))return null;
    const mx=(a[0]+b[0])/2,mz=(a[1]+b[1])/2;
    if(inWater(mx+n[0]*.6,mz+n[1]*.6))return null;           // other water
    if(pavedIndex.at(mx-n[0]*.3,mz-n[1]*.3))return null;       // under a paved quay
+   if(deckIndex.at(mx-n[0]*.3,mz-n[1]*.3))return 'deck';      // under a bridge: the wall stops below the deck
    return classify(mx,mz,n[0],n[1]);
   });
  });
@@ -107,6 +114,7 @@ export const PROFILES={
  quay:{points:QUAY_PROFILE,colors:QUAY_COLORS,skirtStart:0},
  park:{points:rockProfile(.06),colors:ROCK_COLORS,skirtStart:-.45},
  bare:{points:rockProfile(GROUND_Y+.06),colors:ROCK_COLORS,skirtStart:-.45},
+ deck:{points:[[0,QUAY_FOOT],[0,WATER_LEVEL+.22],[0,-.35],[.3,-.35]],colors:QUAY_COLORS.slice(0,3),skirtStart:0}, // the abutment under a bridge: no coping on the carriageway
 };
 
 function linear(hex){const c=new THREE.Color(hex);return [c.r,c.g,c.b];}
@@ -181,13 +189,22 @@ export function buildBridgeRailings(water,land={},{height=1.05,ground=()=>0}={})
  const placed=new Map(),cellOf=(x,z)=>Math.floor(x/4)+','+Math.floor(z/4),railedNear=(x,z,self,r=1.2)=>{for(let i=-1;i<=1;i++)for(let j=-1;j<=1;j++)for(const s of placed.get(cellOf(x+i*4,z+j*4))||[]){if(s[4]===self)continue;const dx=s[2]-s[0],dz=s[3]-s[1],l=dx*dx+dz*dz,t=l?Math.max(0,Math.min(1,((x-s[0])*dx+(z-s[1])*dz)/l)):0;if(Math.hypot(x-s[0]-dx*t,z-s[1]-dz*t)<r)return true;}return false;}; // railing already standing within r m on another deck (two decks' edges along each other: Højbro and Højbro Plads, Holmens Bro and Holmens Kanal had a railing each, side by side)
  const parts=[],box=(w,h,d,x,y,z,yaw)=>{const g=new THREE.BoxGeometry(w,h,d);g.rotateY(yaw);g.translate(x,y,z);parts.push(g.index?g.toNonIndexed():g);};
  const paved=new SpatialIndex(decks),otherPaving=(x,z,self)=>paved.near(x,z).some(p=>p!==self&&x>=p.bbox[0]&&x<=p.bbox[2]&&z>=p.bbox[1]&&z<=p.bbox[3]&&pointInPolygon(x,z,p.rings)); // where the deck meets the next road or footway: no railing across it
+ // Two decks side by side with a strip of water a few metres wide between them (Langebro's carriageways at the
+ // Islands Brygge end, mapped apart): each got a railing along the slot and the slot stayed open, a dark trench down
+ // to the harbour along the middle of the road. A slot up to SLOT metres wide is decked over instead, without railings
+ // (from the first of the two decks only).
+ const SLOT=4,deckOf=(x,z,self)=>paved.near(x,z).find(p=>p!==self&&x>=p.bbox[0]&&x<=p.bbox[2]&&z>=p.bbox[1]&&z<=p.bbox[3]&&pointInPolygon(x,z,p.rings)),order=new Map(decks.map((d,i)=>[d,i])),fillers=[];let slotLength=0;
  let runs=0;const railed=new Set(),deckY=new Map(),rails=[],runList=[];
  for(const deck of decks)for(const ring of deck.rings){const n=ring.length;let ringTop=-Infinity;for(const p of ring){const g=ground(p[0],p[1]);if(Number.isFinite(g))ringTop=Math.max(ringTop,g);}
   for(let i=0;i<n;i++){const a=ring[i],b=ring[(i+1)%n],dx=b[0]-a[0],dz=b[1]-a[1],l=Math.hypot(dx,dz);if(l<1.5)continue;
    const ux=dx/l,uz=dz/l,nx=-uz,nz=ux,steps=Math.max(1,Math.round(l/1.8));let start=-1;
    // outer side: the one off the deck; a railing where that side is water and no other paving continues
    const inRing=(x,z)=>{let c=false;for(let j=0,m=ring.length,k2=m-1;j<m;k2=j++){const p=ring[j],q=ring[k2];if((p[1]>z)!==(q[1]>z)&&x<(q[0]-p[0])*(z-p[1])/(q[1]-p[1])+p[0])c=!c;}return c;};
-   const wet=t=>{const x=a[0]+dx*t,z=a[1]+dz*t,s=inRing(x+nx*.6,z+nz*.6)?-1:1,ox=x+nx*s*1.5,oz=z+nz*s*1.5;if(!inWater(ox,oz)||otherPaving(ox,oz,deck))return false;return BRIDGE.test(`${deck.kind||''} ${deck.name||''}`)||inWater(x-nx*s*1.5,z-nz*s*1.5);};
+   const wet=t=>{const x=a[0]+dx*t,z=a[1]+dz*t,s=inRing(x+nx*.6,z+nz*.6)?-1:1,ox=x+nx*s*1.5,oz=z+nz*s*1.5;
+    if(BRIDGE.test(`${deck.kind||''} ${deck.name||''}`)&&inWater(x+nx*s*.3,z+nz*s*.3)&&!otherPaving(x+nx*s*.3,z+nz*s*.3,deck))for(let d=.5;d<=SLOT;d+=.5){const other=deckOf(x+nx*s*d,z+nz*s*d,deck);if(!other)continue;
+     slotLength+=l/steps;if(order.get(deck)<order.get(other)){const h=l/steps/2,w=d+.1,p=[[x-ux*h,z-uz*h],[x+ux*h,z+uz*h]];fillers.push({deck,ring:[p[0],p[1],[p[1][0]+nx*s*w,p[1][1]+nz*s*w],[p[0][0]+nx*s*w,p[0][1]+nz*s*w]]});}return false;}
+    if(!inWater(ox,oz)||otherPaving(ox,oz,deck))return false;
+    return BRIDGE.test(`${deck.kind||''} ${deck.name||''}`)||inWater(x-nx*s*1.5,z-nz*s*1.5);};
    const shadow=[];for(let k=0;k<=steps;k++){const ok=k<steps&&wet((k+.5)/steps);
     if(ok){const mx=a[0]+dx*(k+.5)/steps,mz=a[1]+dz*(k+.5)/steps;shadow[k]=railedNear(mx,mz,deck);if(!shadow[k]){const c=cellOf(mx,mz);if(!placed.has(c))placed.set(c,[]);placed.get(c).push([a[0]+dx*k/steps,a[1]+dz*k/steps,a[0]+dx*(k+1)/steps,a[1]+dz*(k+1)/steps,deck]);}} /* shadowed: the deck still counts as railed (its plate and height), the railing is not drawn twice */
     if(ok&&start<0)start=k;
@@ -221,7 +238,7 @@ export function buildBridgeRailings(water,land={},{height=1.05,ground=()=>0}={})
  for(const {deck,cx,cz,len,yaw,y:y0,posts} of rails){const y=lifted.has(deck)?deckY.get(deck):y0;
   box(.07,.07,len,cx,y+height,cz,yaw);box(.05,.05,len,cx,y+height*.5,cz,yaw);
   for(let p=0;p<posts.length;p+=2)box(.07,height,.07,posts[p],y+height/2,posts[p+1],0);}
- if(!parts.length)return null;
+ if(!parts.length&&!fillers.length)return null;
  // Decks of tagged bridges as plates of their own: the surface tiles drop paving that lies inside the water
  // polygons (dropSunkenSurfaces), which left railings standing over open water.
  // Untagged paving over the water is mostly a street along a quay that the water reaches into (1760's Børsgraven under
@@ -234,9 +251,12 @@ export function buildBridgeRailings(water,land={},{height=1.05,ground=()=>0}={})
   if(dry.length)plateHeight.set(d,(x,z)=>{let best=Infinity,h=top;for(let i=0;i<dry.length;i+=3){const q=(dry[i]-x)**2+(dry[i+1]-z)**2;if(q<best){best=q;h=dry[i+2]+.035;}}return Math.min(top,h);});}
  const deck=[];for(const d of railed){const r=d.rings[0];
   const flat=r.flat(),ids=earcut(flat),y=deckY.get(d)+.035,at=plateHeight.get(d);for(const i of ids)deck.push(r[i][0],at?at(r[i][0],r[i][1]):y,r[i][1]);}
+ // the slots' plates, level with their deck's (or its highest ground where it has none)
+ const slotPlates=fillers.map(({deck:d,ring})=>{let y=deckY.get(d);if(y===undefined){y=-Infinity;for(const p of d.rings[0]){const g=ground(p[0],p[1]);if(Number.isFinite(g))y=Math.max(y,g);}if(!Number.isFinite(y))y=0;}y+=.035;for(const i of [0,1,2,0,2,3])deck.push(ring[i][0],y,ring[i][1]);return {rings:[ring],y,name:d.name||'',kind:d.kind||''};});
  const pos=[];for(const g of parts){pos.push(...g.attributes.position.array);g.dispose();}
  const geometry=new THREE.BufferGeometry();geometry.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));geometry.computeVertexNormals();geometry.userData.runs=runs;geometry.userData.rails=runList; // [x0,z0,x1,z1,deck id] per run
- geometry.userData.bridges=[...railed].map(d=>({rings:d.rings,y:deckY.get(d)+.035,...(plateHeight.has(d)?{heightAt:plateHeight.get(d)}:{}),name:d.name||'',kind:d.kind||''})); // the plates as drawn: what the ground under them must carry (raiseBridgeDecks); heightAt: a plate that follows its quay
+ geometry.userData.bridges=[...[...railed].map(d=>({rings:d.rings,y:deckY.get(d)+.035,...(plateHeight.has(d)?{heightAt:plateHeight.get(d)}:{}),name:d.name||'',kind:d.kind||''})),...slotPlates]; // the plates as drawn: what the ground under them must carry (raiseBridgeDecks); heightAt: a plate that follows its quay
+ geometry.userData.slots=slotLength;
  if(deck.length){const g=new THREE.BufferGeometry(),uv=new Float32Array(deck.length/3*2);for(let i=0,j=0;i<deck.length;i+=3,j+=2){uv[j]=deck[i]/2.6;uv[j+1]=deck[i+2]/2.6;}g.setAttribute('position',new THREE.Float32BufferAttribute(deck,3));g.setAttribute('uv',new THREE.BufferAttribute(uv,2));const base=new Float32Array(deck.length/3);for(let i=0;i<base.length;i++)base[i]=deck[i*3+1];g.setAttribute('deckBase',new THREE.BufferAttribute(base,1));g.computeVertexNormals();geometry.userData.deck=g;}
  return geometry;
 }

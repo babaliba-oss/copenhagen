@@ -23,6 +23,15 @@ test('a tagged deck with paving along both sides (no railing of its own) still g
  const g=buildBridgeRailings(water,{roads:[road],pavement:walks});assert.equal(g.userData.runs,2,'the railings stand on the footways');
  assert.ok(g.userData.bridges.some(b=>b.rings===road.rings),'the carriageway has a plate: no hole down to the water');
 });
+// Two carriageways mapped 2 m apart across the canal (Langebro at Islands Brygge): no railings along the slot between
+// them and a plate over it, instead of an open trench down to the water in the middle of the road.
+test('a narrow slot of water between two decks is decked over, without railings along it',()=>{
+ const north={kind:'Ajorata (Silta)',rings:[[[-30,-9],[30,-9],[30,-1],[-30,-1]]]},south={kind:'Ajorata (Silta)',rings:[[[-30,1],[30,1],[30,9],[-30,9]]]};
+ const g=buildBridgeRailings(water,{roads:[north,south]});assert.equal(g.userData.runs,2,'railings on the outer edges only');
+ const slot=g.userData.bridges.filter(b=>b.rings!==north.rings&&b.rings!==south.rings);assert.ok(slot.length>0,'plates over the slot');
+ for(const z of [-.9,0,.9]){const covered=slot.some(b=>{const r=b.rings[0],xs=r.map(p=>p[0]),zs=r.map(p=>p[1]);return Math.min(...xs)<=0&&Math.max(...xs)>=0&&Math.min(...zs)<=z&&Math.max(...zs)>=z;});assert.ok(covered,`slot covered at z=${z}`);}
+ const wide=buildBridgeRailings(water,{roads:[north,{...south,rings:[[[-30,6],[30,6],[30,14],[-30,14]]]}]});assert.equal(wide.userData.runs,4,'a real gap keeps its railings');
+});
 
 // Today's street running out along a bridge over a wider (1760) canal: its edge lies half a metre inside the bridge's.
 // One railing, the bridge's; the street keeps its plate. No quay wall round the street's end under the bridge.

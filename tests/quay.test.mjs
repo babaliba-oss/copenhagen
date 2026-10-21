@@ -37,6 +37,13 @@ test('island holes get walls facing outward into the water',()=>{
  for(const e of island){const [x,z]=mid(e);assert.ok((x+e.n[0]-50)**2+(z+e.n[1]-50)**2<(x-50)**2+(z-50)**2,'normal points into the island');assert.equal(e.kind,'quay');}
 });
 
+test('shoreline under a bridge deck keeps a wall whose top stays under the deck (no coping across the carriageway)',()=>{
+ const bridge=poly([sq(-30,995,30,1005)],{kind:'Ajorata (Silta)'}),edges=extractQuayEdges([basin],{...land,roads:[bridge]},{extent:2400});
+ const under=edges.filter(e=>{const [x,z]=mid(e);return Math.abs(x)<1e-6&&z>996&&z<1004;}),beside=edges.filter(e=>{const [x,z]=mid(e);return Math.abs(x)<1e-6&&(z<990||z>1010);});
+ assert.ok(under.length&&under.every(e=>e.kind==='deck'),'under the deck');assert.ok(beside.every(e=>e.kind==='quay'),'the quay either side keeps its coping');
+ const {geometry}=buildQuayGeometry(under),p=geometry.attributes.position.array;for(let i=1;i<p.length;i+=3)assert.ok(p[i]<-.3,'below the paving');
+});
+
 test('paving mapped over the water is walled, and shoreline under it is hidden',()=>{
  const pier=poly([sq(20,0,30,50)]);
  const edges=extractQuayEdges([poly([sq(0,0,100,100)])],{pavement:[pier,poly([sq(-10,-10,0,110)])]},{extent:2400});
