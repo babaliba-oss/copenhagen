@@ -162,3 +162,7 @@
  body.touch #cph-lore .cph-card,body.touch #cph-lore>div{max-height:calc(100dvh - 32px);overflow:auto}
 }
 @media(pointer:coarse){body.touch #help-dialog .help-grid{display:none}} /* a keyboard table; the copy above it explains the touch controls */
+/* Race card on a phone: a third of the landscape screen before. Time smaller, card only as wide as its text. */
+body.touch #cph-hud .cph-race-time{font-size:22px!important;margin:0!important;line-height:1.05}
+body.touch #cph-hud .cph-card:has(.cph-race-time){width:max-content;max-width:100%;padding:5px 10px}
+body.touch #cph-hud .cph-card:has(.cph-race-time) h3{font-size:14px;margin:0}
