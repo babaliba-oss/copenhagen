@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {ImpactSystem,impactSeverity,HITTER_MASS,SEVERITY_REPORT} from '../src/impacts.js';
 import {fallAmount} from '../src/impact-pose.js';
+import {setTerrain,terrain,groundAt} from '../src/terrain.js';
 import {createCrowdReaction,REACTION} from '../src/crowd-reaction.js';
 import {Mobility} from '../src/mobility.js';
 import {PoliceSimulation,incidentHeat} from '../src/police.js';
@@ -47,6 +48,18 @@ test('knocked down: falls, lies a few seconds, gets up and walks back; thrown: f
 test('a tumbling body stops at a wall instead of passing into a building',()=>{
  const world={buildings:{at:(x,z)=>z<-4}},sim=new ImpactSystem(),a=person();sim.hit(a,{x:0,z:3,heading:0,speed:14},{kind:'car'});
  for(let i=0;i<120;i++){sim.step(1/30,world);assert.ok(a.knockdown.body.z>=-4.0001,'outside the wall');}
+});
+
+test('thrown off a bridge into the water: falls past the ground raised beside the deck, sinks out of sight, comes back',()=>{
+ // The field reads the deck's height (0) over the canal (raiseBridgeDecks); the water lies 3 m below it.
+ const previous=terrain(),n=3;setTerrain({size:n,cell:40,extent:40,base:0,ground:new Float32Array(n*n),water:new Float32Array(n*n).fill(-3),lake:null});
+ try{
+  const canal={rings:[[[-40,-4],[40,-4],[40,-40],[-40,-40]]],bbox:[-40,-40,40,-4]},world={buildings:{at:()=>false},roads:{at:(x,z)=>z>-4},pavement:{at:()=>false},water:[canal]};
+  const sim=new ImpactSystem(),a=person();sim.hit(a,{x:0,z:3,heading:0,speed:14},{kind:'car'});
+  let lowest=Infinity;const seen=new Set();
+  for(let t=0;t<40&&a.knockdown;t+=1/30){seen.add(a.knockdown.phase);const b=a.knockdown.body;if(b.z<-5)assert.ok(a.knockdown.phase!=='rest','never lies on the raised ground over the water');lowest=Math.min(lowest,b.y+groundAt(b.x,b.z));sim.step(1/30,world);}
+  assert.ok(seen.has('sunk'),'into the water');assert.ok(lowest<-3-1,'under the surface');assert.equal(a.knockdown,undefined,'back on the path');
+ }finally{setTerrain(previous);}
 });
 
 test('the car stops for someone lying in the road; traffic gets them as an obstacle to brake for',()=>{

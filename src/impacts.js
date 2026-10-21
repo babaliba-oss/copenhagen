@@ -1,6 +1,8 @@
 import {sweptContact} from './contact-geometry.js';
 import {playerSpeedAfter} from './crash-physics.js';
 import {PIVOT} from './impact-pose.js';
+import {inWaterPolygons} from './geo.js';
+import {groundAt,waterAt,seaLevel} from './terrain.js';
 
 // Non-graphic reactions to hitting people, game-like but physically grounded:
 // what happens depends on the collision energy between the hitter (its mass
@@ -60,6 +62,15 @@ function lyingTarget(b){
  if(Math.abs(Math.sin(p))>=Math.abs(Math.sin(r)))return {pitch:Math.sign(p||1)*q,roll:0};
  return {pitch:0,roll:Math.sign(r||1)*q};
 }
+// Thrown off a quay or a bridge: the water's surface relative to the ground under the body (body.y is measured from
+// groundAt), or null on land. Over the water groundAt is the bed, a quay shelf or the ramp raised under a bridge deck
+// (terrain.js raiseBridgeDecks), so a body landing on it lay in the air beside the bridge or on the water's skin. A
+// deck (a road or footway mapped across the water) is land.
+export const SINK=1.6;
+export function waterUnder(world,x,z){
+ if(!world?.water?.length||!inWaterPolygons(world.water,x,z)||world.roads?.at?.(x,z)||world.pavement?.at?.(x,z))return null;
+ const w=waterAt(x,z)??seaLevel();return w==null?null:w-groundAt(x,z);
+}
 // One physics step of a knocked actor. Returns false when the knock-down is over.
 export function stepKnockdown(actor,dt,world=null){
  const k=actor.knockdown,b=k.body;k.elapsed+=dt;k.phaseTime+=dt;actor.speed=0;actor.running=false;
@@ -73,7 +84,15 @@ export function stepKnockdown(actor,dt,world=null){
  }
  if(k.phase==='gesture'){b.pitch=toward(b.pitch,0,6,dt);if(k.phaseTime>2.2){actor.pose=k.prevPose;k.phase='return';k.phaseTime=0;}return true;}
  if(k.phase==='flight'){
-  b.vy-=GRAVITY*dt;b.y+=b.vy*dt;move();b.pitch+=b.wp*dt;b.roll+=b.wr*dt;
+  const g0=groundAt(b.x,b.z);b.vy-=GRAVITY*dt;b.y+=b.vy*dt;move();b.pitch+=b.wp*dt;b.roll+=b.wr*dt;
+  b.y+=g0-groundAt(b.x,b.z); // airborne height is kept, not the height over the ground: off a quay edge the body falls instead of stepping down with the field
+  const water=waterUnder(world,b.x,b.z);
+  if(water!==null){ // nothing to land on: falls past the bed or ramp the field has there
+   // Into the water: dragged to a stop and under, out of sight; they come back (climbed out) after lying time.
+   if(b.y<water+.3){const f=Math.exp(-dt*4);b.vx*=f;b.vz*=f;b.wp*=f;b.wr*=f;if(b.vy<-1.5)b.vy=-1.5;}
+   if(b.y<=water-SINK){b.y=water-SINK;k.phase='sunk';k.phaseTime=0;b.vx=b.vz=b.vy=0;}
+   return true;
+  }
   const lying=1-Math.abs(Math.cos(b.pitch)*Math.cos(b.roll)),floor=.16+(PIVOT-.16)*(1-lying);
   if(b.y<=floor){
    b.y=floor;if(b.vy<0)b.vy=-b.vy*BOUNCE;if(b.vy<.6)b.vy=0;
@@ -86,6 +105,7 @@ export function stepKnockdown(actor,dt,world=null){
   if(k.phaseTime>12){k.phase='rest';k.phaseTime=0;b.vx=b.vz=b.vy=0;b.y=.16;}
   return true;
  }
+ if(k.phase==='sunk'){if(k.phaseTime>=Math.max(2,k.lie)){k.phase='return';k.phaseTime=0;b.x=k.anchor.x;b.z=k.anchor.z;b.y=PIVOT;b.pitch=b.roll=0;}return true;}
  if(k.phase==='rest'){const t=lyingTarget(b);b.pitch=toward(b.pitch,t.pitch,4,dt);b.roll=toward(b.roll,t.roll,4,dt);b.y=toward(b.y,.16,6,dt);if(k.phaseTime>=k.lie){k.phase='rise';k.phaseTime=0;k.from={pitch:b.pitch,roll:b.roll,y:b.y};}return true;}
  if(k.phase==='rise'){
   // Roll over, push up, stand: orientation back to upright, pelvis back up.
