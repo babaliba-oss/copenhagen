@@ -30,6 +30,13 @@ test('junction: signals a few metres apart run as one junction',()=>{
  assert.equal(edgeOf(g,4,0).signal,edgeOf(g,1,0).signal);
 });
 
+test('junction: a boulevard\'s two carriageways (lights 54 m apart, nodes 14 m) run as one junction, the middle is not stopped again',()=>{
+ const nodes=[[0,0],[14,0],[-60,0],[74,0],[0,-60],[0,60],[14,-60],[14,60]],edges=[],two=(a,b,s)=>{edges.push({from:a,to:b,points:[nodes[a],nodes[b]],lane:1.45,signal:s(b)});edges.push({from:b,to:a,points:[nodes[b],nodes[a]],lane:1.45,signal:s(a)});};
+ const sig=k=>k===0?0:k===1?1:-1;two(0,1,sig);two(2,0,sig);two(4,0,sig);two(5,0,sig);two(1,3,sig);two(1,6,sig);two(1,7,sig);
+ const g=prepareGraph({nodes,edges});const {centre}=annotateJunctions(g,[{p:[-20,5]},{p:[34,5]}]);
+ assert.equal(edgeOf(g,2,0).signal,edgeOf(g,3,1).signal);assert.equal(edgeOf(g,0,1).signal,-1);assert.ok(edgeOf(g,0,1).inside);assert.deepEqual(centre[edgeOf(g,2,0).signal],[7,0]);
+});
+
 test('tram relations: crossing, shared same-direction track, oncoming track passed, a track beside the lane shared',()=>{
  const road=prepareGraph({nodes:[[-50,0],[50,0]],edges:[{from:0,to:1,points:[[-50,0],[50,0]],lane:1.5,signal:-1}]}),e=road.edges[0];
  // Lane runs along z=1.5 heading +x. Tracks: a crossing at x=10, a same-direction track on the lane, an oncoming one 2 m away.

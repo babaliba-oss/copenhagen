@@ -15,6 +15,7 @@ export const CAR_HALF_LENGTH=2.36,CAR_HALF_WIDTH=.98,TRACK_HALF_WIDTH=1.35;
 export const ONCOMING_PASS=1;
 // A shared lane: lane centre within this of a same-direction track. Crossings: angle over ~30 degrees.
 const CROSSING_COS=.87,CONFLICT=TRACK_HALF_WIDTH+.98+.1;
+const JOIN_EDGE=25,JOIN_SPAN=70; // metres: two signals' junction nodes this close along one edge run as one junction, while all its nodes fit a box this wide across
 const headingOf=(dx,dz)=>Math.atan2(-dx,-dz);
 export function signalGroup(heading,axis){return Math.abs(Math.cos(heading-axis))>.707;}
 // The fixed 32 s cycle: group A green 0–13 s, all red, group B green 16–29 s, all red. Each signal is offset.
@@ -40,6 +41,11 @@ export function annotateJunctions(graph,signals=[]){
  for(const i of used){if(owned.has(i))continue;const p=signals[i].p;let k=-1,d=30;
   for(const e of edges)if(e.signal===i){const q=nodes[e.to],dd=Math.hypot(q[0]-p[0],q[1]-p[1]);if(dd<d&&owner[e.to]<0){d=dd;k=e.to;}}
   if(k>=0)owner[k]=i;}
+ // Signals owning the two ends of one short edge are one junction too: a boulevard's two carriageways (H.C. Andersens Boulevard: mapped lights 56 m apart, their nodes 13 m) ran out of step, and a car let through the first was held again in the middle.
+ const root=i=>{while(canon[i]!==i)i=canon[i]=canon[canon[i]];return i;},box=new Map(),joined=new Set();
+ for(let k=0;k<n;k++){const i=owner[k];if(i<0)continue;const [x,z]=nodes[k],b=box.get(i);if(b){b[0]=Math.min(b[0],x);b[1]=Math.min(b[1],z);b[2]=Math.max(b[2],x);b[3]=Math.max(b[3],z);}else box.set(i,[x,z,x,z]);}
+ for(const e of edges){const a=owner[e.from],b=owner[e.to];if(a<0||b<0||a===b||e.length>=JOIN_EDGE)continue;const ra=root(a),rb=root(b);if(ra===rb)continue;const p=box.get(ra),q=box.get(rb),u=[Math.min(p[0],q[0]),Math.min(p[1],q[1]),Math.max(p[2],q[2]),Math.max(p[3],q[3])];if(Math.hypot(u[2]-u[0],u[3]-u[1])>JOIN_SPAN)continue;const r=Math.min(ra,rb);canon[Math.max(ra,rb)]=r;box.set(r,u);joined.add(r);} /* not a chain of junctions down a whole street */
+ for(let i=0;i<canon.length;i++)canon[i]=root(i);for(let k=0;k<n;k++)if(owner[k]>=0)owner[k]=canon[owner[k]];
  const sums=new Map();
  for(const e of edges){
   e.junction=junction[e.to]||owner[e.to]>=0;e.stopGap=CAR_HALF_LENGTH+Math.max(2.2,reach[e.to]);e.startGap=Math.max(2.2,reach[e.from])+CAR_HALF_LENGTH;
@@ -51,8 +57,9 @@ export function annotateJunctions(graph,signals=[]){
  const axes=[],radius=[];for(const [i,[s,c]] of sums)axes[i]=Math.atan2(s,c)/4;
  for(const e of edges)if(e.signal>=0){e.signalAxis=axes[e.signal];e.signalGroup=signalGroup(e.endHeading,e.signalAxis);}
  // The controlled area: every node of the cluster plus the width of a junction box and its tracks.
- for(let k=0;k<n;k++){const id=owner[k];if(id<0||axes[id]===undefined)continue;const p=signals[id].p;radius[id]=Math.max(radius[id]||12,Math.hypot(nodes[k][0]-p[0],nodes[k][1]-p[1])+12);}
- return {axes,radius,canon};
+ const centre=[];for(const i of joined){const b=box.get(i);centre[i]=[(b[0]+b[2])/2,(b[1]+b[3])/2];} // a joined junction is centred on its nodes, not on one of its mapped lights
+ for(let k=0;k<n;k++){const id=owner[k];if(id<0||axes[id]===undefined)continue;const p=centre[id]||signals[id].p;radius[id]=Math.max(radius[id]||12,Math.hypot(nodes[k][0]-p[0],nodes[k][1]-p[1])+12);}
+ return {axes,radius,canon,centre};
 }
 // Signalled pedestrian crossings walk with the parallel car flow of the same junction, never across a green.
 export function annotateCrossings(walks,{axes,canon}){
@@ -62,9 +69,9 @@ export function annotateCrossings(walks,{axes,canon}){
 // Trams obey the same signals: a tram path gets a stop line where it enters a signal's controlled area
 // (around the cluster's nodes, wide enough to hold every lane and track conflict), in the signal group of
 // the heading it leaves the area with.
-export function annotateTramSignals(paths,signals,{axes,radius}){
+export function annotateTramSignals(paths,signals,{axes,radius,centre=[]}){
  for(const path of paths){path.signalStops=[];let x0=Infinity,z0=Infinity,x1=-Infinity,z1=-Infinity;for(const q of path.points){if(q[0]<x0)x0=q[0];if(q[0]>x1)x1=q[0];if(q[1]<z0)z0=q[1];if(q[1]>z1)z1=q[1];}
-  for(const [id,axis] of axes.entries()){if(axis===undefined)continue;const [px,pz]=signals[id].p,r=radius[id];if(px+r<x0||px-r>x1||pz+r<z0||pz-r>z1)continue;let inside=false,stop=null; // signal nowhere near this path
+  for(const [id,axis] of axes.entries()){if(axis===undefined)continue;const [px,pz]=centre[id]||signals[id].p,r=radius[id];if(px+r<x0||px-r>x1||pz+r<z0||pz-r>z1)continue;let inside=false,stop=null; // signal nowhere near this path
    for(let i=1;i<path.points.length;i++){const a=path.points[i-1],b=path.points[i];if(Math.min(a[0],b[0])>px+r||Math.max(a[0],b[0])<px-r||Math.min(a[1],b[1])>pz+r||Math.max(a[1],b[1])<pz-r){inside=false;continue;}
     const l=path.cumulative[i]-path.cumulative[i-1];for(let t=0;t<=l;t+=1){const x=a[0]+(b[0]-a[0])*t/(l||1),z=a[1]+(b[1]-a[1])*t/(l||1),now=Math.hypot(x-px,z-pz)<r;
      const heading=Math.atan2(a[0]-b[0],a[1]-b[1]);
