@@ -10,7 +10,8 @@ const raw=fs.readFileSync('public/cities/copenhagen/city.pack'),city=JSON.parse(
 const byId=new Map(),seen=new Map();for(const b of city.buildings){const k=seen.get(b.id)||0;seen.set(b.id,k+1);byId.set(k?`${b.id}#${k}`:b.id,b);} // the keying main.js uses (a few ids repeat)
 
 // scripts/collision-trim.py: mapped footprints of modelled houses cut back to the drawn house where they ran into the street.
-test('trimmed footprints only lose the undrawn part in the street: same house, inside its old outline, never bigger', () => {
+test('trimmed footprints only lose the undrawn part in the street or over a deck drawn at ground level: same house, inside its old outline, never bigger', () => {
+ assert.ok(trim['osm-way-1017475760'],'the bank by Kalvebod Brygge is cut back off its open deck (-426,1159)');
  const ids=Object.keys(trim);assert.ok(ids.length>100,`${ids.length} trimmed`);
  for(const id of ids){const b=byId.get(id),r=trim[id];assert.ok(b,`${id} is a mapped footprint`);assert.ok(b.cover>=.5,`${id} is drawn by the model, not from its footprint`);
   if(!r)continue;const a=bounds([r.flat()]),o=bounds([b.rings.flat()]);assert.ok(a[0]>=o[0]-.3&&a[1]>=o[1]-.3&&a[2]<=o[2]+.3&&a[3]<=o[3]+.3,`${id} stays inside its old box`);

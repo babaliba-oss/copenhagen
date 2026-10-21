@@ -1,4 +1,4 @@
-# Collision footprints trimmed to what is drawn, where they reach into the street.
+# Collision footprints trimmed to what is drawn, where they reach into the street (or over a deck drawn at ground level).
 #
 # The car, walkers and cameras collide with the mapped (OpenStreetMap) footprints in city.pack, but most houses are drawn
 # from the municipal 3D model (scripts/kk-buildings.py), which does not always agree: a footprint that runs a few metres
@@ -35,16 +35,20 @@ street_tree = shapely.STRtree(streets)
 from terrain_field import load_ground, lift_parts, collapsed
 ground_at = load_ground(root)
 index = json.load(open(root + 'buildings3d-index.json'))
-tris = []
+# The collapsed ones are kept apart (plates): where only a plate is drawn over a footprint, off the streets too (a bank's
+# paved forecourt deck, 12,365 m2 within 2.5 km), the footprint was a wall standing on the open deck.
+tris, plates = [], []
 for t in index['tiles']:
     a = lift_parts(np.frombuffer(read(root + t['file']), np.float32).reshape(-1, 5), t['parts'], ground_at)[:, :3]
     tri = a[:len(a) // 3 * 3].reshape(-1, 3, 3)
     n = np.cross(tri[:, 1] - tri[:, 0], tri[:, 2] - tri[:, 0]); ln = np.linalg.norm(n, axis=1)
-    tris.append(tri[(ln > 1e-6) & (np.abs(n[:, 1]) / np.maximum(ln, 1e-12) > .35) & ~collapsed(tri, ground_at)][:, :, [0, 2]])
-tris = np.concatenate(tris)
+    up = (ln > 1e-6) & (np.abs(n[:, 1]) / np.maximum(ln, 1e-12) > .35); flat = collapsed(tri, ground_at)
+    tris.append(tri[up & ~flat][:, :, [0, 2]]); plates.append(tri[up & flat][:, :, [0, 2]])
+tris, plates = np.concatenate(tris), np.concatenate(plates)
 lo, hi = tris.min(axis=1), tris.max(axis=1)
 tri_tree = shapely.STRtree([box(*l, *h) for l, h in zip(lo, hi)])
-print(city, len(tris), 'roof triangles,', len(streets), 'street polygons')
+plate_tree = shapely.STRtree([box(*l, *h) for l, h in zip(plates.min(axis=1), plates.max(axis=1))])
+print(city, len(tris), 'roof triangles,', len(plates), 'collapsed plates,', len(streets), 'street polygons')
 out, trimmed_m2, gone = {}, 0.0, 0
 seen = {}  # a few ids repeat (a relation's parts): keyed id, then id#1, id#2 in city.pack order
 for b in pack['buildings']:
@@ -53,10 +57,11 @@ for b in pack['buildings']:
     if not b.get('rings') or b.get('kind') in UNDRAWN or len(b['rings'][0]) < 3 or b.get('cover', 0) < .5: continue
     fp = poly(b)
     if fp.is_empty: continue
-    near = street_tree.query(fp)
-    if not len(near): continue
-    street = unary_union([streets[i] for i in near]).intersection(fp)
-    if street.area < 2: continue
+    near, flat = street_tree.query(fp), plate_tree.query(fp)
+    street = unary_union([streets[i] for i in near]).intersection(fp) if len(near) else Polygon()
+    deck = unary_union([Polygon(plates[i]).buffer(.02) for i in flat if Polygon(plates[i]).area > 1e-4]).intersection(fp) if len(flat) else Polygon()
+    if street.area < 2 and deck.area < 2: continue
+    street = street.union(deck) if deck.area >= 2 else street  # the open deck goes like the street does: cut back to the drawn roofs
     ids = tri_tree.query(fp)
     drawn = unary_union([Polygon(tris[i]).buffer(.02) for i in ids if Polygon(tris[i]).area > 1e-4]).buffer(.5) if len(ids) else Polygon()
     cut = street.difference(drawn)
