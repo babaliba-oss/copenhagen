@@ -133,7 +133,7 @@ function binTemplate(){
 }
 export function combineKnockables(list){
  const all=list.filter(Boolean);
- return {group:null,get bodies(){return all.flatMap(k=>k.bodies);},rideSources:all.flatMap(k=>k.rideSources||[]),step(dt,car,world){for(const k of all)k.step(dt,car,world);},update(focus){for(const k of all)k.update(focus);},resetAll(){for(const k of all)k.resetAll();},
+ return {group:null,get bodies(){return all.flatMap(k=>k.bodies);},knocked(){const out=[];for(const k of all){if(k.knocked){for(const b of k.knocked())if(b.knocked)out.push(b);}else for(const b of k.bodies)if(b.knocked)out.push(b);}return out;},rideSources:all.flatMap(k=>k.rideSources||[]),step(dt,car,world){for(const k of all)k.step(dt,car,world);},update(focus){for(const k of all)k.update(focus);},resetAll(){for(const k of all)k.resetAll();},
   snapshot(){const s=all.map(k=>k.snapshot());return {count:s.reduce((n,x)=>n+x.count,0),knocked:s.reduce((n,x)=>n+x.knocked,0),hits:s.reduce((n,x)=>n+x.hits,0)};}};
 }
 

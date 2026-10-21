@@ -72,7 +72,7 @@ export class Finale{
  reset(){
   this.inZone=false;this.triggered=false;this.bigCrashes=0;this.tramHits=0;this.offences=new Map();
   this.stats={elapsed:0,distance:0,topSpeed:0,damage:0,maxLevel:0,knocked:0};this.sampleAt=0;this.time=0;this.contacts=new Map();
-  this.knockedBodies=new WeakSet();this.furnitureIds=new WeakMap();this.obstacleIds=new WeakMap();this.nextIncidentId=0;this.furnitureFrom=null;this.furnitureAt=0;this.furnitureSpeed=0;
+  this.knockedBodies=new Set();this.furnitureIds=new WeakMap();this.obstacleIds=new WeakMap();this.nextIncidentId=0;this.furnitureFrom=null;this.furnitureAt=0;this.furnitureSpeed=0;
   this.cinematic=null;this.ended=false;this.summary=null;this.arrested=false;
   this.doc?.body.classList.remove('finale-zone','arrest-cinematic');
  }
@@ -94,11 +94,12 @@ export class Finale{
  // objects or furniture hit elsewhere by NPCs. One continuous row of objects
  // is one crash; separated impacts can escalate normally.
  sampleFurniture(car,knockables,police,started){
-  if(!this.furnitureFrom){for(const b of knockables?.bodies||[])if(b?.knocked)this.knockedBodies.add(b);this.furnitureFrom={...car};this.furnitureAt=this.time+.15;return;}
+  if(!this.furnitureFrom){for(const b of knockables?.knocked?.()??knockables?.bodies??[])if(b?.knocked)this.knockedBodies.add(b);this.furnitureFrom={...car};this.furnitureAt=this.time+.15;return;}
   this.furnitureSpeed=Math.max(this.furnitureSpeed,Math.abs(car.speed||0));
   if(this.time<this.furnitureAt)return;this.furnitureAt=this.time+.15;
-  const bodies=knockables?.bodies||[]; // read only when sampling: a getter that gathers the knocked items of every set
+  const bodies=knockables?.knocked?.()??knockables?.bodies??[]; // knocked items only (the bodies getter gathered every post and bench in the city, ~7 times a second)
   let hit=null;
+  for(const b of this.knockedBodies)if(!b.knocked)this.knockedBodies.delete(b); // reset since (they are no longer in the knocked list)
   for(const b of bodies){
    if(!b)continue;
    if(!b.knocked){this.knockedBodies.delete(b);continue;}

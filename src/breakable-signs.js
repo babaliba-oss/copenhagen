@@ -188,7 +188,7 @@ export function createBreakableSigns(name='Breakable signs',{register=true}={}){
   for(const a of attached){a.object.matrix.multiplyMatrices(poseMatrix(a.post,m4),a.rest);a.object.matrixWorldNeedsUpdate=true;}
   if(stumps)stumps.instanceMatrix.needsUpdate=true;texture.needsUpdate=true;
  }
- const system={group,bodies:posts,post,tag,add,attach,material,mesh,finish,step,update,
+ const system={group,bodies:posts,knocked:()=>{const out=[];for(const s of active)if(s.knocked)out.push(s);return out;},post,tag,add,attach,material,mesh,finish,step,update,
   resetAll(){posts.forEach(reset);update();},
   snapshot:()=>{const live=[...active];return {count:posts.length,knocked:live.filter(s=>s.knocked).length,hits,bent:live.filter(s=>s.state==='bent').length,broken:live.filter(s=>s.state==='flying'||s.state==='down').length};}, // only stepped posts can be anything but upright
   dispose(){SYSTEMS.delete(system);}};
@@ -199,6 +199,7 @@ export function createBreakableSigns(name='Breakable signs',{register=true}={}){
 // Every registered sign set as one knockables-compatible entry (sets created later, e.g. bus stops, join automatically).
 export const breakableSigns={
  get bodies(){return [...SYSTEMS].flatMap(s=>s.bodies);},
+ knocked(){const out=[];for(const s of SYSTEMS)for(const b of s.knocked())out.push(b);return out;}, // knocked posts only (finale.js samples this several times a second)
  step(dt,car,world){for(const s of SYSTEMS)s.step(dt,car,world);},
  update(){for(const s of SYSTEMS)s.update();},
  resetAll(){for(const s of SYSTEMS)s.resetAll();},
