@@ -906,7 +906,7 @@ function interactTravel(id=null){
  if(result.ok){peopleInteraction?.close();cameraTransition={elapsed:0,position:camera.position.clone(),target:camera.position.clone().addScaledVector(camera.getWorldDirection(new THREE.Vector3()),6)};car=travel.actor;playerCars.sync(travel);driveCamera.shake=0;driveCamera.lastSpeed=0;updateHUD(performance.now());}
  if(!result.ok)toast(result.message);$('world').focus();
 }
-const nearbyPeople=()=>[...(mobility?.people||[]),...detailPeople,...(marketShopRenderer?.vendors||[])];
+const NEARBY_PEOPLE=[],nearbyPeople=()=>{const out=NEARBY_PEOPLE;out.length=0;for(const l of [mobility?.people,detailPeople,marketShopRenderer?.vendors])if(l)for(let i=0;i<l.length;i++)out.push(l[i]);return out;}; // every frame: one list refilled, not a ~350-entry spread copy (people-interaction.js reads it, never keeps it)
 const canTalk=()=>ready&&started&&!paused&&!mapOpen&&!captureMode&&!police?.busted&&travel?.mode==='walk';
 // Postcard snapshot: render this frame, then shrink the canvas into a 320 px JPEG for the album.
 function snapPhoto(){
