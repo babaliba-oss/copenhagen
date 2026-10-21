@@ -22,7 +22,7 @@ import {selectCity,useCity,pickStart,startUrl,dataUrl,registerCities,CITIES} fro
 import {createStartPicker,pickerStep} from './start-picker.js';
 import {createAdaptiveResolution} from './adaptive-quality.js';
 import {createQualityGovernor} from './quality-governor.js';
-import {makeCar,driveStep,simulationSteps,settleOnGround,PLAYER_MAX_SPEED,displayedSpeedKmh} from './physics.js';
+import {makeCar,driveStep,simulationSteps,settleOnGround,carSamples,PLAYER_MAX_SPEED,displayedSpeedKmh} from './physics.js';
 import {startSurfaces,laneStart} from './start-placement.js';
 import {boxesOverlap,carBox} from './lane-model.js';
 import {loadColouredModels,loadColouredParts,bakeColoured,loadColouredModel,loadPumpkins} from './coloured-models.js';
@@ -1011,7 +1011,7 @@ function setBusted(active){
  // The arrest starts with a short cinematic (finale.cameraPose); the end screen appears when finale.cinematicStep says so.
  if(!active)$('busted-overlay').hidden=true;document.body.classList.toggle('busted',active);mobileControls?.release();keys.clear();
  for(const el of document.querySelectorAll('.topbar,.dashboard,.right-tools,#touch-controls,#touch-aux,#travel-controls'))el.inert=active;
- if(active){gullEncounter.reset();birds?.clearEncounter();paused=false;$('pause-overlay').hidden=true;roadblock?.startArrest(car);finale.arrest({car,police,knockables});}else{roadblock?.clearArrest();$('busted-overlay').classList.remove('live');finale.dismiss();$('world').focus();}
+ if(active){gullEncounter.reset();birds?.clearEncounter();paused=false;$('pause-overlay').hidden=true;if(travel?.mode==='car'&&mobility&&carSamples(car).some(([x,z])=>(world.collisionBuildings||world.buildings).at(x,z))){const p=clearLaneSpot();if(p){Object.assign(car,{x:p.x,z:p.z,heading:p.heading,speed:0,steer:0});settleOnGround(car);}} /* caught wedged into a house: the scene (and Continue) play out on the road, not with the car and camera inside a wall */roadblock?.startArrest(car);finale.arrest({car,police,knockables});}else{roadblock?.clearArrest();$('busted-overlay').classList.remove('live');finale.dismiss();$('world').focus();}
 }
 function reset(){if(!ready)return;setBusted(false);setStart(startPoint);toast('Back on the road.');}
 // R while driving (and the touch menu's reset): the car goes back on the road right here, GTA style, not to the start.
@@ -1020,12 +1020,17 @@ function reset(){if(!ready)return;setBusted(false);setStart(startPoint);toast('B
 // clear of buildings, kiosks, parked cars, water, street furniture and traffic; there the car stands upright, stopped
 // and repaired. With no such spot in reach it is the old reset to the starting point, which R still is on foot or a ride.
 let laneSurfaces=null,laneSurfaceCount=-1;
-function recoverCar(){
- if(!ready)return;if(travel?.mode!=='car'||!mobility){if(police?.level>0){toast('Lose the police first.');return;}reset();return;} // on foot R went back to the start point and cleared the chase
+// The nearest clear spot in a traffic lane (no house, water, object or vehicle on it), or null: R's recovery, and the arrest scene.
+function clearLaneSpot(){
  const count=data.roads.length+data.pavement.length;if(count!==laneSurfaceCount){laneSurfaces=startSurfaces(data.roads,data.pavement);laneSurfaceCount=count;} // map extensions add streets as they stream in
  const solid=(x,z)=>laneSurfaces.blocked.at(x,z)||world.buildings.at(x,z)||!world.roads.at(x,z)&&inWaterPolygons(world.water,x,z);
  const bodies=[...travelObstacles(),...travel.parkedBodies(),...(parkedCars?.near(car.x,car.z,70)||[])].map(v=>({x:v.x,z:v.z,heading:v.heading||0,hl:v.hl??v.halfLength??2.36,hw:v.hw??v.halfWidth??.98}));
  const p=laneStart({x:car.x,z:car.z,heading:car.heading},mobility.roads.edges,{drive:laneSurfaces.drive,blocked:{at:solid}},{reach:60,step:2,tries:400,accept:q=>!world.objects?.overlap(q)&&!bodies.some(b=>boxesOverlap(carBox(q,.6),b))}); // a few ms; capped so a dense block never stalls a frame
+ return p;
+}
+function recoverCar(){
+ if(!ready)return;if(travel?.mode!=='car'||!mobility){if(police?.level>0){toast('Lose the police first.');return;}reset();return;} // on foot R went back to the start point and cleared the chase
+ const p=clearLaneSpot();
  if(!p){if(police?.level>0){toast('No clear lane nearby. Lose the police first.');return;}reset();return;} // the start-point reset also cleared the chase
  cameraTransition={elapsed:0,position:camera.position.clone(),target:camera.position.clone().addScaledVector(camera.getWorldDirection(new THREE.Vector3()),6)}; // a short glide, not a cut
  Object.assign(car,{x:p.x,z:p.z,heading:p.heading,speed:0,steer:0});settleOnGround(car);repairCar();

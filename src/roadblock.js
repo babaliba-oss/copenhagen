@@ -132,7 +132,9 @@ export function createRoadblock(scene,{world,police,carModel,playerLook=null,gra
   const ring=[[-2.9,-3.3],[2.4,-3.5],[2.6,3.1],[-2.7,3.6],[.4,-5.6],[0,5.8]];
   squad.forEach((o,i)=>{o.role=i===0?'lead':i===1?'second':'ring';o.slot=i===0?(onFoot?[-.75,.6]:[-1.95,1.05]):i===1?(onFoot?[.75,.1]:[-2,2.05]):ring[(i-2)%ring.length];o.pose=null;o.running=true;});
   const doorMesh=onFoot?null:createDoor(currentVehicle());
-  if(doorMesh){doorMesh.root.position.set(car.x,.12+groundAt(car.x,car.z),car.z);doorMesh.root.rotation.y=car.heading;group.add(doorMesh.root);}group.visible=true;
+  // The door hangs on the car model itself (same frame: forward -Z, left -X, origin on the ground): placed flat beside it
+  // in the world, it floated off a car tilted by a slope or a kerb (Daniel's BUSTED shot, the door at a weird angle).
+  if(doorMesh){if(carModel){doorMesh.root.position.set(0,0,0);carModel.add(doorMesh.root);}else{doorMesh.root.position.set(car.x,.12+groundAt(car.x,car.z),car.z);doorMesh.root.rotation.y=car.heading;group.add(doorMesh.root);}}group.visible=true;
   const look=playerLook||personLook(4242,{bagType:null,accessory:null,phoneWalk:false,stoop:0});
   const driver={x:car.x,z:car.z,heading:car.heading,speed:0,groundY:.13,look,gait:{},hidden:!onFoot,pose:onFoot?'grab':null};
   // Walked to the left rear door of the nearest patrol car, or back along the street.
@@ -201,11 +203,12 @@ export function createRoadblock(scene,{world,police,carModel,playerLook=null,gra
   if(!driver.hidden)advanceGait(driver,driver.gait,dt,driver.look);
   // Camera: low, beside the driver's side, looking at the driver; stays out of buildings.
   const focus=driver.hidden?local(car,-1.2,0):driver;
-  const options=[[-4.6,7.5],[-7,4.5],[-7.5,-3.5],[-3,-9],[7,-8]].map(([x,z])=>local(car,x,z));
+  const options=[[-4.6,7.5],[-7,4.5],[-7.5,-3.5],[-3,-9],[7,-8],[4.6,7.5],[7,4.5],[-9,0],[9,0],[0,10],[0,-10]].map(([x,z])=>local(car,x,z));
   const clear=p=>{const n=8;for(let i=0;i<=n;i++){const x=p.x+(focus.x-p.x)*i/n,z=p.z+(focus.z-p.z)*i/n;if((world.cameraBuildings||world.buildings).at(x,z))return false;}return true;};
-  const eye=options.find(clear)||options[0],h=2.7+Math.min(1.2,S.t*.08);
+  // No low view in the clear (a narrow lane, the car against a house): look down from above the roofs instead of from inside a house.
+  const low=options.find(clear),eye=low||options[0],h=low?2.7+Math.min(1.2,S.t*.08):22;
   if(!camera)camera={x:eye.x,z:eye.z,tx:focus.x,tz:focus.z};
-  const k=1-Math.exp(-dt*2.5);camera.x+=(eye.x-camera.x)*k;camera.z+=(eye.z-camera.z)*k;camera.tx+=(focus.x-camera.tx)*k;camera.tz+=(focus.z-camera.tz)*k;camera.h=h;
+  const k=1-Math.exp(-dt*2.5);camera.x+=(eye.x-camera.x)*k;camera.z+=(eye.z-camera.z)*k;camera.tx+=(focus.x-camera.tx)*k;camera.tz+=(focus.z-camera.tz)*k;camera.h=camera.h===undefined?h:camera.h+(h-camera.h)*k;
  }
  return {
   group,step,startArrest,get plan(){return plan;},
@@ -221,7 +224,7 @@ export function createRoadblock(scene,{world,police,carModel,playerLook=null,gra
   },
   cameraPose(){if(!scene_||!camera)return null;const g=groundAt(camera.tx,camera.tz);return {position:[camera.x,camera.h+g,camera.z],target:[camera.tx,1+g,camera.tz]};},
   // Continue clears this response; a later pursuit can earn another one.
-  clearArrest(){if(scene_?.door){group.remove(scene_.door.root);scene_.door.dispose();}scene_=null;camera=null;for(const o of posts){o.busy=false;Object.assign(o,o.post);o.pose='belt';o.knockdown=null;}if(posts.length)posts[Math.floor(posts.length/2)].pose='stop';group.visible=deployed;},
+  clearArrest(){if(scene_?.door){scene_.door.root.removeFromParent();scene_.door.dispose();}scene_=null;camera=null;for(const o of posts){o.busy=false;Object.assign(o,o.post);o.pose='belt';o.knockdown=null;}if(posts.length)posts[Math.floor(posts.length/2)].pose='stop';group.visible=deployed;},
   standDown(){this.clearArrest();clearPursuit();standDown=true;},
   reset(){this.clearArrest();clearPursuit();standDown=false;time=0;},
   snapshot(){return {deployed,standDown,phase,pursuit,attempts,lastReason,warningAt,nextAttempt,pending:pending?{centre:pending.centre,roadName:pending.roadName,distanceAhead:pending.distanceAhead}:null,burst:!!burst,strip:plan?.strip||null,roadName:plan?.roadName||null,cars:plan?.cars.length||0,officers:posts.length,arrest:scene_?{mode:scene_.mode,hasDoor:!!scene_.door,t:+scene_.t.toFixed(2),doorAt:scene_.doorAt,squad:scene_.squad.length,driver:{x:scene_.driver.x,z:scene_.driver.z,hidden:scene_.driver.hidden,pose:scene_.driver.pose,prone:!!scene_.driver.knockdown,lean:+(scene_.driver.lean||0).toFixed(2),groundY:scene_.driver.groundY},patrol:scene_.patrol,officers:scene_.squad.slice(0,2).map(o=>({x:o.x,z:o.z,pose:o.pose}))}:null};},

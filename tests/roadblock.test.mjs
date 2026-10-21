@@ -36,12 +36,20 @@ test('an arrest door uses the car currently driven after switching model and pai
  const world={buildings:{at:()=>null},roads:{at:()=>true},pavement:{at:()=>true}},police={units:[],setParked(){}};
  const block=createRoadblock(scene,{world,police,carModel:renderer.group}),taken={...makeCar(3,4),visual:{type:'van',paint:'#946a2e'}};
  travel.cars.push(taken);travel.car=travel.actor=taken;renderer.sync(travel);block.startArrest(taken);
- const door=block.group.children.at(-1),panel=door.children[0].children[0];
+ const door=renderer.group.children.at(-1),panel=door.children[0].children[0]; // hung on the car model, tilting with it
  assert.equal(panel.material.color.getHexString(),'946a2e');
  // the shaped door (skin with its window cut out) runs from the sill to this car's roof line
  panel.geometry.computeBoundingBox();const bb=panel.geometry.boundingBox,spec=renderer.group.userData.spec;
  assert.ok(Math.abs(bb.min.y-(.34-.012))<.01&&Math.abs(bb.max.y-(spec.h-.12+.012))<.01,`door ${bb.min.y.toFixed(3)}..${bb.max.y.toFixed(3)} for a ${spec.h} m car`);
- block.clearArrest();
+ block.clearArrest();assert.ok(!renderer.group.children.includes(door),'Continue takes the door off the car');
+});
+test('hemmed in by houses, the arrest camera looks down from above the roofs, never from inside a house',()=>{
+ const scene=new Scene(),car=makeCar(0,0),house={at:(x,z)=>Math.hypot(x,z)>3?{}:null}; // only the car's own spot is open
+ const world={buildings:house,cameraBuildings:house,roads:{at:()=>true},pavement:{at:()=>true}},police={units:[],setParked(){}};
+ const block=createRoadblock(scene,{world,police});block.startArrest(car);for(let i=0;i<60;i++)block.update(1/30,car);
+ assert.ok(block.cameraPose().position[1]>15,`camera at ${block.cameraPose().position[1].toFixed(1)} m`);
+ const open=createRoadblock(new Scene(),{world:{...world,buildings:{at:()=>null},cameraBuildings:{at:()=>null}},police});open.startArrest(car);open.update(1/30,car);
+ assert.ok(open.cameraPose().position[1]<5,'a clear street keeps the low view');
 });
 
 function cityFixture(dx=0,dz=0){
