@@ -1,4 +1,4 @@
-// Small FPS meter (P, or G when nobody is near to talk to): frames per second, frame time and draw calls.
+// Small FPS meter (P): frames per second, frame time and draw calls.
 export function createFpsMeter(renderer,extra=()=>''){ // extra(): more status after the numbers (pixel ratio, quality level, shadows)
  const el=document.createElement('div');el.id='fps-meter';el.hidden=true;
  el.style.cssText='position:fixed;top:10px;left:50%;transform:translateX(-50%);z-index:60;padding:4px 10px;border-radius:6px;background:rgba(10,14,18,.72);color:#e9f3ea;font:600 12px/1.3 ui-monospace,Menlo,monospace;pointer-events:none;white-space:nowrap';

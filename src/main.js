@@ -186,7 +186,7 @@ const blenderModels=()=>city?.id?.startsWith('copenhagen')&&new URLSearchParams(
 let seasonCafes=null,cineRadio=false,cineRadioTimer=0,seasonal=null,vehicleBodies=null,blenderLoads=null,treeTrunks=null,cityModelPromise,surfaceStreamer=null,extensionStreamer=null,switchingStart=false,startVisitVersion=0,places=[],speciesTrees=null;const placeHidden=new Set();
 let birds=null,birdColonies=[],crowd=null; // gulls, pigeons, crows and sparrows from the city's map data (birds.js)
 let cyclists,cyclistRenderer,npcScooters,npcScooterRenderer,buses,police,policeRenderer,roadblock; // shared riders and police in every city
-let distance=0,viewSpan=150,desiredSpan=150,lastTime=0,lastUI=0,lastTile=0,lastToast=0,toastTimer,areaLabel;
+let distance=0,viewSpan=150,desiredSpan=150,lastTime=0,lastUI=0,lastTile=0,lastToast=0,lastBump=null,toastTimer,areaLabel;
 let sound=false,audioContext,oscillator,gain,mobileControls=null,soundscape=null,audioFault=false,radio=null;
 let startPicker=null,previewVersion=0,previewing=false,startAfterPreview=false; // the ‹ › starting-point picker on the welcome card
 onGameStop(()=>{surfaceStreamer?.dispose();extensionStreamer?.dispose();mobileControls?.release();keys.clear();paused=true;peopleInteraction?.dispose();gullEncounter.reset();birds?.clearEncounter();marketShopRenderer?.dispose();audioContext?.suspend().catch(()=>{});});
@@ -979,7 +979,7 @@ async function travelTo(l){ /* big map: jump to a named place */
  if(switchingStart||!ready)return;if(police?.level>0){toast('Lose the police first.');return;} // no map hop out of a chase
  switchingStart=true;toast(`Travelling to ${l.name}…`);
  try{await extensionStreamer.ensureStart(l);const near=roofIndex.tiles.filter(t=>tileDistance(t,l)<430).sort((a,b)=>tileDistance(a,l)-tileDistance(b,l));
-  await Promise.all([surfaceStreamer.ensure(l,{radius:900}),pool(near,4,t=>loadRoof(t,l))]);if(police?.busted||police?.level>0)return; /* arrested or wanted while the tiles loaded: no jump out of it */setStart(l);history.replaceState(null,'',startUrl(location,city,l));if(!started)start();}
+  await Promise.all([surfaceStreamer.ensure(l,{radius:900}),pool(near,4,t=>loadRoof(t,l))]);if(police?.busted)return;if(police?.level>0){toast('Lose the police first.');return;} /* arrested or wanted while the tiles loaded: no jump out of it */setStart(l);history.replaceState(null,'',startUrl(location,city,l));if(!started)start();}
  catch(e){handleTileError(e);}finally{switchingStart=false;}
 }
 function showDialog(id){if(!ready||police?.busted)return;
@@ -1053,7 +1053,7 @@ window.addEventListener('keydown',e=>{
   const hud=started&&!paused&&!mapOpen&&!police?.busted&&!cph?.blocking?.()&&!e.target.closest('dialog,input,select,textarea,[contenteditable="true"]');
   if(!(hud&&/^(Key[A-Z]|Arrow|Space|Shift)/.test(e.code)))return;
   e.target.blur?.();focusWorldControls();}
- if(e.code==='Tab'&&started&&!paused&&!mapOpen&&!police?.busted&&!cph?.blocking?.()){e.preventDefault();return;} // Tab moved focus onto the top bar and the keys stopped steering
+ if(e.code==='Tab'&&started&&!paused&&!mapOpen&&!police?.busted&&!cph?.blocking?.()&&!peopleInteraction?.session){e.preventDefault();return;} // Tab moved focus onto the top bar and the keys stopped steering
  if(e.metaKey||e.ctrlKey){if(e.code.startsWith('Meta'))keys.clear();return;} // browser shortcuts (Cmd+A, Ctrl+R): macOS sends no keyup for keys let go under Cmd
  if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space'].includes(e.code)&&!mapOpen)e.preventDefault();
  if(e.repeat){if(started&&!paused&&!mapOpen&&!police?.busted&&/^(Key[WASD]|Arrow|Space|Shift)/.test(e.code))keys.add(e.code);return;} // a key still held after unpausing (its first press was dropped) drives again on its repeat
@@ -1208,9 +1208,9 @@ function frame(now){
      if(r.collision==='building'){impacts.damage(car,Math.abs(previous.speed),'building');finale.buildingImpact({...car,speed:previous.speed},Math.abs(previous.speed),world,police);}
      else if(r.scrape>=2){impacts.damage(car,r.scrape,'building');finale.buildingImpact({...car,speed:r.scrape},r.scrape,world,police);} /* slid along a wall (physics.js): the speed that went into it still counts */
     }else if(!r.crashed){const h=travel.hitPeople(previous,people,impacts,{police,obstacles:travelObstacles()});
-     if(h?.fell){car=travel.actor;playerCars.sync(travel);toast(h.fell>5?'Ouch. You hit someone and went flying.':touchScreen?'You hit someone and came off. Tap the ride button to get back on.':'You hit someone and came off. Press Enter to get back on.');lastToast=now;}else if(h?.bumped&&now-lastToast>1500){toast('Sorry!');lastToast=now;}}
+     if(h?.fell){car=travel.actor;playerCars.sync(travel);toast(h.fell>5?'Ouch. You hit someone and went flying.':touchScreen?'You hit someone and came off. Tap the ride button to get back on.':'You hit someone and came off. Press Enter to get back on.');lastToast=now;}else if(h?.bumped&&now-lastToast>6000){toast('Sorry!');lastToast=now;}}
     distance=car.distance;
-    if(r.collision&&now-lastToast>2200){if(r.collision==='boundary')showEdgeInvite();if(r.collision==='water')toast('The water is best enjoyed from the shore.');lastToast=now;}
+    if(r.collision&&now-lastToast>2200&&r.collision!==lastBump){lastBump=r.collision;if(r.collision==='boundary')showEdgeInvite();if(r.collision==='water')toast('The water is best enjoyed from the shore.');lastToast=now;}else if(!r.collision&&now-lastToast>8000)lastBump=null; // once per wall, not every 2 s while pushing into it
    }
    const beforeTransitImpact=Math.abs(car.speed);
    tramSim.step(step,car,fillList(SCRATCH.tram,mobility.cars,buses?.obstacles,police.obstacles,parked));
@@ -1711,7 +1711,7 @@ async function boot(){
    if(city.era===1760)for(const el of document.querySelectorAll('.help-grid span')){const t={'Handbrake / bike or scooter brake':'Rein in','Enter a nearby car / ride':'Board your coach','Recover car':'Recover coach','Get out / get off':'Step down','Accelerate / reverse':'Drive on / back up'}[el.textContent];if(t)el.textContent=t;if(/^(Horn|Radio: next \/ previous station)$/.test(el.textContent)){el.nextElementSibling?.remove();el.remove();}} // no horn or radio on a coach // 1760: a coach, no bikes or scooters
    if(touchScreen)document.querySelector('#help-dialog .dialog-copy').textContent=`Steer with the slider (or arrows or tilt: Menu > Steering), hold Go, Brake to slow down and reverse. Stopped, the button above the controls gets you out${city.era===1760?' or back on your coach':', onto a bike or into a car'}. Walk up to someone and tap Say hello. Yellow beam: a pick-up. Teal: the drop-off. Red: a saga step. Purple: a race start. Menu has the city map, the journal and the camera.`;
    document.querySelector('#help-dialog .dialog-drive').firstChild.textContent='Keep exploring ';
-   if(city.era===1760)for(const row of document.querySelectorAll('.boot-controls>div')){const dt=row.querySelector('dt'),t=dt?.textContent;if(/radio|Music/.test(t||'')){row.remove();continue;}const n={'Use a nearby car or ride':'Board your coach','Recover car':'Recover coach','Get out / get off':'Step down','1760 / horn / FPS':'Back to today / FPS'}[t];if(n)dt.textContent=n;if(t==='1760 / horn / FPS')row.querySelector('dd').innerHTML='<kbd>Y</kbd> / <kbd>P</kbd>';} // the 1760 welcome card listed the car, horn and radio
+   if(city.era===1760)for(const row of document.querySelectorAll('.boot-controls>div')){const dt=row.querySelector('dt'),t=dt?.textContent;if(/radio/i.test(t||'')){row.remove();continue;}const n={'Use a nearby car or ride':'Board your coach','Recover car':'Recover coach','Get out / get off':'Step down','1760 / horn / FPS':'Back to today / FPS'}[t];if(n)dt.textContent=n;if(t==='1760 / horn / FPS')row.querySelector('dd').innerHTML='<kbd>Y</kbd> / <kbd>P</kbd>';} // the 1760 welcome card listed the car, horn and radio
    const helpGrid=document.querySelector('#help-dialog .help-grid');if(helpGrid)$('pause-controls').append(helpGrid.cloneNode(true));
    updateHUD(0);
    // Read-only diagnostics for smoke tests and performance inspection.

@@ -96,6 +96,7 @@ export function createRoadblock(scene,{world,police,carModel,playerLook=null,gra
    else retry('no-safe-site');
   }
   if(!deployed)return;
+  if(burst&&burst.car!==car)burst=null; // a different car: the old burst no longer blocks the strip
   if(!burst&&previous&&crossesStrip(previous,car,plan.strip)&&Math.abs(car.speed)>.5){
    burst={time,car};car.flat=1;onWarning?.('Spike strip! Tyres shredded.');onBurst?.();
   }

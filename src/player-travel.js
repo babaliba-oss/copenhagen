@@ -181,7 +181,7 @@ export class PlayerTravel{
    const severity=impacts.hit(a,{x:from.x,z:from.z,heading:from.heading,speed:from.speed},{kind,gentle:walk,police:walk?null:police});
    if(!severity)continue;
    if(walk){police?.report('bump',a.id);p.speed=0;return {kind,severity,actor:a,bumped:true};}
-   if(severity.riderFalls){this.crash(speed,obstacles);return {kind,severity,actor:a,fell:speed};}
+   if(severity.riderFalls){if(this.crash(speed,obstacles)===false)return {kind,severity,actor:a};return {kind,severity,actor:a,fell:speed};} // no room to land: still riding
    p.speed=Math.sign(p.speed||from.speed)*Math.min(Math.abs(p.speed),severity.vehicleSpeed);if(this.riding)this.riding.speed=p.speed;
    return {kind,severity,actor:a};
   }
