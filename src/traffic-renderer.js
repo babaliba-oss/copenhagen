@@ -10,7 +10,7 @@ import {finishMaterial,finishGeometry} from './car-finishes.js';
 // Beyond `detail` a vehicle is two boxes (an instance-coloured body and a cabin) in two batches shared by every
 // body style, and past `hide` it is skipped: cars near the player keep full detail.
 // Moving cars keep their full model until they are small on screen; a shape swap at 150 m was a visible pop.
-export const TRAFFIC_LOD={detail:260,hide:650};
+export const TRAFFIC_LOD=typeof matchMedia==='function'&&matchMedia('(pointer:coarse)').matches?{detail:130,hide:520}:{detail:260,hide:650}; // phones: full models within 130 m (260 m: ~120k triangles of traffic at Kongens Nytorv)
 let paintShared=null;
 // One paint material for every body style: colour comes per car (instance colour).
 function paintMaterial(source){if(!paintShared){paintShared=registerEnvMaterial(source.clone());paintShared.color.set('#ffffff');}return paintShared;}
