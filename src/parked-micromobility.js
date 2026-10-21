@@ -250,7 +250,7 @@ export function createParkedMicromobility(city,mobility,trams,options={}){
   bodies:sites.flatMap(s=>s.knockables.bodies),
   rideSources:sites.flatMap(s=>s.knockables.rideSources||[]),
   step(dt,car,world){for(const s of sites){if(car){const visible=Math.hypot(car.x-s.x,car.z-s.z)<MICROMOBILITY_VIEW_RANGE;if(s.group.visible!==visible)s.group.visible=visible;}s.knockables.step(dt,car,world);}},
-  update(){for(const s of sites)if(s.group.visible)s.knockables.update();},
+  update(focus){for(const s of sites)if(s.group.visible)s.knockables.update(focus);},
   resetAll(){for(const s of sites)s.knockables.resetAll();},
   snapshot(){const all=sites.map(s=>s.knockables.snapshot());return {count:all.reduce((n,x)=>n+x.count,0),knocked:all.reduce((n,x)=>n+x.knocked,0),hits:all.reduce((n,x)=>n+x.hits,0)};},
  };

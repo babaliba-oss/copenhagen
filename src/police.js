@@ -93,7 +93,7 @@ export class PoliceSimulation{
  escalate({level=4,message='Police alerted — units converging.'}={}){
   if(this.busted)return false;
   this.heat=Math.max(this.heat,heatForLevel(level));this.grace=0;
-  this.escape=0;this.lastSeen=null;this.repath=0;this.dispatch=this.time;this.surgeUntil=this.time+SURGE.duration;
+  this.escape=0;this.standoff=0;this.lastSeen=null;this.repath=0;this.dispatch=this.time;this.surgeUntil=this.time+SURGE.duration;
   this.message=message;return true;
  }
  report(kind,id,speed){
@@ -109,7 +109,7 @@ export class PoliceSimulation{
   this.heat=Math.min(30,this.heat+add+Math.min(3,this.recentIncidents.length));
   this.recentIncidents.push(this.time);
   if(this.level>=4)this.surgeUntil=this.time+SURGE.duration;
-  this.escape=0;this.lastSeen=null;this.repath=0;this.dispatch=Math.min(this.dispatch,this.time+.5);
+  this.escape=0;this.standoff=0;this.lastSeen=null;this.repath=0;this.dispatch=Math.min(this.dispatch,this.time+.5);
   this.message=kind==='bump'?(this.level>before?'Shoving people — a patrol is responding.':null):kind==='reckless'?(before?'Reckless driving — wanted level increased.':'Reckless driving — a patrol is responding.'):kind==='pedestrian'?'Pedestrian hit — police alerted.':kind==='police'?'You hit a police car!':!before?'Crash reported — a patrol is responding.':this.level>before?'Another crash — wanted level increased.':'Crash reported.';
   this.onIncident?.(kind,id,speed,this.level);
   return true;
@@ -266,7 +266,7 @@ export class PoliceSimulation{
   const canArrest=this.units.some(u=>distance(u,player)<(surge?SURGE.arrestRange:10)&&this.clearSight(u,player));
   // Stand-off: the player is off any road the units can drive (a plaza, Strøget) and they can only watch from the kerb.
   // After 10 s of that the escape clock runs as if unseen (the wanted level used to stay frozen for good).
-  this.standoff=this.seen&&!canArrest&&this.units.every(u=>Math.abs(u.speed||0)<.5)?(this.standoff||0)+dt:0;
+  this.standoff=this.seen&&!canArrest&&!this.world.roads?.at?.(player.x,player.z)&&this.units.every(u=>Math.abs(u.speed||0)<.5)?(this.standoff||0)+dt:0;
   this.escape=!this.seen||this.standoff>10?this.escape+dt:0;
   this.bust=canArrest&&Math.abs(player.speed)<1?this.bust+dt:0;
   // Hands-on arrest: a unit at the car (any side, no line of sight needed) and a stopped or crawling player.

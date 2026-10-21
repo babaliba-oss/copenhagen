@@ -221,7 +221,8 @@ const focus=new THREE.Vector3(0,0,85);
 // Diagnostics for one phone's GPU driver at a time: ?off=post,shadows skips the post pipeline / shadow maps, ?hide=<regex>
 // keeps every object whose name matches out of the frame (e.g. ?hide=Far city|Terrain).
 const OFF=new Set((new URLSearchParams(location.search).get('off')||'').split(',').filter(Boolean)),HIDE=(()=>{try{const h=new URLSearchParams(location.search).get('hide');return h?new RegExp(h,'i'):null;}catch{return null;}})();
-const renderer=new THREE.WebGLRenderer({canvas:$('world'),antialias:OFF.has('post'), /* the post pipeline has its own MSAA target: a multisampled canvas too was memory and a resolve a frame for nothing */powerPreference:'high-performance'});
+const hdrCapable=(()=>{try{const gl=document.createElement('canvas').getContext('webgl2');return !!gl&&!!(gl.getExtension('EXT_color_buffer_float')||gl.getExtension('EXT_color_buffer_half_float'));}catch{return false;}})(); /* without float targets there is no post pipeline, so the canvas keeps its own MSAA */
+const renderer=new THREE.WebGLRenderer({canvas:$('world'),antialias:OFF.has('post')||!hdrCapable, /* the post pipeline has its own MSAA target: a multisampled canvas too was memory and a resolve a frame for nothing */powerPreference:'high-performance'});
 // Instanced batches with nothing in them (no pedestrians on foot near the player, no trams, empty LOD levels:
 // ~50 at Nyhavn) still went through program and uniform setup every frame, in the main and shadow passes.
 {const direct=renderer.renderBufferDirect;renderer.renderBufferDirect=function(cam,sc,geometry,material,object,group){if(object.isInstancedMesh&&object.count===0)return;return direct.call(this,cam,sc,geometry,material,object,group);};}
@@ -1098,7 +1099,7 @@ mobileControls=createMobileControls({
  actions:{
   map:()=>showDialog('map-dialog'),camera:cycleCamera,
   weather:()=>{look.cycle();toast(look.label);},sound:()=>$('sound-btn').click(),
-  help:()=>showDialog('help-dialog'),reset:recoverCar,journal:()=>cph?.key('KeyJ'),quitRace:()=>cph?.key('KeyX'),racing:()=>!!cph?.debug?.()?.race, /* phones have no J or X key */sources:()=>showDialog('sources-dialog'),era:()=>$('era-btn').click(), // phones have no top bar: the Menu carries the time travel
+  help:()=>showDialog('help-dialog'),reset:recoverCar,journal:()=>cph?.key('KeyJ'),hasJournal:()=>!!cph,quitRace:()=>cph?.key('KeyX'),racing:()=>!!cph?.debug?.()?.race, /* phones have no J or X key */sources:()=>showDialog('sources-dialog'),era:()=>$('era-btn').click(), // phones have no top bar: the Menu carries the time travel
  },
  notify:toast,
 });

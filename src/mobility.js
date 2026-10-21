@@ -227,14 +227,15 @@ export class Mobility {
    if(this.world.buildings.at(p.x,p.z)||(a.walking?!this.walkable(p.x,p.z,a.edge):!vehicleFitsRoad(p,this.world)))continue;
    // A long straight main road is almost always in view; corridor cars may appear there, but only in the far haze.
    const distance=Math.hypot(p.x-player.x,p.z-player.z);
-   if(distance<12||(this.visibilityTest?.(p)&&(a.walking?this.time>3&&distance<70:!(a.corridorOnly&&distance>300))))continue; // walkers too: people appeared on the pavement ahead
+   if(distance<12||(this.visibilityTest?.(p)&&(a.walking?this.time>3&&!this.resetting&&distance<70:!(a.corridorOnly&&distance>300))))continue; // walkers too: people appeared on the pavement ahead
    if(!a.walking){const dx=p.x-player.x,dz=p.z-player.z,along=-dx*Math.sin(player.heading||0)-dz*Math.cos(player.heading||0),side=Math.abs(dx*Math.cos(player.heading||0)-dz*Math.sin(player.heading||0));if(along>-24&&along<(this.time<3?95:45)&&side<4.5)continue;} // a clear first 95 m when the drive starts
    if(!a.walking&&this.cars.some(b=>b!==a&&b.edge&&Math.hypot(p.x-b.x,p.z-b.z)<8))continue;
    Object.assign(a,p);a.offset=undefined;a.prevDir=undefined;a.speed=edgeCruise(a.edge,a.cruise);a.waiting=0;a.passing=null;a.unjam=null;a.gridlock=0;a.hold=null;a.holdBy=null;a.deadlocked=false;a.hiddenFor=0;a.panicUntil=0;a.running=false;a.stuck=0;a.progressPoint={x:p.x,z:p.z};return;
   }
   a.edge=null;a.speed=0;
  }
- reset(player){this.updateParked();for(const a of [...this.cars,...this.people]){a.edge=null;a.playerTaken=undefined;a.conversation=undefined;}for(const a of [...this.cars,...this.people])this.spawn(a,player);}
+ // A reset (restart, map jump) respawns everyone against the old view's frustum: no visibility rule for walkers then.
+ reset(player){this.resetting=true;try{this.updateParked();for(const a of [...this.cars,...this.people]){a.edge=null;a.playerTaken=undefined;a.conversation=undefined;}for(const a of [...this.cars,...this.people])this.spawn(a,player);}finally{this.resetting=false;}}
  canRecycle(a,player){return Math.hypot(a.x-player.x,a.z-player.z)>80&&(a.hiddenFor||0)>2;}
  retire(a,player,force=false){a.speed=0;if(force||a.walking||this.canRecycle(a,player))a.edge=null;}
  // Lanes a parked bus stands in (mapped bays on the carriageway) are avoided when routing allows; a car that
