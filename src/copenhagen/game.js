@@ -338,7 +338,7 @@ export function createCopenhagenGame({scene,city,mobilityData,cityData,toast,sou
    const d=dist(here,r.start);if(d>30)r.armed=true;if(m.visible&&r.armed&&d<7){r.armed=false;startRace(r);}});
   mkCp.visible=mkCp2.visible=false;
   if(race&&running){
-   if(race.countdown>0){const before=Math.ceil(race.countdown);race.countdown-=dt;const after=Math.ceil(race.countdown);if(after!==before)banner(after>0?String(after):'Go!','',after>0?'pick':'pass');}
+   if(race.countdown>0){if(travelMode==='car'&&actor)actor.speed*=Math.exp(-4*dt); /* brought to the line: rolling through the countdown was a free head start */const before=Math.ceil(race.countdown);race.countdown-=dt;const after=Math.ceil(race.countdown);if(after!==before)banner(after>0?String(after):'Go!','',after>0?'pick':'pass');}
    else{race.t+=dt;const r=race.r,cp=r.cps[race.k];
     mkCp.visible=true;mkCp.position.set(cp[0],groundAt(...cp),cp[1]);mkCp.children[1].scale.setScalar(1.4+Math.sin(now/200)*.1);
     const nx=r.cps[race.k+1];if(nx){mkCp2.visible=true;mkCp2.position.set(nx[0],groundAt(...nx),nx[1]);}

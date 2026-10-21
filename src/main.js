@@ -951,7 +951,7 @@ async function prefetchOtherEra(){
  for(const t of near)await get(t.file);
 }
 function eraJump(){
- const to=city.id==='copenhagen'?'copenhagen-1760':'copenhagen';if(!CITIES[to]||!car)return;
+ const to=city.id==='copenhagen'?'copenhagen-1760':'copenhagen';if(!CITIES[to]||!car)return;if(started&&police?.level>0){toast('Lose the police first.');return;} // no time travel out of a chase
  try{sessionStorage.setItem('era-jump',JSON.stringify({to,x:car.x,z:car.z,heading:car.heading,look:look?.name}));}catch{}
  showEraCard(to==='copenhagen'?'today':'1760');
  const u=new URL(location.href);u.searchParams.set('city',to);u.searchParams.delete('start');setTimeout(()=>{location.href=u.href;},450);
@@ -977,7 +977,7 @@ async function travelTo(l){ /* big map: jump to a named place */
  if(switchingStart||!ready)return;if(police?.level>0){toast('Lose the police first.');return;} // no map hop out of a chase
  switchingStart=true;toast(`Travelling to ${l.name}…`);
  try{await extensionStreamer.ensureStart(l);const near=roofIndex.tiles.filter(t=>tileDistance(t,l)<430).sort((a,b)=>tileDistance(a,l)-tileDistance(b,l));
-  await Promise.all([surfaceStreamer.ensure(l,{radius:900}),pool(near,4,t=>loadRoof(t,l))]);if(police?.busted)return; /* arrested while the tiles loaded: the BUSTED screen wins */setStart(l);history.replaceState(null,'',startUrl(location,city,l));if(!started)start();}
+  await Promise.all([surfaceStreamer.ensure(l,{radius:900}),pool(near,4,t=>loadRoof(t,l))]);if(police?.busted||police?.level>0)return; /* arrested or wanted while the tiles loaded: no jump out of it */setStart(l);history.replaceState(null,'',startUrl(location,city,l));if(!started)start();}
  catch(e){handleTileError(e);}finally{switchingStart=false;}
 }
 function showDialog(id){if(!ready||police?.busted)return;
@@ -998,7 +998,7 @@ function reset(){if(!ready)return;setBusted(false);setStart(startPoint);toast('B
 // and repaired. With no such spot in reach it is the old reset to the starting point, which R still is on foot or a ride.
 let laneSurfaces=null,laneSurfaceCount=-1;
 function recoverCar(){
- if(!ready)return;if(travel?.mode!=='car'||!mobility){reset();return;}
+ if(!ready)return;if(travel?.mode!=='car'||!mobility){if(police?.level>0){toast('Lose the police first.');return;}reset();return;} // on foot R went back to the start point and cleared the chase
  const count=data.roads.length+data.pavement.length;if(count!==laneSurfaceCount){laneSurfaces=startSurfaces(data.roads,data.pavement);laneSurfaceCount=count;} // map extensions add streets as they stream in
  const solid=(x,z)=>laneSurfaces.blocked.at(x,z)||world.buildings.at(x,z)||!world.roads.at(x,z)&&inWaterPolygons(world.water,x,z);
  const bodies=[...travelObstacles(),...travel.parkedBodies(),...(parkedCars?.near(car.x,car.z,70)||[])].map(v=>({x:v.x,z:v.z,heading:v.heading||0,hl:v.hl??v.halfLength??2.36,hw:v.hw??v.halfWidth??.98}));
@@ -1044,7 +1044,14 @@ window.addEventListener('blur',()=>soundscape?.horn(false));document.addEventLis
 window.addEventListener('keydown',e=>{
  const pick=startPicker&&pickerStep(e.code,{ready:ready&&!gameIsStopped(),started,blocked:mapOpen||!!police?.busted});
  if(pick){e.preventDefault();if(!e.repeat)startPicker.step(pick);return;} // before the start ←/→ choose the place; afterwards they steer
- if(e.code!=='Escape'&&e.target.closest?.('button,a,summary,input,select,textarea,[contenteditable="true"]'))return;
+ if(police?.busted&&finale.ended&&e.code==='KeyR'&&!e.repeat){e.preventDefault();restart();return;} // the BUSTED screen focuses its Continue button: R never got past the button check below
+ if(['KeyJ','KeyK'].includes(e.code)&&cph?.blocking?.()&&cph.key(e.code)){e.preventDefault();return;} // journal / treasure map close with their own key even after a click inside them
+ // A HUD button keeps focus after a click (or Tab): game keys go back to the world instead of being swallowed.
+ if(e.code!=='Escape'&&e.target.closest?.('button,a,summary,input,select,textarea,[contenteditable="true"]')){
+  const hud=started&&!paused&&!mapOpen&&!police?.busted&&!cph?.blocking?.()&&!e.target.closest('dialog,input,select,textarea,[contenteditable="true"]');
+  if(!(hud&&/^(Key[A-Z]|Arrow|Space|Shift)/.test(e.code)))return;
+  e.target.blur?.();focusWorldControls();}
+ if(e.code==='Tab'&&started&&!paused&&!mapOpen&&!police?.busted&&!cph?.blocking?.()){e.preventDefault();return;} // Tab moved focus onto the top bar and the keys stopped steering
  if(e.metaKey||e.ctrlKey){if(e.code.startsWith('Meta'))keys.clear();return;} // browser shortcuts (Cmd+A, Ctrl+R): macOS sends no keyup for keys let go under Cmd
  if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space'].includes(e.code)&&!mapOpen)e.preventDefault();
  if(e.repeat){if(started&&!paused&&!mapOpen&&!police?.busted&&/^(Key[WASD]|Arrow|Space|Shift)/.test(e.code))keys.add(e.code);return;} // a key still held after unpausing (its first press was dropped) drives again on its repeat
@@ -1301,12 +1308,12 @@ function frame(now){
  if(ready)speciesTrees?.update(focus,{high:camera.position.y-groundAt(focus.x,focus.z)>22}); // every frame (cheap until the focus moves 8 m): waiting for tile loads made near trees pop in late
  if(now-lastTile>1200&&ready&&!switchingStart){surfaceStreamer?.update(car,{radius:1000,aheadSeconds:12});if(started)surfaceStreamer?.evictFar(car,1700,m=>{if(m){cityModel.remove(m);surfaceMeshes.delete(m);m.geometry.dispose();}}); /* street surfaces far behind are unloaded (they reload on return): memory stayed growing with exploration */extensionStreamer?.update(car);updateTiles().catch(handleTileError);lastTile=now;}
  // The radio plays while you drive today's car with the sound on, and its now-playing card is on screen exactly then.
- const radioOn=!!radio&&sound&&started&&!paused&&!mapOpen&&travel?.mode==='car'&&city?.id==='copenhagen';
+ const radioOn=!!radio&&sound&&started&&!paused&&!mapOpen&&!police?.busted&&!reading&&travel?.mode==='car'&&city?.id==='copenhagen'; // not over the arrest or a journal/saga card
  {const c=$('radio-now'),shown=radioOn||cineRadio;if(c.hidden===shown){c.hidden=!shown;if(shown)flashRadio();}} /* ?cinematic's radio shot shows the card (silent unless the sound is on) */
  // Sound never stops the game: an audio error (a browser's Web Audio quirk) is logged once and that frame's sound skipped.
  try{
  radio?.update(dt,{on:radioOn}); // getting in announces the station: the card shows what is on
- if(soundscape)soundscape.update(dt,{enabled:sound&&started&&!paused&&!mapOpen,speed:car?.speed||0,mode:travel?.mode,throttle:keys.has('KeyW')||keys.has('ArrowUp')?1:0,musicOff:!!radio?.playing});
+ if(soundscape)soundscape.update(dt,{enabled:sound&&started&&!paused&&!mapOpen&&!reading&&!(police?.busted&&finale.ended),speed:car?.speed||0,mode:travel?.mode,throttle:keys.has('KeyW')||keys.has('ArrowUp')?1:0,musicOff:!!radio?.playing});
  if(gain){gain.gain.setTargetAtTime(sound&&started&&travel?.mode==='car'&&!paused&&!mapOpen&&!soundscape?.013:0,audioContext.currentTime,.12);oscillator.frequency.setTargetAtTime(42+Math.abs(car?.speed||0)*5,audioContext.currentTime,.1);}
  policeRenderer?.audio(audioContext,sound&&started&&!paused&&!mapOpen&&(!police?.busted||!finale.ended));
  birds?.audio(audioContext,sound&&started&&!paused&&!mapOpen,car,frameMs/1000);
@@ -1699,7 +1706,7 @@ async function boot(){
    {const a=document.createElement('a');a.href='/THIRD_PARTY_LICENSES.txt';a.textContent='Open-source software notices ↗';a.target='_blank';a.rel='noreferrer';document.querySelector('#sources-dialog .source-links').append(a);}
    $('world').setAttribute('aria-label',`3D view of ${city.name}, explored on foot, by car, bike or scooter`);
    document.querySelector('#help-dialog .dialog-copy').textContent=city.era===1760?`Explore ${city.name} by coach or on foot. Press F to step down, Enter to board your coach again, and G to greet someone. Hold Shift to run. Tap the small action buttons on a phone. The minimap stays north-up.`:`Explore ${city.name} by car, on foot, by bicycle or on a scooter. Press F to get out, Enter to use a nearby stopped car, bicycle or scooter, and G to greet someone. Hold Shift to run. Tap the small action buttons on a phone. The minimap stays north-up.`;
-   if(city.era===1760)for(const el of document.querySelectorAll('.help-grid span')){const t={'Handbrake / bike or scooter brake':'Rein in','Enter a nearby car / ride':'Board your coach','Recover car':'Recover coach','Get out / get off':'Step down','Accelerate / reverse':'Drive on / back up'}[el.textContent];if(t)el.textContent=t;} // 1760: a coach, no bikes or scooters
+   if(city.era===1760)for(const el of document.querySelectorAll('.help-grid span')){const t={'Handbrake / bike or scooter brake':'Rein in','Enter a nearby car / ride':'Board your coach','Recover car':'Recover coach','Get out / get off':'Step down','Accelerate / reverse':'Drive on / back up'}[el.textContent];if(t)el.textContent=t;if(/^(Horn|Radio: next \/ previous station)$/.test(el.textContent)){el.nextElementSibling?.remove();el.remove();}} // no horn or radio on a coach // 1760: a coach, no bikes or scooters
    if(touchScreen)document.querySelector('#help-dialog .dialog-copy').textContent=`Steer with the slider (or arrows or tilt: Menu > Steering), hold Go, Brake to slow down and reverse. Stopped, the button above the controls gets you out${city.era===1760?' or back on your coach':', onto a bike or into a car'}. Walk up to someone and tap Say hello. Yellow beam: a pick-up. Teal: the drop-off. Red: a saga step. Purple: a race start. Menu has the city map, the journal and the camera.`;
    document.querySelector('#help-dialog .dialog-drive').firstChild.textContent='Keep exploring ';
    const helpGrid=document.querySelector('#help-dialog .help-grid');if(helpGrid)$('pause-controls').append(helpGrid.cloneNode(true));
