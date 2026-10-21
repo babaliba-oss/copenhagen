@@ -21,7 +21,7 @@ for p in city['pavement']:
             if len(ring) > 2: d2.polygon([((x + EXT) / G, (z + EXT) / G) for x, z in ring], fill=1)
 town = np.array(pave, dtype=bool)
 at = lambda m, x, z: (lambda i, j: 0 <= i < N and 0 <= j < N and m[i, j])(int((z + EXT) / G), int((x + EXT) / G))
-items = []; taken = set()
+items = []; taken = set(); near = {}
 for e in mob['roads']['edges']:
     pts = e['points']; run = 0
     for a, b in zip(pts, pts[1:]):
@@ -34,7 +34,9 @@ for e in mob['roads']['edges']:
                 px, pz = x - uz * off, z + ux * off
                 if at(town, px, pz) and not at(bld, px, pz) and not at(bld, px - uz * .8, pz + ux * .8):
                     k = (round(px / 12), round(pz / 12))
-                    if k not in taken: taken.add(k); items.append({'k': 'lantern', 'x': round(px, 2), 'z': round(pz, 2), 'yaw': 0, 'src': 'era-1760'})
+                    c4 = (math.floor(px / 4), math.floor(pz / 4))  # two 12 m cells meet: no second post within 4 m (12 pairs stood grown into each other)
+                    if k not in taken and not any(math.hypot(q['x'] - px, q['z'] - pz) < 4 for i in (-1, 0, 1) for j in (-1, 0, 1) for q in near.get((c4[0] + i, c4[1] + j), ())):
+                        taken.add(k); items.append({'k': 'lantern', 'x': round(px, 2), 'z': round(pz, 2), 'yaw': 0, 'src': 'era-1760'}); near.setdefault(c4, []).append(items[-1])
                     break
             s += 38
         run += L
