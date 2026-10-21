@@ -865,7 +865,7 @@ const transitBodies=()=>[...(tramSim?.bodies||[]),...(buses?.bodies||[]),...(tra
 // foot or riding they block like before (refreshed every 250 ms; the sets are tens of thousands strong).
 const rangedProps=[]; /* instanced props drawn near the player only (instance-range.js); updated each frame */
 let furnitureNear=[],furnitureNearAt=-1e9,furnitureSets=null; // furnitureSets: the mapped furniture (set at boot)
-const nearFurniture=()=>{if(!furnitureSets?.knockables?.near||!car||travel?.mode==='car')return [];const now=performance.now();if(now-furnitureNearAt>250){furnitureNearAt=now;furnitureNear=furnitureSets.knockables.near(car.x,car.z,20);}return furnitureNear;};
+const nearFurniture=()=>{if(!car||travel?.mode==='car'||!(furnitureSets?.knockables?.near||parkedCars))return [];const now=performance.now();if(now-furnitureNearAt>250){furnitureNearAt=now;furnitureNear=furnitureSets?.knockables?.near?furnitureSets.knockables.near(car.x,car.z,20):[];parkedCars?.near(car.x,car.z,20,furnitureNear);}return furnitureNear;};
 const travelObstacles=()=>[...(mobility?.cars.filter(c=>c.edge)||[]),...(tramSim?.bodies||[]),...(buses?.bodies||[]),...(police?.obstacles||[]),...nearFurniture()];
 function interactTravel(id=null){
  if(!ready||!started||paused||mapOpen||police?.busted)return;
@@ -1185,6 +1185,7 @@ function frame(now){
     const parkedHit=driving&&parked.find(p=>sweptContact(previous,car,p));
     if(parkedHit){Object.assign(car,{x:previous.x,z:previous.z,heading:previous.heading,speed:0});impacts.damage(car,Math.abs(previous.speed),'vehicle');police.report(parkedHit.travelMode==='car'?'vehicle':'property',`parked:${parkedHit.id}`,Math.abs(previous.speed));}
     knockables?.step(step,driving?car:Object.assign(SCRATCH.still,car,{speed:0}),world);
+    {const hit=parkedCars?.step(step,driving?car:null,world);if(hit>2.5&&driving){impacts.damage(car,hit,'vehicle');police.report('property','parked-car',hit);}}
     if(driving){
      police.observe(previous,car,mobility.cars,[]);
      {const riders=SCRATCH.riders;riders.length=0;for(const c of cyclists.riders)if(!c.playerTaken)riders.push(c);for(const c of npcScooters.riders)riders.push(c);
@@ -1527,7 +1528,7 @@ async function boot(){
     const paint=(name,sub='')=>{$('radio-station').textContent=name;const t=$('radio-track');t.textContent=sub;t.title=sub;$('radio-now').classList.toggle('off',!radio.station);label();if(name!==shown){shown=name;flashRadio();}};
     radio=createRadio({stations:rd.stations,initial:storedStation(),banner:paint}); // the station of your last drive (0 = off); station 1 the first time, GTA style
     $('radio-btn').hidden=false;paint(radio.station?radio.stations[radio.station-1].name:'Radio off');}else $('radio-btn').hidden=true;}
-   {const pd=parkedData&&await parkedData;if(pd){if(vehicleBodies)await vehicleBodies;parkedCars=createParkedCars(pd,{bodies:['hatchback','sedan','estate','crossover'].map(t=>({parts:vehicleBodyParts(t),spec:VEHICLE_SPECS[t]})).filter(b=>b.parts)});cityModel.add(parkedCars.group);streetObstacles.push(...parkedCars.obstacles);}}
+   {const pd=parkedData&&await parkedData;if(pd){if(vehicleBodies)await vehicleBodies;parkedCars=createParkedCars(pd,{bodies:['hatchback','sedan','estate','crossover'].map(t=>({parts:vehicleBodyParts(t),spec:VEHICLE_SPECS[t]})).filter(b=>b.parts)});cityModel.add(parkedCars.group);}} /* not static obstacles: the car pushes them (parkedCars.step), walkers get their boxes (nearFurniture) */
    const mapped=furnitureData&&await furnitureData;let mappedFurniture=null;
    if(mapped?.items)for(const pl of places)mapped.items=mapped.items.filter(i=>!(pl.dropFurniture||[]).some(([x,z,r])=>Math.hypot(i.x-x,i.z-z)<r)); // replaced by the place's own lamps and masts
    if(mapped?.items&&city.id==='copenhagen')mapped.items.push(...hotdogItems()); // hot-dog stands on the squares (street-food.js)

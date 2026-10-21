@@ -5,7 +5,7 @@ import {groundAt} from '../terrain.js';
 // Parked cars along the kerbs (scripts/parked-cars.py → parked.json). Instanced meshes for the painted body
 // (per-car colour) and the fixed parts (glass, tyres, lights): the detailed Blender bodies near the player, a
 // simple low-poly car (~250 triangles instead of ~3,800) further out, nothing beyond view range. The batches are
-// city-wide pools refilled with the cars in range (CHUNK is the lookup grid). Each car is a solid obstacle.
+// city-wide pools refilled with the cars in range (CHUNK is the lookup grid). Each car is a box the player's car can push (step()); walkers get them as boxes (near()).
 const CHUNK=150,PHONE=typeof matchMedia==='function'&&matchMedia('(pointer:coarse)').matches,NEAR=PHONE?90:170,RANGE=PHONE?320:420; /* phones: the 3,800-triangle cars within 90 m (170 m: ~120k triangles) */
 const paint=(g,hex)=>{const n=g.index?g.toNonIndexed():g;if(n!==g)g.dispose();n.deleteAttribute('uv');const c=new THREE.Color(hex),a=new Float32Array(n.attributes.position.count*3);for(let i=0;i<a.length;i+=3)a.set([c.r,c.g,c.b],i);n.setAttribute('color',new THREE.BufferAttribute(a,3));return n;};
 // A box whose top face is pulled in (cabin taper). Forward is -Z.
@@ -38,7 +38,7 @@ function blenderCar(parts,spec){
 export function createParkedCars(data,{bodies=[]}={}){
  const group=new THREE.Group();group.name='Parked cars';
  const cars=data?.cars||[],paints=(data?.paints||['#ccc']).map(h=>{const c=new THREE.Color(h),l=c.r*.3+c.g*.55+c.b*.15;return l<.035?c.lerp(new THREE.Color('#4a4e55'),.55):c;}); // black and navy read as holes in shadow
- if(!cars.length)return {group,obstacles:[],update(){}};
+ if(!cars.length)return {group,obstacles:[],update(){},step:()=>0,near:(x,z,r,out=[])=>out,hideAlong:()=>0,moved:()=>0};
  const models=bodies.map(({parts,spec})=>blenderCar(parts,spec)).filter(Boolean),simple={body:bodyGeometry(),fixed:fixedGeometry()};
  const bodyMat=new THREE.MeshStandardMaterial({vertexColors:true,roughness:.35,metalness:.15}),fixedMat=new THREE.MeshStandardMaterial({vertexColors:true,roughness:.4,metalness:.2});
  // Every car's pose, paint and body style, once; the drawn batches are pools refilled with the cars in range as the
@@ -55,13 +55,52 @@ export function createParkedCars(data,{bodies=[]}={}){
   if(coloured)mesh.instanceColor=new THREE.InstancedBufferAttribute(new Float32Array(n*3),3).setUsage(THREE.DynamicDrawUsage);group.add(mesh);return mesh;};
  const near=(models.length?models:[simple]).map(model=>[pool(model.body,bodyMat,'Parked cars (detailed)',true),pool(model.fixed,fixedMat,'Parked cars (detailed)',false)]);
  const far=[pool(simple.body,bodyMat,'Parked cars (far)',true),pool(simple.fixed,fixedMat,'Parked cars (far)',false)];
- const batches=[...near.flat(),...far];let at=null;const hidden=new Set(); // ?cinematic hides the few parked where the trailer car's lane runs (hideAlong)
+ const batches=[...near.flat(),...far];let at=null,dirty=false;const hidden=new Set(); // ?cinematic hides the few parked where the trailer car's lane runs (hideAlong)
  function put(mesh,i,colour){const k=mesh.count++;mesh.instanceMatrix.array.set(poses.subarray(i*16,i*16+16),k*16);if(colour)colour.toArray(mesh.instanceColor.array,k*3);}
+ // Pushable: each car is a box the player's car shoves (it slides on its tyres and stops against walls and the next car),
+ // instead of a fixed obstacle you got wedged against. Back at its kerb spot a minute after it was left out of sight.
+ const px=new Float32Array(n),pz=new Float32Array(n),pyaw=new Float32Array(n),vx=new Float32Array(n),vz=new Float32Array(n),vw=new Float32Array(n),idle=new Float32Array(n),moved=new Set();
+ cars.forEach(([x,z,yaw],i)=>{px[i]=x;pz[i]=z;pyaw[i]=yaw;});
+ const pose=i=>{m.compose(v.set(px[i],groundAt(px[i],pz[i]),pz[i]),q.setFromAxisAngle(UP,pyaw[i]),one).toArray(poses,i*16);};
+ const nearby=(x,z,out)=>{out.length=0;const i=Math.floor(x/CHUNK),j=Math.floor(z/CHUNK);for(let di=-1;di<=1;di++)for(let dj=-1;dj<=1;dj++)for(const c of cells.get((i+di)*100000+j+dj)||[])if(!hidden.has(c)&&Math.abs(px[c]-x)<8&&Math.abs(pz[c]-z)<8)out.push(c);for(const c of moved)if(!out.includes(c)&&Math.abs(px[c]-x)<8&&Math.abs(pz[c]-z)<8)out.push(c);return out;};
+ // Separating axes for two boxes (centre, heading, half width, half length): null or {nx,nz,depth}, n from A to B.
+ const sat=(ax,az,ah,aw,al,bx,bz,bh,bw,bl)=>{const dx=bx-ax,dz=bz-az;let best=null;
+  for(const [ux,uz] of [[Math.sin(ah),Math.cos(ah)],[Math.cos(ah),-Math.sin(ah)],[Math.sin(bh),Math.cos(bh)],[Math.cos(bh),-Math.sin(bh)]]){
+   const ra=al*Math.abs(Math.sin(ah)*ux+Math.cos(ah)*uz)+aw*Math.abs(Math.cos(ah)*ux-Math.sin(ah)*uz),rb=bl*Math.abs(Math.sin(bh)*ux+Math.cos(bh)*uz)+bw*Math.abs(Math.cos(bh)*ux-Math.sin(bh)*uz),d=dx*ux+dz*uz,o=ra+rb-Math.abs(d);
+   if(o<=0)return null;if(!best||o<best.depth)best={nx:d<0?-ux:ux,nz:d<0?-uz:uz,depth:o};}
+  return best;};
+ const HW=.9,HL=2.15,PW=.98,PL=2.3,list=[],others=[];
+ const free=(i,x,z,world)=>!world?.buildings?.at(x,z)&&!world?.buildings?.at(x+Math.sin(pyaw[i])*HL,z+Math.cos(pyaw[i])*HL)&&!world?.buildings?.at(x-Math.sin(pyaw[i])*HL,z-Math.cos(pyaw[i])*HL);
+ const shove=(i,dx,dz,world)=>{if(!free(i,px[i]+dx,pz[i]+dz,world)){vx[i]=vz[i]=vw[i]=0;return false;}px[i]+=dx;pz[i]+=dz;moved.add(i);idle[i]=0;dirty=true;return true;};
+ // car: the player's car while driving (null otherwise). Returns the hardest impact speed this step (m/s), 0 for none.
+ function step(dt,car,world){let hit=0;
+  if(car){const h=car.heading,fx=-Math.sin(h),fz=-Math.cos(h);
+   for(const i of nearby(car.x,car.z,list)){const c=sat(car.x,car.z,h,PW,PL,px[i],pz[i],pyaw[i],HW,HL);if(!c)continue;
+    const {nx,nz,depth}=c,pvx=fx*car.speed,pvz=fz*car.speed,vn=(pvx-vx[i])*nx+(pvz-vz[i])*nz;
+    const pushed=shove(i,nx*depth*.7,nz*depth*.7,world),back=pushed?.3:1; // a car pinned against a wall stops you like a wall
+    car.x-=nx*depth*back;car.z-=nz*depth*back;
+    if(vn>0){const J=pushed?vn*.55:0;vx[i]+=nx*J;vz[i]+=nz*J;
+     const rx=car.x-px[i],rz=car.z-pz[i];vw[i]=Math.max(-1.5,Math.min(1.5,vw[i]+(rz*nx-rx*nz)*J*.06));
+     const keep=pushed?.5:1,nvx=pvx-nx*vn*keep,nvz=pvz-nz*vn*keep;car.speed=nvx*fx+nvz*fz;hit=Math.max(hit,vn);}}}
+  // Sliding cars: tyre friction, then the next car along the kerb takes the push.
+  for(const i of moved){const sp=Math.hypot(vx[i],vz[i]);
+   if(sp<.05&&Math.abs(vw[i])<.02){vx[i]=vz[i]=vw[i]=0;idle[i]+=dt;
+    if(idle[i]>60){const fx0=cars[i][0],fz0=cars[i][1],p=car||lastFocus;if(p&&Math.hypot(p.x-px[i],p.z-pz[i])>150&&Math.hypot(p.x-fx0,p.z-fz0)>150){px[i]=fx0;pz[i]=fz0;pyaw[i]=cars[i][2];pose(i);moved.delete(i);dirty=true;}}
+    continue;}
+   const k=Math.max(0,1-6*dt/Math.max(sp,1e-3));vx[i]*=k;vz[i]*=k;vw[i]*=Math.exp(-3*dt);
+   if(!shove(i,vx[i]*dt,vz[i]*dt,world))continue;pyaw[i]+=vw[i]*dt;
+   for(const j of nearby(px[i],pz[i],others)){if(j===i)continue;const c=sat(px[i],pz[i],pyaw[i],HW,HL,px[j],pz[j],pyaw[j],HW,HL);if(!c)continue;
+    const vn=(vx[i]-vx[j])*c.nx+(vz[i]-vz[j])*c.nz;if(shove(j,c.nx*c.depth,c.nz*c.depth,world)){if(vn>0){vx[j]+=c.nx*vn*.5;vz[j]+=c.nz*vn*.5;vx[i]-=c.nx*vn*.5;vz[i]-=c.nz*vn*.5;}}else{px[i]-=c.nx*c.depth;pz[i]-=c.nz*c.depth;vx[i]=vz[i]=0;}}
+   pose(i);}
+  return hit;}
+ let lastFocus=null;
+ // Boxes for a walker or rider (they don't push cars): {x,z,heading,halfWidth,halfLength}.
+ const nearBoxes=(x,z,r,out=[])=>{for(const i of nearby(x,z,list))if(Math.hypot(px[i]-x,pz[i]-z)<r)out.push({x:px[i],z:pz[i],heading:pyaw[i],halfWidth:HW,halfLength:HL});return out;};
  // points: [[x,z],...] along a route; every car within r of one is hidden (and no longer an obstacle). Without points, all come back.
  const hideAlong=(points=[],r=1.7)=>{for(const c of hidden)obstacles[c].disabled=false;hidden.clear();
   for(const [x,z] of points){const i=Math.floor(x/CHUNK),j=Math.floor(z/CHUNK);for(let di=-1;di<=1;di++)for(let dj=-1;dj<=1;dj++)for(const c of cells.get((i+di)*100000+j+dj)||[])if(!hidden.has(c)&&Math.hypot(poses[c*16+12]-x,poses[c*16+14]-z)<r+1.2){hidden.add(c);obstacles[c].disabled=true;}}
   at=null;return hidden.size;};
- return {group,obstacles,hideAlong,update(p){if(!p)return;if(at&&Math.hypot(at[0]-p.x,at[1]-p.z)<12)return;at=[p.x,p.z];
+ return {group,obstacles,hideAlong,step,near:nearBoxes,moved:()=>moved.size,update(p){if(!p)return;lastFocus={x:p.x,z:p.z};if(!dirty&&at&&Math.hypot(at[0]-p.x,at[1]-p.z)<12)return;at=[p.x,p.z];dirty=false;
   for(const b of batches)b.count=0;
   const i0=Math.floor((p.x-RANGE)/CHUNK),i1=Math.floor((p.x+RANGE)/CHUNK),j0=Math.floor((p.z-RANGE)/CHUNK),j1=Math.floor((p.z+RANGE)/CHUNK);
   for(let i=i0;i<=i1;i++)for(let j=j0;j<=j1;j++)for(const c of cells.get(i*100000+j)||[]){const dx=poses[c*16+12]-p.x,dz=poses[c*16+14]-p.z,d=Math.hypot(dx,dz);if(d>=RANGE)continue;
