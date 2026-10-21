@@ -249,7 +249,7 @@ renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=.8
 const hemi=new THREE.HemisphereLight('#e6eef8','#68786f',1.4);scene.add(hemi);
 const sun=new THREE.DirectionalLight('#fff4e2',2.0);sun.position.set(-160,260,-120);sun.castShadow=true;
 // 400 m box, biased ahead of the car: 2048 texels give 20 cm shadows where the camera looks.
-sun.shadow.mapSize.set(2048,2048);Object.assign(sun.shadow.camera,{left:-150,right:150,top:150,bottom:-150,near:1,far:750}); /* 300 m square: fewer casters per frame, sharper shadows */
+{const n=matchMedia('(pointer:coarse)').matches?1024:2048;sun.shadow.mapSize.set(n,n);} /* phones: a quarter of the shadow memory (the Pixel's driver lost the context over the shadow pass) */Object.assign(sun.shadow.camera,{left:-150,right:150,top:150,bottom:-150,near:1,far:750}); /* 300 m square: fewer casters per frame, sharper shadows */
 sun.shadow.bias=-.0002;sun.shadow.normalBias=.3; // was swallowed by the comment above: no bias at all (acne)
 scene.add(sun,sun.target);
 const sky=createSky({renderer,scene,camera});sky.applyLighting(hemi,sun);
