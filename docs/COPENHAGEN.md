@@ -59,12 +59,14 @@ echo '[]' > public/cities/copenhagen/insets.json && echo '{}' > public/cities/co
 echo '[]' > public/cities/copenhagen-1760/insets.json && echo '{}' > public/cities/copenhagen-1760/recolour.json
 node scripts/building-sweep.mjs copenhagen-1760 --hide     # 1760: shells you see straight through join duplicates.json
 python3 scripts/fit-colliders.py copenhagen && python3 scripts/fit-colliders.py copenhagen-1760   # last: footprints = the houses you see
+node scripts/shed-colliders.mjs copenhagen-1760 --write   # after fit-colliders: the small drawn sheds, booths and pillars it leaves without one
 python3 scripts/surface-fill.py copenhagen          # after fit-colliders, and again after any surface-dissolve.mjs: paving for the
                                                     # unmapped strips between the streets and the houses (below)
 node scripts/furniture-ground.mjs copenhagen        # after surface-fill and mapillary-features: flags the furniture with no
                                                     # surface under it, set down onto the bare ground or lawn (main.js)
 node scripts/indoor-items.mjs copenhagen            # after furniture-ground, kk-collision and collision-trim: drops furniture
                                                     # inside the model's drawn houses, lists such trees (indoor-trees.json)
+node scripts/furniture-ground.mjs copenhagen-1760   # the 1760 lanterns likewise
 ```
 
 Most of today's pavements are not mapped as areas (OpenStreetMap draws them as lines or not at all), so the rendered
