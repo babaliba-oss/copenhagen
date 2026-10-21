@@ -18,8 +18,13 @@ export function busFitsRoad(p,world){
  for(let along=-d.length/2;along<=d.length/2+.01;along+=.5)for(let k=-1;k<=1;k++){const side=k*w;if(!freeAt(world,p.x+c*side+s*along,p.z-s*side+c*along))return false;}
  return true;
 }
-export function busOverlaps(a,b,margin=0){const da=dims(a),db=dims(b),dx=b.x-a.x,dz=b.z-a.z;if(Math.hypot(dx,dz)>(da.length+db.length)/2+margin+3)return false;const axes=p=>[[Math.cos(p.heading),-Math.sin(p.heading)],[Math.sin(p.heading),Math.cos(p.heading)]],aa=axes(a),bb=axes(b);for(const v of [...aa,...bb]){const dot=u=>Math.abs(v[0]*u[0]+v[1]*u[1]);if(Math.abs(dx*v[0]+dz*v[1])>=(da.width/2+margin)*dot(aa[0])+(da.length/2+margin)*dot(aa[1])+db.width/2*dot(bb[0])+db.length/2*dot(bb[1]))return false;}return true;}
-export function safeBusSweep(a,b,world){const distance=Math.hypot(b.x-a.x,b.z-a.z),angle=turn(a.heading,b.heading);if(distance>.02&&Math.abs(angle)/distance>1/8)return false;const n=Math.max(1,Math.ceil(distance/.35),Math.ceil(Math.abs(angle)*dims(a).length/.35));for(let i=0;i<=n;i++){const t=i/n;if(!busFitsRoad({...a,x:a.x+(b.x-a.x)*t,z:a.z+(b.z-a.z)*t,heading:a.heading+angle*t},world))return false;}return true;}
+// Separating axes of two boxes, without lists or closures (thousands of tests a step: probes ahead x vehicles near).
+const halfL=p=>{const d=BUS_DIMENSIONS[p.kind];return d?d.length/2:(p.halfLength??2.36);},halfW=p=>{const d=BUS_DIMENSIONS[p.kind];return d?d.width/2:(p.halfWidth??.98);};
+function apart(vx,vz,dx,dz,wa,la,ac,as,wb,lb,bc,bs){return Math.abs(dx*vx+dz*vz)>=wa*Math.abs(vx*ac-vz*as)+la*Math.abs(vx*as+vz*ac)+wb*Math.abs(vx*bc-vz*bs)+lb*Math.abs(vx*bs+vz*bc);}
+export function busOverlaps(a,b,margin=0){const la=halfL(a)+margin,wa=halfW(a)+margin,lb=halfL(b),wb=halfW(b),dx=b.x-a.x,dz=b.z-a.z;if(Math.hypot(dx,dz)>la+lb+3)return false;const ac=Math.cos(a.heading),as=Math.sin(a.heading),bc=Math.cos(b.heading),bs=Math.sin(b.heading);
+ return !(apart(ac,-as,dx,dz,wa,la,ac,as,wb,lb,bc,bs)||apart(as,ac,dx,dz,wa,la,ac,as,wb,lb,bc,bs)||apart(bc,-bs,dx,dz,wa,la,ac,as,wb,lb,bc,bs)||apart(bs,bc,dx,dz,wa,la,ac,as,wb,lb,bc,bs));}
+export function safeBusSweep(a,b,world){const distance=Math.hypot(b.x-a.x,b.z-a.z),angle=turn(a.heading,b.heading);if(distance>.02&&Math.abs(angle)/distance>1/8)return false;const n=Math.max(1,Math.ceil(distance/.35),Math.ceil(Math.abs(angle)*dims(a).length/.35));const q=SWEEP;q.kind=a.kind;q.halfLength=a.halfLength;q.halfWidth=a.halfWidth;for(let i=0;i<=n;i++){const t=i/n;q.x=a.x+(b.x-a.x)*t;q.z=a.z+(b.z-a.z)*t;q.heading=a.heading+angle*t;if(!busFitsRoad(q,world))return false;}return true;}
+const SWEEP={x:0,z:0,heading:0,kind:'city',halfLength:undefined,halfWidth:undefined}; // one pose reused along the sweep (a copy of the whole bus per 35 cm was the step's biggest garbage)
 // Lane assignment: a route line from GTFS or OpenStreetMap usually follows the middle of the street, so
 // both directions would share it head-on. `lanes` (from scripts/bus-lanes.mjs) holds a right-hand offset
 // every LANE_STEP metres, as far right as the bus fits; buses then keep to their own side like cars.
@@ -28,7 +33,7 @@ export function laneOffset(path,s){const l=path.lanes;if(!l?.length)return 0;con
 // `pull(s)` is an extra offset to the right: the bus pulling in to a stop and out again (busStopPull).
 export function busPose(path,s,kind='city',pull=null){
  const at=s=>routePoint(path,s,laneOffset(path,s)+(pull?pull(s):0)),centre=at(s),front=at(s+3),rear=at(s-3);
- return {...centre,kind,heading:Math.atan2(rear.x-front.x,rear.z-front.z)};
+ centre.kind=kind;centre.heading=Math.atan2(rear.x-front.x,rear.z-front.z);return centre; /* routePoint's point is fresh: no copy of it */
 }
 // Bus stops (dated stop poles from the data, `data.stops`). A path takes the stops beside its right-hand kerb
 // (doors side) within reach of its line, or exactly its own stops when the data lists them (`stopIds`).
@@ -134,6 +139,7 @@ export class BusSimulation{
    const blocked=this.buses.some(b=>b.path.id===c.path.id||(c.parked?busOverlaps(c,b,1):Math.hypot(b.x-c.x,b.z-c.z)<55));
    if((c.parked||count<this.cap(c.kind))&&!blocked&&!traffic.some(o=>o.edge!==null&&busOverlaps(c,o,1)))this.buses.push(c);
   }this.buses.forEach((b,i)=>b.id=i);}
+  const all=this._all??=[];all.length=0;all.push(player);for(let i=0;i<traffic.length;i++)all.push(traffic[i]);for(let i=0;i<this.buses.length;i++)all.push(this.buses[i]); /* one list a step, not two fresh copies of all traffic per bus */
   for(const b of this.buses){if(b.parked)continue;b.redFor=0;
    // At a stop: doors open, then close a moment before it pulls out.
    if(b.dwell>0){b.dwell=Math.max(0,b.dwell-dt);b.speed=0;b.held=0;b.doorsOpen=b.dwell>.8;continue;}
@@ -153,13 +159,13 @@ export class BusSimulation{
    if(b.unjam&&this.time>b.unjamUntil&&!(b.unjam.edge!==null&&busOverlaps(b,b.unjam)))b.unjam=null; // keeps going until clear of it
    const other=b.holdBy;b.gridlock=other&&other.holdBy===b&&b.speed<.1&&(!this.buses.includes(other)||b.id<other.id)?(b.gridlock||0)+dt:0;
    if(b.gridlock>2){b.unjam=other;b.unjamUntil=this.time+5;b.gridlock=0;}
-   const others=[player,...traffic,...this.buses].filter(o=>o!==b&&o.edge!==null&&(!b.unjam||o!==b.unjam&&o.ref!==b.unjam)&&Math.abs(o.x-b.x)<40&&Math.abs(o.z-b.z)<40&&(o.x-b.x)*-Math.sin(b.heading)+(o.z-b.z)*-Math.cos(b.heading)>dims(b).length/2-2.5&&!oncomingPasses(b,o));b.holdBy=null;
+   const others=this._others??=[],fx=-Math.sin(b.heading),fz=-Math.cos(b.heading),reach=dims(b).length/2-2.5;others.length=0;for(let i=0;i<all.length;i++){const o=all[i];if(o!==b&&o.edge!==null&&(!b.unjam||o!==b.unjam&&o.ref!==b.unjam)&&Math.abs(o.x-b.x)<40&&Math.abs(o.z-b.z)<40&&(o.x-b.x)*fx+(o.z-b.z)*fz>reach&&!oncomingPasses(b,o))others.push(o);}b.holdBy=null;
    for(let ahead=2;ahead<28;ahead+=2){const p=busPose(b.path,Math.min(b.path.end,b.s+ahead),b.kind,b.pull),o=others.find(o=>busOverlaps(p,o,.25));if(o){desired=Math.min(desired,Math.sqrt(Math.max(0,ahead-3)*2));b.holdBy=o.ref||o;break;}}
    b.speed+=Math.max(-3.2*dt,Math.min(1.1*dt,desired-b.speed));const nextS=Math.min(b.path.end,b.s+b.speed*dt),next=busPose(b.path,nextS,b.kind,b.pull);
    // Authored street furniture can change after offline road validation. Check a
    // metre ahead periodically against the live world before entering it.
    if(!b.clearUntil||nextS>b.clearUntil){const checkS=Math.min(b.path.end,nextS+1),check=busPose(b.path,checkS,b.kind,b.pull);b.clearUntil=safeBusSweep(b,check,this.world)?checkS:0;}
-   const hit=[player,...traffic,...this.buses].find(o=>o!==b&&o.edge!==null&&(!b.unjam||o!==b.unjam&&o.ref!==b.unjam)&&busOverlaps(next,o)&&(o===player||!busOverlaps(b,o))); /* the player's car blocks even when already touching (a nudge-out that failed against a kerb left it overlapping, and the bus crept on through it); a traffic car it already overlaps does not, so two can still part */
+   let hit=null;for(let i=0;i<all.length;i++){const o=all[i];if(o!==b&&o.edge!==null&&(!b.unjam||o!==b.unjam&&o.ref!==b.unjam)&&busOverlaps(next,o)&&(o===player||!busOverlaps(b,o))){hit=o;break;}} /* the player's car blocks even when already touching (a nudge-out that failed against a kerb left it overlapping, and the bus crept on through it); a traffic car it already overlaps does not, so two can still part */
    if(!b.clearUntil||hit){b.speed=0;b.held=(b.held||0)+dt;if(hit)b.holdBy=hit.ref||hit;}else{b.s=nextS;Object.assign(b,next);b.held=0;}
    // A bus that has finished its route, or is held by live furniture for a long time, restarts its route once the
    // player is well away. It used to wait at a route end until the player was 450 m off, standing in a live lane.
