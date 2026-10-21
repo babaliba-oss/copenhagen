@@ -30,7 +30,7 @@ const ANIMALS={
  pig:()=>mergeGeometries([paint(new THREE.SphereGeometry(.35,10,8).scale(1.5,.9,.9).translate(0,.45,0),'#e2a99a'),paint(new THREE.SphereGeometry(.18,8,6).translate(.55,.5,0),'#e2a99a'),paint(new THREE.CylinderGeometry(.08,.08,.08,8).rotateZ(Math.PI/2).translate(.72,.5,0),'#c98a80')])};
 const rnd=seed=>()=>{seed=(seed*16807)%2147483647;return (seed-1)/2147483646;};
 
-export function createPeriodLife({city,world,water=[],squares=[],gates=[],animalModels={},propModels={},bare=null,parks=[]}){ // animalModels: Blender pig/hen/goose (scripts/blender/animals.py) where loaded; propModels: farm-wagon, covered-wagon (CC BY agt14032013), and Daniel's barrel and crate (CC BY RipeR / SomeKevin) for the cargo on the quays
+export function createPeriodLife({city,world,water=[],squares=[],gates=[],animalModels={},propModels={},bare=null,parks=[],walks=null}){ // animalModels: Blender pig/hen/goose (scripts/blender/animals.py) where loaded; propModels: farm-wagon, covered-wagon (CC BY agt14032013), and Daniel's barrel and crate (CC BY RipeR / SomeKevin) for the cargo on the quays
  const group=new THREE.Group();group.name='1760 street life';const r=rnd(1760);
  const wet=(x,z)=>water.some(w=>{const b=w.bbox;return (!b||x>=b[0]&&x<=b[2]&&z>=b[1]&&z<=b[3])&&pointInPolygon(x,z,w.rings);});
  // off the roads too: wagons, crowds and pigs stood in the coaches' lanes, and nothing there collides with them
@@ -77,12 +77,18 @@ export function createPeriodLife({city,world,water=[],squares=[],gates=[],animal
  const mat=new THREE.MeshStandardMaterial({vertexColors:true,roughness:.85});const m4=new THREE.Matrix4(),q=new THREE.Quaternion(),v=new THREE.Vector3(),one=new THREE.Vector3(1,1,1),UP=new THREE.Vector3(0,1,0);
  const chunks=[];
  const bodies=[]; // the market's carts and wagons are solid (main.js gathers group.worldObjects): you drove through them
+ // walks (mobility footways): a wagon standing across one had walkers pass through it (7 of 25 on the squares; dropping the footways instead took 722 m of them)
+ const paths=new Map();if(walks?.edges)for(const e of walks.edges){if(e.crossing)continue;const P=e.points;for(let i=1;i<P.length;i++){const a=P[i-1],q=P[i];for(let gx=Math.floor(Math.min(a[0],q[0])/10);gx<=Math.floor(Math.max(a[0],q[0])/10);gx++)for(let gz=Math.floor(Math.min(a[1],q[1])/10);gz<=Math.floor(Math.max(a[1],q[1])/10);gz++){const k=gx*100003+gz;let l=paths.get(k);if(!l)paths.set(k,l=[]);l.push([a,q]);}}}
+ const onFootway=(x,z,yaw,hw,hd)=>{const c=Math.cos(yaw),s=Math.sin(yaw),r=Math.hypot(hw,hd),loc=([px,pz])=>{const dx=px-x,dz=pz-z;return [dx*c-dz*s,dx*s+dz*c];}; /* solidBox's frame: width along a, depth along b */
+  for(let gx=Math.floor((x-r)/10);gx<=Math.floor((x+r)/10);gx++)for(let gz=Math.floor((z-r)/10);gz<=Math.floor((z+r)/10);gz++)for(const [a,q] of paths.get(gx*100003+gz)||[]){const p=loc(a),e=loc(q),dx=e[0]-p[0],dz=e[1]-p[1];let t0=0,t1=1,hit=true;
+   for(const [pp,qq] of [[-dx,p[0]+hw],[dx,hw-p[0]],[-dz,p[1]+hd],[dz,hd-p[1]]]){if(pp===0){if(qq<0){hit=false;break;}continue;}const t=qq/pp;if(pp<0){if(t>t1){hit=false;break;}if(t>t0)t0=t;}else{if(t<t0){hit=false;break;}if(t<t1)t1=t;}}if(hit)return true;}
+  return false;};
  const knockables=[]; // the quay cargo tumbles when the coach drives into it (knockables.js; main.js steps them): 1,339 barrels, crates and sacks had no collision and the coach passed through them
  for(const [kind,list] of Object.entries(props)){const geo=propModels[kind]||PROPS[kind]?.();if(!geo)continue;const by=new Map();
   if(/^(barrel|crate|sack)$/.test(kind)){if(!geo.boundingBox)geo.computeBoundingBox();const {min,max}=geo.boundingBox,k=createKnockables(list.map(([x,z,yaw],i)=>({id:`1760-${kind}-${i}`,x,z,yaw,drop:ground(x,z)-groundAt(x,z)})),[{geometry:geo,material:mat}],{radius:Math.max(.2,Math.min(max.x-min.x,max.z-min.z)/2),range:520});k.group.name=`1760 ${kind}`;group.add(k.group);knockables.push(k);continue;}
   if(WAGONS.test(kind)){if(!geo.boundingBox)geo.computeBoundingBox();const {min,max}=geo.boundingBox,cx=(min.x+max.x)/2,cz=(min.z+max.z)/2;
    const kept=list.filter(([x,z,yaw],i)=>{const c=Math.cos(yaw),s=Math.sin(yaw),b=solidBox({id:`1760-${kind}-${i}`,name:kind.replace('-',' '),x:x+cx*c+cz*s,z:z-cx*s+cz*c,width:max.x-min.x,depth:max.z-min.z,yaw});
-    if(b.rings[0].some(([px,pz])=>world.roads.at(px,pz)||world.buildings.at(px,pz)))return false;bodies.push(b);return true;}); // only its middle was checked: wagons stood half in a house wall or out in the lane
+    if(b.rings[0].some(([px,pz])=>world.roads.at(px,pz)||world.buildings.at(px,pz))||onFootway(x+cx*c+cz*s,z-cx*s+cz*c,yaw,(max.x-min.x)/2+.5,(max.z-min.z)/2+.5))return false;bodies.push(b);return true;}); // only its middle was checked: wagons stood half in a house wall or out in the lane
    list.splice(0,list.length,...kept);}
   for(const it of list){const k=`${Math.floor(it[0]/400)},${Math.floor(it[1]/400)}`;if(!by.has(k))by.set(k,[]);by.get(k).push(it);}
   for(const its of by.values()){const im=new THREE.InstancedMesh(geo,mat,its.length);im.name=`1760 ${kind}`;im.castShadow=true;im.receiveShadow=true;
