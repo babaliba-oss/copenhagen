@@ -2,7 +2,7 @@
 """Parked cars along the kerbs: for every car edge long enough, slots on its right-hand side just
 beyond the driving lane, kept only where the carriageway surface is there and no building, crossing
 or junction is. Writes public/cities/<id>/parked.json ({cars:[[x, z, yaw, paint]]}).
-  python3 scripts/parked-cars.py copenhagen
+  python3 scripts/parked-cars.py copenhagen && node scripts/parked-lanes.mjs copenhagen  (drops cars in any traffic lane, and overlaps)
 """
 import gzip, json, math, random, sys
 from PIL import Image, ImageDraw
