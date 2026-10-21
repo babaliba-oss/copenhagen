@@ -76,7 +76,7 @@ import {createKauppatoriFingerpost} from './kauppatori-fingerpost.js';
 import {createSofiankatuSigns} from './sofiankatu-signs.js';
 import {createBusSystem} from './bus-system.js';
 import {installTransit} from './extension-transit.js';
-import {createSea,removeLegacyWater} from './sea.js';
+import {createSea,removeLegacyWater,splitByCell} from './sea.js';
 import {PoliceSimulation} from './police.js';
 import {createPoliceRenderer} from './police-renderer.js';import {setPoliceLettering} from './police-model.js';
 import './police-alert.css';
@@ -1428,7 +1428,7 @@ async function boot(){
     const cobbles=data.pavement.filter(p=>p.name==='Brosten'&&p.rings?.length),pos=[];
     for(const p of data.pavement){if(p.name==='Brosten'||/silta/i.test(p.kind||'')||!(p.rings?.[0]?.length>2))continue;const r=p.rings[0];let cx=0,cz=0;for(const q of r){cx+=q[0];cz+=q[1];}cx/=r.length;cz/=r.length;if(cobbles.some(c=>pointInPolygon(cx,cz,c.rings)))continue;
      const flat=[],holes=[];p.rings.forEach((ring,k)=>{if(k)holes.push(flat.length/2);for(const q of ring)flat.push(q[0],q[1]);});const ids=earcut(flat,holes,2);for(let t=0;t<ids.length;t+=3){const [a,b,c]=[ids[t],ids[t+1],ids[t+2]],up=(flat[b*2]-flat[a*2])*(flat[c*2+1]-flat[a*2+1])-(flat[b*2+1]-flat[a*2+1])*(flat[c*2]-flat[a*2])<0;for(const i of up?[a,b,c]:[a,c,b])pos.push(flat[i*2],0,flat[i*2+1]);}} /* wound to face up (earcut's x,y winding faces down once y is the map's z) */
-    if(pos.length){let g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));g.computeVertexNormals();g=drapeGeometry(g,{maxEdge:4});const m=new THREE.Mesh(g,ground.material);m.name='1760 pavements off the cobbles';m.receiveShadow=true;cityModel.add(m);console.info('1760 pavements off the cobbles',pos.length/9,'triangles before draping');}}
+    if(pos.length){let g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));g.computeVertexNormals();g=drapeGeometry(g,{maxEdge:touchScreen?8:4});for(const part of splitByCell(g,500)){const m=new THREE.Mesh(part,ground.material);m.name='1760 pavements off the cobbles';m.receiveShadow=true;cityModel.add(m);}g.dispose(); /* 500 m cells: one city-wide mesh was never culled */console.info('1760 pavements off the cobbles',pos.length/9,'triangles before draping');}}
    // Helsinki's hand-built scenery (landmarks, harbour, street life, signs). Other cities get the generic engine only.
    async function buildHelsinkiScenery(){
    progress(30,'Loading roads and waterfront');
