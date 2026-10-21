@@ -22,3 +22,13 @@ test('an open cut (no wall under a roof edge) is walled, facing out; walled side
  const shapes=periodShapes(cut,[{start:0,count:cut.length/5,roofColor:[.5,.2,.1],color:[.8,.7,.5]}]);assert.equal(shapes.length,2,'roof and wall');
  assert.equal(periodShapes(cut,[{start:0,count:cut.length/5,noRoof:true,noWalls:true}]).length,0);
 });
+// A side walled only near the top (it stood clear above a neighbour that is now taller than the house in 1760) is
+// closed below, 10 cm inside so the measured wall above stays in front.
+test('a side walled only near the top is closed below it',async()=>{
+ const {partyWalls}=await import('../src/period-roofs.js');
+ const full=box(10,20,12),stride=30,top=[10,8,0,0,0, 10,8,20,0,0, 10,12,20,0,0, 10,8,0,0,0, 10,12,20,0,0, 10,12,0,0,0];
+ const a=new Float32Array([...full.slice(0,stride),...top,...full.slice(stride*2)]);
+ const pos=partyWalls(a,{start:0,count:a.length/5});assert.ok(pos&&pos.length>=18,'the open lower part is walled');
+ let ylo=Infinity,yhi=-Infinity;for(let i=0;i<pos.length;i+=3){assert.ok(Math.abs(pos[i]-(10-.1))<1e-4,'behind the measured wall');ylo=Math.min(ylo,pos[i+1]);yhi=Math.max(yhi,pos[i+1]);}
+ assert.equal(ylo,0);assert.ok(yhi>=8,'up to the measured wall');
+});

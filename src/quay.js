@@ -178,7 +178,7 @@ export function buildBridgeRailings(water,land={},{height=1.05,ground=()=>0}={})
  const inWater=waterLocator(water),decks=[...(land.roads||[]),...(land.pavement||[])].filter(p=>p.rings?.[0]?.length>2); // 'Silta' decks, and any paving mapped across the water (a bridge without the tag)
  const parts=[],box=(w,h,d,x,y,z,yaw)=>{const g=new THREE.BoxGeometry(w,h,d);g.rotateY(yaw);g.translate(x,y,z);parts.push(g.index?g.toNonIndexed():g);};
  const paved=new SpatialIndex(decks),otherPaving=(x,z,self)=>paved.near(x,z).some(p=>p!==self&&x>=p.bbox[0]&&x<=p.bbox[2]&&z>=p.bbox[1]&&z<=p.bbox[3]&&pointInPolygon(x,z,p.rings)); // where the deck meets the next road or footway: no railing across it
- let runs=0;const railed=new Set(),deckY=new Map();
+ let runs=0;const railed=new Set(),deckY=new Map(),rails=[];
  for(const deck of decks)for(const ring of deck.rings){const n=ring.length;let ringTop=-Infinity;for(const p of ring){const g=ground(p[0],p[1]);if(Number.isFinite(g))ringTop=Math.max(ringTop,g);}
   for(let i=0;i<n;i++){const a=ring[i],b=ring[(i+1)%n],dx=b[0]-a[0],dz=b[1]-a[1],l=Math.hypot(dx,dz);if(l<1.5)continue;
    const ux=dx/l,uz=dz/l,nx=-uz,nz=ux,steps=Math.max(1,Math.round(l/1.8));let start=-1;
@@ -190,8 +190,8 @@ export function buildBridgeRailings(water,land={},{height=1.05,ground=()=>0}={})
     else if(!ok&&start>=0){const t0=start/steps,t1=k/steps,x0=a[0]+dx*t0,z0=a[1]+dz*t0,x1=a[0]+dx*t1,z1=a[1]+dz*t1,len=Math.hypot(x1-x0,z1-z0),yaw=Math.atan2(ux,uz);
      // set in 25 cm from the deck edge
      const cx=(x0+x1)/2,cz=(z0+z1)/2,y0=Math.max(ground(x0,z0),ground(x1,z1),ground(a[0],a[1]),ground(b[0],b[1])),y1=y0<ringTop-2?ringTop:y0,y=Number.isFinite(y1)?y1:0; /* all over sunk canal bed: the deck's highest corner */deckY.set(deck,Math.max(deckY.get(deck)??-Infinity,y));
-     box(.07,.07,len,cx,y+height,cz,yaw);box(.05,.05,len,cx,y+height*.5,cz,yaw);
-     for(let p=0;p<=k-start;p++){const t=(start+p)/steps;box(.07,height,.07,a[0]+dx*t,y+height/2,a[1]+dz*t,0);}
+     const posts=[];for(let p=0;p<=k-start;p++){const t=(start+p)/steps;posts.push(a[0]+dx*t,a[1]+dz*t);}
+     rails.push({deck,cx,cz,len,yaw,y,posts}); // drawn once the deck heights are settled (a span is lifted to the decks it joins)
      runs++;railed.add(deck);start=-1;}
    }
   }
@@ -202,6 +202,18 @@ export function buildBridgeRailings(water,land={},{height=1.05,ground=()=>0}={})
  for(const deck of decks){if(railed.has(deck)||!BRIDGE.test(`${deck.kind||''} ${deck.name||''}`))continue;const ring=deck.rings[0],[x0,z0,x1,z1]=deck.bbox||[Math.min(...ring.map(p=>p[0])),Math.min(...ring.map(p=>p[1])),Math.max(...ring.map(p=>p[0])),Math.max(...ring.map(p=>p[1]))];
   const step=Math.max(2,Math.sqrt((x1-x0)*(z1-z0)/4000));let n=0,wet=0; /* fine enough for a thin strip lying diagonally */for(let x=x0+step/2;x<x1;x+=step)for(let z=z0+step/2;z<z1;z+=step)if(pointInPolygon(x,z,deck.rings)){n++;if(inWater(x,z))wet++;}
   if(!n||wet<n*.2)continue;let top=-Infinity;for(const p of ring){const g=ground(p[0],p[1]);if(Number.isFinite(g))top=Math.max(top,g);}railed.add(deck);deckY.set(deck,Number.isFinite(top)?top:0);}
+ // A span mapped on its own between two approaches (Langebro's middle, the lifting span of a drawbridge) has every corner
+ // out over the water, where the 1760 canal bed is sunk: its plate and railings lay on the bed, 8 m under the approaches,
+ // a hole in the bridge with the approaches' raised ground standing beyond it as a block. A bridge deck more than a metre
+ // below the bridge decks it touches takes their height (the higher of them), passed along a chain of spans.
+ const lifted=new Set();{const list=[...railed].filter(d=>BRIDGE.test(`${d.kind||''} ${d.name||''}`)),bb=d=>{let a=[Infinity,Infinity,-Infinity,-Infinity];for(const [x,z] of d.rings[0])a=[Math.min(a[0],x),Math.min(a[1],z),Math.max(a[2],x),Math.max(a[3],z)];return a;},boxes=new Map(list.map(d=>[d,bb(d)]));
+  const touch=(d,e)=>{const p=boxes.get(d),q=boxes.get(e);if(p[2]<q[0]-.6||q[2]<p[0]-.6||p[3]<q[1]-.6||q[3]<p[1]-.6)return false;
+   const near=(r,s)=>r.some(([x,z])=>{for(let i=0,m=s.length;i<m;i++){const [ax,az]=s[i],[bx,bz]=s[(i+1)%m],dx=bx-ax,dz=bz-az,l=dx*dx+dz*dz,t=l?Math.max(0,Math.min(1,((x-ax)*dx+(z-az)*dz)/l)):0;if(Math.hypot(x-ax-dx*t,z-az-dz*t)<.6)return true;}return false;});
+   return near(d.rings[0],e.rings[0])||near(e.rings[0],d.rings[0]);};
+  for(let pass=0;pass<4;pass++){let moved=false;for(const d of list){let up=-Infinity;for(const e of list)if(e!==d&&touch(d,e))up=Math.max(up,deckY.get(e));if(up>deckY.get(d)+1){deckY.set(d,up);lifted.add(d);moved=true;}}if(!moved)break;}}
+ for(const {deck,cx,cz,len,yaw,y:y0,posts} of rails){const y=lifted.has(deck)?deckY.get(deck):y0;
+  box(.07,.07,len,cx,y+height,cz,yaw);box(.05,.05,len,cx,y+height*.5,cz,yaw);
+  for(let p=0;p<posts.length;p+=2)box(.07,height,.07,posts[p],y+height/2,posts[p+1],0);}
  if(!parts.length)return null;
  // Decks of tagged bridges as plates of their own: the surface tiles drop paving that lies inside the water
  // polygons (dropSunkenSurfaces), which left railings standing over open water.

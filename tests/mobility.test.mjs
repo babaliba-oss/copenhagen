@@ -74,6 +74,13 @@ test('walkers keep their own place on the pavement and a step behind the one ahe
  assert.ok(closest>.6,`never closer than a step: ${closest.toFixed(2)} m`);assert.ok(b.s>13+.9*15,'the one ahead walks on at its own pace');
  assert.ok(Math.abs(a.x)>.15&&Math.abs(a.x)<.9,`off the line, to the right of the way it walks: x=${a.x.toFixed(2)}`);
 });
+test('a walker at the end of its path turns back in view instead of vanishing',()=>{
+ const pave={rings:[[[-6,5],[6,5],[6,-45],[-6,-45]]],kind:'Jalkakäytävä'},none=new SpatialIndex([]);
+ const sim=new Mobility({roads:{nodes:[],edges:[]},walks:{nodes:[[0,0],[0,-40]],edges:[{from:0,to:1,points:[[0,0],[0,-40]],lane:0},{from:1,to:0,points:[[0,-40],[0,0]],lane:0}]},signals:[]},{buildings:none,roads:none,pavement:new SpatialIndex([pave])},{cars:0,people:1});
+ const a=sim.people[0],edge=sim.walks.edges.find(e=>e.from===0);Object.assign(a,{edge,s:38,speed:1.2,cruise:1.2,side:.4});Object.assign(a,sim.position(a));sim.visibilityTest=()=>true;
+ const player={x:20,z:-20,speed:0};let gone=0;for(let i=0;i<300;i++){sim.step(1/30,player);if(!a.edge)gone++;}
+ assert.equal(gone,0,'never recycled while seen');assert.ok(a.z>-38,`walked back: z=${a.z.toFixed(1)}`);
+});
 test('a shoved coach (1760) pulls back into its lane once it has come to rest, instead of standing in the street',()=>{
  const graph={nodes:[[0,0],[0,-200]],edges:[{from:0,to:1,points:[[0,0],[0,-200]],length:200,lane:1.5,signal:-1}]};
  const sim=new Mobility({roads:structuredClone(graph),walks:{nodes:[],edges:[]},signals:[]},{roads:{at:()=>true},pavement:{at:()=>false},buildings:{at:()=>undefined},water:[]},{cars:1,people:0});

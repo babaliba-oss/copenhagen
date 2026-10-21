@@ -65,34 +65,56 @@ export function periodRoof(array,part,{maxRise=4.2}={}){
 // showed sky through its side above a lower neighbour, and a row ended without its gable wall. Every roof outline
 // edge with no wall beneath it gets a wall down to the part's foot (following the roof edge, so a gable end is
 // filled up to the ridge), set 3 cm inside the cut so it never fights a neighbour's own wall, wound to face out.
-export function partyWalls(array,part,{inset=.03}={}){
- const roof=[],wallEdges=[];let lo=Infinity;
+// Whether a wall stands beneath is sampled down the whole height under the edge (a ray from just outside, in toward the
+// house, meets a wall within half a metre: walls set back under an eave count). One test at the edge's midpoint passed
+// an edge whose only wall rose above it (the step up to a taller wing) and one walled only near the top (the side that
+// stood clear above a neighbour that was taller in 1760's terms than today's): both stayed open below.
+// A side that is partly walled gets its patch 10 cm inside instead, behind the measured wall it overlaps.
+export function partyWalls(array,part,{inset=.03,step=.5}={}){
+ const roof=[],walls=[];let lo=Infinity;
  for(let v=part.start;v+2<part.start+part.count;v+=3){const o=v*5;
   const t=[[array[o],array[o+1],array[o+2]],[array[o+5],array[o+6],array[o+7]],[array[o+10],array[o+11],array[o+12]]];
   for(const p of t)if(p[1]<lo)lo=p[1];
   const ux=t[1][0]-t[0][0],uy=t[1][1]-t[0][1],uz=t[1][2]-t[0][2],wx=t[2][0]-t[0][0],wy=t[2][1]-t[0][1],wz=t[2][2]-t[0][2],nx=uy*wz-uz*wy,ny=uz*wx-ux*wz,nz=ux*wy-uy*wx,l=Math.hypot(nx,ny,nz);if(l<1e-6)continue;
-  if(Math.abs(ny)/l>.2)roof.push(t);else for(let i=0;i<3;i++)wallEdges.push([t[i],t[(i+1)%3]]);
+  if(Math.abs(ny)/l>.2)roof.push(t);else walls.push(t);
  }
  if(!roof.length||!Number.isFinite(lo))return null;
  // Roof outline: edges used by one roof triangle (with the triangle's third corner: the inside).
  const key=p=>`${Math.round(p[0]*20)},${Math.round(p[1]*20)},${Math.round(p[2]*20)}`,edges=new Map();
  for(const t of roof)for(let i=0;i<3;i++){const a=t[i],b=t[(i+1)%3],ka=key(a),kb=key(b);if(ka===kb)continue;const k=ka<kb?ka+'|'+kb:kb+'|'+ka;const e=edges.get(k);if(e)e.n++;else edges.set(k,{a,b,c:t[(i+2)%3],n:1});}
- // Wall edges bucketed in 4 m cells: an outline edge is walled when its midpoint lies on one (T-junctions split them).
- const C=4,grid=new Map();wallEdges.forEach((s,i)=>{const [a,b]=s;for(let x=Math.floor(Math.min(a[0],b[0])/C);x<=Math.floor(Math.max(a[0],b[0])/C);x++)for(let z=Math.floor(Math.min(a[2],b[2])/C);z<=Math.floor(Math.max(a[2],b[2])/C);z++){const k=x*65536+z;let l=grid.get(k);if(!l)grid.set(k,l=[]);l.push(i);}});
- const onWall=m=>{const l=grid.get(Math.floor(m[0]/C)*65536+Math.floor(m[2]/C));if(!l)return false;
-  for(const i of l){const [a,b]=wallEdges[i],dx=b[0]-a[0],dy=b[1]-a[1],dz=b[2]-a[2],q=dx*dx+dy*dy+dz*dz;let s=q?((m[0]-a[0])*dx+(m[1]-a[1])*dy+(m[2]-a[2])*dz)/q:0;s=s<0?0:s>1?1:s;
-   if(Math.hypot(a[0]+dx*s-m[0],a[1]+dy*s-m[1],a[2]+dz*s-m[2])<.03)return true;}
+ // Wall triangles bucketed in 2 m cells.
+ const C=2,grid=new Map(),roofGrid=new Map();roof.forEach((t,i)=>{for(let x=Math.floor(Math.min(t[0][0],t[1][0],t[2][0])/C);x<=Math.floor(Math.max(t[0][0],t[1][0],t[2][0])/C);x++)for(let z=Math.floor(Math.min(t[0][2],t[1][2],t[2][2])/C);z<=Math.floor(Math.max(t[0][2],t[1][2],t[2][2])/C);z++){const k=x*65536+z;let l=roofGrid.get(k);if(!l)roofGrid.set(k,l=[]);l.push(i);}});
+ const wy0=walls.map(t=>Math.min(t[0][1],t[1][1],t[2][1])-.01),wy1=walls.map(t=>Math.max(t[0][1],t[1][1],t[2][1])+.01);
+ walls.forEach((t,i)=>{for(let x=Math.floor((Math.min(t[0][0],t[1][0],t[2][0])-.6)/C);x<=Math.floor((Math.max(t[0][0],t[1][0],t[2][0])+.6)/C);x++)for(let z=Math.floor((Math.min(t[0][2],t[1][2],t[2][2])-.6)/C);z<=Math.floor((Math.max(t[0][2],t[1][2],t[2][2])+.6)/C);z++){const k=x*65536+z;let l=grid.get(k);if(!l)grid.set(k,l=[]);l.push(i);}});
+ const walled=(x,y,z,ix,iz,l)=>{const ox=x-ix*.05,oz=z-iz*.05; // a horizontal ray from 5 cm outside, inward, meets a wall within 55 cm (l: the walls along this edge)
+  for(const i of l){if(y<wy0[i]||y>wy1[i])continue;const [a,b,c]=walls[i],e1x=b[0]-a[0],e1y=b[1]-a[1],e1z=b[2]-a[2],e2x=c[0]-a[0],e2y=c[1]-a[1],e2z=c[2]-a[2],px=-iz*e2y,py=iz*e2x-ix*e2z,pz=ix*e2y,det=e1x*px+e1y*py+e1z*pz;if(Math.abs(det)<1e-9)continue;
+   const inv=1/det,tx=ox-a[0],ty=y-a[1],tz=oz-a[2],u=(tx*px+ty*py+tz*pz)*inv;if(u<-1e-3||u>1+1e-3)continue;const qx=ty*e1z-tz*e1y,qy=tz*e1x-tx*e1z,qz=tx*e1y-ty*e1x,w=(ix*qx+iz*qz)*inv;if(w<-1e-3||u+w>1+1e-3)continue;
+   const s=(e2x*qx+e2y*qy+e2z*qz)*inv;if(s>-.02&&s<.55)return true;}
+  return false;};
+ // Under this part's own roof just outside the edge (below the step up to a taller wing, or an edge inside the roof that only
+ // looks like outline because the triangles meet it at a T-junction): inside the house, nothing to close.
+ const roofed=(x,y,z,below)=>{const l=roofGrid.get(Math.floor(x/C)*65536+Math.floor(z/C));if(l)for(const i of l){const [a,b,c]=roof[i],ux=b[0]-a[0],uz=b[2]-a[2],vx=c[0]-a[0],vz=c[2]-a[2],d=ux*vz-uz*vx;if(Math.abs(d)<1e-9)continue;
+   const px=x-a[0],pz=z-a[2],s=(px*vz-pz*vx)/d,t=(ux*pz-uz*px)/d;if(s<0||t<0||s+t>1)continue;const h=a[1]+s*(b[1]-a[1])+t*(c[1]-a[1]);if(h>y&&h<below)return true;}
   return false;};
  const out=[];
  for(const {a,b,c,n} of edges.values()){if(n!==1)continue;
   const dx=b[0]-a[0],dz=b[2]-a[2],L=Math.hypot(dx,dz);if(L<.05||Math.max(a[1],b[1])<lo+1)continue; // a vertical roof edge, or one at the foot
-  if(onWall([(a[0]+b[0])/2,(a[1]+b[1])/2,(a[2]+b[2])/2]))continue;
   let ix=-dz/L,iz=dx/L;if(ix*(c[0]-a[0])+iz*(c[2]-a[2])<0){ix=-ix;iz=-iz;} // toward the inside
-  const A=[a[0]+ix*inset,a[2]+iz*inset],B=[b[0]+ix*inset,b[2]+iz*inset];
+  // Sample columns about a metre apart, every half metre from just under the edge down to the foot.
+  // The walls that can stand under this edge: in its cells, within 60 cm of its line, alongside it.
+  const near=new Set();for(let x=Math.floor((Math.min(a[0],b[0])-.6)/C);x<=Math.floor((Math.max(a[0],b[0])+.6)/C);x++)for(let z=Math.floor((Math.min(a[2],b[2])-.6)/C);z<=Math.floor((Math.max(a[2],b[2])+.6)/C);z++)for(const i of grid.get(x*65536+z)||[]){if(near.has(i))continue;
+   let s0=Infinity,s1=-Infinity,d0=Infinity,d1=-Infinity;for(const q of walls[i]){const rx=q[0]-a[0],rz=q[2]-a[2],s=(rx*dx+rz*dz)/L,d=rx*ix+rz*iz;s0=Math.min(s0,s);s1=Math.max(s1,s);d0=Math.min(d0,d);d1=Math.max(d1,d);}
+   if(s1>-.05&&s0<L+.05&&d1>-.1&&d0<.6)near.add(i);}
+  const l=[...near];
+  const m=Math.max(1,Math.ceil(L/1.2)),last=m-1;let open=false,shut=false,topOpen=false,high=-Infinity;
+  for(let k=0;k<m;k++){const f=m===1?.5:.05+.9*k/last,x=a[0]+dx*f,z=a[2]+dz*f,top=a[1]+(b[1]-a[1])*f,dy=Math.max(step,(top-lo)/30);
+   for(let y=top-.15,first=true;y>lo+.1;y-=dy,first=false){if(l.length&&walled(x,y,z,ix,iz,l)){shut=true;continue;}if(roofed(x-ix*.15,y,z-iz*.15,top+.3))break;open=true;if(first)topOpen=true;if(y>high)high=y;}}
+  if(!open)continue;
+  const foot=lo,d=shut?.1:inset,A=[a[0]+ix*d,a[2]+iz*d],B=[b[0]+ix*d,b[2]+iz*d],ya=topOpen?a[1]:Math.min(a[1],high+1),yb=topOpen?b[1]:Math.min(b[1],high+1);
   // Facing out (away from the inside): the quad A-foot, B-foot, B-top, A-top has the normal (-dz, 0, dx); when that
   // points inside, A and B swap.
-  const [P,Q,yp,yq]=(-dz*ix+dx*iz)<0?[A,B,a[1],b[1]]:[B,A,b[1],a[1]];
-  out.push(P[0],lo,P[1],Q[0],lo,Q[1],Q[0],yq,Q[1], P[0],lo,P[1],Q[0],yq,Q[1],P[0],yp,P[1]);
+  const [P,Q,yp,yq]=(-dz*ix+dx*iz)<0?[A,B,ya,yb]:[B,A,yb,ya];
+  out.push(P[0],foot,P[1],Q[0],foot,Q[1],Q[0],yq,Q[1], P[0],foot,P[1],Q[0],yq,Q[1],P[0],yp,P[1]);
  }
  return out.length?new Float32Array(out):null;
 }

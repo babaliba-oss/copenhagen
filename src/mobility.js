@@ -237,7 +237,11 @@ export class Mobility {
  // A reset (restart, map jump) respawns everyone against the old view's frustum: no visibility rule for walkers then.
  reset(player){this.resetting=true;try{this.updateParked();for(const a of [...this.cars,...this.people]){a.edge=null;a.playerTaken=undefined;a.conversation=undefined;}for(const a of [...this.cars,...this.people])this.spawn(a,player);}finally{this.resetting=false;}}
  canRecycle(a,player){return Math.hypot(a.x-player.x,a.z-player.z)>80&&(a.hiddenFor||0)>2;}
- retire(a,player,force=false){a.speed=0;if(force||a.walking||this.canRecycle(a,player))a.edge=null;}
+ retire(a,player,force=false){a.speed=0;
+  // A walker at the end of its path or stuck there turns back (or stands) while you can see it: recycled on the spot it
+  // vanished in front of you (two walkers met on a path, stood inside each other and were gone; the 1760 riding ground).
+  if(a.walking&&!force&&a.edge&&(a.hiddenFor||0)<1.5&&Math.hypot(a.x-player.x,a.z-player.z)<120){const back=this.walks.outgoing[a.edge.to]?.find(e=>e.to===a.edge.from&&Math.abs(e.length-a.edge.length)<.8);if(back&&(a.turnedAt===undefined||this.time-a.turnedAt>2)){a.s=Math.max(0,back.length-a.s);a.edge=back;a.turnedAt=this.time;a.stuck=0;a.progressPoint=null;}return;}
+  if(force||a.walking||this.canRecycle(a,player))a.edge=null;}
  // Lanes a parked bus stands in (mapped bays on the carriageway) are avoided when routing allows; a car that
  // must pass one steers around it (position()).
  // Never spawn inside a junction box or on a tram conflict: a car must have arrived there under the rules.
