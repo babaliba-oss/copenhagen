@@ -478,9 +478,12 @@ function createCar(){
 }
 async function createTrees(trees=data.trees){
  // Every drawn tree gets a solid trunk (src/tree-trunks.js); register points on a traffic lane's carriageway are dropped.
+ // Cities other than Helsinki: none standing in a carriageway or a house. Dropped before the trunks are made: filtered after,
+ // 230 undrawn trees in Copenhagen's carriageways kept solid trunks (Daniel: blocked by something invisible at Rådhuspladsen).
+ if(city.scenery!=='helsinki'){const before=trees.length;trees=trees.filter(t=>{const [x,z]=t.p;if(world.buildings.at(x,z))return false;if(world.pavement?.at(x,z))return true;return ![[0,0],[1.5,0],[-1.5,0],[0,1.5],[0,-1.5]].every(([a,b])=>world.roads.at(x+a,z+b));});if(before-trees.length)console.info(`Trees: ${before-trees.length} in carriageways or houses dropped`);}
  if(treeTrunks){const t=treeTrunks.build(trees,world);trees=t.draw;world.objects.add(t.obstacles);}
  // Cities other than Helsinki: every registered tree gets its species' shape (src/tree-species.js).
- if(city.scenery!=='helsinki'){const before=trees.length;trees=trees.filter(t=>{const [x,z]=t.p;if(world.buildings.at(x,z))return false;if(world.pavement?.at(x,z))return true;return ![[0,0],[1.5,0],[-1.5,0],[0,1.5],[0,-1.5]].every(([a,b])=>world.roads.at(x+a,z+b));}); /* none standing in a carriageway or a house */if(before-trees.length)console.info(`Trees: ${before-trees.length} in carriageways or houses dropped`);speciesTrees=createSpeciesTrees(trees,{lod:matchMedia('(pointer:coarse)').matches?{near:60,mid:420,far:800}:undefined,detailed:true,models:blenderLoads?.trees?await blenderLoads.trees:null});cityModel.add(speciesTrees.group);speciesTrees.update(focus);return;}
+ if(city.scenery!=='helsinki'){speciesTrees=createSpeciesTrees(trees,{lod:matchMedia('(pointer:coarse)').matches?{near:60,mid:420,far:800}:undefined,detailed:true,models:blenderLoads?.trees?await blenderLoads.trees:null});cityModel.add(speciesTrees.group);speciesTrees.update(focus);return;}
  const {createRouteTrees,detailedTreeArea,detailedTreeCell}=await import('./route-trees.js');
  const detailed=createRouteTrees(trees.filter(t=>detailedTreeArea(t)&&!world.buildings.at(...t.p)));cityModel.add(detailed);harbour.group.userData.detailedTrees=detailed.userData;
  // Detailed trees get blob proxies in cells matching createRouteTrees' buckets (detailedTreeCell); applyTreeLod swaps them by distance.
@@ -1626,7 +1629,7 @@ async function boot(){
    const marketCameraObstacles=new SpatialIndex((market.stalls||[]).map(s=>solidBox({x:s.x,z:s.z,width:s.w+.5,depth:s.d+.5,yaw:s.facing||0})));
    world.travelCameraBuildings={at:(x,z)=>world.cameraBuildings.at(x,z)||marketCameraObstacles.at(x,z)}; // walking cameras must stay outside canopy roofs and counters
    world.collisionBuildings=world.cameraBuildings;
-   if(city.id==='copenhagen'){const here=city;json(dataUrl('kk-footprints.json')).then(list=>{if(city===here&&list?.length)world.cameraBuildings.add(list);}).catch(()=>{});} // the city model's own houses with no mapped footprint (scripts/kk-collision.py): the car drove into them
+   if(city.id==='copenhagen'){const here=city;json(dataUrl('kk-footprints.json')).then(list=>{if(city===here&&list?.length)world.cameraBuildings.add(list);}).catch(()=>{});json(dataUrl('collision-trim.json')).then(trim=>{if(city!==here||!trim)return;const seen=new Map();for(const b of data.buildings){const k=seen.get(b.id)||0;seen.set(b.id,k+1);const r=trim[k?`${b.id}#${k}`:b.id];if(r===undefined)continue; /* a few ids repeat: id#1, id#2 in city.pack order */if(r){b.rings=r;b.bbox=bounds([r.flat()]);}else b.disabled=true;}}).catch(()=>{});} // the city model's own houses with no mapped footprint (scripts/kk-collision.py): the car drove into them. collision-trim (scripts/collision-trim.py): mapped footprints cut back to the drawn house where they ran into the street, invisible walls (a smaller box stays inside the indexed cells)
    world.objects=new WorldObjects([...streetObstacles,...ads.obstacles,...breakableSigns.bodies]);
    cityModel.traverse(object=>{if(object.worldObjects)world.objects.add(object.worldObjects);});
    // ?start=<name> picks any start on the city map (fuzzy, accent-insensitive).
