@@ -22,6 +22,24 @@ export function safeVehicleSegment(a,b,world){
  for(let i=1;i<n;i++){const t=i/n;along.x=a.x+(b.x-a.x)*t;along.z=a.z+(b.z-a.z)*t;along.heading=a.heading+turn*t;if(!vehicleFitsRoad(along,world))return false;}
  return true;
 }
+// Lanes through a drawn wall (list: 0.6 m strips {rings: [A+, B+, B-, A-]}, scripts/road-walls.mjs) are not driven: the
+// edge is marked as not fitting (Mobility.fits, routed round like a lane off the carriageway); vehicleFitsRoad's footprint
+// every 2 m steps over so thin a strip. A lane (its offset polyline) within REACH of a strip's middle line runs a car's
+// body through it. Returns the edges marked.
+export function markWalledLanes(edges,list,REACH=.9+.3){
+ const C=16,grid=new Map(),cell=(x,z)=>Math.floor(x/C)*65536+Math.floor(z/C);
+ for(const w of list){const r=w.rings[0],s=[(r[0][0]+r[3][0])/2,(r[0][1]+r[3][1])/2,(r[1][0]+r[2][0])/2,(r[1][1]+r[2][1])/2];
+  for(let x=Math.floor((Math.min(s[0],s[2])-REACH)/C);x<=Math.floor((Math.max(s[0],s[2])+REACH)/C);x++)for(let z=Math.floor((Math.min(s[1],s[3])-REACH)/C);z<=Math.floor((Math.max(s[1],s[3])+REACH)/C);z++){const k=x*65536+z;let l=grid.get(k);if(!l)grid.set(k,l=[]);l.push(s);}}
+ const ptSeg=(px,pz,ax,az,bx,bz)=>{const dx=bx-ax,dz=bz-az,l=dx*dx+dz*dz,t=l?Math.max(0,Math.min(1,((px-ax)*dx+(pz-az)*dz)/l)):0;return Math.hypot(px-ax-dx*t,pz-az-dz*t);};
+ const cross=(ax,az,bx,bz,cx,cz,dx,dz)=>{const d=(bx-ax)*(dz-cz)-(bz-az)*(dx-cx);if(!d)return false;const t=((cx-ax)*(dz-cz)-(cz-az)*(dx-cx))/d,u=((cx-ax)*(bz-az)-(cz-az)*(bx-ax))/d;return t>=0&&t<=1&&u>=0&&u<=1;};
+ const near=(ax,az,bx,bz,s)=>!(Math.min(ax,bx)-REACH>Math.max(s[0],s[2])||Math.max(ax,bx)+REACH<Math.min(s[0],s[2])||Math.min(az,bz)-REACH>Math.max(s[1],s[3])||Math.max(az,bz)+REACH<Math.min(s[1],s[3]))&&(cross(ax,az,bx,bz,...s)||Math.min(ptSeg(ax,az,...s),ptSeg(bx,bz,...s),ptSeg(s[0],s[1],ax,az,bx,bz),ptSeg(s[2],s[3],ax,az,bx,bz))<REACH);
+ let n=0;
+ for(const e of edges){if(e.fits===false)continue;const lane=e.lane||0;let hit=false;
+  for(let i=1;i<e.points.length&&!hit;i++){const a=e.points[i-1],b=e.points[i],L=Math.hypot(b[0]-a[0],b[1]-a[1])||1,ox=-(b[1]-a[1])/L*lane,oz=(b[0]-a[0])/L*lane,ax=a[0]+ox,az=a[1]+oz,bx=b[0]+ox,bz=b[1]+oz;
+   for(let x=Math.floor((Math.min(ax,bx))/C);x<=Math.floor((Math.max(ax,bx))/C)&&!hit;x++)for(let z=Math.floor((Math.min(az,bz))/C);z<=Math.floor((Math.max(az,bz))/C)&&!hit;z++){const l=grid.get(x*65536+z);if(l)for(const s of l)if(near(ax,az,bx,bz,s)){hit=true;break;}}}
+  if(hit){e.fits=false;n++;}}
+ return n;
+}
 // Separating-axis test for the conservative vehicle footprints. This covers
 // cross traffic as well as a car directly ahead, so turns cannot stack cars.
 export {trafficFootprintsOverlap} from './contact-geometry.js';

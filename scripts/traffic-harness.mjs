@@ -45,6 +45,7 @@ export function loadCity(id){
  const islands=city.roads.filter(r=>/Koroke/.test(r.kind));
  const world={buildings:new SpatialIndex(helsinki?[...city.buildings,...createSenateSquare().obstacles]:city.buildings),roads:new SpatialIndex(city.roads.filter(r=>!/Koroke/.test(r.kind))),pavement:new SpatialIndex(city.pavement),
   trafficForbidden:new SpatialIndex(helsinki?[...city.pavement.filter(inHarbour),...islands,...olympiaTramOnlySurfaces(city)]:islands),water:city.water};
+ if(existsSync(`${root}/road-walls.json`)){const walls=read('road-walls.json');world.buildings.add(walls);world.laneWalls=walls;} // main.js: the model's walls on the roads
  const out={id,helsinki,city,mobility:helsinki?correctHarbourLanes(mobility):mobility,trams,buses,world};cache.set(id,out);return out;
 }
 export function seeded(seed=1){let n=seed>>>0||1;return ()=>{n=(Math.imul(n,1664525)+1013904223)>>>0;return n/4294967296;};}

@@ -1,6 +1,6 @@
 // Pure simulation: routes come from Helsinki's measured mobility network.
 import {crashImpulse,knockCar,stepKnocked,playerSpeedAfter,REST_RECYCLE_AFTER} from './crash-physics.js';
-import {vehicleFitsRoad,safeVehicleSegment,trafficFootprintsOverlap} from './road-safety.js';
+import {vehicleFitsRoad,safeVehicleSegment,trafficFootprintsOverlap,markWalledLanes} from './road-safety.js';
 import {cornerSpeedLimit,edgeCruise,approachCruise,edgeTopSpeed,carLane} from './traffic-driving.js';
 import {sweptContact} from './contact-geometry.js';
 import {annotateJunctions,annotateCrossings,annotateTramRelations,annotateTramSignals,signalGreen as phaseGreen,tramThreat,boxesOverlap,carBox,oncomingPasses,CAR_HALF_LENGTH} from './lane-model.js';
@@ -71,6 +71,7 @@ export class Mobility {
  constructor(data,world,{cars=52,people=100,stationCars=0,corridorCars=0,corridor=null,random=Math.random,walkSpawn=200,walkRecycle=330}={}){
   this.walkSpawn=walkSpawn;this.walkRecycle=walkRecycle;this.spawnBudget=6; // walkers appear within walkSpawn m of the player and are recycled past walkRecycle
   this.roads=prepareGraph(data.roads);this.walks=prepareGraph(data.walks);this.signals=data.signals;this.signalControl=annotateJunctions(this.roads,data.signals||[]);annotateCrossings(this.walks,this.signalControl);this.signalAxes=this.signalControl.axes;this.world=world;this.random=random;this.time=0;this.collisions=0;this.externalObstacles=[];this.externalBodies=[];this.trams=null;this.edgeCars=new Map();this.boxCars=new Map();this.approaching=new Map();
+  if(world?.laneWalls)this.walledLanes=markWalledLanes(this.roads.edges,world.laneWalls); // lanes through a wall the model draws on the road (road-walls.json) are routed round
   this.stationEdges=this.roads.edges.filter(e=>e.points.some(([x,z])=>inStationTrafficArea({x,z})));
   // Main-road pool: extra cars that live only on a busy corridor (e.g. Olympia terminal → Kauppatori), both directions.
   this.corridor=corridor;this.corridorEdges=corridor?this.roads.edges.filter(e=>e.length>10&&corridor(...e.points[Math.floor(e.points.length/2)])):[];
