@@ -19,7 +19,7 @@ export function createPant({items=[],clear=()=>true,geometry=null,capacity=160,r
    let a,u=0;if(S.front){a=yaw;u=(h(3)-.5)*1.3;}else a=h(3)*Math.PI*2; // in front of benches and shelters (their open side, +Z), all round bins and stands
    const x=it.x+Math.sin(a)*d+Math.cos(a)*u,z=it.z+Math.cos(a)*d-Math.sin(a)*u;
    if(!clear(x,z))continue;
-   cans.push({x,z,yaw:h(4)*Math.PI*2,lying:h(5)<.75,tint:new THREE.Color(TINTS[Math.floor(h(6)*TINTS.length)]),taken:-1e9});}}
+   cans.push({x,z,drop:it.drop||0 /* by a bench or bin off the paving: on the ground drawn there, as the item (main.js) */,yaw:h(4)*Math.PI*2,lying:h(5)<.75,tint:new THREE.Color(TINTS[Math.floor(h(6)*TINTS.length)]),taken:-1e9});}}
  // a coarse grid for the near query
  const CELL=60,grid=new Map(),key=(i,j)=>i*100003+j;
  cans.forEach((c,i)=>{const k=key(Math.floor(c.x/CELL),Math.floor(c.z/CELL));if(!grid.has(k))grid.set(k,[]);grid.get(k).push(i);});
@@ -42,7 +42,7 @@ export function createPant({items=[],clear=()=>true,geometry=null,capacity=160,r
   for(let i=i0;i<=i1;i++)for(let j=j0;j<=j1;j++){const l=grid.get(key(i,j));if(l)for(const k of l){const c=cans[k];if(clock-c.taken>=PANT_RESPAWN&&Math.hypot(c.x-player.x,c.z-player.z)<range)near.push(k);}}
   if(near.length>capacity){near.sort((a,b)=>Math.hypot(cans[a].x-player.x,cans[a].z-player.z)-Math.hypot(cans[b].x-player.x,cans[b].z-player.z));near.length=capacity;}
   near.forEach((k,n)=>{const c=cans[k];e.set(c.lying?Math.PI/2:0,c.yaw,0,'YXZ');
-   mesh.setMatrixAt(n,m.compose(v.set(c.x,groundAt(c.x,c.z)+(c.lying?radius:0)+.005,c.z),q.setFromEuler(e),s));mesh.setColorAt(n,c.tint);});
+   mesh.setMatrixAt(n,m.compose(v.set(c.x,groundAt(c.x,c.z)+c.drop+(c.lying?radius:0)+.005,c.z),q.setFromEuler(e),s));mesh.setColorAt(n,c.tint);});
   mesh.count=near.length;mesh.instanceMatrix.needsUpdate=true;mesh.instanceColor.needsUpdate=true;
   return got;
  }
