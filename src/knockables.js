@@ -17,7 +17,7 @@ export function carContact(car,x,z,radius){
 
 // footprint [halfWidth, halfLength]: the upright item's box for walkers and riders (near()); range: drawn out to this.
 export function createKnockables(items,parts,{radius=.3,height=1.1,range=Infinity,footprint=null}={}){
-  const clear=Number.isFinite(range)?range+20:RESPAWN_CLEAR; // back home only out of sight: the set is drawn out to `range`
+  const clear=Number.isFinite(range)?range+20:RESPAWN_CLEAR,long=footprint&&footprint[1]>radius*1.5?footprint[1]-radius*.5:0; // back home only out of sight: the set is drawn out to `range`
   const group=new THREE.Group();group.name='Knockable street furniture';
   const meshes=parts.map(({geometry,material})=>{const m=new THREE.InstancedMesh(geometry,material,items.length);m.castShadow=true;m.receiveShadow=true;m.frustumCulled=false;group.add(m);return m;});
   const bodies=items.map((p,i)=>({id:p.id??i,home:{x:p.x,z:p.z,yaw:p.yaw},x:p.x,y:0,z:p.z,yaw:p.yaw,vx:0,vy:0,vz:0,spin:0,
@@ -50,7 +50,8 @@ export function createKnockables(items,parts,{radius=.3,height=1.1,range=Infinit
       if(b.playerTaken||b.disabled)continue;
       // Upright bollards are only struck when the car is actually moving into them; fallen ones get nudged along.
       if(car&&b.y<.6&&Math.abs(car.speed)>.6&&Math.abs(b.x-car.x)<5&&Math.abs(b.z-car.z)<5){ // cheap reject first: sets run to 10k bodies
-        const contact=carContact(car,b.x,b.z,radius);
+        let contact=carContact(car,b.x,b.z,radius);
+        if(!contact&&long){const ex=Math.sin(b.yaw)*long,ez=Math.cos(b.yaw)*long;contact=carContact(car,b.x+ex,b.z+ez,radius)||carContact(car,b.x-ex,b.z-ez,radius);} // long items (rack bikes): their ends count, not only the centre
         if(contact&&(b.resting||Math.hypot(b.vx,b.vz)<Math.abs(car.speed)*.8)){if(!b.knocked)slowdown+=.012;kick(b,car,contact);touched.add(b);}
       }
       if(b.resting){

@@ -176,7 +176,7 @@ export function createMappedFurniture(layer,{rangeScale=1,player=()=>null,mobili
   chunkedInstances(wireLamps,shade,painted,'Wire lamp shades',it=>[it.x,it.z,it.yaw],{shadow:false});
   // Poles are already allowed where they stand and shared by wires ending within 3 m (wireLines snaps them).
   if(wirePoles.length){chunkedInstances(wirePoles,mergeGeometries([cyl(.06,.09,8.2,4.1,'#3b3f42',7)]),painted,'Wire poles',p=>[p[0],p[1],0]);
-   wirePoles.forEach(([x,z],i)=>obstacles.push({id:`wire-pole-${i}`,name:'pole',rings:[[[x-.1,z-.1],[x+.1,z-.1],[x+.1,z+.1],[x-.1,z+.1]]],bbox:[x-.1,z-.1,x+.1,z+.1]}));}
+   wirePoles.forEach(([x,z],i)=>obstacles.push({id:`wire-pole-${i}`,name:'pole',breakable:true /* 18 cm masts wedged the car (Daniel: stuck on 'something invisible'); placement only */,rings:[[[x-.1,z-.1],[x+.1,z-.1],[x+.1,z+.1],[x-.1,z+.1]]],bbox:[x-.1,z-.1,x+.1,z+.1]}));}
  }
  const wireMaterial=new THREE.LineBasicMaterial({color:'#1f2325'});
  for(const chunk of chunks.values()){
