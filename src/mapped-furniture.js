@@ -43,7 +43,7 @@ export function bringAshore(items,{wet,deck=()=>false,blocked=()=>false,reach=3,
   for(let r=.4;r<=reach+1e-9&&!to;r+=.4)for(const [dx,dz] of dirs){const x=it.x+dx*r,z=it.z+dz*r;if(wet(x,z)||blocked(x,z))continue;
    for(const k of [inland,inland/2,0]){const fx=x+dx*k,fz=z+dz*k;if(!wet(fx,fz)&&!blocked(fx,fz)&&!wet(x+dx*k/2,z+dz*k/2)){to=[fx,fz];break;}}if(to)break;}
   if(!to){dropped++;continue;}
-  it.x=+to[0].toFixed(2);it.z=+to[1].toFixed(2);it.bare=undefined;moved++;out.push(it);} // bare (furniture.json) held for the mapped spot
+  it.x=+to[0].toFixed(2);it.z=+to[1].toFixed(2);it.bare=it.mb;moved++;out.push(it);} // bare (furniture.json) held for the mapped spot, mb for where it is moved (scripts/furniture-ground.mjs)
  return {items:out,moved,dropped};
 }
 // Benches are photo detections placed to within a few metres, and 920 came with no heading (all faced north). One
@@ -63,7 +63,7 @@ export function placeBenches(items,{houses,wheels,walk}){
  let moved=0,turned=0,dropped=0,parked=0;items=items.filter(it=>{if(it.k!=='bench')return true;const e=kerb(it.x,it.z);
   if(!e||e.d>7){if(it.yaw)return true;const w=edgeOf(walk,it.x,it.z,6);if(w&&w.d>.05){const on=!!walk.at(it.x,it.z),sx=(it.x-w.x)/w.d,sz=(it.z-w.z)/w.d;it.yaw=on?Math.atan2(sx,sz):Math.atan2(-sx,-sz);parked++;}return true;}
   const inside=!!wheels.at(it.x,it.z);let ux=it.x-e.x,uz=it.z-e.z;const l=Math.hypot(ux,uz);if(l<.01)return false;ux/=l;uz/=l;if(inside){ux=-ux;uz=-uz;} // (ux,uz): from the kerb into the pavement
-  if(inside||e.d<.9){const x=e.x+ux*.9,z=e.z+uz*.9;if(wheels.at(x,z)||houses.at(x,z)){dropped++;return false;}it.x=x;it.z=z;it.bare=undefined;moved++;}
+  if(inside||e.d<.9){const x=e.x+ux*.9,z=e.z+uz*.9;if(wheels.at(x,z)||houses.at(x,z)){dropped++;return false;}it.x=x;it.z=z;it.bare=it.mb;moved++;} /* mb: off the drawn surfaces where moved (scripts/furniture-ground.mjs) */
   it.yaw=Math.atan2(-ux,-uz);turned++;return true;}); // the seat faces +Z in the bench model: towards the street
  // One bench seen from several photos lands as two or three a metre or two apart, and the kerb snap above lines them
  // up on the same spot (end to end and through each other on Langebro): the first stays, one overlapping it is dropped.
