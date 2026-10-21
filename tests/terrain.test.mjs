@@ -358,5 +358,11 @@ test('shallow terrain ground: under the field everywhere, 8 cm below it where fl
  assert.ok(flatMax>-.2,`dry ground sits close under the streets (highest vertex ${flatMax.toFixed(2)} m)`);
  assert.ok(deepMax<=-.5+1e-6,'around a sunk lawn it keeps half a metre');
  const f=field((x,z)=>x*.1,{size:41,cell:3});assert.ok(groundSag(f,10,50,10).every(s=>s<1e-4),'a plane has no sag');
+ // a canal 4 m down beside a quay: the drop under the mapped water no longer pulls the quay's ground under the street
+ const q=field((x,z)=>x>4?-4:0,{size:41,cell:1}),wet=(x,z)=>x>4;assert.ok(Math.max(...groundSag(q,10,20,4))>1,'the drop sags the cells it crosses');assert.ok(Math.max(...groundSag(q,10,20,4,wet))<.05,'not where it is under water');
+ // a lawn given as a polygon holds only the cells it touches, not its whole bounding box
+ setTerrain(field(()=>0,{size:61,cell:3}));
+ {const tri={rings:[[[0,0],[80,0],[0,80]]]},h=createTerrainGround(new THREE.MeshBasicMaterial(),{cell:10,chunk:8,shallow:{margin:.08,deep:[tri]}}).userData.heightAt;
+  assert.ok(Math.abs(h(10,10)+.5)<1e-6,'under the lawn: half a metre down');assert.ok(Math.abs(h(75,75)+.08)<1e-6,`outside it, inside its box: 8 cm (${h(75,75)})`);}
  setTerrain(null);
 });

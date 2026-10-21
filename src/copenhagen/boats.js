@@ -98,7 +98,7 @@ export function createBoats(data,{waterY=-1.2,era=null,models={},wet=undefined,b
  for(const bt of boats){if(!BUILD[bt[3]])continue;const k=`${Math.floor(bt[0]/300)},${Math.floor(bt[1]/300)}`;if(!chunks.has(k))chunks.set(k,{list:{},x:0,z:0,n:0});const c=chunks.get(k);(c.list[bt[3]]??=[]).push(bt);c.x+=bt[0];c.z+=bt[1];c.n++;}
  const meshes=[],m4=new THREE.Matrix4(),q=new THREE.Quaternion(),e=new THREE.Euler(),v=new THREE.Vector3(),s=new THREE.Vector3();
  for(const c of chunks.values()){c.x/=c.n;c.z/=c.n;c.meshes=[];
-  for(const [kind,list] of Object.entries(c.list)){const im=new THREE.InstancedMesh(geos[kind]??=BUILD[kind](),mat,list.length);im.name=`Moored ${kind} boats`;im.userData.shadowLod=true;group.add(im);const entry={im,list,chunk:c};meshes.push(entry);c.meshes.push(entry);}}
+  for(const [kind,list] of Object.entries(c.list)){const geo=geos[kind]??=BUILD[kind]();if(!geo.boundingBox)geo.computeBoundingBox();const im=new THREE.InstancedMesh(geo,mat,list.length);im.userData.sink=geo.boundingBox.min.y<-1?0:.35; /* hulls built with the keel 30 cm under y=0 sink .35 m; the 1760 ship models are drawn with y=0 at their waterline (keel 1.8-3 m down): sunk the same .35 m more, the schooner's deck lay at the water */im.name=`Moored ${kind} boats`;im.userData.shadowLod=true;group.add(im);const entry={im,list,chunk:c};meshes.push(entry);c.meshes.push(entry);}}
  // Tour boats: two per loop (modern only), spaced along the route.
  const movers=[];
  if(era!==1760)for(const r of data?.routes||[]){const pts=[...r,r[0]];let len=0;const cum=[0];for(let i=1;i<pts.length;i++){len+=Math.hypot(pts[i][0]-pts[i-1][0],pts[i][1]-pts[i-1][1]);cum.push(len);}
@@ -111,7 +111,7 @@ export function createBoats(data,{waterY=-1.2,era=null,models={},wet=undefined,b
  let ferryMesh=null;if(ferries.length){ferryMesh=new THREE.InstancedMesh(models.havnebus||havnebus(),mat,ferries.length);ferryMesh.castShadow=true;ferryMesh.frustumCulled=false;ferryMesh.name='Harbour buses';group.add(ferryMesh);}
  const ferryAt=(f,s)=>{let k=1;while(k<f.cum.length-1&&f.cum[k]<s)k++;const a=f.pts[k-1],b=f.pts[k],u=(s-f.cum[k-1])/Math.max(.01,f.cum[k]-f.cum[k-1]);return [a[0]+(b[0]-a[0])*u,a[1]+(b[1]-a[1])*u,Math.atan2(-(b[0]-a[0]),-(b[1]-a[1]))];};
  let t=0;
- function placeMesh(im,list){for(let i=0;i<list.length;i++){const b=list[i],x=b[0],z=b[1],sc=b[4],ph=x*.13+z*.07;e.set(Math.sin(t*.9+ph)*.025,b[2],Math.sin(t*.7+ph)*.035);b.wl??=level(x,z);m4.compose(v.set(x,b.wl-.35+Math.sin(t*1.1+ph)*.06,z),q.setFromEuler(e),s.set(sc,sc,sc));im.setMatrixAt(i,m4);}im.instanceMatrix.needsUpdate=true;}
+ function placeMesh(im,list){const sink=im.userData.sink??.35;for(let i=0;i<list.length;i++){const b=list[i],x=b[0],z=b[1],sc=b[4],ph=x*.13+z*.07;e.set(Math.sin(t*.9+ph)*.025,b[2],Math.sin(t*.7+ph)*.035);b.wl??=level(x,z);m4.compose(v.set(x,b.wl-sink+Math.sin(t*1.1+ph)*.06,z),q.setFromEuler(e),s.set(sc,sc,sc));im.setMatrixAt(i,m4);}im.instanceMatrix.needsUpdate=true;}
  function place(player){for(const c of chunks.values()){const d=player?Math.hypot(c.x-player.x,c.z-player.z):0;const vis=d<650;for(const en of c.meshes){en.im.visible=vis;en.im.castShadow=d<350;if(vis&&d<400)placeMesh(en.im,en.list);}}}
  for(const {im,list} of meshes){placeMesh(im,list);im.computeBoundingSphere();}
  let acc=0;

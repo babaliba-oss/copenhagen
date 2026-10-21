@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import {facadeGrain} from '../facade-grain.js';
 import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';
 import {groundAt,waterAt,seaLevel} from '../terrain.js';
+import {onRampartTop,RAMPART_DRAPE} from '../ramparts.js';
 
 // Hand-built details the city's LOD2 model cannot carry, placed on its own geometry (positions are local
 // metres in the shared Copenhagen projection; the spire axes are the model's top vertices):
@@ -159,7 +160,9 @@ export function createLandmarks({era=null,mills=[],anchors={},statues={}}={}){ /
   add(spireTower(),336,158,{material:built}); // Sankt Nikolaj tower and spire (lost in 1795)
   if(anchors.marmorkirken)add(buildingSite(),anchors.marmorkirken[0],anchors.marmorkirken[2]); // Frederik's Church, building site
  }
- if(era===1760)for(const [x,z] of mills){add(windmill(),x,z,{y:groundAt(x,z)+7,material:built});const r=new THREE.Mesh(sails(),mat);r.position.set(x,groundAt(x,z)+14.6,z+2.3);group.add(r);rotors.push(r);}
+ // The ramparts are in the height field (ramparts.js): a mill stands on the ground under it, moved onto the bastion's top
+ // when its mapped spot is just beside one (a guessed 7 m over the field left mills floating off the banks).
+ if(era===1760)for(const [mx,mz] of mills){const [x,z]=onRampartTop(mx,mz),y=groundAt(x,z)+RAMPART_DRAPE;add(windmill(),x,z,{y,material:built});const r=new THREE.Mesh(sails(),mat);r.position.set(x,y+7.6,z+2.3);group.add(r);rotors.push(r);}
  // Static landmarks merge into one mesh per material (1760's windmills, churches, statues and flagpoles were ~20
  // draws) and the windmill sails turn as one instanced batch. Tivoli's rides and the flags keep their own meshes.
  const moving=new Set([...rotors,...flags,...spinners.map(sp=>sp.m)]),byMaterial=new Map();group.updateMatrixWorld(true);

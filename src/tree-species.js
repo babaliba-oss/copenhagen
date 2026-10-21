@@ -148,21 +148,21 @@ export function spaceTrees(trees){
 // per-tree visibility by distance and per-tree frustum culling. Returns {group, update(focus), stats}.
 export const SPECIES_LOD={near:95,mid:460,far:850}; // near: full EZ crowns (about 2-9k triangles each)
 export function treeLevel(d,b=SPECIES_LOD){return d<b.near?'near':d<b.mid?'mid':d<b.far?'far':null;}
-export function createSpeciesTrees(trees,{detailed=false,models=null,lod=SPECIES_LOD}={}){ // lod: phones draw the full crowns to 60 m (95 m: 220k triangles of near trees at Kongens Nytorv) // models: ez-trees.js loadTreeModels(), the near crowns of the broadleaf families
+export function createSpeciesTrees(trees,{detailed=false,models=null,lod=SPECIES_LOD,ground=groundAt}={}){ // ground(x,z): the height a trunk stands at (main.js: the ground drawn there, not the field) // lod: phones draw the full crowns to 60 m (95 m: 220k triangles of near trees at Kongens Nytorv) // models: ez-trees.js loadTreeModels(), the near crowns of the broadleaf families
  trees=spaceTrees(trees);
  const group=new THREE.Group();group.name='Species trees';
  const material=new THREE.MeshStandardMaterial({vertexColors:true,roughness:.95,metalness:0,emissive:'#3a4a28',emissiveIntensity:.45});
  const items=trees.map((t,i)=>({t,inst:treeInstance(t,i)})),used=new Set(items.map(o=>`${o.inst.family}|${o.inst.variant}`));
  const meshes={},ids={},triangles={};const m=new THREE.Object3D(),tint=new THREE.Color();
  // Near trees: the detailed EZ-Tree crowns (as in Helsinki) where the family has one; the procedural near shape otherwise.
- const ez=detailed?createEzTrees(items.map(({t,inst})=>{const F=FAMILY[inst.family]||FAMILY.broadleaf;return {x:t.p[0],z:t.p[1],y:groundAt(t.p[0],t.p[1]),kind:ezKind(inst.family,models),width:inst.width*F.width*1.05,height:inst.height,yaw:inst.yaw,tint:inst.tint};}),models):null;
+ const ez=detailed?createEzTrees(items.map(({t,inst})=>{const F=FAMILY[inst.family]||FAMILY.broadleaf;return {x:t.p[0],z:t.p[1],y:ground(t.p[0],t.p[1]),kind:ezKind(inst.family,models),width:inst.width*F.width*1.05,height:inst.height,yaw:inst.yaw,tint:inst.tint};}),models):null;
  if(ez)group.add(ez.group);
  for(const level of LEVELS){
   const geos=new Map([...used].map(k=>{const [f,v]=k.split('|');return [k,treeTemplate(f,level,+v+1)];}));
   const verts=[...geos.values()].reduce((n,g)=>n+g.attributes.position.count,0);
   const bm=new THREE.BatchedMesh(Math.max(1,items.length),Math.max(3,verts),0,material);bm.name=`Species trees (${level})`;
   const gid=new Map([...geos].map(([k,g])=>[k,bm.addGeometry(g)]));ids[level]=[];triangles[level]=0;
-  for(const {t,inst} of items){const id=bm.addInstance(gid.get(`${inst.family}|${inst.variant}`));m.position.set(t.p[0],groundAt(t.p[0],t.p[1]),t.p[1]);m.rotation.set(0,inst.yaw,0);m.scale.set(inst.width,inst.height,inst.width);m.updateMatrix();
+  for(const {t,inst} of items){const id=bm.addInstance(gid.get(`${inst.family}|${inst.variant}`));m.position.set(t.p[0],ground(t.p[0],t.p[1]),t.p[1]);m.rotation.set(0,inst.yaw,0);m.scale.set(inst.width,inst.height,inst.width);m.updateMatrix();
    bm.setMatrixAt(id,m.matrix);bm.setColorAt(id,tint.setScalar(inst.tint));bm.setVisibleAt(id,false);ids[level].push(id);triangles[level]+=geos.get(`${inst.family}|${inst.variant}`).attributes.position.count/3;}
   geos.forEach(g=>g.dispose());
   bm.perObjectFrustumCulled=true;bm.castShadow=level==='near';bm.receiveShadow=level!=='far';bm.userData.shadowLod=true;meshes[level]=bm;group.add(bm);

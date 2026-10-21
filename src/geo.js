@@ -92,6 +92,9 @@ export class SpatialIndex {
 const waterIndexes=new WeakMap();
 export function inWaterPolygons(water,x,z){
  if(!water?.length)return false;
+ return wetIn(water,x,z)&&!water.dry?.(x,z); // land a list marks dry inside its polygons (1760: bastions standing in today's lakes)
+}
+function wetIn(water,x,z){
  let entry=waterIndexes.get(water);
  if(!entry||entry.count!==water.length){entry={count:water.length,index:new SpatialIndex(water.filter(w=>w?.rings?.length)),raster:waterRaster(water)};waterIndexes.set(water,entry);}
  // 2 m raster: clearly wet / clearly dry cells answer at once; only cells an edge crosses run the polygon test

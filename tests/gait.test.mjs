@@ -4,7 +4,7 @@ import {readFileSync} from 'node:fs';
 import {gunzipSync} from 'node:zlib';
 import * as THREE from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
-import {horseGeometry,wheelGeometry,stepMotion,withAttributes,ROLL_WRAP} from '../src/copenhagen/gait.js';
+import {horseGeometry,wheelGeometry,stepMotion,withAttributes,ROLL_WRAP,ROLL_SPEED} from '../src/copenhagen/gait.js';
 
 // The shipped one-mesh models (scripts/models/*.py), parsed the way the game does (gzipped GLB).
 async function model(path){
@@ -50,10 +50,12 @@ test('the coachman and the nisse carry their colours (the nisse may be textured)
 test('gait motion: the trot quickens and grows with speed, the wheels roll the distance, angles stay small',()=>{
  const m={phase:0,amp:0,roll:0};
  for(let i=0;i<60;i++)stepMotion(m,7,1/30);
- assert.ok(m.phase>18&&m.phase<22,`about 1.6 strides a second at 7 m/s: ${m.phase.toFixed(1)}`);assert.ok(m.amp>.3&&m.amp<=.38);assert.ok(Math.abs(m.roll-14)<1e-6);
+ assert.ok(m.phase>18&&m.phase<22,`about 1.6 strides a second at 7 m/s: ${m.phase.toFixed(1)}`);assert.ok(m.amp>.3&&m.amp<=.38);assert.ok(Math.abs(m.roll-Math.min(7,ROLL_SPEED)*2)<1e-6,'the wheels roll, at most ROLL_SPEED');
  const still={phase:3,amp:.38,roll:5};for(let i=0;i<120;i++)stepMotion(still,0,1/30);assert.equal(still.phase,3,'standing: no gait');assert.ok(still.amp<.01,'legs come to rest');
- const far={phase:0,amp:0,roll:ROLL_WRAP-.5};stepMotion(far,15,1/30);assert.ok(far.roll<1,'distance wraps at a whole number of turns of both wheels');
- assert.ok(Math.abs(ROLL_WRAP/.62/(2*Math.PI)-Math.round(ROLL_WRAP/.62/(2*Math.PI)))<1e-9&&Math.abs(ROLL_WRAP/.44/(2*Math.PI)-Math.round(ROLL_WRAP/.44/(2*Math.PI)))<1e-9);
+ const far={phase:0,amp:0,roll:ROLL_WRAP-.05};stepMotion(far,15,1/30);assert.ok(far.roll<1,'distance wraps at a whole number of turns of both wheels');
+ assert.ok(Math.abs(ROLL_WRAP/.7/(2*Math.PI)-Math.round(ROLL_WRAP/.7/(2*Math.PI)))<1e-9&&Math.abs(ROLL_WRAP/.4875/(2*Math.PI)-Math.round(ROLL_WRAP/.4875/(2*Math.PI)))<1e-9);
+ // at the cap a front wheel (0.4875 m, ~20 spokes 18 degrees apart) turns under a third of a spoke a frame at 60 fps: it reads as turning forwards
+ assert.ok(ROLL_SPEED/60/.4875<(Math.PI/10)/3);
 });
 
 test('parts of a coach get the same attributes so they merge',()=>{

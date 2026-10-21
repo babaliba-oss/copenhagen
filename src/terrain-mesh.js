@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import {groundAt,waterAt,hasTerrain,terrain,footprintBase,seaLevel} from './terrain.js';
+import {pointInPolygon,bounds} from './geo.js';
 
 // Geometry that follows the ground (src/terrain.js). Flat cities skip all of this.
 
@@ -131,7 +132,7 @@ export function createTerrainGround(material,{cell=10,chunk=32,size=11000,depth=
  const f=terrain(),group=new THREE.Group();group.name='Terrain ground';if(!f)return group;
  const E=Math.floor(f.extent/cell)*cell,n=Math.round(2*E/cell);
  const shore=wet?shoreVertices(f,wet,cell,E,n):null;
- const lift=shallow?shallowDepth(f,cell,E,n,depth,shallow):null;
+ const lift=shallow?shallowDepth(f,cell,E,n,depth,shallow,wet):null;
  const grid=(xs,zs,fine=false)=>{const pos=[],nor=[],idx=[],w=xs.length;
   // Under (or next to) water the ground drops 2 m below the water surface: the elevation model's ground is often
   // above the water layer in the harbour and canals, and drawing it there hid the water (the "muddy" harbour).
@@ -148,10 +149,16 @@ export function createTerrainGround(material,{cell=10,chunk=32,size=11000,depth=
  for(let cz=0;cz<n;cz+=chunk)for(let cx=0;cx<n;cx+=chunk){
   const xs=range(-E+cx*cell,-E+Math.min(n,cx+chunk)*cell,cell),zs=range(-E+cz*cell,-E+Math.min(n,cz+chunk)*cell,cell);
   const m=new THREE.Mesh(grid(xs,zs,true),material);m.receiveShadow=true;m.name='Terrain chunk';group.add(m);}
+ const fine=group.children.slice(),per=Math.ceil(n/chunk);
  // Skirt: four coarse strips around the fine square, clamped to the edge heights.
  const H=size/2,coarse=125,side=range(-H,-E,coarse),far=range(E,H,coarse),mid=range(-E,E,coarse);
  for(const [xs,zs] of [[[...side,...mid.slice(1),...far.slice(1)],side],[[...side,...mid.slice(1),...far.slice(1)],far],[side,mid],[far,mid]]){const m=new THREE.Mesh(grid(xs,zs),material);m.receiveShadow=true;m.name='Terrain skirt';group.add(m);}
- group.userData={cell,chunks:group.children.length};
+ // The drawn height of the fine grid (its own triangles), for things standing on the bare ground: on the field they
+ // stood over it by its margin and sag (trees beside the quays hung in the air).
+ const heightAt=(x,z)=>{const gi=(x+E)/cell,gj=(z+E)/cell;if(!(gi>=0&&gj>=0&&gi<n&&gj<n))return null;const ci=Math.floor(gi/chunk),cj=Math.floor(gj/chunk),p=fine[cj*per+ci]?.geometry.attributes.position?.array;if(!p)return null;
+  const w=Math.min(n,(ci+1)*chunk)-ci*chunk+1,i=Math.floor(gi)-ci*chunk,j=Math.floor(gj)-cj*chunk,u=gi%1,v=gj%1,Y=(a,b)=>p[((j+b)*w+i+a)*3+1],A=Y(0,0),B=Y(1,0),C=Y(0,1),D=Y(1,1);
+  return u+v<=1?A+u*(B-A)+v*(C-A):D+(1-u)*(C-D)+(1-v)*(B-D);};
+ group.userData={cell,chunks:group.children.length,heightAt};
  return group;
 }
 
@@ -159,7 +166,7 @@ export function createTerrainGround(material,{cell=10,chunk=32,size=11000,depth=
 // the bilinear field wherever it is concave; each grid cell's bulge (groundSag, at the field's own samples) plus
 // `margin` keeps every triangle under the streets draped on the field. `deep` ([x0,z0,x1,z1] boxes) and lake banks keep
 // the full `depth`. → (x,z) at a grid vertex → offset (negative).
-export function groundSag(f,cell,E,n){
+export function groundSag(f,cell,E,n,wet=null){ // wet(x,z): samples in the mapped water do not count (the material cuts the ground away there; counted, the drop into a canal pulled the quay's vertices metres under the street and trees and benches stood over a hole)
  const N=n+1,hv=new Float32Array(N*N),sag=new Float32Array(n*n);
  const F=f.size,fc=f.cell,fe=f.extent,g=f.ground,at=(x,z)=>{const m=F-1,u=Math.max(0,Math.min(m,(x+fe)/fc)),v=Math.max(0,Math.min(m,(z+fe)/fc)),i=Math.min(m-1,Math.floor(u)),j=Math.min(m-1,Math.floor(v)),a=u-i,b=v-j,k=j*F+i;return (g[k]*(1-a)+g[k+1]*a)*(1-b)+(g[k+F]*(1-a)+g[k+F+1]*a)*b;}; /* groundAt on f */
  for(let j=0;j<N;j++)for(let i=0;i<N;i++)hv[j*N+i]=at(-E+i*cell,-E+j*cell);
@@ -170,13 +177,17 @@ export function groundSag(f,cell,E,n){
  for(let fj=0;fj<F;fj++){const vz=(-fe+fj*fc+E)/cell;if(vz<0||vz>n)continue;const cj=Math.min(n-1,Math.floor(vz)),v=vz-cj,row=fj*F;
   for(let fi=0;fi<F;fi++){const ci=col[fi];if(ci<0)continue;
    const u=cu[fi],a=hv[cj*N+ci],b=hv[cj*N+ci+1],c=hv[(cj+1)*N+ci],d=hv[(cj+1)*N+ci+1]; /* triangles (a,c,b) and (b,c,d), as grid() indexes them */
-   const y=u+v<=1?a+u*(b-a)+v*(c-a):d+(1-u)*(c-d)+(1-v)*(b-d),s=y-g[row+fi],k=cj*n+ci;if(s>sag[k])sag[k]=s;}}
+   const y=u+v<=1?a+u*(b-a)+v*(c-a):d+(1-u)*(c-d)+(1-v)*(b-d),s=y-g[row+fi],k=cj*n+ci;if(s>sag[k]&&!(s>.05&&wet?.(-fe+fi*fc,-fe+fj*fc)))sag[k]=s;}}
  return sag;
 }
-function shallowDepth(f,cell,E,n,depth,{margin=.08,deep=[]}={}){
- const N=n+1,sag=groundSag(f,cell,E,n),hold=new Uint8Array(n*n),out=new Float32Array(N*N);
+function shallowDepth(f,cell,E,n,depth,{margin=.08,deep=[]}={},wet=null){
+ const N=n+1,sag=groundSag(f,cell,E,n,wet),hold=new Uint8Array(n*n),out=new Float32Array(N*N);
  const mark=(x0,z0,x1,z1)=>{const i0=Math.max(0,Math.floor((x0+E)/cell)),i1=Math.min(n-1,Math.floor((x1+E)/cell)),j0=Math.max(0,Math.floor((z0+E)/cell)),j1=Math.min(n-1,Math.floor((z1+E)/cell));for(let j=j0;j<=j1;j++)for(let i=i0;i<=i1;i++)hold[j*n+i]=1;};
- for(const b of deep||[])mark(b[0],b[1],b[2],b[3]);
+ // deep: boxes [x0,z0,x1,z1], or polygons ({rings}) marking only the cells they touch (a lawn's bounding box held the
+ // bare ground half a metre down across the paths and quays around it: trees and benches there stood over a step)
+ for(const b of deep||[]){if(!b.rings){mark(b[0],b[1],b[2],b[3]);continue;}const bb=b.bbox||bounds(b.rings),i0=Math.max(0,Math.floor((bb[0]+E)/cell)),i1=Math.min(n-1,Math.floor((bb[2]+E)/cell)),j0=Math.max(0,Math.floor((bb[1]+E)/cell)),j1=Math.min(n-1,Math.floor((bb[3]+E)/cell));
+  for(let j=j0;j<=j1;j++)for(let i=i0;i<=i1;i++){const x=-E+i*cell,z=-E+j*cell;if([[0,0],[1,0],[0,1],[1,1],[.5,.5]].some(([a,c])=>pointInPolygon(x+a*cell,z+c*cell,b.rings)))hold[j*n+i]=1;}
+  for(const r of b.rings)for(let k=0;k<r.length;k++){const p=r[k],q=r[(k+1)%r.length],m=Math.max(1,Math.ceil(Math.hypot(q[0]-p[0],q[1]-p[1])/2));for(let t=0;t<=m;t++){const x=p[0]+(q[0]-p[0])*t/m,z=p[1]+(q[1]-p[1])*t/m;mark(x,z,x,z);}}}
  const lake=lakeSurface();if(lake){const F=f.size,fc=f.cell,fe=f.extent;for(let k=0;k<F*F;k++)if(!Number.isNaN(lake.level[k])){const x=-fe+(k%F)*fc,z=-fe+((k/F)|0)*fc;mark(x-fc,z-fc,x+fc,z+fc);}}
  for(let j=0;j<N;j++)for(let i=0;i<N;i++){let s=0,keep=false;
   for(let cj=j-1;cj<=j;cj++)for(let ci=i-1;ci<=i;ci++){if(ci<0||cj<0||ci>=n||cj>=n)continue;const k=cj*n+ci;if(hold[k])keep=true;if(sag[k]>s)s=sag[k];}

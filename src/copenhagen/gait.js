@@ -58,10 +58,13 @@ export function wheelGeometry(g,wheels){
  g.setAttribute('anim',new THREE.BufferAttribute(anim,4));g.setAttribute('pivot',new THREE.BufferAttribute(piv,4));return g;
 }
 // Per-instance motion: phase advances with speed (a walk when slow, a brisk trot at 7 m/s), the swing grows with speed
-// and the wheels roll the distance covered. Wrapped so the angles keep float precision; 171.4 m is a whole number of turns
-// of both wheel sizes (0.62 and 0.44 m).
-export const ROLL_WRAP=2*Math.PI*.62*.44*100;
-export function stepMotion(m,speed,dt){const v=Math.min(Math.abs(speed),14);m.phase=(m.phase+dt*v*1.45)%(Math.PI*2000);m.amp+=(Math.min(.38,v*.065)-m.amp)*Math.min(1,dt*4);m.roll=(m.roll+speed*dt)%ROLL_WRAP;return m;}
+// and the wheels roll the distance covered, up to ROLL_SPEED: the coach's wheels have about twenty spokes (18 degrees
+// apart), so from 4.6 m/s (front, 0.49 m) and 6.6 m/s (rear, 0.7 m) a frame turned them half a spoke or more and they
+// read as standing still or turning backwards (the wagon-wheel effect): at driving speeds the wheels looked static.
+// Capped, they turn visibly forwards at any speed (under a third of a spoke a frame at 60 fps). Wrapped so the angles keep
+// float precision, at a whole number of turns of the brougham's wheels (0.7 and 0.4875 m: 171.5 m).
+export const ROLL_WRAP=2*Math.PI*.7*.4875*80,ROLL_SPEED=3;
+export function stepMotion(m,speed,dt){const v=Math.min(Math.abs(speed),14);m.phase=(m.phase+dt*v*1.45)%(Math.PI*2000);m.amp+=(Math.min(.38,v*.065)-m.amp)*Math.min(1,dt*4);m.roll=(m.roll+Math.max(-ROLL_SPEED,Math.min(ROLL_SPEED,speed))*dt)%ROLL_WRAP;return m;}
 
 // One-mesh models made by scripts/models/*.py: the geometry and the mesh's extras. Stored gzipped (Cloudflare serves .glb
 // uncompressed), unzipped here. Null on failure (the caller keeps what it had).

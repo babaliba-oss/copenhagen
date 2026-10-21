@@ -97,13 +97,31 @@ export function groundPose(x,z,heading,halfLength=2.2,halfWidth=.9,out={y:0,pitc
 }
 // Building tiles ([x,y,z,u,v] per vertex, parts with start/count): each part stands on the lowest ground
 // under its own vertices, so the downhill side never floats; the uphill side runs into the slope. Parts marked `abs`
-// carry surveyed heights on this terrain and stay where they are.
+// carry surveyed heights on this terrain and stay where they are, but meet the ground as the game shapes it (settleSurveyed).
 export function liftBuildings(array,parts){
  if(field===null)return;
  for(const p of parts){
-  if(p.abs){let lo=Infinity;for(let i=p.start;i<p.start+p.count;i++){const y=array[i*5+1];if(y<lo)lo=y;}p.base=lo;continue;} // surveyed heights on this terrain already (scripts/kk-buildings.py)
+  if(p.abs){settleSurveyed(array,p);let lo=Infinity;for(let i=p.start;i<p.start+p.count;i++){const y=array[i*5+1];if(y<lo)lo=y;}p.base=lo;continue;} // surveyed heights on this terrain already (scripts/kk-buildings.py)
   let low=Infinity;for(let i=p.start;i<p.start+p.count;i++){const h=groundAt(array[i*5],array[i*5+2]);if(h<low)low=h;}
   if(!Number.isFinite(low))continue;p.base=low;for(let i=p.start;i<p.start+p.count;i++)array[i*5+1]+=low;}
+}
+// A surveyed part's walls reach about half a metre under the field (the median in 1760). Where the field differs from the
+// survey (quays levelled, hollows raised, the moat sunk, a model built on its own ground level) a part sank with its
+// ground floor buried (every wall foot over 0.9 m under: raised to 0.5 m under), or a wall foot stood over the street
+// with a gap under it (walls whose foot is up to 1.5 m over the field: that foot taken down to 0.3 m under it; higher
+// ones are walls rising from a lower roof or out over the water). Wall feet: the lower corners of vertical triangles.
+const FOOT=.5,BURIED=.9,GAP=1.5,TUCK=.3;
+export function settleSurveyed(array,p){
+ const end=p.start+p.count,feet=[];let top=-Infinity;
+ for(let v=p.start;v+2<end;v+=3){const o=v*5,ay=array[o+1],by=array[o+6],cy=array[o+11],ux=array[o+5]-array[o],uz=array[o+7]-array[o+2],wx=array[o+10]-array[o],wz=array[o+12]-array[o+2];
+  const ny=ux*wz-uz*wx,nl=Math.hypot((by-ay)*wz-uz*(cy-ay),ny,ux*(cy-ay)-(by-ay)*wx);if(!(nl>1e-6)||Math.abs(ny/nl)>.1)continue; // walls only
+  const lo=Math.min(ay,by,cy);for(let k=0;k<3;k++){const i=o+k*5;if(array[i+1]>lo+.05)continue;const d=array[i+1]-groundAt(array[i],array[i+2]);if(d<GAP){feet.push(i,d);if(d>top)top=d;}}}
+ if(!feet.length)return 0;let lift=0;
+ if(top<-BURIED&&(p.height??9)>2){lift=-FOOT-top;for(let v=p.start;v<end;v++)array[v*5+1]+=lift;for(let n=1;n<feet.length;n+=2)feet[n]+=lift;}
+ const key=i=>Math.round(array[i]*50)+','+Math.round(array[i+1]*50)+','+Math.round(array[i+2]*50),down=new Map();
+ for(let n=0;n<feet.length;n+=2)if(feet[n+1]>-TUCK)down.set(key(feet[n]),feet[n+1]+TUCK);
+ if(down.size)for(let v=p.start;v<end;v++){const i=v*5,d=down.get(key(i));if(d)array[i+1]-=d;} // every copy of the corner (the triangles are not indexed)
+ return lift||down.size;
 }
 // Open water found only in the elevation model (src/terrain.js `lake` layer): its level at x,z, else null.
 export function lakeAt(x,z){
@@ -202,6 +220,7 @@ export function sinkShallowWater(isWet,{depth=1.8,bed=1.3,clearance=1}={},f=fiel
   // the level spread onto the banks around it comes down too (the water surface is drawn from it near the edge)
   for(const k of cells){const r=(k/n)|0,c=k-r*n;for(let dr=-2;dr<=2;dr++)for(let dc=-2;dc<=2;dc++){const rr=r+dr,cc=c+dc;if(rr<0||cc<0||rr>=n||cc>=n)continue;const q=rr*n+cc;if(wet[q]===2&&w[q]>to)w[q]=to;}}
   sunk++;}
+ if(sunk)seaCache=null; // the common level is taken again: cached from before (main.js reads it first), the 1760 harbour's underlay plane stood 17 cm over the sunk sea and the ships sat that much deeper in it
  return sunk;
 }
 // Bridges the elevation model never saw (the 1760 moat and canal crossings, footbridges mapped across a canal): the
@@ -228,5 +247,5 @@ export function flattenWaterBodies(f=field){
   while(stack.length){const k=stack.pop();cells.push(k);const r=(k/n)|0,c=k-r*n;
    const visit=q=>{if(label[q]<0&&!Number.isNaN(w[q])){label[q]=regions;stack.push(q);}};if(c>0)visit(k-1);if(c<n-1)visit(k+1);if(r>0)visit(k-n);if(r<n-1)visit(k+n);}
   const vals=Float32Array.from(cells,k=>w[k]).sort(),mid=vals[vals.length>>1];for(const k of cells)if(w[k]>mid)w[k]=mid;regions++;} // only bumps come down; nothing is raised
- return regions;
+ seaCache=null;return regions;
 }
