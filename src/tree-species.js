@@ -148,7 +148,7 @@ export function spaceTrees(trees){
 // per-tree visibility by distance and per-tree frustum culling. Returns {group, update(focus), stats}.
 export const SPECIES_LOD={near:95,mid:460,far:850}; // near: full EZ crowns (about 2-9k triangles each)
 export function treeLevel(d,b=SPECIES_LOD){return d<b.near?'near':d<b.mid?'mid':d<b.far?'far':null;}
-export function createSpeciesTrees(trees,{detailed=false,models=null}={}){ // models: ez-trees.js loadTreeModels(), the near crowns of the broadleaf families
+export function createSpeciesTrees(trees,{detailed=false,models=null,lod=SPECIES_LOD}={}){ // lod: phones draw the full crowns to 60 m (95 m: 220k triangles of near trees at Kongens Nytorv) // models: ez-trees.js loadTreeModels(), the near crowns of the broadleaf families
  trees=spaceTrees(trees);
  const group=new THREE.Group();group.name='Species trees';
  const material=new THREE.MeshStandardMaterial({vertexColors:true,roughness:.95,metalness:0,emissive:'#3a4a28',emissiveIntensity:.45});
@@ -172,7 +172,7 @@ export function createSpeciesTrees(trees,{detailed=false,models=null}={}){ // mo
  // leaf cards stand mostly upright and read as bare branches from above, so the procedural 'mid' crowns are used.
  const update=(focus,{high=false}={})=>{
   if(last&&high===lastHigh&&Math.hypot(focus.x-last.x,focus.z-last.z)<8)return;last={x:focus.x,z:focus.z};lastHigh=high;
-  items.forEach(({t},i)=>{let l=treeLevel(Math.hypot(t.p[0]-focus.x,t.p[1]-focus.z));if(high&&l==='near')l='mid';if(l===shown[i])return;
+  items.forEach(({t},i)=>{let l=treeLevel(Math.hypot(t.p[0]-focus.x,t.p[1]-focus.z),lod);if(high&&l==='near')l='mid';if(l===shown[i])return;
    const vis=(lv,on)=>{if(lv==='near'&&ez?.has(i))ez.show(i,on);else meshes[lv].setVisibleAt(ids[lv][i],on);};
    if(shown[i])vis(shown[i],false);if(l)vis(l,true);shown[i]=l;});
  };
