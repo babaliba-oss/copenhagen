@@ -35,9 +35,9 @@ function blenderCar(parts,spec){
  for(const sx of [-1,1])for(const sz of [-1,1]){const r=spec.r;fixed.push(paint(new THREE.CylinderGeometry(r,r,.21,14).rotateZ(Math.PI/2).translate(sx*(spec.w/2-.06),r,sz*spec.wb/2),'#151617'));fixed.push(paint(new THREE.CylinderGeometry(r*.62,r*.62,.215,12).rotateZ(Math.PI/2).translate(sx*(spec.w/2-.06),r,sz*spec.wb/2),'#9aa1a4'));}
  return {body:paint(body.clone(),'#ffffff'),fixed:mergeGeometries(fixed)};
 }
-export function createParkedCars(data,{bodies=[]}={}){
+export function createParkedCars(data,{bodies=[],skip=null}={}){ // skip(x,z): leave a car out (on a bridge, over water)
  const group=new THREE.Group();group.name='Parked cars';
- const cars=data?.cars||[],paints=(data?.paints||['#ccc']).map(h=>{const c=new THREE.Color(h),l=c.r*.3+c.g*.55+c.b*.15;return l<.035?c.lerp(new THREE.Color('#4a4e55'),.55):c;}); // black and navy read as holes in shadow
+ const cars=(data?.cars||[]).filter(c=>!skip?.(c[0],c[1])),paints=(data?.paints||['#ccc']).map(h=>{const c=new THREE.Color(h),l=c.r*.3+c.g*.55+c.b*.15;return l<.035?c.lerp(new THREE.Color('#4a4e55'),.55):c;}); // black and navy read as holes in shadow
  if(!cars.length)return {group,obstacles:[],update(){},step:()=>0,near:(x,z,r,out=[])=>out,movedBodies:(out=[])=>out,hideAlong:()=>0,moved:()=>0,lastHit:()=>-1};
  const models=bodies.map(({parts,spec})=>blenderCar(parts,spec)).filter(Boolean),simple={body:bodyGeometry(),fixed:fixedGeometry()};
  const bodyMat=new THREE.MeshStandardMaterial({vertexColors:true,roughness:.35,metalness:.15}),fixedMat=new THREE.MeshStandardMaterial({vertexColors:true,roughness:.4,metalness:.2});

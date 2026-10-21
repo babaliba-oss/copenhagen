@@ -50,3 +50,31 @@ export function expandMobility(m){
  if(m?.packed!==2)return m;
  m.roads=expandGraph(m.roads);m.walks=expandGraph(m.walks);delete m.packed;return m;
 }
+
+// Footway edges that run through a drawn house: a path mapped through a building passage the model draws shut (around
+// Christiansborg, the palace's wings and the Thorvaldsen Museum), or hugging a façade the city model draws a metre
+// further out than the mapped footprint. Walkers on them walked through the walls, or stuck at them until they were
+// recycled. Drops (in place) every non-crossing edge whose line runs at least `run` metres inside one of `houses`
+// ({rings}: the drawn footprints) or within `clearance` metres of one (on the `res` raster the footprints are filled
+// into), the first and last `ends` metres aside (paths meet at doors and corners). Returns the number dropped.
+export function dropWalksThroughBuildings(walks,houses,{clearance=.5,run=1,ends=.75,res=.5}={}){
+ const polys=(houses||[]).filter(h=>h?.rings?.[0]?.length>2);if(!walks?.edges?.length||!polys.length)return 0;
+ let X0=Infinity,Z0=Infinity,X1=-Infinity,Z1=-Infinity;for(const h of polys)for(const [x,z] of h.rings[0]){if(x<X0)X0=x;if(x>X1)X1=x;if(z<Z0)Z0=z;if(z>Z1)Z1=z;}
+ const R=Math.max(0,Math.round(clearance/res));X0-=R*res;Z0-=R*res; // grown by R cells: the footprint spans, then the rows
+ const W=Math.ceil((X1-X0)/res)+R+2,H=Math.ceil((Z1-Z0)/res)+R+2,WW=Math.ceil(W/32),bits=new Uint32Array(WW*H);let xs=new Float64Array(64);
+ const span=(o,i0,i1)=>{const w0=i0>>5,w1=i1>>5,m0=~0<<(i0&31),m1=(i1&31)===31?~0:(1<<((i1&31)+1))-1;if(w0===w1){bits[o+w0]|=m0&m1;return;}bits[o+w0]|=m0;for(let w=w0+1;w<w1;w++)bits[o+w]=~0;bits[o+w1]|=m1;}; // whole words between the ends
+ for(const h of polys){let a=Infinity,b=-Infinity;for(const [,z] of h.rings[0]){if(z<a)a=z;if(z>b)b=z;}
+  for(let j=Math.max(0,Math.floor((a-Z0)/res));j<=Math.min(H-1,Math.ceil((b-Z0)/res));j++){const z=Z0+(j+.5)*res,o=j*WW;let n=0; /* scanline through the cell centres, even-odd over every ring (holes stay open) */
+   for(const r of h.rings)for(let i=0,k=r.length-1;i<r.length;k=i++){const p=r[i],q=r[k];if((p[1]>z)!==(q[1]>z)){let v=p[0]+(q[0]-p[0])*(z-p[1])/(q[1]-p[1]),m=n++;if(n>xs.length)xs=Float64Array.from({length:xs.length*2},(_,u)=>xs[u]||0);while(m>0&&xs[m-1]>v){xs[m]=xs[m-1];m--;}xs[m]=v;}} /* insertion sort: a row crosses a few edges */
+   for(let t=0;t+1<n;t+=2){const i0=Math.max(0,Math.ceil((xs[t]-X0)/res-.5)-R),i1=Math.min(W-1,Math.floor((xs[t+1]-X0)/res-.5)+R);if(i1>=i0)span(o,i0,i1);}}}
+ let grid=bits;if(R>0){grid=new Uint32Array(WW*H);for(let j=0;j<H;j++)for(let d=-R;d<=R;d++){const jj=j+d;if(jj<0||jj>=H)continue;const o=j*WW,p=jj*WW;for(let w=0;w<WW;w++)grid[o+w]|=bits[p+w];}}
+ const before=walks.edges.length;
+ walks.edges=walks.edges.filter(e=>{if(e.crossing||!(e.points?.length>1))return true;const L=e.length??0;let pos=0,len=0;
+  for(let i=1;i<e.points.length;i++){const a=e.points[i-1],b=e.points[i],l=Math.hypot(b[0]-a[0],b[1]-a[1]),k=Math.max(1,Math.ceil(l/.5));
+   for(let j=i===1?0:1;j<=k;j++){const s=pos+l*j/k;if(s<ends||s>L-ends){len=0;continue;}
+    const gi=Math.floor((a[0]+(b[0]-a[0])*j/k-X0)/res),gj=Math.floor((a[1]+(b[1]-a[1])*j/k-Z0)/res);
+    if(gi>=0&&gj>=0&&gi<W&&gj<H&&(grid[gj*WW+(gi>>5)]>>>(gi&31)&1)){len+=l/k;if(len>=run)return false;}else len=0;}
+   pos+=l;}
+  return true;});
+ return before-walks.edges.length;
+}

@@ -377,6 +377,11 @@ export class Mobility {
  }
  wayThrough(a,plan,start,end){const way=[];for(let d=Math.max(start,0);d<=end+CAR_HALF_LENGTH;d+=1.5){const p=this.routeAt(a,plan,d);if(!p)break;way.push(p);}return way;}
  routeAt(a,plan,d){let s=a.s+d;for(let i=-1;i<plan.length;i++){const e=i<0?a.edge:plan[i];if(s<=e.length)return routePoint(e,s,e.lane);s-=e.length;}return null;}
+ // A turn whose blended corner clips a kerb by a few centimetres (narrow streets meeting at a sharp angle, as in
+ // Christianshavn) undid every step a car took there: it stood across the junction for good, beside the player where
+ // nothing recycles it, and the cars giving way to it or queued behind it waited too. After half a second of that, a step
+ // through the corner whose centre is still on the carriageway is taken anyway.
+ kerbCorner(a,p,oldEdge){if(!((a.stuck||0)>.5||this.time<(a.kerbUntil||0))||!(a.edge!==oldEdge||a.s<CORNER_BLEND+1||a.edge.length-a.s<CORNER_BLEND+1)||!this.world.roads.at(p.x,p.z)||this.world.trafficForbidden?.at(p.x,p.z))return false;a.kerbUntil=this.time+1.5;return true;} // then through the rest of the corner without stopping again
  hitsBody(box){for(const body of this.externalBodies)if(boxesOverlap(box,body))return body;return null;}
  // Moving into a tram or bus body is refused; moving out of one (it drove into us) is allowed.
  bodyBlocking(a,p){
@@ -487,7 +492,7 @@ export class Mobility {
    // The last half-step out of a crossing is still part of that crossing. Testing
    // it as an ordinary footway strands pedestrians on the road and blocks cars.
    const segmentEdge=a.walking&&oldEdge.crossing?oldEdge:a.edge;
-   if(this.world.buildings.at(p.x,p.z)||(a.walking?(!this.walkable(p.x,p.z,a.edge)||!this.safeWalkSegment(a,p,segmentEdge)):!safeVehicleSegment(a,p,this.world))){undo(a,oldS,oldEdge,oldPrev,null);
+   if(this.world.buildings.at(p.x,p.z)||(a.walking?(!this.walkable(p.x,p.z,a.edge)||!this.safeWalkSegment(a,p,segmentEdge)):!safeVehicleSegment(a,p,this.world)&&!this.kerbCorner(a,p,oldEdge))){undo(a,oldS,oldEdge,oldPrev,null);
     // A lane that runs off the mapped carriageway never clears; recycle it once it is not right beside the player.
     if(a.stuck>3)this.retire(a,player,!a.walking&&a.stuck>8&&Math.hypot(a.x-player.x,a.z-player.z)>40);continue;}
    // Tiny successful steps between repeated failures are not real progress.

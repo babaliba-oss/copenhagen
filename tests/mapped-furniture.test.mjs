@@ -20,3 +20,12 @@ test('runtime: plates stack by facing; posts are breakable, bins and junction bo
  assert.ok(lamp.knocked&&lamp.state!=='upright');assert.equal(breakableSigns.snapshot().hits-hits,1);
  for(const c of m.chunks.values())c.signs.dispose();
 });
+
+test('furniture placed just inside the mapped water moves ashore past the coping; on a bridge deck it stays',async()=>{
+ const {bringAshore}=await import('../src/mapped-furniture.js');
+ const wet=(x,z)=>x>0,deck=(x,z)=>z>50&&z<60,blocked=(x,z)=>x<-30;
+ const r=bringAshore([{k:'bench',x:1.2,z:0},{k:'lamp',x:-5,z:0},{k:'sign',x:2,z:55},{k:'bin',x:40,z:0}],{wet,deck,blocked});
+ assert.equal(r.moved,1);assert.equal(r.dropped,1,'well out on the water: dropped');
+ const bench=r.items.find(i=>i.k==='bench');assert.ok(bench.x<=-.5&&bench.x>-1.5&&Math.abs(bench.z)<.01,`bench at ${bench.x},${bench.z}`);
+ assert.deepEqual(r.items.find(i=>i.k==='lamp'),{k:'lamp',x:-5,z:0});assert.equal(r.items.find(i=>i.k==='sign').x,2,'on the deck');
+});

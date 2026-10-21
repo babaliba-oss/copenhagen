@@ -121,18 +121,25 @@ export function settleObject(root,{maxEdge=4,skip=null,tolerance=.03}={}){
 
 // The bare ground: chunked grids following the terrain half a metre below street level (as the flat
 // ground plane was), with a coarse skirt out to the horizon. Normals give the hills their shading.
-export function createTerrainGround(material,{cell=10,chunk=32,size=11000,depth=-.5,wet=null}={}){
+// `shallow` ({margin, deep(x0,z0,x1,z1)}): dry ground sits only `margin` below the height field plus what its coarse
+// triangles bulge above it (groundSag), not half a metre: unmapped strips between the mapped surfaces and the houses
+// (pavement nobody drew, Christianshavn's back lots) were a 57 cm step down from the street, so the carriageway stood
+// on a plinth, the car looked raised beside them and furniture placed on the height field hung in the air. Vertices
+// whose cells touch something drawn under street level keep `depth`: deep(x0,z0,x1,z1) (main.js: the mapped lawns,
+// sunk 22 cm) and the lakes' banks (lakeSurface traces their shore against the half-metre drop).
+export function createTerrainGround(material,{cell=10,chunk=32,size=11000,depth=-.5,wet=null,shallow=null}={}){
  const f=terrain(),group=new THREE.Group();group.name='Terrain ground';if(!f)return group;
  const E=Math.floor(f.extent/cell)*cell,n=Math.round(2*E/cell);
  const shore=wet?shoreVertices(f,wet,cell,E,n):null;
- const grid=(xs,zs)=>{const pos=[],nor=[],idx=[],w=xs.length;
+ const lift=shallow?shallowDepth(f,cell,E,n,depth,shallow):null;
+ const grid=(xs,zs,fine=false)=>{const pos=[],nor=[],idx=[],w=xs.length;
   // Under (or next to) water the ground drops 2 m below the water surface: the elevation model's ground is often
   // above the water layer in the harbour and canals, and drawing it there hid the water (the "muddy" harbour).
   const sink=(x,z)=>{let w=null;for(const [a,b] of [[0,0],[cell/2,0],[-cell/2,0],[0,cell/2],[0,-cell/2]]){const v=waterAt(x+a,z+b);if(v!=null)w=w==null?v:Math.min(w,v);}return w;};
   for(const z of zs)for(const x of xs){const g0=groundAt(x,z),s=shore?.(x,z);
-   if(s!==undefined){if(s===null)pos.push(x,g0+depth,z);else pos.push(x,s+depth,z);} /* masked ground (see shoreVertices) */
-   else{const w0=sink(x,z),w=w0!=null&&(g0<w0+1||wet?.(x,z))?w0:null; /* banks well above the water (quays) keep their height: sinking every vertex near a canal dug pits beside the streets */
-    pos.push(x,w==null?g0+depth:Math.min(g0+depth,w-2),z);}
+   if(s!==undefined){if(s===null)pos.push(x,g0+(fine&&lift?lift(x,z):depth),z);else pos.push(x,s+depth,z);} /* masked ground (see shoreVertices) */
+   else{const w0=sink(x,z),w=w0!=null&&(g0<w0+1||wet?.(x,z))?w0:null,d=fine&&lift&&w==null?lift(x,z):depth; /* banks well above the water (quays) keep their height: sinking every vertex near a canal dug pits beside the streets */
+    pos.push(x,w==null?g0+d:Math.min(g0+depth,w-2),z);}
    if(typeof s==='number'){nor.push(0,1,0);continue;} /* a shore vertex lies level with the land beside it */
    const dx=groundAt(x+1,z)-groundAt(x-1,z),dz=groundAt(x,z+1)-groundAt(x,z-1),l=Math.hypot(dx,2,dz);nor.push(-dx/l,2/l,-dz/l);}
   for(let j=0;j+1<zs.length;j++)for(let i=0;i+1<w;i++){const a=j*w+i,b=a+1,c=a+w,d=c+1;idx.push(a,c,b,b,c,d);}
@@ -140,12 +147,41 @@ export function createTerrainGround(material,{cell=10,chunk=32,size=11000,depth=
  const range=(a,b,step)=>{const out=[];for(let x=a;x<b-1e-6;x+=step)out.push(x);out.push(b);return out;};
  for(let cz=0;cz<n;cz+=chunk)for(let cx=0;cx<n;cx+=chunk){
   const xs=range(-E+cx*cell,-E+Math.min(n,cx+chunk)*cell,cell),zs=range(-E+cz*cell,-E+Math.min(n,cz+chunk)*cell,cell);
-  const m=new THREE.Mesh(grid(xs,zs),material);m.receiveShadow=true;m.name='Terrain chunk';group.add(m);}
+  const m=new THREE.Mesh(grid(xs,zs,true),material);m.receiveShadow=true;m.name='Terrain chunk';group.add(m);}
  // Skirt: four coarse strips around the fine square, clamped to the edge heights.
  const H=size/2,coarse=125,side=range(-H,-E,coarse),far=range(E,H,coarse),mid=range(-E,E,coarse);
  for(const [xs,zs] of [[[...side,...mid.slice(1),...far.slice(1)],side],[[...side,...mid.slice(1),...far.slice(1)],far],[side,mid],[far,mid]]){const m=new THREE.Mesh(grid(xs,zs),material);m.receiveShadow=true;m.name='Terrain skirt';group.add(m);}
  group.userData={cell,chunks:group.children.length};
  return group;
+}
+
+// Per vertex of the (n+1)² ground grid: how far below the height field it goes. The coarse grid's triangles bulge above
+// the bilinear field wherever it is concave; each grid cell's bulge (groundSag, at the field's own samples) plus
+// `margin` keeps every triangle under the streets draped on the field. `deep` ([x0,z0,x1,z1] boxes) and lake banks keep
+// the full `depth`. → (x,z) at a grid vertex → offset (negative).
+export function groundSag(f,cell,E,n){
+ const N=n+1,hv=new Float32Array(N*N),sag=new Float32Array(n*n);
+ const F=f.size,fc=f.cell,fe=f.extent,g=f.ground,at=(x,z)=>{const m=F-1,u=Math.max(0,Math.min(m,(x+fe)/fc)),v=Math.max(0,Math.min(m,(z+fe)/fc)),i=Math.min(m-1,Math.floor(u)),j=Math.min(m-1,Math.floor(v)),a=u-i,b=v-j,k=j*F+i;return (g[k]*(1-a)+g[k+1]*a)*(1-b)+(g[k+F]*(1-a)+g[k+F+1]*a)*b;}; /* groundAt on f */
+ for(let j=0;j<N;j++)for(let i=0;i<N;i++)hv[j*N+i]=at(-E+i*cell,-E+j*cell);
+ const col=new Int32Array(F),cu=new Float32Array(F);
+ for(let fi=0;fi<F;fi++){const vx=(-fe+fi*fc+E)/cell;col[fi]=vx<0||vx>n?-1:Math.min(n-1,Math.floor(vx));cu[fi]=vx-col[fi];}
+ // A sample on a cell edge reads the same on both sides (the edge is linear between its two vertices, and both take the
+ // larger of their cells' sag), so each sample goes to one cell.
+ for(let fj=0;fj<F;fj++){const vz=(-fe+fj*fc+E)/cell;if(vz<0||vz>n)continue;const cj=Math.min(n-1,Math.floor(vz)),v=vz-cj,row=fj*F;
+  for(let fi=0;fi<F;fi++){const ci=col[fi];if(ci<0)continue;
+   const u=cu[fi],a=hv[cj*N+ci],b=hv[cj*N+ci+1],c=hv[(cj+1)*N+ci],d=hv[(cj+1)*N+ci+1]; /* triangles (a,c,b) and (b,c,d), as grid() indexes them */
+   const y=u+v<=1?a+u*(b-a)+v*(c-a):d+(1-u)*(c-d)+(1-v)*(b-d),s=y-g[row+fi],k=cj*n+ci;if(s>sag[k])sag[k]=s;}}
+ return sag;
+}
+function shallowDepth(f,cell,E,n,depth,{margin=.08,deep=[]}={}){
+ const N=n+1,sag=groundSag(f,cell,E,n),hold=new Uint8Array(n*n),out=new Float32Array(N*N);
+ const mark=(x0,z0,x1,z1)=>{const i0=Math.max(0,Math.floor((x0+E)/cell)),i1=Math.min(n-1,Math.floor((x1+E)/cell)),j0=Math.max(0,Math.floor((z0+E)/cell)),j1=Math.min(n-1,Math.floor((z1+E)/cell));for(let j=j0;j<=j1;j++)for(let i=i0;i<=i1;i++)hold[j*n+i]=1;};
+ for(const b of deep||[])mark(b[0],b[1],b[2],b[3]);
+ const lake=lakeSurface();if(lake){const F=f.size,fc=f.cell,fe=f.extent;for(let k=0;k<F*F;k++)if(!Number.isNaN(lake.level[k])){const x=-fe+(k%F)*fc,z=-fe+((k/F)|0)*fc;mark(x-fc,z-fc,x+fc,z+fc);}}
+ for(let j=0;j<N;j++)for(let i=0;i<N;i++){let s=0,keep=false;
+  for(let cj=j-1;cj<=j;cj++)for(let ci=i-1;ci<=i;ci++){if(ci<0||cj<0||ci>=n||cj>=n)continue;const k=cj*n+ci;if(hold[k])keep=true;if(sag[k]>s)s=sag[k];}
+  out[j*N+i]=keep?Math.min(depth,-(margin+s)):-(margin+s);}
+ return (x,z)=>{const i=Math.round((x+E)/cell),j=Math.round((z+E)/cell);return i>=0&&j>=0&&i<N&&j<N?out[j*N+i]:depth;};
 }
 
 // Ground the material cuts away over the mapped water (wet(x,z): inside the water polygons; main.js masks them):

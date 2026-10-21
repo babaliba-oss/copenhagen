@@ -125,6 +125,18 @@ export function splitByCell(source,cell){
  if(g!==source)g.dispose();
  return out;
 }
+// After raiseBridgeDecks (main.js): the deck plates were drawn against the canal bed and the quay-end heights, before the
+// ground under them was raised; the streets' own paving, draped on the raised ground, then lay up to 35 cm under the
+// plate in places, and the dark plate showed through the cobbles as patches (Knippelsbro, Børsgade, the Slotsholmen
+// bridges). Each plate vertex comes down to the ground under it (the paving lies 4.5-7 cm above that), never more than
+// `drop` metres. Returns the number of vertices lowered.
+export function settleBridgeDecks(group,{drop=.3}={}){
+ if(!hasTerrain()||!group)return 0;let lowered=0;
+ group.traverse(o=>{if(!o.isMesh||o.name!=='Bridge decks')return;const p=o.geometry.attributes.position;
+  for(let i=0;i<p.count;i++){const y=p.getY(i),to=Math.max(y-drop,Math.min(y,groundAt(p.getX(i),p.getZ(i))));if(to<y-1e-4){p.setY(i,to);lowered++;}}
+  p.needsUpdate=true;o.geometry.computeVertexNormals();o.geometry.computeBoundingSphere();o.geometry.computeBoundingBox?.();});
+ return lowered;
+}
 export function createSea(water,land={},{helsinkiHarbour=true,groundExtent=0,deckColor='#4a4b4d',deckTexture=null}={}){
  const group=new THREE.Group();group.name='Helsinki harbour water and quays';
  const time={value:0},geometries=[];

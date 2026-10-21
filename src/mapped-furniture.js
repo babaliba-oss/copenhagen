@@ -30,6 +30,22 @@ export const POSTS={
 };
 export const KNOCK_SOLID=new Set(['bollard','bench','bike-rack','hydrant','junction-box']);
 export const SOLIDS={bollard:[.22,.22,.95],'junction-box':[.85,.42,1.3],bench:[1.8,.6,.85],'bike-rack':[2.4,.55,.4],hydrant:[.36,.36,.8],shelter:[3.6,1.5,2.5],'hotdog-stand':[2.55,1.45,4.2]}; // width, depth, height
+// Furniture whose photo position fell just inside the mapped water (benches and bins along Christianshavn's canal
+// quays, posts at the quay edge): no paving is drawn there (surface-tiles.js drops it over the water, bridge decks
+// aside), so it hung at quay height over the canal. Each is moved to the nearest dry ground within `reach` and `inland`
+// metres further, past the quay's coping; dropped when no dry ground is near. wet(x,z): mapped water; deck(x,z): a bridge
+// deck drawn there; blocked(x,z): a house. → {items, moved, dropped}
+export function bringAshore(items,{wet,deck=()=>false,blocked=()=>false,reach=3,inland=.8}={}){
+ let moved=0,dropped=0;const out=[],dirs=Array.from({length:12},(_,k)=>[Math.cos(k*Math.PI/6),Math.sin(k*Math.PI/6)]);
+ for(const it of items){
+  if(!wet(it.x,it.z)||deck(it.x,it.z)){out.push(it);continue;}
+  let to=null;
+  for(let r=.4;r<=reach+1e-9&&!to;r+=.4)for(const [dx,dz] of dirs){const x=it.x+dx*r,z=it.z+dz*r;if(wet(x,z)||blocked(x,z))continue;
+   for(const k of [inland,inland/2,0]){const fx=x+dx*k,fz=z+dz*k;if(!wet(fx,fz)&&!blocked(fx,fz)&&!wet(x+dx*k/2,z+dz*k/2)){to=[fx,fz];break;}}if(to)break;}
+  if(!to){dropped++;continue;}
+  it.x=+to[0].toFixed(2);it.z=+to[1].toFixed(2);moved++;out.push(it);}
+ return {items:out,moved,dropped};
+}
 // A stable id per object: Mapillary feature id, else its source and place in the file.
 const itemId=(it,i)=>`mapped-${it.k}-${it.mly?.[0]??`${it.src||'item'}-${i}`}`;
 export const KNOCKABLE={bin:{radius:.26},barrier:{radius:.35},cone:{radius:.2}};

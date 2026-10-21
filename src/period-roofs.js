@@ -59,12 +59,58 @@ export function periodRoof(array,part,{maxRise=4.2}={}){
  return positions;
 }
 
+// The municipal model is one continuous city cut into parts along today's footprints: a terrace's party walls are
+// not there (about a fifth of a block's roof outline in the old town ends in an open cut). Today the neighbours stand
+// flush and hide it; 1760 gives each house its own period height (and drops later buildings), so a taller house
+// showed sky through its side above a lower neighbour, and a row ended without its gable wall. Every roof outline
+// edge with no wall beneath it gets a wall down to the part's foot (following the roof edge, so a gable end is
+// filled up to the ridge), set 3 cm inside the cut so it never fights a neighbour's own wall, wound to face out.
+export function partyWalls(array,part,{inset=.03}={}){
+ const roof=[],wallEdges=[];let lo=Infinity;
+ for(let v=part.start;v+2<part.start+part.count;v+=3){const o=v*5;
+  const t=[[array[o],array[o+1],array[o+2]],[array[o+5],array[o+6],array[o+7]],[array[o+10],array[o+11],array[o+12]]];
+  for(const p of t)if(p[1]<lo)lo=p[1];
+  const ux=t[1][0]-t[0][0],uy=t[1][1]-t[0][1],uz=t[1][2]-t[0][2],wx=t[2][0]-t[0][0],wy=t[2][1]-t[0][1],wz=t[2][2]-t[0][2],nx=uy*wz-uz*wy,ny=uz*wx-ux*wz,nz=ux*wy-uy*wx,l=Math.hypot(nx,ny,nz);if(l<1e-6)continue;
+  if(Math.abs(ny)/l>.2)roof.push(t);else for(let i=0;i<3;i++)wallEdges.push([t[i],t[(i+1)%3]]);
+ }
+ if(!roof.length||!Number.isFinite(lo))return null;
+ // Roof outline: edges used by one roof triangle (with the triangle's third corner: the inside).
+ const key=p=>`${Math.round(p[0]*20)},${Math.round(p[1]*20)},${Math.round(p[2]*20)}`,edges=new Map();
+ for(const t of roof)for(let i=0;i<3;i++){const a=t[i],b=t[(i+1)%3],ka=key(a),kb=key(b);if(ka===kb)continue;const k=ka<kb?ka+'|'+kb:kb+'|'+ka;const e=edges.get(k);if(e)e.n++;else edges.set(k,{a,b,c:t[(i+2)%3],n:1});}
+ // Wall edges bucketed in 4 m cells: an outline edge is walled when its midpoint lies on one (T-junctions split them).
+ const C=4,grid=new Map();wallEdges.forEach((s,i)=>{const [a,b]=s;for(let x=Math.floor(Math.min(a[0],b[0])/C);x<=Math.floor(Math.max(a[0],b[0])/C);x++)for(let z=Math.floor(Math.min(a[2],b[2])/C);z<=Math.floor(Math.max(a[2],b[2])/C);z++){const k=x*65536+z;let l=grid.get(k);if(!l)grid.set(k,l=[]);l.push(i);}});
+ const onWall=m=>{const l=grid.get(Math.floor(m[0]/C)*65536+Math.floor(m[2]/C));if(!l)return false;
+  for(const i of l){const [a,b]=wallEdges[i],dx=b[0]-a[0],dy=b[1]-a[1],dz=b[2]-a[2],q=dx*dx+dy*dy+dz*dz;let s=q?((m[0]-a[0])*dx+(m[1]-a[1])*dy+(m[2]-a[2])*dz)/q:0;s=s<0?0:s>1?1:s;
+   if(Math.hypot(a[0]+dx*s-m[0],a[1]+dy*s-m[1],a[2]+dz*s-m[2])<.03)return true;}
+  return false;};
+ const out=[];
+ for(const {a,b,c,n} of edges.values()){if(n!==1)continue;
+  const dx=b[0]-a[0],dz=b[2]-a[2],L=Math.hypot(dx,dz);if(L<.05||Math.max(a[1],b[1])<lo+1)continue; // a vertical roof edge, or one at the foot
+  if(onWall([(a[0]+b[0])/2,(a[1]+b[1])/2,(a[2]+b[2])/2]))continue;
+  let ix=-dz/L,iz=dx/L;if(ix*(c[0]-a[0])+iz*(c[2]-a[2])<0){ix=-ix;iz=-iz;} // toward the inside
+  const A=[a[0]+ix*inset,a[2]+iz*inset],B=[b[0]+ix*inset,b[2]+iz*inset];
+  // Facing out (away from the inside): the quad A-foot, B-foot, B-top, A-top has the normal (-dz, 0, dx); when that
+  // points inside, A and B swap.
+  const [P,Q,yp,yq]=(-dz*ix+dx*iz)<0?[A,B,a[1],b[1]]:[B,A,b[1],a[1]];
+  out.push(P[0],lo,P[1],Q[0],lo,Q[1],Q[0],yq,Q[1], P[0],lo,P[1],Q[0],yq,Q[1],P[0],yp,P[1]);
+ }
+ return out.length?new Float32Array(out):null;
+}
+
+// One tile's period shapes: hipped roofs (not for parts flagged noRoof) and the walls closing open cuts, as
+// [{colour, positions}]. One odd footprint keeps its flat roof or its gap; the tile's job still answers.
+export function periodShapes(array,parts){
+ const out=[];for(const p of parts){
+  if(!p.noRoof)try{const positions=periodRoof(array,p);if(positions)out.push({colour:p.roofColor,positions});}catch{}
+  if(!p.noWalls)try{const positions=partyWalls(array,p);if(positions)out.push({colour:p.color||[.62,.57,.5],positions});}catch{}}
+ return out;
+}
 // Roofs are computed in a worker (big blocks take 100+ ms): roofsInWorker(array, parts) → [{colour, positions}].
 let worker=null,jobs=new Map(),nextJob=0;
 export function roofsInWorker(array,parts){
- if(typeof Worker==='undefined')return Promise.resolve(parts.map(p=>({colour:p.roofColor,positions:periodRoof(array,p)})).filter(r=>r.positions));
+ if(typeof Worker==='undefined')return Promise.resolve(periodShapes(array,parts));
  if(!worker){worker=new Worker(new URL('./period-roof-worker.js',import.meta.url),{type:'module'});worker.onmessage=({data})=>{const j=jobs.get(data.id);if(j){jobs.delete(data.id);j(data.roofs);}};worker.onerror=()=>{for(const j of jobs.values())j([]);jobs.clear();worker=null;};} // a dead worker: flat roofs, and the next tile starts a new one
- const id=nextJob++,copy=array.slice(),list=parts.map(p=>({start:p.start,count:p.count,roofColor:p.roofColor}));
+ const id=nextJob++,copy=array.slice(),list=parts.map(p=>({start:p.start,count:p.count,roofColor:p.roofColor,color:p.color,noRoof:!!p.noRoof,noWalls:!!p.noWalls}));
  return new Promise(resolve=>{jobs.set(id,resolve);worker.postMessage({id,array:copy,parts:list},[copy.buffer]);});
 }
 const linear=c=>new THREE.Color(c[0],c[1],c[2]).convertSRGBToLinear();

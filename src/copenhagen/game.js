@@ -287,7 +287,9 @@ export function createCopenhagenGame({scene,city,mobilityData,cityData,toast,sou
    if(d<bd-.5){bd=d;best=i;bp=[px,pz];}run+=Math.sqrt(L2);}
   return best>0||bp&&best===0?[bp,...pts.slice(best+1)]:pts;}
 
- let hudClock=1;const setHtml=(el,h)=>{if(el&&el.__h!==h){el.__h=h;el.innerHTML=h;}};
+ let hudClock=1;const setHtml=(el,h)=>{if(el&&el.__h!==h){el.__h=h;el.innerHTML=h;
+   // Desktop: a card shows its story for 10 s when its heading changes, then only the heading and the next step (CSS .settled).
+   const t=el.querySelector('h3')?.textContent||'';if(t!==el.__t){el.__t=t;el.classList.remove('settled');clearTimeout(el.__settle);el.__settle=setTimeout(()=>el.classList.add('settled'),10000);}}};
  function updateHud(){
   {const n=save.delivered||0,r=rankOf(n),next=RANKS[r+1],from=RANKS[r][1],pct=next?Math.round((n-from)/(next[1]-from)*100):100;
    setHtml($('cph-money'),`<b>${fmtKr(save.money)} ${UNIT}</b>${save.nisser?.length?` · nisser ${save.nisser.length}/${nisser.length}`:''}${save.pant?` · pant ${save.pant}`:''}<span class="cph-rank">${esc(RANKS[r][0])}${save.streak>1?` · streak ×${save.streak}`:''}<i style="--p:${pct}%"></i></span>`);}

@@ -342,3 +342,21 @@ test('paving over the mapped water is dropped, but not on a bridge deck (the dec
  assert.equal(deck,dry,'on the bridge deck it stays');
  setTerrain(null);
 });
+
+test('shallow terrain ground: under the field everywhere, 8 cm below it where flat, deep where something is sunk under the streets',async()=>{
+ const {createTerrainGround,groundSag}=await import('../src/terrain-mesh.js');
+ // a bowl and a ridge on 3 m samples, drawn on a 10 m grid: the grid's triangles bulge above the concave parts
+ setTerrain(field((x,z)=>Math.max(0,40-Math.hypot(x,z))*.08+Math.sin(x/7)*.6,{size:121,cell:3}));
+ const lawn=[30,30,60,60],g=createTerrainGround(new THREE.MeshBasicMaterial(),{cell:10,chunk:8,shallow:{margin:.08,deep:[lawn]}});
+ let worst=-Infinity,flatMax=-Infinity,deepMax=-Infinity;
+ for(const m of g.children){if(m.name!=='Terrain chunk')continue;const p=m.geometry.attributes.position,idx=m.geometry.index.array;
+  for(let t=0;t<idx.length;t+=3){const v=[idx[t],idx[t+1],idx[t+2]];for(const [a,b,c] of [[1/3,1/3,1/3],[.5,.5,0],[0,.5,.5],[.5,0,.5],[.7,.15,.15]]){
+   const x=a*p.getX(v[0])+b*p.getX(v[1])+c*p.getX(v[2]),z=a*p.getZ(v[0])+b*p.getZ(v[1])+c*p.getZ(v[2]),y=a*p.getY(v[0])+b*p.getY(v[1])+c*p.getY(v[2]);
+   worst=Math.max(worst,y-groundAt(x,z));}}
+  for(let i=0;i<p.count;i++){const x=p.getX(i),z=p.getZ(i),d=p.getY(i)-groundAt(x,z);if(Math.abs(x)<120&&Math.abs(z)<120){if(x>lawn[0]-10&&x<lawn[2]+10&&z>lawn[1]-10&&z<lawn[3]+10)deepMax=Math.max(deepMax,d);else flatMax=Math.max(flatMax,d);}}}
+ assert.ok(worst<-.05,`ground pokes ${worst.toFixed(3)} m above the height field`);
+ assert.ok(flatMax>-.2,`dry ground sits close under the streets (highest vertex ${flatMax.toFixed(2)} m)`);
+ assert.ok(deepMax<=-.5+1e-6,'around a sunk lawn it keeps half a metre');
+ const f=field((x,z)=>x*.1,{size:41,cell:3});assert.ok(groundSag(f,10,50,10).every(s=>s<1e-4),'a plane has no sag');
+ setTerrain(null);
+});

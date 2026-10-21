@@ -199,11 +199,19 @@ export function buildBridgeRailings(water,land={},{height=1.05,ground=()=>0}={})
  if(!parts.length)return null;
  // Decks of tagged bridges as plates of their own: the surface tiles drop paving that lies inside the water
  // polygons (dropSunkenSurfaces), which left railings standing over open water.
+ // Untagged paving over the water is mostly a street along a quay that the water reaches into (1760's Børsgraven under
+ // today's Børskaj, wider canals under Christians Brygge): a plate level with its highest corner stood up to a metre
+ // over the cobbles at its low end, a pale slab on the quay with the canal bed raised under it. Its plate follows the
+ // nearest dry ground of its own outline instead (never above the flat height); tagged bridges stay flat.
+ const plateHeight=new Map();for(const d of railed){const top=deckY.get(d)+.035;if(BRIDGE.test(`${d.kind||''} ${d.name||''}`))continue;
+  const dry=[];for(const ring of d.rings)for(let i=0;i<ring.length;i++){const a=ring[i],b=ring[(i+1)%ring.length],n=Math.max(1,Math.ceil(Math.hypot(b[0]-a[0],b[1]-a[1])/2));
+   for(let k=0;k<n;k++){const x=a[0]+(b[0]-a[0])*k/n,z=a[1]+(b[1]-a[1])*k/n;if(inWater(x,z))continue;const g=ground(x,z);if(Number.isFinite(g))dry.push(x,z,g);}}
+  if(dry.length)plateHeight.set(d,(x,z)=>{let best=Infinity,h=top;for(let i=0;i<dry.length;i+=3){const q=(dry[i]-x)**2+(dry[i+1]-z)**2;if(q<best){best=q;h=dry[i+2]+.035;}}return Math.min(top,h);});}
  const deck=[];for(const d of railed){const r=d.rings[0];
-  const flat=r.flat(),ids=earcut(flat),y=deckY.get(d)+.035;for(const i of ids)deck.push(r[i][0],y,r[i][1]);}
+  const flat=r.flat(),ids=earcut(flat),y=deckY.get(d)+.035,at=plateHeight.get(d);for(const i of ids)deck.push(r[i][0],at?at(r[i][0],r[i][1]):y,r[i][1]);}
  const pos=[];for(const g of parts){pos.push(...g.attributes.position.array);g.dispose();}
  const geometry=new THREE.BufferGeometry();geometry.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));geometry.computeVertexNormals();geometry.userData.runs=runs;
- geometry.userData.bridges=[...railed].map(d=>({rings:d.rings,y:deckY.get(d)+.035,name:d.name||'',kind:d.kind||''})); // the plates as drawn: what the ground under them must carry (raiseBridgeDecks)
+ geometry.userData.bridges=[...railed].map(d=>({rings:d.rings,y:deckY.get(d)+.035,...(plateHeight.has(d)?{heightAt:plateHeight.get(d)}:{}),name:d.name||'',kind:d.kind||''})); // the plates as drawn: what the ground under them must carry (raiseBridgeDecks); heightAt: a plate that follows its quay
  if(deck.length){const g=new THREE.BufferGeometry(),uv=new Float32Array(deck.length/3*2);for(let i=0,j=0;i<deck.length;i+=3,j+=2){uv[j]=deck[i]/2.6;uv[j+1]=deck[i+2]/2.6;}g.setAttribute('position',new THREE.Float32BufferAttribute(deck,3));g.setAttribute('uv',new THREE.BufferAttribute(uv,2));const base=new Float32Array(deck.length/3);for(let i=0;i<base.length;i++)base[i]=deck[i*3+1];g.setAttribute('deckBase',new THREE.BufferAttribute(base,1));g.computeVertexNormals();geometry.userData.deck=g;}
  return geometry;
 }

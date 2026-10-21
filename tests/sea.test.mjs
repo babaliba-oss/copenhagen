@@ -86,3 +86,13 @@ test('a subsequent smaller region never shrinks ground beneath an activated oute
   sea.groundGeometry.dispose();sea.material.uniforms.uRipples.value.dispose();sea.material.dispose();
  }finally{clearPlayableAreas();}
 });
+
+test('bridge deck plates come down onto the raised ground, so the paving draped on it stays on top',async()=>{
+ const {settleBridgeDecks}=await import('../src/sea.js');const {setTerrain,groundAt}=await import('../src/terrain.js');
+ const size=41,ground=new Float32Array(size*size).fill(1);setTerrain({size,cell:2,extent:40,base:0,ground,water:null,lake:null});
+ const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute([0,1.2,0,4,1.1,0,0,1.6,4,8,.9,8],3));g.setIndex([0,1,2,1,3,2]);
+ const deck=new THREE.Mesh(g,new THREE.MeshBasicMaterial());deck.name='Bridge decks';const group=new THREE.Group();group.add(deck);
+ assert.equal(settleBridgeDecks(group),3);
+ const p=g.attributes.position;assert.deepEqual([0,1,2,3].map(i=>+p.getY(i).toFixed(3)),[1,1,1.3,.9],'down to the ground, at most 30 cm, never raised');
+ assert.equal(groundAt(2,2),1);setTerrain(null);
+});

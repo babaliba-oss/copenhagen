@@ -74,7 +74,7 @@ export function createStreetLife(scene,mobility,{paintedMarkings=true,mappedSign
    else if(!ok&&run>=0){const p=t=>[a[0]+dx*t/n,a[1]+dz*t/n];if(k-run>=1)kerbs.push(...kerbSegments(p(run),p(k),crossingData.chains));run=-1;}
   }
  }
- const longKerbs=keepLongKerbs(kerbs),kerbGroup=longKerbs.length&&paintedMarkings?settleObject(createGraniteKerbs(longKerbs)):null; // stray stubs (bricks in the road) left outif(kerbGroup){group.add(kerbGroup);kerbGroups.push(kerbGroup);}
+ const longKerbs=keepLongKerbs(kerbs),kerbGroup=longKerbs.length&&paintedMarkings?settleObject(createGraniteKerbs(longKerbs)):null;if(kerbGroup){group.add(kerbGroup);kerbGroups.push(kerbGroup);} // stray stubs (bricks in the road) left out; the add was swallowed by this comment, so no kerbs were drawn
  const signalPosts=createBreakableSigns('Traffic signal posts');
  // One post per approach that stops at the signal (lane-model.js), showing that approach's own phase.
  for(const e of mobility.roads.edges){if(e.signal<0||e.length<4)continue;const key=`${e.signal}:${Math.round(routePoint(e,e.length-3).heading/1.6)}`;if(used.has(key))continue;

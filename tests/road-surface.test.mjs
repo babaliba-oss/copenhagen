@@ -48,23 +48,23 @@ const peak=samples=>Math.max(...samples.map(s=>Math.abs(s.bob)));
 const std=values=>{const m=values.reduce((a,b)=>a+b,0)/values.length;return Math.sqrt(values.reduce((a,v)=>a+(v-m)**2,0)/values.length);};
 const crossingsPerSecond=(samples,dt)=>{let n=0;for(let i=1;i<samples.length;i++)if((samples[i].bob>=0)!==(samples[i-1].bob>=0))n++;return n/2/(samples.length*dt);};
 
-test('body bob scales with speed: ~1.5 cm peak at 20 km/h, ~3 cm at 50 km/h, 9-12 mm standard deviation at 30 km/h, nothing at rest',()=>{
+test('body bob scales with speed: ~0.8 cm peak at 20 km/h, ~1.5 cm at 50 km/h, 4-6.5 mm standard deviation at 30 km/h, nothing at rest',()=>{
  assert.equal(rumbleAmplitude(0),0);
- assert.ok(rumbleAmplitude(20/3.6)>=.015&&rumbleAmplitude(20/3.6)<=.021);
- assert.ok(rumbleAmplitude(50/3.6)>=.034&&rumbleAmplitude(50/3.6)<=.04);
+ assert.ok(rumbleAmplitude(20/3.6)>=.0075&&rumbleAmplitude(20/3.6)<=.0105);
+ assert.ok(rumbleAmplitude(50/3.6)>=.017&&rumbleAmplitude(50/3.6)<=.02);
  assert.equal(rumbleAmplitude(140/3.6),RUMBLE.maxAmplitude);
  const slow=run('setts',20/3.6,3,1/120).slice(60),fast=run('setts',50/3.6,3,1/120).slice(60),mid=run('setts',30/3.6,4,1/120).slice(120);
- assert.ok(peak(slow)>=.01&&peak(slow)<=.02,`20 km/h peak ${peak(slow)}`);
- assert.ok(peak(fast)>=.022&&peak(fast)<=.038,`50 km/h peak ${peak(fast)}`);
+ assert.ok(peak(slow)>=.005&&peak(slow)<=.01,`20 km/h peak ${peak(slow)}`);
+ assert.ok(peak(fast)>=.011&&peak(fast)<=.019,`50 km/h peak ${peak(fast)}`);
  const bodyStd=std(mid.map(s=>s.bob));
- assert.ok(bodyStd>=.008&&bodyStd<=.013,`body std at 30 km/h ${bodyStd}`);
+ assert.ok(bodyStd>=.004&&bodyStd<=.0065,`body std at 30 km/h ${bodyStd}`);
  const rest=run('setts',0,2,1/60);assert.ok(rest.every(s=>s.bob===0&&s.roll===0&&s.cameraBob===0),'parked on setts: still');
 });
 
-test('camera sway is a gentle third of the body: 3-5 mm standard deviation at 30 km/h, nothing above ~6 Hz',()=>{
+test('camera sway is a faint fraction of the body: 0.5-1.3 mm standard deviation at 30 km/h, nothing above ~6 Hz',()=>{
  const mid=run('setts',30/3.6,6,1/240).slice(240),fast=run('setts',50/3.6,6,1/240).slice(240);
  const camStd=std(mid.map(s=>s.cameraBob)),bodyStd=std(mid.map(s=>s.bob));
- assert.ok(camStd>=.0028&&camStd<=.0052,`camera std at 30 km/h ${camStd}`);
+ assert.ok(camStd>=.0005&&camStd<=.0013,`camera std at 30 km/h ${camStd}`);
  assert.ok(camStd<bodyStd*.45,`camera ${camStd} vs body ${bodyStd}`);
  for(const [label,samples] of [['30',mid],['50',fast]]){
   const f=crossingsPerSecond(samples.map(s=>s.cameraBob),1/240);
@@ -79,12 +79,12 @@ test('camera sway is a gentle third of the body: 3-5 mm standard deviation at 30
  assert.ok(run('asphalt',30/3.6,2,1/60).every(s=>s.cameraBob===0&&s.cameraRoll===0));
 });
 
-test('body frequency rises from ~8 Hz to ~12 Hz with speed and the tilt jitter stays within ±0.3°',()=>{
+test('body frequency rises from ~8 Hz to ~12 Hz with speed and the tilt jitter stays within ±0.15°',()=>{
  assert.equal(rumbleFrequency(0),8);assert.equal(rumbleFrequency(50/3.6),12);assert.equal(rumbleFrequency(100/3.6),12);
  const slow=run('setts',10/3.6,6,1/240).slice(240),fast=run('setts',50/3.6,6,1/240).slice(240);
  const fs=crossingsPerSecond(slow,1/240),ff=crossingsPerSecond(fast,1/240);
  assert.ok(fs>7&&fs<10.5,`10 km/h ~${fs} Hz`);assert.ok(ff>10&&ff<14,`50 km/h ~${ff} Hz`);assert.ok(ff>fs+1.5,'faster is busier');
- const tilt=.3*Math.PI/180;
+ const tilt=.15*Math.PI/180;
  for(const s of fast){assert.ok(Math.abs(s.roll)<=tilt+1e-9&&Math.abs(s.pitch)<=tilt+1e-9);}
  assert.ok(Math.max(...fast.map(s=>Math.abs(s.roll)))>tilt*.4,'roll jitter is used');
 });

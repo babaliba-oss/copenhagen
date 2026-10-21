@@ -32,12 +32,12 @@ export function createRadio({stations=[],banner=null,initial=RADIO_OFF,clock=()=
  const list=stations.filter(s=>s.tracks?.length).map(s=>({...s,offset:random()*3600}));
  const player=audio||(typeof Audio!=='undefined'?new Audio():null);
  if(player){player.preload='auto';player.volume=0;}
- let station=Math.max(0,Math.min(list.length,initial|0)),active=false,track=null,failures=0,silentUntil=0,volume=0,target=0,pendingSeek=0,tuned=null;
+ let loadAt=0,station=Math.max(0,Math.min(list.length,initial|0)),active=false,track=null,failures=0,silentUntil=0,volume=0,target=0,pendingSeek=0,tuned=null;
  const current=()=>station>0?list[station-1]:null;
  function show(text,sub=''){banner?.(text,sub);}
  function load(index,offset){
   const s=current();if(!s||!player)return;
-  track={station:s,index};pendingSeek=offset>3?offset:0;tuned=s;
+  track={station:s,index};pendingSeek=offset>3?offset:0;tuned=s;loadAt=clock();
   player.src=s.tracks[index].url;player.load?.();
   const p=player.play?.();if(p?.catch)p.catch(()=>{}); // a refused play (no gesture yet) retries on the next update
  }
@@ -51,10 +51,11 @@ export function createRadio({stations=[],banner=null,initial=RADIO_OFF,clock=()=
   player.addEventListener?.('loadedmetadata',()=>{if(pendingSeek&&Number.isFinite(player.duration)&&pendingSeek<player.duration-8){try{player.currentTime=pendingSeek;}catch{}}pendingSeek=0;});
   player.addEventListener?.('playing',()=>{failures=0;});
   player.addEventListener?.('ended',()=>nextTrack());
-  player.addEventListener?.('error',()=>{if(!track)return;failures++;
-   if(failures>=3){silentUntil=clock()+45;failures=0;show(track.station.name,'No signal');track=null;player.pause?.();return;}
-   setTimeout(()=>{if(track&&active)nextTrack();},800);});
+  player.addEventListener?.('error',()=>fail());
  }
+ function fail(){{if(!track)return;failures++;
+   if(failures>=3){silentUntil=clock()+45;failures=0;show(track.station.name,'No signal');track=null;player.pause?.();return;}
+   setTimeout(()=>{if(track&&active)nextTrack();},800);}}
  // The station and what is on: the track loaded (it moves on after a failed one), else where the broadcast is.
  function announce(){const s=current();if(!s){show('Radio off');return;}
   if(clock()<silentUntil){show(s.name,'No signal');return;}
@@ -62,7 +63,7 @@ export function createRadio({stations=[],banner=null,initial=RADIO_OFF,clock=()=
  return {
   get station(){return station;},
   get stations(){return list;},
-  get playing(){return !!(active&&track);},
+  get playing(){return !!(active&&track&&player&&!player.paused&&player.readyState>=3);}, // actually sounding: while a station can't be reached the game's own music plays instead
   // the track now on air (for the now-playing card and the credits line)
   nowPlaying(){return track?track.station.tracks[track.index]:null;},
   next(step=1){if(!list.length){show('No stations');return;}station=((station+step)%(list.length+1)+list.length+1)%(list.length+1);if(active)tune();announce();return station;},
@@ -71,9 +72,11 @@ export function createRadio({stations=[],banner=null,initial=RADIO_OFF,clock=()=
   // the station, so the card comes up with it (and with "Radio off" when that is the choice).
   update(dt,{on=false,level=.55}={}){
    if(on!==active){active=on;if(active){tune();announce();}else{track=null;tuned=null;}}
+   else if(active&&!track&&station>0&&silentUntil&&clock()>=silentUntil){silentUntil=0;tune();announce();} // after a 'no signal' spell, try the station again
    target=active&&track?level:0;volume+=(target-volume)*Math.min(1,dt*3);
    if(player){player.volume=Math.max(0,Math.min(1,volume));if(!active&&volume<.01&&!player.paused)player.pause?.();
-    if(active&&track&&player.paused&&player.readyState>=2){const p=player.play?.();if(p?.catch)p.catch(()=>{});}}
+    if(active&&track&&player.paused&&player.readyState>=2){const p=player.play?.();if(p?.catch)p.catch(()=>{});}
+    if(active&&track&&player.readyState<3&&clock()-loadAt>12){loadAt=clock();fail();}} // a host that never answers (archive.org hung for 20 s+ on Daniel's network) counts as a failure, not silence
   },
   dispose(){player?.pause?.();if(player)player.src='';}
  };

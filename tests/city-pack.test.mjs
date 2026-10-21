@@ -22,3 +22,15 @@ test('compacted mobility graph expands back to the same edges',()=>{
    assert.deepEqual(f.points[0],back[g].nodes[f.from]);});}
  assert.deepEqual(back.signals,m.signals);
 });
+import {dropWalksThroughBuildings} from '../src/mobility-pack.js';
+test('footway edges through a drawn house, or hugging its wall, are dropped; crossings and paths beside it stay',()=>{
+ const house={rings:[[[0,0],[20,0],[20,10],[0,10],[0,0]]]},edge=(points,crossing=false)=>({points,length:points.slice(1).reduce((s,p,i)=>s+Math.hypot(p[0]-points[i][0],p[1]-points[i][1]),0),crossing});
+ const through=edge([[-5,5],[25,5]]),hugging=edge([[2,10.3],[18,10.3]]),beside=edge([[-5,12],[25,12]]),door=edge([[10,10.5],[10,14]]),zebra=edge([[-5,5],[25,5]],true);
+ const walks={edges:[through,hugging,beside,door,zebra]};
+ assert.equal(dropWalksThroughBuildings(walks,[house]),2);
+ assert.deepEqual(walks.edges,[beside,door,zebra]);
+ const c=JSON.parse(gunzipSync(fs.readFileSync('public/cities/copenhagen/city.pack'))),m=expandMobility(JSON.parse(fs.readFileSync('public/cities/copenhagen/mobility.json','utf8')));
+ const n=m.walks.edges.length,dropped=dropWalksThroughBuildings(m.walks,expandCity(c).buildings.filter(b=>!/^(roof|construction|carport|bridge)$/.test(b.kind||'')));
+ assert.ok(dropped>500&&dropped<n*.04,`${dropped} of ${n} Copenhagen footway edges dropped`);
+ assert.ok(!m.walks.edges.some(e=>e.points.some(([x,z])=>Math.abs(x-162.43)<.01&&Math.abs(z-377.18)<.01)),'the path along the Thorvaldsen Museum\'s wall is gone');
+});
