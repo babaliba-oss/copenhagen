@@ -4,6 +4,7 @@ import {groundAt} from '../terrain.js';
 import {pointInPolygon,SpatialIndex} from '../geo.js';
 import {createInstancedPeople} from '../market-life.js';
 import {solidBox} from '../world-objects.js';
+import {createKnockables} from '../knockables.js';
 const WAGONS=/^(handcart|haywagon|farm-wagon|covered-wagon)$/;
 
 // Copenhagen 1760 street life the traffic simulation does not give: crowds on the squares, sailors and
@@ -76,7 +77,9 @@ export function createPeriodLife({city,world,water=[],squares=[],gates=[],animal
  const mat=new THREE.MeshStandardMaterial({vertexColors:true,roughness:.85});const m4=new THREE.Matrix4(),q=new THREE.Quaternion(),v=new THREE.Vector3(),one=new THREE.Vector3(1,1,1),UP=new THREE.Vector3(0,1,0);
  const chunks=[];
  const bodies=[]; // the market's carts and wagons are solid (main.js gathers group.worldObjects): you drove through them
+ const knockables=[]; // the quay cargo tumbles when the coach drives into it (knockables.js; main.js steps them): 1,339 barrels, crates and sacks had no collision and the coach passed through them
  for(const [kind,list] of Object.entries(props)){const geo=propModels[kind]||PROPS[kind]?.();if(!geo)continue;const by=new Map();
+  if(/^(barrel|crate|sack)$/.test(kind)){if(!geo.boundingBox)geo.computeBoundingBox();const {min,max}=geo.boundingBox,k=createKnockables(list.map(([x,z,yaw],i)=>({id:`1760-${kind}-${i}`,x,z,yaw,drop:ground(x,z)-groundAt(x,z)})),[{geometry:geo,material:mat}],{radius:Math.max(.2,Math.min(max.x-min.x,max.z-min.z)/2),range:520});k.group.name=`1760 ${kind}`;group.add(k.group);knockables.push(k);continue;}
   if(WAGONS.test(kind)){if(!geo.boundingBox)geo.computeBoundingBox();const {min,max}=geo.boundingBox,cx=(min.x+max.x)/2,cz=(min.z+max.z)/2;
    const kept=list.filter(([x,z,yaw],i)=>{const c=Math.cos(yaw),s=Math.sin(yaw),b=solidBox({id:`1760-${kind}-${i}`,name:kind.replace('-',' '),x:x+cx*c+cz*s,z:z-cx*s+cz*c,width:max.x-min.x,depth:max.z-min.z,yaw});
     if(b.rings[0].some(([px,pz])=>world.roads.at(px,pz)||world.buildings.at(px,pz)))return false;bodies.push(b);return true;}); // only its middle was checked: wagons stood half in a house wall or out in the lane
@@ -107,7 +110,7 @@ export function createPeriodLife({city,world,water=[],squares=[],gates=[],animal
  const people=[...crowds.values()].reduce((n,l)=>n+l.length,0);
  group.worldObjects=bodies;
  group.userData={people,props:Object.fromEntries(Object.entries(props).map(([k,l])=>[k,l.length])),animals:flocks.reduce((n,f)=>n+f.members.length,0),batches:batches.length};
- return {group,update};
+ return {group,update,knockables};
 }
 
 // Modern Copenhagen: tourists and locals gathered at the named places (start points) the way the squares
