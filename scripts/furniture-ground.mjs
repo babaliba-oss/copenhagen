@@ -33,7 +33,7 @@ let moved=0,movedBare=0;{let c=readFileSync(`${dir}/city.pack`);if(c[0]===31&&c[
  let items=layer.items.map(it=>({...it,src:it}));items=items.filter(it=>it.k==='wire-lamp'||!(lanes.at(it.x,it.z)&&!islands.at(it.x,it.z)));
  items=placeBenches(items,{houses,wheels:new SpatialIndex(data.roads.filter(r=>!/Koroke/.test(r.kind))),walk}).items;
  items=items.filter(it=>!([[0,0],[2.5,0],[-2.5,0],[0,2.5],[0,-2.5]].every(([a,b])=>wet(it.x+a,it.z+b))&&!lanes.at(it.x,it.z)&&!walk.at(it.x,it.z)));
- items=bringAshore(items,{wet,blocked:(x,z)=>!!houses.at(x,z)}).items;
+ items=bringAshore(items,{wet,blocked:(x,z)=>!!houses.at(x,z)||lanes.at(x,z)&&!islands.at(x,z)}).items;
  for(const it of items){if(it.k==='wire-lamp'||it.x===it.src.x&&it.z===it.src.z)continue;moved++;if(!covered(it.x,it.z)){it.src.mb=1;movedBare++;}}}
 writeFileSync(`${dir}/furniture.json`,JSON.stringify(layer));
 console.log(`${id}: ${bare} of ${layer.items.length} items off the drawn street surfaces (${wanted.length} surface tiles); ${movedBare} of the ${moved} the game moves end up off them`,kinds);
