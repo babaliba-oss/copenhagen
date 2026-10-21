@@ -14,16 +14,17 @@ test('street-life startup triangulates real crossing polygons with installed ear
  const life=createStreetLife(scene,mobility);
  life.update(0,{x:1000,z:1000});
  const markings=[];scene.traverse(m=>{if(m.isMesh&&m.material.polygonOffset)markings.push(m);});
- assert.equal(markings.length,1);
- assert.ok(markings[0].geometry.attributes.position.count>0);
- assert.ok(markings[0].geometry.attributes.position.array.every(Number.isFinite));
- const p=markings[0].geometry.attributes.position,n=markings[0].geometry.attributes.normal;
+ assert.ok(markings.length>=1); // split into 500 m cells (frustum culling)
+ for(const mk of markings){
+ assert.ok(mk.geometry.attributes.position.count>0);
+ assert.ok(mk.geometry.attributes.position.array.every(Number.isFinite));
+ const p=mk.geometry.attributes.position,n=mk.geometry.attributes.normal;
  for(let i=0;i<p.count;i+=3){
   const a=new THREE.Vector3().fromBufferAttribute(p,i),b=new THREE.Vector3().fromBufferAttribute(p,i+1),c=new THREE.Vector3().fromBufferAttribute(p,i+2);
   assert.ok(b.sub(a).cross(c.sub(a)).y>0,'stripe top must be front-facing, not a flipped DoubleSide back face');
   assert.ok(n.getY(i)>.99,'computed lighting normal points upward');
   assert.ok(p.getY(i)>.10,'crossing stays above the market/cycleway surface');
- }
+ }}
  scene.traverse(m=>{m.geometry?.dispose();m.material?.dispose();});
 });
 

@@ -116,7 +116,7 @@ const kauppatoriBollards=(x,z)=>x>12&&x<300&&z>265&&z<545;
 // Lowered Baltic water on the municipal sea polygons, granite quay walls on
 // every shore edge that borders land, and the ground plane cut under the sea.
 // Three draw calls: water, quay walls (merged), transparent wall shade.
-function splitByCell(source,cell){
+export function splitByCell(source,cell){
  const g=source.index?source.toNonIndexed():source,pos=g.attributes.position,names=Object.keys(g.attributes),buckets=new Map();
  for(let t=0;t<pos.count;t+=3){const x=(pos.getX(t)+pos.getX(t+1)+pos.getX(t+2))/3,z=(pos.getZ(t)+pos.getZ(t+1)+pos.getZ(t+2))/3,k=`${Math.floor(x/cell)},${Math.floor(z/cell)}`;if(!buckets.has(k))buckets.set(k,[]);buckets.get(k).push(t);}
  const out=[];for(const tris of buckets.values()){const ng=new THREE.BufferGeometry();

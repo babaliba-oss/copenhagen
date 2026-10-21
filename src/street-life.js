@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import {splitByCell} from './sea.js';
 import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';
 import {createTrafficRenderer} from './traffic-renderer.js';
 import {routePoint,signalGreen} from './mobility.js';
@@ -58,7 +59,7 @@ export function createStreetLife(scene,mobility,{paintedMarkings=true,mappedSign
   for(let s=7+((edge.length-14)%6)/2;s<=edge.length-7;s+=6){const p=routePoint(edge,s,0);if(!mobility.world.roads.at(p.x,p.z)||mobility.world.buildings.at(p.x,p.z))continue;const g=new THREE.PlaneGeometry(.10,2.7);g.rotateX(-Math.PI/2);g.rotateY(p.heading);g.translate(p.x,.092,p.z);markings.push(g);}
  }
  if(!paintedMarkings){markings.forEach(g=>g.dispose());markings.length=0;}
- if(markings.length){const geometries=markings.map(g=>g.index?g.toNonIndexed():g);const m=new THREE.Mesh(drapeGeometry(mergeGeometries(geometries)),new THREE.MeshStandardMaterial({color:'#e7e3d4',roughness:1,side:THREE.DoubleSide,polygonOffset:true,polygonOffsetFactor:-1}));m.receiveShadow=true;group.add(m);new Set([...geometries,...markings]).forEach(g=>g.dispose());}
+ if(markings.length){const geometries=markings.map(g=>g.index?g.toNonIndexed():g);const material=new THREE.MeshStandardMaterial({color:'#e7e3d4',roughness:1,side:THREE.DoubleSide,polygonOffset:true,polygonOffsetFactor:-1}),merged=drapeGeometry(mergeGeometries(geometries)); /* 500 m cells: one city-wide mesh (78k triangles) was never frustum-culled */for(const g of splitByCell(merged,500)){const m=new THREE.Mesh(g,material);m.name='Centre-line dashes';m.receiveShadow=true;group.add(m);}merged.dispose();new Set([...geometries,...markings]).forEach(g=>g.dispose());}
  const kerbs=[];
  // Raised granite kerbstones (not in 1760: they are 19th-century) follow surveyed pavement boundaries adjacent to a carriageway,
  // dropped across crossings; geometry and shader live in street-furniture.js (createGraniteKerbs).
