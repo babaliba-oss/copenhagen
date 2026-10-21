@@ -96,6 +96,7 @@ import {CityCyclists} from './copenhagen/city-cyclists.js';
 import {createTrains} from './copenhagen/trains.js';
 import {createCafes} from './copenhagen/cafes.js';
 import {createStalls} from './copenhagen/stalls.js';
+import {rangeInstances} from './instance-range.js';
 import {hotdogItems} from './copenhagen/street-food.js';
 import {createParkGeese} from './copenhagen/park-geese.js';
 import {PERIOD as PERSON_PERIOD,personLook,flushPeople,loadDogModel,setDogModel,drawLooseDog} from './person-model.js';import {loadPeopleModels,createSkinnedCrowd,createBakedCrowd,createBakedPeople,createRiggedFigure,defineFigure,bakesPending} from './skinned-people.js';
@@ -862,6 +863,7 @@ function drawCityMap(){const canvas=$('city-map'),ctx=canvas.getContext('2d');co
 const transitBodies=()=>[...(tramSim?.bodies||[]),...(buses?.bodies||[]),...(travel?.parkedBodies()||[])];
 // Upright knockable furniture (benches, racks, bikes, bollards) near the player, as boxes: only the car kicks them, so on
 // foot or riding they block like before (refreshed every 250 ms; the sets are tens of thousands strong).
+const rangedProps=[]; /* instanced props drawn near the player only (instance-range.js); updated each frame */
 let furnitureNear=[],furnitureNearAt=-1e9,furnitureSets=null; // furnitureSets: the mapped furniture (set at boot)
 const nearFurniture=()=>{if(!furnitureSets?.knockables?.near||!car||travel?.mode==='car')return [];const now=performance.now();if(now-furnitureNearAt>250){furnitureNearAt=now;furnitureNear=furnitureSets.knockables.near(car.x,car.z,20);}return furnitureNear;};
 const travelObstacles=()=>[...(mobility?.cars.filter(c=>c.edge)||[]),...(tramSim?.bodies||[]),...(buses?.bodies||[]),...(police?.obstacles||[]),...nearFurniture()];
@@ -1206,7 +1208,7 @@ function frame(now){
    roadblock?.step(step,car,before,{started:started&&driving,knockables,onBurst:()=>finale.offence('roadblock','Drove into a police roadblock')});
    if(police.busted){setBusted(true);break;}
   }
-  knockables?.update(car);streetLife.update(dt,car);tramRenderer.update(car);cyclistRenderer.update(car);npcScooterRenderer.update(car,dt);policeRenderer.update(dt);roadblock?.update(dt,car);
+  knockables?.update(car);for(const r of rangedProps)r(car);streetLife.update(dt,car);tramRenderer.update(car);cyclistRenderer.update(car);npcScooterRenderer.update(car,dt);policeRenderer.update(dt);roadblock?.update(dt,car);
   if(police.message){toast(police.message);police.message=null;}
   if(cph&&car)cph.update(dt,car,travel.mode,{running:started,cinematic:!!cinematic});if(carriage&&car)carriage.userData.update(travel.mode==='car'?car.speed||0:0,dt); /* on foot, car is the walker: the parked team stands */coaches?.update(groundAt,dt,camera.position.z!==undefined?{x:camera.position.x,z:camera.position.z}:null);parkedCars?.update(car);seasonal?.update(dt,car);boats?.update(dt,car);harbourBath?.update(dt,car);landmarks?.update(dt);trains?.update(dt);cafeGuests?.update(dt,car);periodLife?.update(dt,car);parkGeese?.update(dt,car);
  }else if(ready&&police?.busted){policeRenderer.update(dt);roadblock?.update(dt,car);if(finale.cinematicStep(dt,roadblock?.playing)){$('busted-overlay').classList.toggle('live',!!roadblock?.active);$('busted-overlay').hidden=false;$('busted-continue').focus();}} // arrest cinematic: strobes keep flashing, then the end screen
@@ -1515,7 +1517,7 @@ async function boot(){
    {const sd=stallData&&await stallData;if(sd){const lanes=new Map(),C=20; // the road graph's lane lines on a 20 m grid: a stall within 4.6 m of one stands where coaches drive
      for(const e of mobilityData?.roads?.edges||[])for(let k=1;k<e.points.length;k++){const [ax,az]=e.points[k-1],[bx,bz]=e.points[k],L=Math.hypot(bx-ax,bz-az);for(let t=0;t<=L;t+=3){const x=ax+(bx-ax)*t/Math.max(L,1e-6),z=az+(bz-az)*t/Math.max(L,1e-6),key=Math.floor(x/C)+','+Math.floor(z/C);(lanes.get(key)||lanes.set(key,[]).get(key)).push([x,z]);}}
      const onLane=(x,z)=>{for(let i=-1;i<=1;i++)for(let j=-1;j<=1;j++)for(const [px,pz] of lanes.get((Math.floor(x/C)+i)+','+(Math.floor(z/C)+j))||[])if(Math.hypot(px-x,pz-z)<4.6)return true;return false;}; /* lane offset 1.6 + coach half width 1 + stall half size 1.3 + a little */
-     const st=createStalls(sd,{skip:onLane,model:await loadColouredModel('/models/props/market-stall.glb').catch(()=>null) /* Daniel's food stand (CC BY bpcrews) where it loads */});cityModel.add(st.group);streetObstacles.push(...st.obstacles);
+     const st=createStalls(sd,{skip:onLane,model:await loadColouredModel('/models/props/market-stall.glb').catch(()=>null) /* Daniel's food stand (CC BY bpcrews) where it loads */});cityModel.add(st.group);rangedProps.push(st.update);streetObstacles.push(...st.obstacles);
     if(st.people.length){const cx=st.people.reduce((a,p)=>a+p.x,0)/st.people.length,cz=st.people.reduce((a,p)=>a+p.z,0)/st.people.length;cafeGuests=createInstancedPeople(st.people,{name:'Market people',center:{x:cx,z:cz},seed:1760});cityModel.add(cafeGuests.group);}}}
    {const rd=railData&&await railData;if(rd){cityModel.add(createRails(rd).group);trains=createTrains(rd);cityModel.add(trains.group);}}
    {const cm=cycleMarkData&&await cycleMarkData;if(cm?.marks?.length)cityModel.add(createCycleMarks(cm.marks));}
@@ -1590,7 +1592,7 @@ async function boot(){
    // loaded after the city like the warship.
    if(city.era===1760){const here=city;Promise.all([json(dataUrl('cannons.json')).catch(()=>null),loadColouredModel('/models/props/cannon.glb')]).then(([list,g])=>{if(!list?.length||!g||city!==here){g?.dispose();return;}
     const im=new THREE.InstancedMesh(g,new THREE.MeshStandardMaterial({vertexColors:true,roughness:.6,metalness:.3}),list.length),m=new THREE.Matrix4(),q=new THREE.Quaternion(),v=new THREE.Vector3(),one=new THREE.Vector3(1,1,1),UP=new THREE.Vector3(0,1,0);
-    list.forEach(([x,y,z,yaw],i)=>im.setMatrixAt(i,m.compose(v.set(x,y,z),q.setFromAxisAngle(UP,yaw),one)));im.name='Rampart cannons';im.castShadow=true;im.receiveShadow=true;im.computeBoundingSphere();cityModel.add(im);}).catch(e=>console.warn('Cannons:',e.message));}
+    list.forEach(([x,y,z,yaw],i)=>im.setMatrixAt(i,m.compose(v.set(x,y,z),q.setFromAxisAngle(UP,yaw),one)));im.name='Rampart cannons';im.castShadow=true;im.receiveShadow=true;im.computeBoundingSphere();cityModel.add(im);{const r=rangeInstances(im,list.map(([x,,z])=>[x,z]),320);rangedProps.push(p=>r.update(p));}}).catch(e=>console.warn('Cannons:',e.message));}
    if(city.era===1760){const gateNames=/Vesterport|Nørreport|Østerport/,lm=data.landmarks||[];periodLife=createPeriodLife({city,world,animalModels:await loadColouredModels('/models/animals/',['pig','hen','goose']),propModels:await loadColouredModels('/models/props/',['farm-wagon','covered-wagon','barrel','crate','watchman','spinner']),water:data.water,squares:lm.filter(l=>!gateNames.test(l.name)&&!/^(Little Mermaid|Langelinie)$/.test(l.name)),gates:lm.filter(l=>gateNames.test(l.name))});cityModel.add(periodLife.group);console.info('1760 life',periodLife.group.userData);}
    else if(city.id==='copenhagen'){periodLife=createSquareCrowds({world,water:data.water,places:data.landmarks||[]});cityModel.add(periodLife.group);const cc=createCycleCrossings({pavement:data.pavement,world});cityModel.add(cc);console.info('Blue cycle crossings',cc.userData.crossings);}
    if(city.id.startsWith('copenhagen')){parkGeese=createParkGeese({parks:data.parks||[],water:data.water||[],clear:(x,z)=>!world.roads.at(x,z)&&!world.buildings.at(x,z)&&!inWaterPolygons(data.water||[],x,z),model:blenderLoads?await loadColouredModel('/models/animals/goose.glb'):null,count:city.era===1760?6:14,seed:city.era===1760?17:7});cityModel.add(parkGeese.group);console.info('Park geese',parkGeese.count);} // geese on the park lawns (park-geese.js)

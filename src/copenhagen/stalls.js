@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';
 import {groundAt} from '../terrain.js';
+import {rangeInstances} from '../instance-range.js';
 
 // 1760 market stalls on the squares (scripts/market-1760.py → stalls.json): a trestle table under a linen
 // awning on poles, with barrels and baskets. Awning colours vary per stall. model: a stall model (Daniel's food stand,
@@ -22,5 +23,6 @@ export function createStalls(data,{skip=()=>false,model=null}={}){
   // the seller behind the table, a customer in front (heading faces the table)
   const s=Math.sin(yaw),co=Math.cos(yaw);people.push({x:x-s*.9,z:z-co*.9,heading:yaw+Math.PI,pose:'chat',walking:false,talkable:true});if(i%2===0)people.push({x:x+s*1.5,z:z+co*1.5,heading:yaw,pose:'chat',walking:false,talkable:true});});
  a.computeBoundingSphere();group.add(a);if(b){b.computeBoundingSphere();group.add(b);}
- return {group,people,obstacles:list.map(([x,z],i)=>({id:`stall-${i}`,name:'market stall',rings:[[[x-1.3,z-1.3],[x+1.3,z-1.3],[x+1.3,z+1.3],[x-1.3,z+1.3]]],bbox:[x-1.3,z-1.3,x+1.3,z+1.3]}))};
+ const pts=list.map(([x,z])=>[x,z]),ranged=[a,b].filter(Boolean).map(mm=>rangeInstances(mm,pts,260)); /* drawn within 260 m */
+ return {group,update:p=>{for(const r of ranged)r.update(p);},people,obstacles:list.map(([x,z],i)=>({id:`stall-${i}`,name:'market stall',rings:[[[x-1.3,z-1.3],[x+1.3,z-1.3],[x+1.3,z+1.3],[x-1.3,z+1.3]]],bbox:[x-1.3,z-1.3,x+1.3,z+1.3]}))};
 }
