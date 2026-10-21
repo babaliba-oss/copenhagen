@@ -85,7 +85,7 @@ const later=job=>{queue.push(job);if(!ticking){ticking=true;MeshoptSimplifier.re
 // The far version of a baked model: about a third of its triangles (meshoptimizer keeps the vertices it uses, so the
 // frames and colours are shared), for the baked people beyond LOD_NEAR metres, where a 6,000-triangle character is a
 // few dozen pixels tall. null until the simplifier is ready, or where it saves little.
-const LOD_NEAR=32;
+const LOD_NEAR=typeof matchMedia==='function'&&matchMedia('(pointer:coarse)').matches?20:32; /* phones: the full model only within 20 m (a crowd at Kongens Nytorv drew 207k triangles) */
 function farVersion(g){
  if(!simplifier||!g.index)return null;
  // weld first: the Quaternius characters come with every triangle's corners apart (flat shaded), which leaves the
