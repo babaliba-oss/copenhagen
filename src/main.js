@@ -274,7 +274,7 @@ const governor=createQualityGovernor([
  ()=>{if(post?.targets.scene.samples){post.targets.scene.samples=0;post.targets.scene.dispose();}},
  // Last: detailed buildings, building shadows and the far-shell ring pulled in (dense blocks such as Nyhavn
  // and Strøget otherwise stay heavy whatever the resolution). Tiles pick it up on their next LOD pass.
- ()=>{Object.assign(TILE_LOD,{near:170,far:210,detail:130,shadow:70,building:100});if(farCity)farCity.visible=false;},
+ ()=>{for(const [k,v] of Object.entries({near:170,far:210,detail:130,shadow:70,building:100}))TILE_LOD[k]=Math.min(TILE_LOD[k],v); /* never wider than a phone's own bands */if(farCity)farCity.visible=false;},
 ],{cpuStep:3}); // CPU-bound (draw calls): the LOD step first
 {const q=new URLSearchParams(location.search).get('quality'),n=q==='low'?9:q==='high'?0:q!==null&&q!==''&&!isNaN(+q)?+q:(matchMedia('(pointer:coarse)').matches?3:0);for(let i=0;i<n;i++)governor.update(99,{atMin:true,smoothed:99});} // ?quality=low (or 1-3 steps, or high). Phones start without AO, bloom, MSAA and with 1024 shadows: at full desktop quality they spent their first 30-40 s stepping down (resolution first, then one effect every 4-7 s) at a choppy frame rate, just as the player pulled away
 let look=null;
@@ -524,6 +524,8 @@ function partOnRay(tile,w,ray,far){
   return false;}
  return false;
 }
+// Footprints the fallback pass never draws (when no model covers them): kept out of collision, they were invisible walls.
+function undrawnFootprint(b){const bb=b.bbox;return /^(roof|construction|carport|bridge)$/.test(b.kind||'')||city.era===1760&&!!bb&&(bb[2]-bb[0])*(bb[3]-bb[1])<60;}
 function createFallbackBuildings(buildings=data.buildings){
  const geoms=[],modelled=[];
  const models=roofIndex.tiles.flatMap(t=>t.parts),ratus=new Set(models.filter(m=>m.ratu>0).map(m=>String(m.ratu))),index=new SpatialIndex(models);
@@ -533,8 +535,7 @@ function createFallbackBuildings(buildings=data.buildings){
   // cover: the share of the footprint under the model's roofs (scripts/fit-colliders.py); data without it: bounding boxes, which
   // counted a footprint as modelled when a big neighbour's box lay over it (an invisible wall where nothing was drawn)
   if(b.cover!==undefined?b.cover>=.5:ratus.has(String(b.ratu))||index.near(cx,cz).some(m=>{const a=m.bbox;return Math.max(0,Math.min(a[2],bb[2])-Math.max(a[0],bb[0]))*Math.max(0,Math.min(a[3],bb[3])-Math.max(a[1],bb[1]))/Math.max(1,(bb[2]-bb[0])*(bb[3]-bb[1]))>.5;})){modelled.push(b);continue;}
-  if(/^(roof|construction|carport|bridge)$/.test(b.kind||'')){b.undrawn=true;continue;} // canopies and building sites: nothing standing to draw (undrawn: not solid either, world below)
-  if(city.era===1760&&(bb[2]-bb[0])*(bb[3]-bb[1])<60){b.undrawn=true;continue;} // today's kiosks, metro shafts and sheds: a windowless brick drum in an 18th-century square
+  if(undrawnFootprint(b))continue; // canopies, building sites, 1760's modern kiosks: nothing standing to draw (and not solid either: the collision indexes skip them) // today's kiosks, metro shafts and sheds: a windowless brick drum in an 18th-century square
   const shape=new THREE.Shape(b.rings[0].map(p=>new THREE.Vector2(p[0],-p[1])));
   for(const r of b.rings.slice(1))shape.holes.push(new THREE.Path(r.map(p=>new THREE.Vector2(p[0],-p[1]))));
   // OpenStreetMap's 10 m default (and a station's 12 m) stood a 3 m lift shaft or a metro stair up as a slim tower in the street (Nørreport)
@@ -865,7 +866,7 @@ function drawMinimap(){if(!car)return;const canvas=$('minimap'),ctx=canvas.getCo
  mapCar(ctx,canvas.width/2,canvas.height/2,car.heading,1.25);ctx.fillStyle='#34483d';ctx.font='18px sans-serif';ctx.fillText('N',canvas.width-26,25);}
 function drawCityMap(){const canvas=$('city-map'),ctx=canvas.getContext('2d');const side=canvas.height;ctx.fillStyle='#b3ced0';ctx.fillRect(0,0,canvas.width,canvas.height);const offset=(canvas.width-side)/2;ctx.drawImage(mapCache,offset,0,side,side);const s=side/mapView.size,mx=x=>canvas.width/2+(x-mapView.cx)*s,mz=z=>canvas.height/2+(z-mapView.cz)*s;for(const [i,l] of data.landmarks.entries()){const x=mx(l.x),z=mz(l.z);ctx.fillStyle='#f8f5eb';ctx.strokeStyle='#758670';ctx.lineWidth=1.5;ctx.beginPath();ctx.arc(x,z,11,0,Math.PI*2);ctx.fill();ctx.stroke();ctx.fillStyle='#34483d';ctx.font='600 11px sans-serif';ctx.textAlign='center';ctx.fillText(String(i+1),x,z+4);}mapPolice(ctx,p=>[mx(p.x),mz(p.z)],s);mapCar(ctx,mx(car.x),mz(car.z),car.heading,1.35);}
 // Tram sections and bus bodies: cars never drive or spawn into them (mobility.js).
-const transitBodies=()=>[...(tramSim?.bodies||[]),...(buses?.bodies||[]),...(travel?.parkedBodies()||[])];
+const transitBodies=()=>[...(tramSim?.bodies||[]),...(buses?.bodies||[]),...(travel?.parkedBodies()||[]),...(parkedCars?.movedBodies()||[])]; // pushed parked cars: traffic stops for one shoved into its lane
 // Upright knockable furniture (benches, racks, bikes, bollards) near the player, as boxes: only the car kicks them, so on
 // foot or riding they block like before (refreshed every 250 ms; the sets are tens of thousands strong).
 const rangedProps=[]; /* instanced props drawn near the player only (instance-range.js); updated each frame */
@@ -1000,7 +1001,7 @@ function recoverCar(){
  if(!ready)return;if(travel?.mode!=='car'||!mobility){reset();return;}
  const count=data.roads.length+data.pavement.length;if(count!==laneSurfaceCount){laneSurfaces=startSurfaces(data.roads,data.pavement);laneSurfaceCount=count;} // map extensions add streets as they stream in
  const solid=(x,z)=>laneSurfaces.blocked.at(x,z)||world.buildings.at(x,z)||!world.roads.at(x,z)&&inWaterPolygons(world.water,x,z);
- const bodies=[...travelObstacles(),...travel.parkedBodies()].map(v=>({x:v.x,z:v.z,heading:v.heading||0,hl:v.hl??v.halfLength??2.36,hw:v.hw??v.halfWidth??.98}));
+ const bodies=[...travelObstacles(),...travel.parkedBodies(),...(parkedCars?.near(car.x,car.z,70)||[])].map(v=>({x:v.x,z:v.z,heading:v.heading||0,hl:v.hl??v.halfLength??2.36,hw:v.hw??v.halfWidth??.98}));
  const p=laneStart({x:car.x,z:car.z,heading:car.heading},mobility.roads.edges,{drive:laneSurfaces.drive,blocked:{at:solid}},{reach:60,step:2,tries:400,accept:q=>!world.objects?.overlap(q)&&!bodies.some(b=>boxesOverlap(carBox(q,.6),b))}); // a few ms; capped so a dense block never stalls a frame
  if(!p){reset();return;}
  cameraTransition={elapsed:0,position:camera.position.clone(),target:camera.position.clone().addScaledVector(camera.getWorldDirection(new THREE.Vector3()),6)}; // a short glide, not a cut
@@ -1190,7 +1191,7 @@ function frame(now){
     const parkedHit=driving&&parked.find(p=>sweptContact(previous,car,p));
     if(parkedHit){Object.assign(car,{x:previous.x,z:previous.z,heading:previous.heading,speed:0});impacts.damage(car,Math.abs(previous.speed),'vehicle');police.report(parkedHit.travelMode==='car'?'vehicle':'property',`parked:${parkedHit.id}`,Math.abs(previous.speed));}
     knockables?.step(step,driving?car:Object.assign(SCRATCH.still,car,{speed:0}),world);
-    {const hit=parkedCars?.step(step,driving?car:null,world);if(hit>2.5&&driving){impacts.damage(car,hit,'vehicle');police.report('property','parked-car',hit);}}
+    {const hit=parkedCars?.step(step,driving?car:null,world);if(hit>2.5&&driving){impacts.damage(car,hit,'vehicle');police.report('property',`parked-car:${parkedCars.lastHit()}`,hit);}}
     if(driving){
      police.observe(previous,car,mobility.cars,[]);
      {const riders=SCRATCH.riders;riders.length=0;for(const c of cyclists.riders)if(!c.playerTaken)riders.push(c);for(const c of npcScooters.riders)riders.push(c);
@@ -1591,7 +1592,7 @@ async function boot(){
      console.info(`Street furniture: ${dropped} duplicate poles dropped`);}}
    if(mapped?.items?.length){const bikeParts=blenderLoads?await blenderLoads.rackBike:null,furnitureModels=blenderLoads?await blenderLoads.furniture:{};
     mappedFurniture=createMappedFurniture(mapped,{rangeScale:touchScreen?.55:1,models:furnitureModels,rackBikes:bikeParts&&['#1d1f22','#2d4f7a','#7a2a20','#3f5d45','#c9c4b8','#e8e4da','#5b6d3a'].map(c=>bakeColoured(bikeParts,{frame:c})).filter(Boolean),player:()=>car,mobility:()=>mobility,poleAllowed:mapped.poleAllowed,wallAt:(()=>{const b=new SpatialIndex(data.buildings||[]);return (x,z)=>!!b.at(x,z);})()});cityModel.add(mappedFurniture.group);furnitureSets=mappedFurniture;streetObstacles.push(...mappedFurniture.obstacles);bikeParts?.forEach(p=>p.geometry.dispose());knockables=combineKnockables([knockables,mappedFurniture.knockables]);mappedFurniture.update();} // the start chunk exists for the shader warm-up
-   world={buildings:new SpatialIndex([...data.buildings.filter(b=>!b.undrawn) /* footprints with nothing drawn were invisible walls (canopies, carports, building sites; today's kiosks in 1760) */,...streetObstacles.filter(o=>!o.breakable),...ads.obstacles]),roads:new SpatialIndex(data.roads.filter(r=>!/Koroke/.test(r.kind))),pavement:new SpatialIndex(data.pavement),trafficForbidden:new SpatialIndex(helsinki?[...data.pavement.filter(inHarbour),...data.roads.filter(r=>/Koroke/.test(r.kind)),...olympiaTramOnlySurfaces(data)]:data.roads.filter(r=>/Koroke/.test(r.kind))),water:data.water};
+   world={buildings:new SpatialIndex([...data.buildings.filter(b=>!undrawnFootprint(b)) /* footprints with nothing drawn were invisible walls (canopies, carports, building sites; today's kiosks in 1760) */,...streetObstacles.filter(o=>!o.breakable),...ads.obstacles]),roads:new SpatialIndex(data.roads.filter(r=>!/Koroke/.test(r.kind))),pavement:new SpatialIndex(data.pavement),trafficForbidden:new SpatialIndex(helsinki?[...data.pavement.filter(inHarbour),...data.roads.filter(r=>/Koroke/.test(r.kind)),...olympiaTramOnlySurfaces(data)]:data.roads.filter(r=>/Koroke/.test(r.kind))),water:data.water};
    if(cph&&mapped?.items?.length)cph.setFurniture?.(mapped.items,{clear:(x,z)=>!world.roads.at(x,z)&&!world.buildings.at(x,z)&&!inWaterPolygons(data.water||[],x,z),geometry:blenderLoads?await blenderLoads.can:null}); // pant: cans by the benches, bins and stands
    // Authored characters whose surveyed spot lands inside a house (the coordinates are approximate): step them out
    // onto the nearest open pavement or quay, so they stand where you can walk up and talk to them.
@@ -1606,7 +1607,7 @@ async function boot(){
    if(city.era===1760){const gateNames=/Vesterport|Nørreport|Østerport/,lm=data.landmarks||[];periodLife=createPeriodLife({city,world,animalModels:await loadColouredModels('/models/animals/',['pig','hen','goose']),propModels:await loadColouredModels('/models/props/',['farm-wagon','covered-wagon','barrel','crate','watchman','spinner']),water:data.water,squares:lm.filter(l=>!gateNames.test(l.name)&&!/^(Little Mermaid|Langelinie)$/.test(l.name)),gates:lm.filter(l=>gateNames.test(l.name))});cityModel.add(periodLife.group);console.info('1760 life',periodLife.group.userData);}
    else if(city.id==='copenhagen'){periodLife=createSquareCrowds({world,water:data.water,places:data.landmarks||[]});cityModel.add(periodLife.group);const cc=createCycleCrossings({pavement:data.pavement,world});cityModel.add(cc);console.info('Blue cycle crossings',cc.userData.crossings);}
    if(city.id.startsWith('copenhagen')){parkGeese=createParkGeese({parks:data.parks||[],water:data.water||[],clear:(x,z)=>!world.roads.at(x,z)&&!world.buildings.at(x,z)&&!inWaterPolygons(data.water||[],x,z),model:blenderLoads?await loadColouredModel('/models/animals/goose.glb'):null,count:city.era===1760?6:14,seed:city.era===1760?17:7});cityModel.add(parkGeese.group);console.info('Park geese',parkGeese.count);} // geese on the park lawns (park-geese.js)
-   world.cameraBuildings=new SpatialIndex(data.buildings);world.sightBuildings=world.cameraBuildings; // mapped buildings only: the camera boom and the police surge's line of sight ignore street furniture
+   world.cameraBuildings=new SpatialIndex(data.buildings.filter(b=>!undrawnFootprint(b)));world.sightBuildings=world.cameraBuildings; // mapped buildings only: the camera boom and the police surge's line of sight ignore street furniture
    const marketCameraObstacles=new SpatialIndex((market.stalls||[]).map(s=>solidBox({x:s.x,z:s.z,width:s.w+.5,depth:s.d+.5,yaw:s.facing||0})));
    world.travelCameraBuildings={at:(x,z)=>world.cameraBuildings.at(x,z)||marketCameraObstacles.at(x,z)}; // walking cameras must stay outside canopy roofs and counters
    world.collisionBuildings=world.cameraBuildings;

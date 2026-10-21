@@ -12,3 +12,8 @@ test('a fast device stays at 60 and a held one retries',()=>{
  for(let i=0;i<400;i++)q.record(16.7,.0167);assert.equal(q.half,false,'kept 60 when it holds');
 });
 test('off when disabled',()=>{const p=createFramePacer({enabled:false});for(let i=0;i<300;i++)p.record(30,.03);assert.equal(p.half,false);});
+test('120 Hz screens are held at an even 30 too',()=>{
+ const p=createFramePacer();for(let i=0;i<300;i++)p.record(25,.025);
+ const gaps=[];let last=null;for(let t=0;t<2000;t+=8.33)if(!p.skip(t)){if(last!==null)gaps.push(t-last);last=t;}
+ const later=gaps.slice(10);assert.ok(later.every(g=>Math.abs(g-33.3)<1),'gaps '+[...new Set(later.map(Math.round))]);
+});

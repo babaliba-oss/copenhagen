@@ -73,7 +73,7 @@ export function createBuildingBatches(buildings,textures,partOf){
    placed.delete(s);if(--g.waiting===0){releaseAfterUpload(g.mesh);g.mesh.geometry.attributes.aBid.needsUpdate=true;
     // A batch only uploads (and frees its arrays) when drawn: one beyond the detail range never was, and its arrays
     // stayed in memory (272 MB on a phone at Nyhavn). Drawn once now with every part masked (nothing reaches the screen).
-    if(!g.mesh.visible){const mesh=g.mesh;g.upload=true;mesh.frustumCulled=false;mesh.onAfterRender=()=>{g.upload=false;mesh.frustumCulled=true;mesh.onAfterRender=()=>{};show(g);};show(g);}}} // aBid is not re-uploaded by landing: one more upload frees it too
+    if(!g.mesh.visible&&!g.always){const mesh=g.mesh; /* unmaskable parts (always) would flash for that frame */g.upload=true;mesh.frustumCulled=false;mesh.onAfterRender=()=>{g.upload=false;mesh.frustumCulled=true;mesh.onAfterRender=()=>{};show(g);};show(g);}}} // aBid is not re-uploaded by landing: one more upload frees it too
  }
  return {meshes,data,land,batched:s=>taken.has(s),
   set(i,v){if(!(i>=0&&i<256))return;const was=data[i]>0;data[i]=v;if(was!==(v>0))for(const g of ofPart.get(i)||[]){g.shown+=v>0?1:-1;show(g);}},get(i){return data[i];},
