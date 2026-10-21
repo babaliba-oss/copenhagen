@@ -96,18 +96,22 @@ export function partyWalls(array,part,{inset=.03,step=.5}={}){
  const roofed=(x,y,z,below)=>{const l=roofGrid.get(Math.floor(x/C)*65536+Math.floor(z/C));if(l)for(const i of l){const [a,b,c]=roof[i],ux=b[0]-a[0],uz=b[2]-a[2],vx=c[0]-a[0],vz=c[2]-a[2],d=ux*vz-uz*vx;if(Math.abs(d)<1e-9)continue;
    const px=x-a[0],pz=z-a[2],s=(px*vz-pz*vx)/d,t=(ux*pz-uz*px)/d;if(s<0||t<0||s+t>1)continue;const h=a[1]+s*(b[1]-a[1])+t*(c[1]-a[1]);if(h>y&&h<below)return true;}
   return false;};
+ const covered=(x,z)=>{const l=roofGrid.get(Math.floor(x/C)*65536+Math.floor(z/C));if(l)for(const i of l){const [a,b,c]=roof[i],ux=b[0]-a[0],uz=b[2]-a[2],vx=c[0]-a[0],vz=c[2]-a[2],d=ux*vz-uz*vx;if(Math.abs(d)<1e-9)continue;const px=x-a[0],pz=z-a[2],s=(px*vz-pz*vx)/d,t=(ux*pz-uz*px)/d;if(s>=0&&t>=0&&s+t<=1)return true;}return false;};
  const out=[];
  for(const {a,b,c,n} of edges.values()){if(n!==1)continue;
   const dx=b[0]-a[0],dz=b[2]-a[2],L=Math.hypot(dx,dz);if(L<.05||Math.max(a[1],b[1])<lo+1)continue; // a vertical roof edge, or one at the foot
-  let ix=-dz/L,iz=dx/L;if(ix*(c[0]-a[0])+iz*(c[2]-a[2])<0){ix=-ix;iz=-iz;} // toward the inside
-  // Sample columns about a metre apart, every half metre from just under the edge down to the foot.
+  let ix=-dz/L,iz=dx/L;const cd=ix*(c[0]-a[0])+iz*(c[2]-a[2]);if(cd<0){ix=-ix;iz=-iz;} // toward the inside
+  if(Math.abs(cd)<.05){const mx=(a[0]+b[0])/2,mz=(a[2]+b[2])/2;if(!covered(mx+ix*.15,mz+iz*.15)&&covered(mx-ix*.15,mz-iz*.15)){ix=-ix;iz=-iz;}} // a sliver's third corner lies a hair off the edge, on either side (the fan round a rounded corner): the inside is the side the roof covers, or the corner's walls were never put up
+  // Sample columns along the edge, every half metre from just under the edge down to the foot.
   // The walls that can stand under this edge: in its cells, within 60 cm of its line, alongside it.
   const near=new Set();for(let x=Math.floor((Math.min(a[0],b[0])-.6)/C);x<=Math.floor((Math.max(a[0],b[0])+.6)/C);x++)for(let z=Math.floor((Math.min(a[2],b[2])-.6)/C);z<=Math.floor((Math.max(a[2],b[2])+.6)/C);z++)for(const i of grid.get(x*65536+z)||[]){if(near.has(i))continue;
    let s0=Infinity,s1=-Infinity,d0=Infinity,d1=-Infinity;for(const q of walls[i]){const rx=q[0]-a[0],rz=q[2]-a[2],s=(rx*dx+rz*dz)/L,d=rx*ix+rz*iz;s0=Math.min(s0,s);s1=Math.max(s1,s);d0=Math.min(d0,d);d1=Math.max(d1,d);}
-   if(s1>-.05&&s0<L+.05&&d1>-.1&&d0<.6)near.add(i);}
+   if(s1>-.05&&s0<L+.05&&d1>-.1&&d0<.6&&d1-d0<s1-s0)near.add(i);} // alongside: within 45 degrees of the edge (a side wall round a corner met the inward ray of a column near the end)
   const l=[...near];
-  const m=Math.max(1,Math.ceil(L/1.2)),last=m-1;let open=false,shut=false,topOpen=false,high=-Infinity;
-  for(let k=0;k<m;k++){const f=m===1?.5:.05+.9*k/last,x=a[0]+dx*f,z=a[2]+dz*f,top=a[1]+(b[1]-a[1])*f,dy=Math.max(step,(top-lo)/30);
+  // Columns 60 cm apart from 20 cm in at each end: 1.2 m apart from 5% in, the gap where a wall stops short of the corner (a
+  // 40 cm strip from the foot up) fell between them, and the end ones' step outside landed under the next wing's roof.
+  const e=Math.min(.2,L*.25),m=L<.5?1:Math.max(2,Math.ceil((L-2*e)/.6)+1),last=m-1;let open=false,shut=false,topOpen=false,high=-Infinity;
+  for(let k=0;k<m;k++){const f=m===1?.5:(e+(L-2*e)*k/last)/L,x=a[0]+dx*f,z=a[2]+dz*f,top=a[1]+(b[1]-a[1])*f,dy=Math.max(step,(top-lo)/30);
    for(let y=top-.15,first=true;y>lo+.1;y-=dy,first=false){if(l.length&&walled(x,y,z,ix,iz,l)){shut=true;continue;}if(roofed(x-ix*.15,y,z-iz*.15,top+.3))break;open=true;if(first)topOpen=true;if(y>high)high=y;}}
   if(!open)continue;
   const foot=lo,d=shut?.1:inset,A=[a[0]+ix*d,a[2]+iz*d],B=[b[0]+ix*d,b[2]+iz*d],ya=topOpen?a[1]:Math.min(a[1],high+1),yb=topOpen?b[1]:Math.min(b[1],high+1);

@@ -32,3 +32,10 @@ test('a side walled only near the top is closed below it',async()=>{
  let ylo=Infinity,yhi=-Infinity;for(let i=0;i<pos.length;i+=3){assert.ok(Math.abs(pos[i]-(10-.1))<1e-4,'behind the measured wall');ylo=Math.min(ylo,pos[i+1]);yhi=Math.max(yhi,pos[i+1]);}
  assert.equal(ylo,0);assert.ok(yhi>=8,'up to the measured wall');
 });
+// A side whose wall stops 40 cm short of the corner leaves a slit from the foot to the eaves; columns 1.2 m apart from 5% in missed it.
+test('a wall stopping short of the corner is closed',async()=>{
+ const {partyWalls}=await import('../src/period-roofs.js');
+ const full=box(10,20,12),stride=30,side=[10,0,.4,0,0, 10,0,20,0,0, 10,12,20,0,0, 10,0,.4,0,0, 10,12,20,0,0, 10,12,.4,0,0];
+ const a=new Float32Array([...full.slice(0,stride),...side,...full.slice(stride*2)]);
+ const pos=partyWalls(a,{start:0,count:a.length/5});assert.ok(pos&&pos.length>=18,'the slit is walled');
+});
