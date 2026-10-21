@@ -24,3 +24,4 @@
  body.mobile-controls-ready #people-chat{max-height:calc(100dvh - var(--mobile-bottom,10px) - 176px);padding:12px}
  body.mobile-controls-ready #people-chat-response{font-size:13px;margin:6px 0 9px}
 }
+@media not (pointer:coarse){#people-interaction{left:auto;right:76px;top:24px}} /* desktop: the job and saga cards sit where it was (top left) */

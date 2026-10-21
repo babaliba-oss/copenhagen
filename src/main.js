@@ -893,6 +893,7 @@ function talkToPerson(){
  if(!canTalk()||gullEncounter.snapshot().phase==='chase')return false;
  const result=peopleInteraction.interact(car,nearbyPeople(),{enabled:true});
  if(result.ok&&!result.closed){marketShop?.close();refreshMarketUI();}
+ if(!result.ok&&result.message)toast(result.message);
  return !!result.ok;
 }
 function replyToPerson(id){
@@ -1066,7 +1067,7 @@ window.addEventListener('keydown',e=>{
  if(e.code==='KeyY'&&started&&city?.id?.startsWith('copenhagen')){e.preventDefault();eraJump();return;}
  if(e.code==='KeyL'&&started&&radio){e.preventDefault();tuneRadio(e.shiftKey?-1:1);return;} // car radio: next station (Shift: back)
  if(e.code==='KeyF'||e.code==='Enter'&&started){e.preventDefault();if(!paused)interactTravel();return;}
- if(e.code==='KeyG'){e.preventDefault();if(!talkToPerson())toast(fpsMeter.toggle()?'FPS meter on (P or G to hide)':'FPS meter off');return;}
+ if(e.code==='KeyG'){e.preventDefault();if(!talkToPerson()&&started&&!paused&&travel?.mode!=='walk')toast(city?.era===1760?'Step down (F) to greet someone.':'Get out (F) to talk to someone.');return;} // G was also the FPS meter: a G in the car toggled it
  if(e.code==='KeyP'){e.preventDefault();toast(fpsMeter.toggle()?'FPS meter on (P to hide)':'FPS meter off');return;}
  if(e.code==='KeyE'&&!paused&&canTalk()&&(marketShop?.intent()||gullEncounter.snapshot().phase==='chase'&&marketShop?.hand?.item.encounter==='gulls')){e.preventDefault();marketAction();return;} // otherwise E keeps looking right
  if(marketShop?.open&&/^(Digit|Numpad)[1-9]$/.test(e.code)){e.preventDefault();const item=marketShop.menu()[Number(e.code.at(-1))-1];if(item)buyAtStall(item.id);return;}
@@ -1679,7 +1680,7 @@ async function boot(){
     document.querySelector('#map-dialog .dialog-copy').textContent=`${(city.radius/1000).toFixed(1)} km around the centre of ${city.name}. Pick a starting point, then find your own way.`;
     document.querySelector('#map-dialog .map-caption span').textContent=`${(city.radius/1000).toFixed(1)} KM PLAYABLE RADIUS`;
     document.querySelector('#sources-dialog h2').textContent=`${city.name}, from open data.`;
-    document.querySelector('#sources-dialog .dialog-copy').textContent=`${city.attribution} Built with the worldhood city builder; maintained by ${city.maintainers?.length?city.maintainers.join(', '):'the community'}.`;
+    document.querySelector('#sources-dialog .dialog-copy').textContent=`Everything this city is made from is listed below with its licence. Built with the worldhood city builder; maintained by ${city.maintainers?.length?city.maintainers.join(', '):'the community'}.`;
     document.querySelector('#sources-dialog .help-note').textContent=`An evolving reconstruction of the city. Building heights, facades and street details may be estimated. ${hasTerrain()?'Terrain follows the bundled elevation data.':'Terrain is flattened.'} Traffic and public transport are simulated rather than live services.`;
     document.querySelector('#sources-dialog .attribution').textContent=city.attribution;
     const sourceLinks=document.querySelector('#sources-dialog .source-links');sourceLinks.replaceChildren();
@@ -1710,6 +1711,7 @@ async function boot(){
    if(city.era===1760)for(const el of document.querySelectorAll('.help-grid span')){const t={'Handbrake / bike or scooter brake':'Rein in','Enter a nearby car / ride':'Board your coach','Recover car':'Recover coach','Get out / get off':'Step down','Accelerate / reverse':'Drive on / back up'}[el.textContent];if(t)el.textContent=t;if(/^(Horn|Radio: next \/ previous station)$/.test(el.textContent)){el.nextElementSibling?.remove();el.remove();}} // no horn or radio on a coach // 1760: a coach, no bikes or scooters
    if(touchScreen)document.querySelector('#help-dialog .dialog-copy').textContent=`Steer with the slider (or arrows or tilt: Menu > Steering), hold Go, Brake to slow down and reverse. Stopped, the button above the controls gets you out${city.era===1760?' or back on your coach':', onto a bike or into a car'}. Walk up to someone and tap Say hello. Yellow beam: a pick-up. Teal: the drop-off. Red: a saga step. Purple: a race start. Menu has the city map, the journal and the camera.`;
    document.querySelector('#help-dialog .dialog-drive').firstChild.textContent='Keep exploring ';
+   if(city.era===1760)for(const row of document.querySelectorAll('.boot-controls>div')){const dt=row.querySelector('dt'),t=dt?.textContent;if(/radio|Music/.test(t||'')){row.remove();continue;}const n={'Use a nearby car or ride':'Board your coach','Recover car':'Recover coach','Get out / get off':'Step down','1760 / horn / FPS':'Back to today / FPS'}[t];if(n)dt.textContent=n;if(t==='1760 / horn / FPS')row.querySelector('dd').innerHTML='<kbd>Y</kbd> / <kbd>P</kbd>';} // the 1760 welcome card listed the car, horn and radio
    const helpGrid=document.querySelector('#help-dialog .help-grid');if(helpGrid)$('pause-controls').append(helpGrid.cloneNode(true));
    updateHUD(0);
    // Read-only diagnostics for smoke tests and performance inspection.

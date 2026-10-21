@@ -84,7 +84,9 @@ export function createCopenhagenGame({scene,city,mobilityData,cityData,toast,sou
  const walk=makeGraph(mobilityData.walks,true),road=makeGraph(mobilityData.roads,false);
  const ERA=city.era===1760?'h':'m';UNIT=ERA==='h'?'sk.':'kr';const inEra=e=>(e||'m')===ERA||e==='b',cast=CHARACTERS.filter(c=>inEra(c.era));
  const jobs=(ERA==='h'?JOBS_1760:JOBS).map(j=>({...j,A:ll(j.a),B:ll(j.b),aName:j.a[2],bName:j.b[2]}));
- const sagas=SAGAS.filter(s=>inEra(s.era)).map(s=>({...s,steps:s.steps.map(st=>({...st,p:ll(st.at)}))}));
+ // Sagas told in both eras: in 1760 nothing from later (GPS, Andersen's 1845 tale, the war).
+ const period=t=>ERA!=='h'||typeof t!=='string'?t:t.replace('No beams, no GPS. Just the map.','No signposts. Just the map.').replace(' Andersen wrote a tale about him in 1845.','').replace(' In the Second World War a resistance group took his name.','');
+ const sagas=SAGAS.filter(s=>inEra(s.era)).map(s=>({...s,intro:period(s.intro),steps:s.steps.map(st=>({...st,card:st.card?.map(period),p:ll(st.at)}))}));
  const byId=Object.fromEntries(sagas.map(s=>[s.id,s]));
  const people=cast.map(c=>{const [x,z]=c.local||ll(c.at); /* local: a hand-placed spot in game metres */return {id:`cph-${c.id}`,script:c.id,x,z,heading:0,pose:'chat',walking:false,talkable:true,shirt:c.look.coat,coat:.7,...(c.look.height?{height:c.look.height}:{})};});
 
@@ -108,7 +110,7 @@ export function createCopenhagenGame({scene,city,mobilityData,cityData,toast,sou
  const hud=document.createElement('div');hud.id='cph-hud';hud.innerHTML=`<div class="cph-money" id="cph-money"></div><div class="cph-card-hint" id="cph-card-hint" hidden></div><div class="cph-card" id="cph-job"></div><div class="cph-card cph-saga" id="cph-saga" hidden></div>`;
  const lore=document.createElement('div');lore.id='cph-lore';lore.hidden=true;lore.innerHTML=`<div class="cph-lore-card" role="dialog"><div class="cph-kick" id="cph-lore-kick"></div><h2 id="cph-lore-title"></h2><p id="cph-lore-text"></p><button id="cph-lore-go">Continue <kbd>Enter</kbd></button></div>`;
  const journal=document.createElement('div');journal.id='cph-journal';journal.hidden=true;
- const tmap=document.createElement('div');tmap.id='cph-tmap';tmap.hidden=true;tmap.innerHTML=`<div class="cph-tmap-wrap"><div id="cph-tmap-canvas"></div><p>No GPS for this one. The saga card tells you if you’re getting warmer.</p><button id="cph-tmap-close">Put the map away <kbd>K</kbd></button></div>`;
+ const tmap=document.createElement('div');tmap.id='cph-tmap';tmap.hidden=true;tmap.innerHTML=`<div class="cph-tmap-wrap"><div id="cph-tmap-canvas"></div><p>Just the map. The saga card tells you if you’re getting warmer.</p><button id="cph-tmap-close">Put the map away <kbd>K</kbd></button></div>`;
  document.body.append(hud,lore,journal,tmap);
  const $=id=>document.getElementById(id);
 
