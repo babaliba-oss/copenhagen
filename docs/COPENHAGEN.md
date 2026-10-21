@@ -59,6 +59,8 @@ node scripts/building-sweep.mjs copenhagen-1760 --hide     # 1760: shells you se
 python3 scripts/fit-colliders.py copenhagen && python3 scripts/fit-colliders.py copenhagen-1760   # last: footprints = the houses you see
 python3 scripts/surface-fill.py copenhagen          # after fit-colliders, and again after any surface-dissolve.mjs: paving for the
                                                     # unmapped strips between the streets and the houses (below)
+node scripts/furniture-ground.mjs copenhagen        # after surface-fill and mapillary-features: flags the furniture with no
+                                                    # surface under it, set down onto the bare ground or lawn (main.js)
 ```
 
 Most of today's pavements are not mapped as areas (OpenStreetMap draws them as lines or not at all), so the rendered
