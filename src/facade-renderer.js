@@ -28,7 +28,7 @@ class Batch{
 
 // One wall face's frame: placement and the "is this point on real wall" test.
 export class FaceFrame{
- constructor(face){Object.assign(this,{nx:face.normal.x,nz:face.normal.z,d:face.d,s0:face.s0,s1:face.s1,y0:face.y0,y1:face.y1,tris:face.triangles||[]});this.rot=Math.atan2(this.nx,this.nz);}
+ constructor(face){Object.assign(this,{nx:face.normal.x,nz:face.normal.z,d:face.d,lean:face.lean||0,yRef:face.yRef||0,s0:face.s0,s1:face.s1,y0:face.y0,y1:face.y1,tris:face.triangles||[]});this.rot=Math.atan2(this.nx,this.nz);}
  covered(s,y){
   for(const {local:[a,b,c]} of this.tris){
    const den=(b[1]-c[1])*(a[0]-c[0])+(c[0]-b[0])*(a[1]-c[1]);if(Math.abs(den)<1e-8)continue;
@@ -38,7 +38,7 @@ export class FaceFrame{
   return false;
  }
  rect(s0,s1,y0,y1){for(const u of [0,.5,1])for(const v of [0,.5,1])if(!this.covered(s0+u*(s1-s0),y0+v*(y1-y0)))return false;return true;}
- place(g,s,y,e){g.rotateY(this.rot);g.translate(this.nx*(this.d+e)+this.nz*s,y,this.nz*(this.d+e)-this.nx*s);return g;}
+ place(g,s,y,e){const d=this.d-this.lean*(y-this.yRef)+e;g.rotateY(this.rot);g.translate(this.nx*d+this.nz*s,y,this.nz*d-this.nx*s);return g;} // a leaning wall: at the wall's offset for this height (building-detail.js analyseBuilding)
 }
 
 // Glass reads as glass without an environment map: lighter toward the top (sky reflection),
@@ -132,6 +132,7 @@ function groundStorey(F,G,B,band,g,c){
   if(g.type==='solid')continue;
   for(const s of bays(a,b,g.pitch,.4)){
    const w=g.pitch-(g.type==='glass'?.12:.7),h=glassTop-base,y=base+h/2;
+   if(!F.rect(s-w/2,s+w/2,base-(g.type==='glass'?0:.2),glassTop))continue; // the whole shop front on wall: the run is tested at one height, and a bay wider than a short run (or one at a stepped corner) hung past the wall's end
    pane(F,G,s,y,w,h,c.shop,g.type==='arcade',shopTone);
    if(g.type!=='arcade'&&w>1.4)slab(F,B,s,base+h*.62,.03,w,.06,.06,c.groundFrame); // transom bar
    for(const dx of [-w/2,w/2])slab(F,B,s+dx,y-(g.type==='arcade'?w/4:0),.03,.12,h-(g.type==='arcade'?w/2:0),.09,c.groundFrame);
@@ -186,7 +187,7 @@ export function createFacade(faces,spec){
   }
   if(spec.storeys===1&&spec.ground?.type==='glass')windows+=groundStorey(F,G,B,{y0:F.y0,y1:F.y1-.3},spec.ground,c);
   // Cornice along the top edge: frieze, a projecting crown and a shadow line under it.
-  if(spec.cornice||spec.material!=='glass')for(const [a,b] of runs(F,F.y1-.4,[F.s0,F.s1])){
+  if(spec.cornice||spec.material!=='glass')for(const [a,b] of runs(F,F.y1-.4,[F.s0,F.s1])){if(!F.rect(a,b,F.y1-(height>6?.8:.44),F.y1-.1))continue; // along a level top only: under a gable's sloping edge the crown hung in the air past the wall
    slab(F,B,(a+b)/2,F.y1-.22,.0,b-a+.1,.44,spec.cornice?.42:.18,c.cornice);
    if(spec.material!=='glass'&&height>6){slab(F,B,(a+b)/2,F.y1-.62,0,b-a,.36,.1,c.cornice);slab(F,B,(a+b)/2,F.y1-.03,.0,b-a+.2,.08,spec.cornice?.58:.3,c.cornice);}}
   // Plinth: a darker stone base along the street.

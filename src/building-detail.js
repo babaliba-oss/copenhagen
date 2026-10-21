@@ -46,6 +46,7 @@ function colour(samples,wall){
  const c=sorted[Math.min(sorted.length-1,Math.floor(sorted.length*(wall?.78:.55)))];
  return c.map(v=>Math.min(.94,Math.max(wall?.23:.10,v*(wall?1.10:1.02))));
 }
+const PLANE_TOLERANCE=.15; // metres off a face's plane that still count as its wall
 export function analyseBuilding(array,part,pixels){
  const faces=new Map(),roof=[],triangles=[];
  // Some source meshes are wound inside-out (about half of the Copenhagen city model): orient every normal
@@ -62,7 +63,22 @@ export function analyseBuilding(array,part,pixels){
   if(!faces.has(key))faces.set(key,{tint:triangle.tint,normal:n,triangles:[],samples:[],s0:Infinity,s1:-Infinity,y0:Infinity,y1:-Infinity,windows:[]});
   const face=faces.get(key);face.triangles.push(triangle);face.samples.push(...triangle.samples);
  }
- for(const face of faces.values()){
+ // The key's normal bins are ~1.4 degrees wide and d is taken from the world origin, so walls of one part metres apart
+ // (a bent or stepped front, a parallel wall across a courtyard) shared a face, and windows, shop fronts and doors were
+ // laid on the plane of its first triangle wherever any of its triangles covered the spot: slabs standing off the wall,
+ // up to metres out in the street. Each face keeps only the triangles lying on its plane (largest triangle first); the
+ // rest start faces of their own. The plane's horizontal normal is unit length: a wall leaning a few degrees left it
+ // short, and elements placed at n*d (d hundreds of metres from the origin) landed metres in front of or behind the wall.
+ // A leaning wall (|n.y| up to .12) moves `lean` metres back per metre of height: d is its offset at height yRef, and
+ // elements are placed at the offset of their own height (FaceFrame.place), not 0.7 m off it six metres up.
+ const planar=[];
+ for(const face of faces.values()){const subs=[];
+  for(const t of face.triangles.sort((a,b)=>b.area-a.area)){
+   let f=subs.find(f=>t.v.every(v=>Math.abs(f.normal.x*v[0]+f.normal.z*v[2]+f.lean*(v[1]-f.yRef)-f.d)<PLANE_TOLERANCE));
+   if(!f){const h=Math.hypot(t.n.x,t.n.z),n=new THREE.Vector3(t.n.x/h,t.n.y,t.n.z/h);f={tint:face.tint,normal:n,d:n.x*t.v[0][0]+n.z*t.v[0][2],yRef:t.v[0][1],lean:t.n.y/h,triangles:[],samples:[],s0:Infinity,s1:-Infinity,y0:Infinity,y1:-Infinity,windows:[]};subs.push(f);}
+   f.triangles.push(t);f.samples.push(...t.samples);}
+  planar.push(...subs);}
+ for(const face of planar){
   const n=face.normal;face.d=n.x*face.triangles[0].v[0][0]+n.z*face.triangles[0].v[0][2];
   for(const t of face.triangles){t.local=t.v.map(v=>[v[0]*n.z-v[2]*n.x,v[1]]);for(const p of t.local){face.s0=Math.min(face.s0,p[0]);face.s1=Math.max(face.s1,p[0]);face.y0=Math.min(face.y0,p[1]);face.y1=Math.max(face.y1,p[1]);}}
   const width=face.s1-face.s0,height=face.y1-face.y0;
@@ -83,13 +99,13 @@ export function analyseBuilding(array,part,pixels){
   }
   face.color=colour(face.samples,true);
  }
- return {faces:[...faces.values()],roof,triangles};
+ return {faces:planar,roof,triangles};
 }
 
 export function createModelledBuilding(array,part,pixels,texture=null,includeHero=true){
  const analysis=analyseBuilding(array,part,pixels),walls=[],roofs=[],wallColours=[],roofColours=[],wallUV=[],roofUV=[],trim=[],glazing=[],ridges=[];
  function triangles(items,rgb,positions,colours){const color=new THREE.Color(...rgb).convertSRGBToLinear();for(const t of items)for(const v of t.v){positions.push(v[0],v[1],v[2]);colours.push(color.r,color.g,color.b);(positions===walls?wallUV:roofUV).push(v[3],v[4]);}}
- function box(face,s,y,w,h,depth,offset,target){const n=face.normal,g=new THREE.BoxGeometry(w,h,depth);g.rotateY(Math.atan2(n.x,n.z));g.translate(n.z*s+n.x*(face.d+offset),y,-n.x*s+n.z*(face.d+offset));target.push(g);}
+ function box(face,s,y,w,h,depth,offset,target){const n=face.normal,g=new THREE.BoxGeometry(w,h,depth),d=face.d-(face.lean||0)*(y-(face.yRef||0));g.rotateY(Math.atan2(n.x,n.z));g.translate(n.z*s+n.x*(d+offset),y,-n.x*s+n.z*(d+offset));target.push(g);}
  let windows=0,provisional=false;const authoredFaces=[];
  // Listed smeared-atlas shells: flat photo-guided colours, no pixel-inferred windows.
  const clean=cleanWaterfrontShell(part);
