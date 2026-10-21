@@ -156,7 +156,7 @@ export class BusSimulation{
    // Authored street furniture can change after offline road validation. Check a
    // metre ahead periodically against the live world before entering it.
    if(!b.clearUntil||nextS>b.clearUntil){const checkS=Math.min(b.path.end,nextS+1),check=busPose(b.path,checkS,b.kind,b.pull);b.clearUntil=safeBusSweep(b,check,this.world)?checkS:0;}
-   const hit=[player,...traffic,...this.buses].find(o=>o!==b&&o.edge!==null&&(!b.unjam||o!==b.unjam&&o.ref!==b.unjam)&&busOverlaps(next,o)&&!busOverlaps(b,o));
+   const hit=[player,...traffic,...this.buses].find(o=>o!==b&&o.edge!==null&&(!b.unjam||o!==b.unjam&&o.ref!==b.unjam)&&busOverlaps(next,o)&&(o===player||!busOverlaps(b,o))); /* the player's car blocks even when already touching (a nudge-out that failed against a kerb left it overlapping, and the bus crept on through it); a traffic car it already overlaps does not, so two can still part */
    if(!b.clearUntil||hit){b.speed=0;b.held=(b.held||0)+dt;if(hit)b.holdBy=hit.ref||hit;}else{b.s=nextS;Object.assign(b,next);b.held=0;}
    // A bus that has finished its route, or is held by live furniture for a long time, restarts its route once the
    // player is well away. It used to wait at a route end until the player was 450 m off, standing in a live lane.

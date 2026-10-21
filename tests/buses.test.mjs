@@ -32,6 +32,11 @@ test('simulation uses only supplied paths, moves, respects full-body obstacles a
  for(let i=0;i<300;i++)sim.step(1/30,player);assert.ok(sim.buses[0].z<start-10);assert.ok(sim.buses[0].speed<=30/3.6);
  const b=sim.buses[0],hit={x:b.x,z:b.z+5.5,heading:0,speed:10};sim.step(0,hit);assert.equal(hit.speed,0);assert.equal(sim.obstacles.length,5);
 });
+test('a bus waits beside the player\'s car left touching it (nudge-out blocked by a kerb wall) instead of creeping through it',()=>{
+ const w={roads:{at:()=>true},buildings:{at:x=>x>2.1}},sim=new BusSimulation({paths:[{id:'straight',kind:'city',points:[[0,0],[0,-300]]}]},w,{cityCount:1});sim.supplyAt=1e9;
+ const b={id:0,path:sim.paths[0],s:100,speed:0,edge:true,...busPose(sim.paths[0],100,'city')};sim.buses=[b];const player={x:b.x+2,z:b.z,heading:b.heading,speed:0};
+ for(let i=0;i<600;i++){sim.step(1/60,player);player.speed=0;}assert.ok(busOverlaps(b,player),'still touching: the wall stops the nudge');assert.ok(b.s-100<.01,`the bus held (moved ${(b.s-100).toFixed(3)} m)`);
+});
 test('solid traffic obstruction brakes buses before contact',()=>{
  const sim=new BusSimulation({paths:[{id:'straight',kind:'city',points:[[0,0],[0,-300]]}]},world,{cityCount:1});const player={x:30,z:0,speed:0,heading:0};sim.reset(player);const b=sim.buses[0],obstacle={x:b.x,z:b.z-25,heading:0,edge:true};for(let i=0;i<900;i++)sim.step(1/30,player,[obstacle]);assert.equal(busOverlaps(b,obstacle),false);assert.ok(b.speed<.1);
 });
