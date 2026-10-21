@@ -54,7 +54,7 @@ export function createShellMask(count){
   set(i,v){v=Math.max(0,Math.min(1,v));if(i>255||data[i]===v)return;if(data[i]>0&&v===0)shown--;else if(data[i]===0&&v>0)shown++;data[i]=v;},
   get(i){return data[i];}};
 }
-const MASK_VERTEX='\nvMask=1.;if(uMaskOn>.5&&aBid<255.5){int b=int(aBid+.5);vMask=uMask[b>>2][b&3];}if(vMask<.002)gl_Position=vec4(0.,0.,2.,1.);';
+const MASK_VERTEX='\nvMask=1.;if(uMaskOn>.5&&aBid<255.5){int b=int(aBid+.5);vMask=dot(uMask[b>>2],vec4(equal(ivec4(b&3),ivec4(0,1,2,3))));}if(vMask<.002)gl_Position=vec4(0.,0.,2.,1.);';
 function maskShader(material,uniforms,{fragment=true}={}){
  const prev=material.onBeforeCompile,prevKey=material.customProgramCacheKey;
  material.onBeforeCompile=(shader,renderer)=>{prev?.call(material,shader,renderer);Object.assign(shader.uniforms,uniforms);

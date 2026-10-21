@@ -27,7 +27,7 @@ function batchMaterial(part,source,textures,uniforms){
  const prev=material.onBeforeCompile,prevKey=material.customProgramCacheKey?.bind(material);
  material.onBeforeCompile=(shader,renderer)=>{prev?.call(material,shader,renderer);Object.assign(shader.uniforms,uniforms);
   shader.vertexShader=shader.vertexShader.replace('#include <common>','#include <common>\nattribute float aBid;uniform vec4 uDetail[64];varying float vDetail;')
-   .replace('#include <project_vertex>','#include <project_vertex>\nvDetail=1.;if(aBid<255.5){int bi=int(aBid+.5);vDetail=uDetail[bi>>2][bi&3];}if(vDetail<.002)gl_Position=vec4(0.,0.,2.,1.);');
+   .replace('#include <project_vertex>','#include <project_vertex>\nvDetail=1.;if(aBid<255.5){int bi=int(aBid+.5);vDetail=dot(uDetail[bi>>2],vec4(equal(ivec4(bi&3),ivec4(0,1,2,3))));}if(vDetail<.002)gl_Position=vec4(0.,0.,2.,1.);');
   if(material.userData.dither)shader.fragmentShader=shader.fragmentShader.replace('#include <common>','#include <common>\nvarying float vDetail;')
    .replace('#include <clipping_planes_fragment>','#include <clipping_planes_fragment>\nif(vDetail<.996&&fract(52.9829189*fract(dot(floor(gl_FragCoord.xy),vec2(.06711056,.00583715))))>vDetail)discard;');
  };
