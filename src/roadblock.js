@@ -75,7 +75,7 @@ export function createRoadblock(scene,{world,police,carModel,playerLook=null,gra
   if(!(police.level>0)){if(pursuit||deployed||pending)clearPursuit();standDown=false;return;}
   if(standDown||!car)return;
   const driving=started&&(!car.travelMode||car.travelMode==='car');
-  if(!driving){if(pending)retry('left-vehicle');burst=null;crawl=0;return;}
+  if(!driving){if(pending)retry('left-vehicle');crawl=0;return;} // a burst tyre stays burst: hopping out and back in dodged the arrest
   if(!pursuit&&police.level>=settings.minLevel){
    pursuit=true;attempts=0;
    if(random()>=settings.chance){phase='skipped';lastReason='chance';}

@@ -271,7 +271,8 @@ export class PoliceSimulation{
   this.bust=canArrest&&Math.abs(player.speed)<1?this.bust+dt:0;
   // Hands-on arrest: a unit at the car (any side, no line of sight needed) and a stopped or crawling player.
   const atCar=this.units.some(u=>distance(u,player)<CONTACT_BUST.range);
-  this.contact=atCar&&Math.abs(player.speed)<CONTACT_BUST.speed?this.contact+dt:0;
+  const still=player.walking?.5:CONTACT_BUST.speed,handsOn=atCar&&Math.abs(player.speed)<still&&(!player.walking||this.units.some(u=>distance(u,player)<CONTACT_BUST.range&&this.clearSight(u,player)));
+  this.contact=handsOn?this.contact+dt:0; // on foot: only stopped and in sight (walking pace is 2.2 m/s, under the car's 'crawling', and it worked through walls)
   if(this.bust>=this.bustTime||this.contact>=CONTACT_BUST.time){this.busted=true;this.heat=0;this.bust=this.bustTime;this.escape=0;player.speed=0;for(const u of this.units)u.speed=0;this.message='Busted — pursuit ended.';}
   else if(this.escape>=escapeTime(this.level)*(surge?SURGE.escapeScale:1)*(this.relaxed?.5:1)){
    const was=this.level;this.heat=0;this.units=[...(this.parked||[])];this.lastSeen=null;this.intercept=null;

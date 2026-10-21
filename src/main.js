@@ -872,7 +872,8 @@ const transitBodies=()=>[...(tramSim?.bodies||[]),...(buses?.bodies||[]),...(tra
 const rangedProps=[]; /* instanced props drawn near the player only (instance-range.js); updated each frame */
 let furnitureNear=[],furnitureNearAt=-1e9,furnitureSets=null; // furnitureSets: the mapped furniture (set at boot)
 const nearFurniture=()=>{if(!car||travel?.mode==='car'||!(furnitureSets?.knockables?.near||parkedCars))return [];const now=performance.now();if(now-furnitureNearAt>250){furnitureNearAt=now;furnitureNear=furnitureSets?.knockables?.near?furnitureSets.knockables.near(car.x,car.z,20):[];parkedCars?.near(car.x,car.z,20,furnitureNear);}return furnitureNear;};
-const travelObstacles=()=>[...(mobility?.cars.filter(c=>c.edge)||[]),...(tramSim?.bodies||[]),...(buses?.bodies||[]),...(police?.obstacles||[]),...nearFurniture()];
+const nearRiders=()=>{const out=[];if(car&&typeof cyclists!=='undefined'&&cyclists?.riders)for(const c of cyclists.riders)if(!c.playerTaken&&Math.abs(c.x-car.x)<30&&Math.abs(c.z-car.z)<30)out.push({x:c.x,z:c.z,heading:c.heading||0,halfWidth:.32,halfLength:.9,speed:c.speed||0});return out;}; // NPC cyclists: a walker or the player's bike passed through them
+const travelObstacles=()=>[...(mobility?.cars.filter(c=>c.edge)||[]),...(tramSim?.bodies||[]),...(buses?.bodies||[]),...(police?.obstacles||[]),...nearFurniture(),...(travel?.mode!=='car'?nearRiders():[])];
 function interactTravel(id=null){
  if(!ready||!started||paused||mapOpen||police?.busted)return;
  // Wanted players may still get out and run: the pursuit follows travel.actor, and units arrest a stopped player on foot too.
@@ -1003,7 +1004,7 @@ function recoverCar(){
  const solid=(x,z)=>laneSurfaces.blocked.at(x,z)||world.buildings.at(x,z)||!world.roads.at(x,z)&&inWaterPolygons(world.water,x,z);
  const bodies=[...travelObstacles(),...travel.parkedBodies(),...(parkedCars?.near(car.x,car.z,70)||[])].map(v=>({x:v.x,z:v.z,heading:v.heading||0,hl:v.hl??v.halfLength??2.36,hw:v.hw??v.halfWidth??.98}));
  const p=laneStart({x:car.x,z:car.z,heading:car.heading},mobility.roads.edges,{drive:laneSurfaces.drive,blocked:{at:solid}},{reach:60,step:2,tries:400,accept:q=>!world.objects?.overlap(q)&&!bodies.some(b=>boxesOverlap(carBox(q,.6),b))}); // a few ms; capped so a dense block never stalls a frame
- if(!p){reset();return;}
+ if(!p){if(police?.level>0){toast('No clear lane nearby. Lose the police first.');return;}reset();return;} // the start-point reset also cleared the chase
  cameraTransition={elapsed:0,position:camera.position.clone(),target:camera.position.clone().addScaledVector(camera.getWorldDirection(new THREE.Vector3()),6)}; // a short glide, not a cut
  Object.assign(car,{x:p.x,z:p.z,heading:p.heading,speed:0,steer:0});settleOnGround(car);repairCar();
  cameraHeading=driveCamera.heading=car.heading;driveCamera.shake=0;driveCamera.lastSpeed=0;
@@ -1011,7 +1012,7 @@ function recoverCar(){
 }
 // BUSTED screen: Continue (Enter/Esc) respawns on the spot — wanted cleared, car repaired, police gone and
 // any tram boxing the car in removed; Restart (R) is a clean restart at the chosen starting point.
-function repairCar(){if(!car)return;car.flat=0;car.damage=0;car.damageZones={front:0,rear:0,left:0,right:0};car.damageVersion=(car.damageVersion||0)+1;impacts.reset();}
+function repairCar(){if(!car)return;for(const c of new Set([car,travel?.car,travel?.homeCar].filter(Boolean))){c.flat=0;c.damage=0;c.damageZones={front:0,rear:0,left:0,right:0};c.damageVersion=(c.damageVersion||0)+1;}impacts.reset();} // on foot, car is the walker: the parked car is repaired too
 function restart(){if(!ready)return;setBusted(false);knockables?.resetAll();distance=0;setStart(startPoint);toast(`Back on the road at ${startPoint.name}.`);}
 function continueDriving(){if(!ready)return;roadblock?.standDown();police?.reset();finale.resume();repairCar();tramSim?.clearAround(car);setBusted(false);toast('Back on the road — wanted level cleared.');}
 $('busted-restart').addEventListener('click',restart);$('busted-continue').addEventListener('click',continueDriving);

@@ -2,7 +2,7 @@
 import {insidePlayable,pointInPolygon,inWaterPolygons} from './geo.js';
 import {makeCar} from './physics.js';
 import {sweptContact} from './contact-geometry.js';
-import {slopeAt} from './terrain.js';
+import {slopeAt,lakeAt} from './terrain.js';
 
 export const TRAVEL_MODES=Object.freeze({
  walk:{label:'On foot',speed:2,run:4.8,acceleration:8,braking:12,halfWidth:.28,halfLength:.28},
@@ -40,7 +40,7 @@ export function travelCollision(p,mode,world,obstacles=[],ignore=[],from=null){
   if(!insidePlayable(q.x,q.z,.2))return 'boundary';
   const building=ignore.length&&buildings.near?buildings.near(q.x,q.z).find(b=>!b.disabled&&!ignore.includes(b)&&pointInPolygon(q.x,q.z,b.rings)):buildings.at(q.x,q.z);
   if(building&&!ignore.includes(building))return 'building';
-  if(!world.roads.at(q.x,q.z)&&!world.pavement?.at(q.x,q.z)&&inWaterPolygons(world.water,q.x,q.z))return 'water';
+  if(!world.roads.at(q.x,q.z)&&!world.pavement?.at(q.x,q.z)&&(inWaterPolygons(world.water,q.x,q.z)||lakeAt(q.x,q.z)!==null))return 'water'; // lakes from the elevation model too, as for the car
  }
  const dimensions={halfWidth:w,halfLength:l,ignore};
  if(from&&world.objects?.blocksStep?world.objects.blocksStep(from,p,dimensions):world.objects?.overlap(p,dimensions))return 'building';
@@ -163,8 +163,9 @@ export class PlayerTravel{
  // A bike or scooter that hits something at speed falls over; the rider lands beside it and gets up after a moment.
  crash(speed,obstacles=[]){
   const ride=this.riding,from={...this.actor};if(!ride)return;
+  const spot=exitPosition(this.actor,this.mode,this.world,[...this.parked(),...obstacles]);
+  if(!spot){this.actor.speed=0;ride.speed=0;return false;} // no room to land beside it: the rider stays on (landing on the fallen ride trapped the walker)
   Object.assign(ride,{speed:0,steer:0,parked:true,fallen:{side:Math.random()<.5?-1:1,elapsed:0}});
-  const spot=exitPosition(this.actor,this.mode,this.world,[...this.parked(),...obstacles])||from;
   this.actor=makeActor({x:spot.x,z:spot.z,heading:from.heading},'walk',from.distance);this.mode='walk';this.riding=null;this.sprint=false;this.transition=null;
   this.actor.knockdown={elapsed:.001,duration:clamp(1.8+speed*.3,2,4.5),prone:speed>4.5,side:ride.fallen.side};
  }
@@ -225,7 +226,7 @@ export class PlayerTravel{
    p.distance+=gap(p,q);Object.assign(p,{x:q.x,z:q.z,heading:q.heading});
   }
   if(this.riding)Object.assign(this.riding,p);
-  if(collision&&!walk&&Math.abs(before.speed)>=CRASH_SPEED){const v=Math.abs(before.speed);this.crash(v,obstacles);return {collision,moved:gap(before,p),crashed:v};}
+  if(collision&&!walk&&Math.abs(before.speed)>=CRASH_SPEED){const v=Math.abs(before.speed);if(this.crash(v,obstacles)===false)return {collision,moved:gap(before,p)};return {collision,moved:gap(before,p),crashed:v};}
   return {collision,moved:gap(before,p)};
  }
  snapshot(){const copy=({visual,...actor})=>({...actor});return {mode:this.mode,sprint:this.sprint,actor:copy(this.actor),car:copy(this.car),cars:this.cars.map(copy),rides:this.rides.map(copy),choices:this.choices().map(({id,mode,label,distance,available})=>({id,mode,label,distance,available}))};}
