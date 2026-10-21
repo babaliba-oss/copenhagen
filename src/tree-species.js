@@ -168,13 +168,13 @@ export function createSpeciesTrees(trees,{detailed=false,models=null,lod=SPECIES
   bm.perObjectFrustumCulled=true;bm.castShadow=level==='near';bm.receiveShadow=level!=='far';bm.userData.shadowLod=true;meshes[level]=bm;group.add(bm);
  }
  let last=null,lastHigh=false;const shown=new Array(items.length).fill(null);
+ const vis=(lv,i,on)=>{if(lv==='near'&&ez?.has(i))ez.show(i,on);else meshes[lv].setVisibleAt(ids[lv][i],on);}; // one function, not one per tree per pass
  // high: the camera looks down from well above the street (high camera, overhead views). The detailed crowns'
  // leaf cards stand mostly upright and read as bare branches from above, so the procedural 'mid' crowns are used.
  const update=(focus,{high=false}={})=>{
   if(last&&high===lastHigh&&Math.hypot(focus.x-last.x,focus.z-last.z)<8)return;last={x:focus.x,z:focus.z};lastHigh=high;
-  items.forEach(({t},i)=>{let l=treeLevel(Math.hypot(t.p[0]-focus.x,t.p[1]-focus.z),lod);if(high&&l==='near')l='mid';if(l===shown[i])return;
-   const vis=(lv,on)=>{if(lv==='near'&&ez?.has(i))ez.show(i,on);else meshes[lv].setVisibleAt(ids[lv][i],on);};
-   if(shown[i])vis(shown[i],false);if(l)vis(l,true);shown[i]=l;});
+  for(let i=0;i<items.length;i++){const t=items[i].t;let l=treeLevel(Math.hypot(t.p[0]-focus.x,t.p[1]-focus.z),lod);if(high&&l==='near')l='mid';if(l===shown[i])continue;
+   if(shown[i])vis(shown[i],i,false);if(l)vis(l,i,true);shown[i]=l;}
  };
  const families={};for(const {inst} of items)families[inst.family]=(families[inst.family]||0)+1;
  group.userData={count:trees.length,families,templates:used.size*LEVELS.length,drawCalls:LEVELS.length,trianglesIfAllNear:triangles.near,trianglesIfAllMid:triangles.mid,trianglesIfAllFar:triangles.far,
