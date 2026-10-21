@@ -16,6 +16,28 @@ export function pointInPolygon(x,z,rings) {
   for(let i=1;i<rings.length;i++) if(pointInRing(x,z,rings[i])) return false;
   return true;
 }
+// Indexed polygons with long rings (1760's town-wide cobble areas and commons: 900-1,900 vertices, under every walker's
+// step) test only the edges crossing the point's 4 m band of z: the same crossings as pointInRing, a few instead of all.
+const RING_BANDS=new WeakMap(),BAND=4;
+function ringBands(ring){
+  let t=RING_BANDS.get(ring);if(t)return t;
+  let z0=Infinity,z1=-Infinity;for(const p of ring){if(p[1]<z0)z0=p[1];if(p[1]>z1)z1=p[1];}
+  const base=Math.floor(z0/BAND),lists=Array.from({length:Math.floor(z1/BAND)-base+1},()=>[]);
+  for(let i=0,j=ring.length-1;i<ring.length;j=i++){const a=ring[i],b=ring[j];if(a[1]===b[1])continue; // level edges never cross
+    for(let k=Math.floor(Math.min(a[1],b[1])/BAND)-base,e=Math.floor(Math.max(a[1],b[1])/BAND)-base;k<=e;k++)lists[k].push(a[0],a[1],b[0],b[1]);}
+  t={base,lists};RING_BANDS.set(ring,t);return t;
+}
+function pointInLongRing(x,z,ring){
+  if(ring.length<48)return pointInRing(x,z,ring);
+  const t=ringBands(ring),e=t.lists[Math.floor(z/BAND)-t.base];if(!e)return false;let inside=false;
+  for(let i=0;i<e.length;i+=4){const az=e[i+1],bz=e[i+3];if((az>z)!==(bz>z)&&x<(e[i+2]-e[i])*(z-az)/(bz-az)+e[i])inside=!inside;}
+  return inside;
+}
+function pointInIndexedPolygon(x,z,rings){
+  if(!pointInLongRing(x,z,rings[0]))return false;
+  for(let i=1;i<rings.length;i++)if(pointInLongRing(x,z,rings[i]))return false;
+  return true;
+}
 export function bounds(rings) {
   let minX=Infinity,minZ=Infinity,maxX=-Infinity,maxZ=-Infinity;
   for(const p of rings[0]) { minX=Math.min(minX,p[0]);minZ=Math.min(minZ,p[1]);maxX=Math.max(maxX,p[0]);maxZ=Math.max(maxZ,p[1]); }
@@ -82,7 +104,7 @@ export class SpatialIndex {
   at(x,z){
     // Hot path: called thousands of times per frame by physics, traffic and pedestrians.
     const list=this.near(x,z); // indexed: for-of allocated an iterator result per polygon tested
-    for(let i=0;i<list.length;i++){const p=list[i];if(p.disabled)continue;const b=p.bbox;if(x>=b[0]&&x<=b[2]&&z>=b[1]&&z<=b[3]&&pointInPolygon(x,z,p.rings))return p;}
+    for(let i=0;i<list.length;i++){const p=list[i];if(p.disabled)continue;const b=p.bbox;if(x>=b[0]&&x<=b[2]&&z>=b[1]&&z<=b[3]&&pointInIndexedPolygon(x,z,p.rings))return p;}
     return undefined;
   }
 }
