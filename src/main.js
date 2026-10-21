@@ -5,6 +5,7 @@ import './loading-screen.css';
 import './speedometer.css';
 import {createSpeedometer} from './speedometer.js';
 import {createFpsMeter} from './fps-meter.js';
+import {releaseAfterUpload} from './release-cpu.js';
 import {createFramePacer} from './frame-pacer.js';
 import {createBigMap} from './copenhagen/big-map.js';
 import {createSoundscape} from './copenhagen/soundscape.js';
@@ -587,7 +588,7 @@ function createFarCity(buildings){
    for(let t=0;t<tri.length;t+=3){let a=tri[t],c=tri[t+1],d=tri[t+2];const ux=flat[c*2]-flat[a*2],uz=flat[c*2+1]-flat[a*2+1],wx=flat[d*2]-flat[a*2],wz=flat[d*2+1]-flat[a*2+1];if(uz*wx-ux*wz<0){const x=c;c=d;d=x;} // facing up
     put(flat[a*2],top,flat[a*2+1],0,1,0,roofColour);put(flat[c*2],top,flat[c*2+1],0,1,0,roofColour);put(flat[d*2],top,flat[d*2+1],0,1,0,roofColour);}}
   if(!v)return;const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.BufferAttribute(P.slice(0,v*3),3));g.setAttribute('aFar',new THREE.BufferAttribute(F.slice(0,v*3),3));g.setAttribute('color',new THREE.BufferAttribute(Q.slice(0,v*3),3,true));
-  g.computeBoundingSphere();g.computeBoundingBox();const m=new THREE.Mesh(g,material);m.name='Far city chunk';m.matrixAutoUpdate=false;m.updateMatrix();group.add(m);};
+  g.computeBoundingSphere();g.computeBoundingBox();const m=new THREE.Mesh(g,material);m.name='Far city chunk';m.matrixAutoUpdate=false;m.updateMatrix();releaseAfterUpload(m);group.add(m);};
  const step=()=>{if(gameIsStopped())return;const t0=performance.now();while(lists.length&&performance.now()-t0<6)build(lists.pop());if(lists.length)(window.requestIdleCallback||setTimeout)(step,{timeout:200});else console.info('Far city built',group.children.length,'chunks');};
  step();
 }
@@ -749,7 +750,7 @@ function initSurfaceStreamer(){
  surfaceStreamer??=createSurfaceStreamer({concurrency:3,onError:handleTileError,load:async (t,{signal}={})=>{
   const g=await surfaceTile(new Float32Array(await unpack(`${dataUrl(t.file)}.pack`)),data.water); // same URL geometry() used
   if(signal?.aborted||gameIsStopped()){g.dispose();return;}
-  const m=new THREE.Mesh(g,surfaceMaterial);m.receiveShadow=true;cityModel.add(m);surfaceMeshes.add(m);return m;
+  const m=new THREE.Mesh(g,surfaceMaterial);m.receiveShadow=true;releaseAfterUpload(m); /* street surfaces held ~70 MB of arrays nothing reads after upload */cityModel.add(m);surfaceMeshes.add(m);return m;
  }});
  surfaceStreamer.add(surfaceIndex);
 }
