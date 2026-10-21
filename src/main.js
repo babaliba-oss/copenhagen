@@ -1663,7 +1663,7 @@ async function boot(){
    // Copenhagen has no street trams: its trams.json holds the S-train route relations, which run through the
    // Boulevard tunnel; drawn as tram track they laid rails and contact wire across Nørreport at street level.
    tramSim=new TramSimulation(tramData,world);tramSim.reset(car);tramRenderer=createTramRenderer(scene,tramSim);tramRenderer.update(car);
-   cyclists=city.id==='copenhagen'?new CityCyclists(mobility.roads,world,64):new Cyclists(data);cyclistRenderer=createCyclistRenderer(scene,cyclists);cyclistRenderer.update(car);
+   cyclists=city.id==='copenhagen'?new CityCyclists(mobility.roads,world,64,undefined,{parked:parkedCars?(x,z,r)=>parkedCars.near(x,z,r):null}):new Cyclists(data);cyclistRenderer=createCyclistRenderer(scene,cyclists);cyclistRenderer.update(car);
    npcScooters=new ScooterRiders(mobility.walks,world,city.id.startsWith('copenhagen')?{count:0}:undefined);npcScooters.reset(car);npcScooterRenderer=createScooterRiderRenderer(scene,npcScooters);npcScooterRenderer.update(car);
    birds=createBirds(data,{colonies:birdColonies});cityModel.add(birds.group);
    safeBirdFlight=createBirdFlightClearance({buildings:world.cameraBuildings,stalls:market.stalls||[],water:world.water});

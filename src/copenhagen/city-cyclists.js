@@ -6,8 +6,8 @@ import {routePoint} from '../mobility.js';
 // cyclist renderer (src/cyclists.js), which only needs `riders`.
 const RANGE=420;
 export class CityCyclists{
- constructor(roads,world,count=36,random=Math.random){
-  this.roads=roads;this.world=world;this.random=random;this.offsets=new Map();
+ constructor(roads,world,count=36,random=Math.random,{parked=null}={}){ // parked(x,z,r): boxes of the parked cars near a point ({x,z,heading,halfWidth,halfLength}; parked-cars.js near())
+  this.roads=roads;this.world=world;this.random=random;this.offsets=new Map();this.parked=parked;
   this.riders=Array.from({length:count},(_,id)=>({id,travelMode:'bike',halfWidth:.34,halfLength:.9,x:1e6,z:1e6,heading:0,speed:0,cruise:4.2+random()*1.8,phase:random()*6,route:null,leg:0,s:0}));
  }
  offset(e){
@@ -15,10 +15,13 @@ export class CityCyclists{
   const w=this.world;let best=null;
   for(const o of [e.lane+3.9,e.lane+3.2,e.lane+1.7]){
    let ok=0;for(const f of [.25,.5,.75]){const p=routePoint(e,e.length*f,o);if(!w.buildings.at(p.x,p.z)&&(w.roads.at(p.x,p.z)||w.pavement?.at(p.x,p.z)))ok++;}
-   if(ok>=2){best=o;break;}
+   if(ok>=2&&!this.throughParked(e,o)){best=o;break;}
   }
   this.offsets.set(e.id,best);return best;
  }
+ // A riding line through a parked car (narrow streets: the cars at the kerb fill the strip the track would take) is
+ // no line: riders went through the parked cars along 174 streets in the centre. No line left: the street is not ridden.
+ throughParked(e,o){if(!this.parked)return false;for(let s=1;s<e.length;s+=2){const p=routePoint(e,s,o);for(const b of this.parked(p.x,p.z,3.2)){const dx=p.x-b.x,dz=p.z-b.z,c=Math.cos(b.heading),sn=Math.sin(b.heading);if(Math.abs(dx*c-dz*sn)<b.halfWidth+.45&&Math.abs(dx*sn+dz*c)<b.halfLength+.45)return true;}}return false;}
  spawn(r,player){
   const E=this.roads.edges;
   for(let tries=0;tries<40;tries++){
