@@ -196,6 +196,12 @@ export function buildBridgeRailings(water,land={},{height=1.05,ground=()=>0}={})
    }
   }
  }
+ // A tagged deck with paving along every side (Langebro's carriageway between its cycle tracks) has no railing of its
+ // own, so it got no plate either: the paving over the water is dropped, and the road had a hole down to the harbour.
+ // It gets a plate at its quay-end height when a fifth of it lies over the water.
+ for(const deck of decks){if(railed.has(deck)||!BRIDGE.test(`${deck.kind||''} ${deck.name||''}`))continue;const ring=deck.rings[0],[x0,z0,x1,z1]=deck.bbox||[Math.min(...ring.map(p=>p[0])),Math.min(...ring.map(p=>p[1])),Math.max(...ring.map(p=>p[0])),Math.max(...ring.map(p=>p[1]))];
+  const step=Math.max(2,Math.sqrt((x1-x0)*(z1-z0)/4000));let n=0,wet=0; /* fine enough for a thin strip lying diagonally */for(let x=x0+step/2;x<x1;x+=step)for(let z=z0+step/2;z<z1;z+=step)if(pointInPolygon(x,z,deck.rings)){n++;if(inWater(x,z))wet++;}
+  if(!n||wet<n*.2)continue;let top=-Infinity;for(const p of ring){const g=ground(p[0],p[1]);if(Number.isFinite(g))top=Math.max(top,g);}railed.add(deck);deckY.set(deck,Number.isFinite(top)?top:0);}
  if(!parts.length)return null;
  // Decks of tagged bridges as plates of their own: the surface tiles drop paving that lies inside the water
  // polygons (dropSunkenSurfaces), which left railings standing over open water.

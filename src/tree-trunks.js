@@ -1,4 +1,4 @@
-import {segmentDistance} from './geo.js';
+import {segmentDistance,pointInPolygon} from './geo.js';
 
 // Solid tree trunks for every tree the city draws: registered street and park trees, landcover and
 // inferred forest trees, extension trees and place trees. Each trunk is a static circle in the shared
@@ -53,6 +53,23 @@ export class LaneIndex{
  }
 }
 
+// A register point inside a drawn carriageway polygon (kind Ajorata…; islands and footways are other kinds) stood on
+// the asphalt: the footway polygons overlap the carriageway at junctions, so 'on the pavement' kept it (a tree in the
+// middle of the road by Rådhuspladsen). Within `slack` of the kerb it stays (a trunk at the kerb line); deeper, it is
+// moved to the nearest kerb and `radius`+0.3 m beyond it, onto the footway. → false: leave it, [x,z]: moved, null: drop
+// (the far side of that kerb is a house or another carriageway).
+const CARRIAGEWAY=/^Ajorata/;
+export function offCarriageway(world,x,z,radius=TRUNK_RADIUS.fallback,slack=.3){
+ const roads=world?.roads;if(!roads?.near)return false;
+ const inRoad=(px,pz)=>{const list=roads.near(px,pz);for(const p of list){if(!CARRIAGEWAY.test(p.kind||''))continue;const b=p.bbox;if(px>=b[0]&&px<=b[2]&&pz>=b[1]&&pz<=b[3]&&pointInPolygon(px,pz,p.rings))return true;}return false;};
+ if(!inRoad(x,z))return false;
+ let best=null,d=Infinity;
+ for(const p of roads.near(x,z)){if(!CARRIAGEWAY.test(p.kind||''))continue;for(const ring of p.rings)for(let i=0;i<ring.length;i++){const [ax,az]=ring[i],[bx,bz]=ring[(i+1)%ring.length],dx=bx-ax,dz=bz-az,l=dx*dx+dz*dz;if(!l)continue;const t=clamp(((x-ax)*dx+(z-az)*dz)/l,0,1),px=ax+dx*t,pz=az+dz*t,q=Math.hypot(x-px,z-pz);if(q<d){d=q;best=[px,pz];}}}
+ if(!best)return false;if(d<=slack)return false;
+ const ux=(best[0]-x)/d,uz=(best[1]-z)/d,to=[+(best[0]+ux*(radius+.3)).toFixed(2),+(best[1]+uz*(radius+.3)).toFixed(2)];
+ return inRoad(...to)||world.buildings?.at(...to)?null:to;
+}
+
 export function trunkObstacle(tree,radius=trunkRadius(tree)){
  const [x,z]=tree.p;
  return {id:`tree:${x},${z}`,name:'a tree',tree:true,x,z,radius,collisionMode:'solid',bbox:[x-radius,z-radius,x+radius,z+radius]};
@@ -65,17 +82,18 @@ export function trunkObstacle(tree,radius=trunkRadius(tree)){
 // at the first build (after extensions installed at startup have merged their edges into it).
 export function createTreeTrunks({lanes=[]}={}){
  const laneIndex=new LaneIndex(),seen=new Set();
- const stats={solid:0,insideBuildings:0,inLane:0,inLaneOnPavement:0,laneDropped:0};
+ const stats={solid:0,insideBuildings:0,inLane:0,inLaneOnPavement:0,laneDropped:0,carriagewayMoved:0,carriagewayDropped:0};
  return {
   stats,laneIndex,
   addLanes(edges){laneIndex.add(edges);},
   // Returns the trees to draw and the trunk obstacles to add to world.objects.
   build(trees,world){
    const draw=[],obstacles=[];laneIndex.add(lanes);
-   for(const t of trees){
-    const [x,z]=t.p;
+   for(let t of trees){
+    let [x,z]=t.p;
     if(world?.buildings?.at(x,z)){stats.insideBuildings++;continue;}
     const radius=trunkRadius(t);
+    {const r=offCarriageway(world,x,z,radius);if(r===null){stats.carriagewayDropped++;continue;}if(r){[x,z]=r;t={...t,p:r};stats.carriagewayMoved++;}}
     if(laneIndex.distance(x,z)<radius+CAR_CLEARANCE){
      stats.inLane++;
      if(!world?.pavement?.at(x,z)){stats.laneDropped++;continue;}

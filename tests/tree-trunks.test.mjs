@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync,existsSync} from 'node:fs';
 import {gunzipSync} from 'node:zlib';
-import {trunkRadius,trunkObstacle,createTreeTrunks,LaneIndex,TRUNK_RADIUS} from '../src/tree-trunks.js';
+import {trunkRadius,trunkObstacle,createTreeTrunks,LaneIndex,TRUNK_RADIUS,offCarriageway} from '../src/tree-trunks.js';
 import {WorldObjects} from '../src/world-objects.js';
 import {SpatialIndex} from '../src/geo.js';
 import {makeCar,driveStep} from '../src/physics.js';
@@ -97,3 +97,13 @@ for(const [id,root] of [['helsinki','public/data'],['tampere','public/cities/tam
   for(const o of obstacles)if(lanes.distance(o.x,o.z)<o.radius+1.05)assert.ok(world.pavement.at(o.x,o.z),`${o.id} in a lane`);
   assert.ok(trunks.stats.laneDropped<100,JSON.stringify(trunks.stats));
  });
+
+test('a tree point inside a drawn carriageway is moved out to the kerb, or dropped when the far side is a house or road',()=>{
+ const road={kind:'Ajorata',rings:[[[-50,-4],[50,-4],[50,4],[-50,4]]]},walk=square(-50,4,100,4);
+ const world={roads:new SpatialIndex([road]),pavement:new SpatialIndex([walk,square(-50,-4,100,8)]),buildings:new SpatialIndex([square(18,-8,6,4)])};
+ const trunks=createTreeTrunks({lanes:[]}),trees=[{p:[0,3.8]},{p:[10,2.5]},{p:[20,-3]},{p:[30,6]}];
+ const {draw}=trunks.build(trees,world);
+ assert.deepEqual(draw.map(t=>t.p),[[0,3.8],[10,4.52],[30,6]],'at the kerb line it stays; 1.5 m in, it goes onto the footway; by a house it is dropped');
+ assert.equal(trunks.stats.carriagewayMoved,1);assert.equal(trunks.stats.carriagewayDropped,1);
+ assert.equal(offCarriageway({roads:new SpatialIndex([{kind:'traffic_island',rings:road.rings}])},0,0),false,'islands are not carriageway');
+});

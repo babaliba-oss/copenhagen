@@ -30,7 +30,7 @@ import {setLadcykelBox} from './player-ride-models.js';
 import {setScooterModel} from './parked-micromobility.js';
 import {setCarriageModels} from './copenhagen/carriage.js';import {loadArmouredHorse,loadBrougham,loadCoachman,loadOneMesh} from './copenhagen/gait.js';
 import {loadVehicleBodies} from './vehicle-bodies.js';
-import {currentSeason,createSeasonalDecor} from './copenhagen/seasons.js';
+import {currentSeason,createSeasonalDecor,noteDrawnWalls} from './copenhagen/seasons.js';
 import {inWaterPolygons,bounds} from './geo.js';
 import {vehicleBodyParts,VEHICLE_SPECS} from './vehicle-models.js';
 import {animateVehicle} from './vehicles.js';
@@ -138,7 +138,7 @@ import {breakableSigns} from './breakable-signs.js';
 import {createParkedMicromobility} from './parked-micromobility.js';
 import {Finale} from './finale.js';
 import {createRoadblock} from './roadblock.js';
-import {createMappedFurniture,bringAshore} from './mapped-furniture.js';
+import {createMappedFurniture,bringAshore,placeBenches} from './mapped-furniture.js';
 import {createCycleMarks} from './cycle-marks.js';
 import {createRadio,storedStation,storeStation} from './copenhagen/radio.js';
 import {createPlace} from './place-scene.js';
@@ -632,6 +632,7 @@ async function buildRoof(t,at){
    {const cx=(a[o]+a[o+5]+a[o+10])/3,cz=(a[o+2]+a[o+7]+a[o+12])/3,g=groundAt(cx,cz),y=(y0+y1+y2)/3;if(y>g+1.3||y<g-1.5)continue;} // lying near the street (a low annex sunk by the slope)
    for(const k of [5,10]){a[o+k]=a[o];a[o+k+1]=a[o+1];a[o+k+2]=a[o+2];}}
   const parts=t.parts.filter(p=>![211,212,213,1796,57950,STATION_KIOSK_RATU,USPENSKI.ratu].includes(p.ratu)&&!placeHidden.has(p.id)&&!p.duplicate); // duplicate: a second copy of the same building (building-dedupe.js) // place landmarks and shelters are drawn by place-scene.js
+  if(city.id==='copenhagen')noteDrawnWalls(a,parts,t.file); // the drawn walls keep Halloween's pumpkins out of the shopfronts (seasons.js)
   // Far level: one merged shell per atlas. Near level: per-part shells until the worker's details replace them.
   const shells=await shellNormals(a,mergedShellRanges(parts).map(r=>[r.start,r.end])); // off the main thread (15-40 ms a tile)
   const mask=createShellMask(parts.length);group.add(...createMergedShells(a,parts,textures,mask,shells?.normals));addShadowCasters(group,shells?.positions);
@@ -1153,7 +1154,7 @@ let seasonSwitch=null;
 async function switchSeason(name){
  if(city?.id!=='copenhagen'||!world||(seasonal?.season||null)===(name||null))return;const mine=seasonSwitch={};
  const cd=seasonCafes&&await seasonCafes;if(seasonSwitch!==mine)return;
- if(seasonal){cityModel.remove(seasonal.group);seasonal.group.traverse(o=>{if(o.isMesh||o.isPoints)o.geometry?.dispose();});seasonal=null;}
+ if(seasonal){seasonal.dispose?.();cityModel.remove(seasonal.group);seasonal.group.traverse(o=>{if(o.isMesh||o.isPoints)o.geometry?.dispose();});seasonal=null;}
  if(name){seasonal=createSeasonalDecor(name,{buildings:data.buildings,world,places:data.landmarks||[],cafes:cd?.tables||[],walks:data.pavement||[],pumpkins:blenderLoads?await blenderLoads.pumpkins:null});cityModel.add(seasonal.group);}
 }
 function cineHud(kind,on,shot){
@@ -1399,6 +1400,7 @@ async function boot(){
    if(city.era===1760){let n=0;for(const t of roofIndex.tiles)for(const p of t.parts){if(p.name||p.noFacade||p.duplicate||p.height<=13.5)continue;let h=0;for(const ch of p.id)h=(h*31+ch.charCodeAt(0))>>>0;
      p.sourceHeight??=p.height;p.height=p.measuredHeight=9.5+(h%9)*.5;n++;}console.info('1760: houses brought down to period height',n);} // the municipal model is today's city: 5-7 storey blocks. In 1760 houses had 2-4 storeys under steep roofs
    if(city.id.startsWith('copenhagen')){const afloat=[];for(const t of roofIndex.tiles)for(const p of t.parts){const [a,b,c,d]=p.bbox,ix=(c-a)*.25,iz=(d-b)*.25,wet=[[(a+c)/2,(b+d)/2],[a+ix,b+iz],[c-ix,b+iz],[a+ix,d-iz],[c-ix,d-iz]].filter(([x,z])=>inWaterPolygons(data.water,x,z)).length;if(wet>=4){if(city.era===1760)p.duplicate=true;else if(!p.id.startsWith('kk-')&&p.height===10){p.sourceHeight=10;p.height=p.measuredHeight=3.4;}afloat.push(p);}}console.info('Buildings standing in the water (houseboats: low, none in 1760)',afloat.length);if(import.meta.env.DEV)window.__afloat=afloat.map(p=>[p.id,p.name||'',p.height,p.bbox.map(Math.round).join(',')]);} // houseboats and ships mapped as buildings: OpenStreetMap's default 10 m made them tall boxes in the canals
+   if(city.id==='copenhagen'){let n=0;for(const t of roofIndex.tiles)for(const p of t.parts){const [a,b,c,d]=p.bbox;if(p.id.startsWith('kk-')||p.height!==10||p.sourceHeight!==undefined||(c-a)*(d-b)>=150)continue;p.sourceHeight=10;p.height=p.measuredHeight=3.4;n++;}console.info('Small houses at the default height brought down (kiosks, sheds, rides)',n);} /* the city model's own houses are surveyed; newer ones from OpenStreetMap without a height got 10 m, and every kiosk, shed and Tivoli carousel stood as a blank 10 m tower */
    if(city.facades)attachFacades(roofIndex,await json(dataUrl(city.facades)).catch(()=>null)); // photo-described street fronts (optional, any city)
    if(city.estimatedFacades)estimateFacades(roofIndex,{era:city.era}); // plausible fronts for untextured official meshes (see facade-data.js)
    // Photo-matched places (squares with their tram stop, trees and landmarks; scripts/place-build.mjs): measured heights,
@@ -1558,24 +1560,9 @@ async function boot(){
     // of a lane only counts off the pavement (a post at the kerb); traffic islands keep their lights and signs.
     const onRoad=(x,z)=>lanes.at(x,z)&&!islands.at(x,z);
     const inLane=(x,z)=>onRoad(x,z)||[[.6,0],[-.6,0],[0,.6],[0,-.6]].some(([a,b])=>lanes.at(x+a,z+b))&&!walk.at(x,z)&&!islands.at(x,z);mapped.poleAllowed=(x,z)=>!inLane(x,z);
-    mapped.items=mapped.items.filter(it=>!onRoad(it.x,it.z));console.info(`Street furniture: ${before-mapped.items.length} items in traffic lanes dropped`);
-    // Benches are photo detections placed to within a few metres, and 920 came with no heading (all faced north). One
-    // beside a street now stands 0.9 m back from the kerb with its seat along it, facing the street; one placed in
-    // the carriageway is moved off it (dropped when that puts it in a house or another lane).
-    {const houses=new SpatialIndex(data.buildings),wheels=new SpatialIndex(data.roads.filter(r=>!/Koroke/.test(r.kind))),kerb=(x,z)=>{let best=null,d=Infinity;const seen=new Set(); // wheels: carriageway and cycle tracks (a bench stood on the cycle track)
-      for(const [a,b] of [[0,0],[10,0],[-10,0],[0,10],[0,-10]])for(const p of wheels.near(x+a,z+b)){if(seen.has(p))continue;seen.add(p);if(p.bbox[0]>x+8||p.bbox[2]<x-8||p.bbox[1]>z+8||p.bbox[3]<z-8)continue;
-       for(const r of p.rings)for(let i=0;i<r.length;i++){const [ax,az]=r[i],[bx,bz]=r[(i+1)%r.length],dx=bx-ax,dz=bz-az,l=dx*dx+dz*dz;if(!l)continue;const t=Math.max(0,Math.min(1,((x-ax)*dx+(z-az)*dz)/l)),px=ax+dx*t,pz=az+dz*t,q=Math.hypot(x-px,z-pz);if(q<d){d=q;best={x:px,z:pz,d:q};}}}
-      return best;};
-     // away from the streets (parks, squares) a bench with no heading faces the footway it stands on or beside
-     const edgeOf=(index,x,z,r)=>{let best=null,d=r;for(const [a,b] of [[0,0],[10,0],[-10,0],[0,10],[0,-10]])for(const p of index.near(x+a,z+b)){if(p.bbox[0]>x+r||p.bbox[2]<x-r||p.bbox[1]>z+r||p.bbox[3]<z-r)continue;
-       for(const ring of p.rings)for(let i=0;i<ring.length;i++){const [ax,az]=ring[i],[bx,bz]=ring[(i+1)%ring.length],dx=bx-ax,dz=bz-az,l=dx*dx+dz*dz;if(!l)continue;const t=Math.max(0,Math.min(1,((x-ax)*dx+(z-az)*dz)/l)),px=ax+dx*t,pz=az+dz*t,q=Math.hypot(x-px,z-pz);if(q<d){d=q;best={x:px,z:pz,d:q};}}}
-      return best;};
-     let moved=0,turned=0,dropped=0,parked=0;mapped.items=mapped.items.filter(it=>{if(it.k!=='bench')return true;const e=kerb(it.x,it.z);
-      if(!e||e.d>7){if(it.yaw)return true;const w=edgeOf(walk,it.x,it.z,6);if(w&&w.d>.05){const on=!!walk.at(it.x,it.z),sx=(it.x-w.x)/w.d,sz=(it.z-w.z)/w.d;it.yaw=on?Math.atan2(sx,sz):Math.atan2(-sx,-sz);parked++;}return true;}
-      const inside=!!wheels.at(it.x,it.z);let ux=it.x-e.x,uz=it.z-e.z;const l=Math.hypot(ux,uz);if(l<.01)return false;ux/=l;uz/=l;if(inside){ux=-ux;uz=-uz;} // (ux,uz): from the kerb into the pavement
-      if(inside||e.d<.9){const x=e.x+ux*.9,z=e.z+uz*.9;if(wheels.at(x,z)||houses.at(x,z)){dropped++;return false;}it.x=x;it.z=z;moved++;}
-      it.yaw=Math.atan2(-ux,-uz);turned++;return true;}); // the seat faces +Z in the bench model: towards the street
-     console.info(`Street furniture: benches set along the kerb ${turned} (moved off the carriageway ${moved}, dropped ${dropped}), park benches turned to their footway ${parked}`);}
+    mapped.items=mapped.items.filter(it=>it.k==='wire-lamp'||!onRoad(it.x,it.z));/* wire lamps hang 7 m over the carriageway, where the register places them: dropped with the rest, 8,400 of 10,200 went and the few over the pavements hung from one wire */console.info(`Street furniture: ${before-mapped.items.length} items in traffic lanes dropped`);
+    {const r=placeBenches(mapped.items,{houses:new SpatialIndex(data.buildings),wheels:new SpatialIndex(data.roads.filter(r=>!/Koroke/.test(r.kind))),walk});mapped.items=r.items; // benches along the kerb, facing the street; one bench per spot (mapped-furniture.js)
+     console.info(`Street furniture: benches set along the kerb ${r.turned} (moved off the carriageway ${r.moved}, dropped ${r.dropped}), park benches turned to their footway ${r.parked}, doubles dropped ${r.doubled}`);}
     {const b=mapped.items.length;mapped.items=mapped.items.filter(it=>!([[0,0],[2.5,0],[-2.5,0],[0,2.5],[0,-2.5]].every(([a,b])=>inWaterPolygons(data.water,it.x+a,it.z+b))&&!lanes.at(it.x,it.z)&&!walk.at(it.x,it.z))); /* well out on the water, not the quay-edge lamps and bollards */console.info(`Street furniture: ${b-mapped.items.length} items standing in the water dropped`);} // signs and poles mapped on the water (bridge ends, survey drift)
     {const decks=new SpatialIndex((sea?.group?.userData?.bridges||[]).filter(d=>d.rings?.[0]?.length>2)),houses=new SpatialIndex(data.buildings||[]),r=bringAshore(mapped.items,{wet:(x,z)=>inWaterPolygons(data.water,x,z),deck:(x,z)=>!!decks.at(x,z),blocked:(x,z)=>!!houses.at(x,z)});mapped.items=r.items;console.info(`Street furniture: ${r.moved} items on the quay edge moved ashore, ${r.dropped} dropped`);} /* the rest of the quay-edge items: no paving is drawn over the mapped water, they hung over the canal (benches on Christianshavn's quays) */
     // Sign clutter: photo detections give blank blue 'generic plates' (no readable type) and the same sign seen

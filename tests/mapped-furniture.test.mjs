@@ -29,3 +29,23 @@ test('furniture placed just inside the mapped water moves ashore past the coping
  const bench=r.items.find(i=>i.k==='bench');assert.ok(bench.x<=-.5&&bench.x>-1.5&&Math.abs(bench.z)<.01,`bench at ${bench.x},${bench.z}`);
  assert.deepEqual(r.items.find(i=>i.k==='lamp'),{k:'lamp',x:-5,z:0});assert.equal(r.items.find(i=>i.k==='sign').x,2,'on the deck');
 });
+
+test('one bench per spot: a second within a seat length of the first is dropped after the kerb snap',async()=>{
+ const {placeBenches,benchesOverlap}=await import('../src/mapped-furniture.js');const {SpatialIndex}=await import('../src/geo.js');
+ const box=(x0,z0,x1,z1,kind)=>({kind,rings:[[[x0,z0],[x1,z0],[x1,z1],[x0,z1]]]});
+ const wheels=new SpatialIndex([box(-50,-4,50,4,'Ajorata')]),walk=new SpatialIndex([box(-50,4,50,10)]),houses=new SpatialIndex([]);
+ const items=[{k:'bench',x:0,z:5.5},{k:'bench',x:1.3,z:6.2},{k:'bench',x:6,z:5.5},{k:'lamp',x:0,z:5}];
+ const r=placeBenches(items,{houses,wheels,walk});
+ assert.equal(r.doubled,1);assert.deepEqual(r.items.filter(i=>i.k==='bench').map(i=>i.x),[0,6]);assert.equal(r.items.length,3,'other furniture untouched');
+ assert.ok(benchesOverlap({x:0,z:0},{x:2.3,z:0}));assert.ok(!benchesOverlap({x:0,z:0},{x:2.5,z:0}));
+});
+
+test('a wire lamp hangs from two wires or not at all, and wires share the poles they end at',async()=>{
+ const {wireLines}=await import('../src/mapped-furniture.js');
+ const wall=(x,z)=>Math.abs(x)>=8; // facades 8 m either side of the lamp
+ let out=[],poles=[];assert.equal(wireLines({x:0,z:0,yaw:Math.PI/2,a:8,b:8},out,poles,{wallAt:wall}),2);assert.equal(out.length,48);assert.equal(poles.length,0);
+ out=[];assert.equal(wireLines({x:0,z:0,yaw:Math.PI/2,a:8,b:8,pb:true},out,poles,{wallAt:wall,poleAllowed:()=>false}),0,'no pole allowed on one side: no lamp');assert.equal(out.length,0);assert.equal(poles.length,0,'nothing left behind');
+ out=[];assert.equal(wireLines({x:0,z:0,yaw:Math.PI/2,a:8,b:15},out,poles,{wallAt:(x,z)=>x>=8||x<=-20}),2,'no facade within 3 m of the far anchor: a pole there');assert.equal(poles.length,1);
+ out=[];assert.equal(wireLines({x:0,z:2,yaw:Math.PI/2,a:8,b:15},out,poles,{wallAt:(x,z)=>x>=8||x<=-20}),2);assert.equal(poles.length,1,'the next lamp shares that pole');
+ out=[];assert.equal(wireLines({x:0,z:40,yaw:Math.PI/2,a:8,b:15},out,poles,{wallAt:(x,z)=>x>=8||x<=-20,crowded:()=>true}),0,'crowded: no new pole, no lamp');assert.equal(poles.length,1);
+});

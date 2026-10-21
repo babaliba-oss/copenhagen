@@ -46,6 +46,36 @@ export function bringAshore(items,{wet,deck=()=>false,blocked=()=>false,reach=3,
   it.x=+to[0].toFixed(2);it.z=+to[1].toFixed(2);moved++;out.push(it);}
  return {items:out,moved,dropped};
 }
+// Benches are photo detections placed to within a few metres, and 920 came with no heading (all faced north). One
+// beside a street now stands 0.9 m back from the kerb with its seat along it, facing the street; one placed in
+// the carriageway is moved off it (dropped when that puts it in a house or another lane). houses, wheels (carriageway
+// and cycle tracks: a bench stood on the cycle track), walk: SpatialIndex of footprints, road and footway polygons.
+// -> {items, moved, turned, dropped, parked, doubled}
+export function placeBenches(items,{houses,wheels,walk}){
+ const kerb=(x,z)=>{let best=null,d=Infinity;const seen=new Set(); // wheels: carriageway and cycle tracks (a bench stood on the cycle track)
+  for(const [a,b] of [[0,0],[10,0],[-10,0],[0,10],[0,-10]])for(const p of wheels.near(x+a,z+b)){if(seen.has(p))continue;seen.add(p);if(p.bbox[0]>x+8||p.bbox[2]<x-8||p.bbox[1]>z+8||p.bbox[3]<z-8)continue;
+   for(const r of p.rings)for(let i=0;i<r.length;i++){const [ax,az]=r[i],[bx,bz]=r[(i+1)%r.length],dx=bx-ax,dz=bz-az,l=dx*dx+dz*dz;if(!l)continue;const t=Math.max(0,Math.min(1,((x-ax)*dx+(z-az)*dz)/l)),px=ax+dx*t,pz=az+dz*t,q=Math.hypot(x-px,z-pz);if(q<d){d=q;best={x:px,z:pz,d:q};}}}
+  return best;};
+ // away from the streets (parks, squares) a bench with no heading faces the footway it stands on or beside
+ const edgeOf=(index,x,z,r)=>{let best=null,d=r;for(const [a,b] of [[0,0],[10,0],[-10,0],[0,10],[0,-10]])for(const p of index.near(x+a,z+b)){if(p.bbox[0]>x+r||p.bbox[2]<x-r||p.bbox[1]>z+r||p.bbox[3]<z-r)continue;
+   for(const ring of p.rings)for(let i=0;i<ring.length;i++){const [ax,az]=ring[i],[bx,bz]=ring[(i+1)%ring.length],dx=bx-ax,dz=bz-az,l=dx*dx+dz*dz;if(!l)continue;const t=Math.max(0,Math.min(1,((x-ax)*dx+(z-az)*dz)/l)),px=ax+dx*t,pz=az+dz*t,q=Math.hypot(x-px,z-pz);if(q<d){d=q;best={x:px,z:pz,d:q};}}}
+  return best;};
+ let moved=0,turned=0,dropped=0,parked=0;items=items.filter(it=>{if(it.k!=='bench')return true;const e=kerb(it.x,it.z);
+  if(!e||e.d>7){if(it.yaw)return true;const w=edgeOf(walk,it.x,it.z,6);if(w&&w.d>.05){const on=!!walk.at(it.x,it.z),sx=(it.x-w.x)/w.d,sz=(it.z-w.z)/w.d;it.yaw=on?Math.atan2(sx,sz):Math.atan2(-sx,-sz);parked++;}return true;}
+  const inside=!!wheels.at(it.x,it.z);let ux=it.x-e.x,uz=it.z-e.z;const l=Math.hypot(ux,uz);if(l<.01)return false;ux/=l;uz/=l;if(inside){ux=-ux;uz=-uz;} // (ux,uz): from the kerb into the pavement
+  if(inside||e.d<.9){const x=e.x+ux*.9,z=e.z+uz*.9;if(wheels.at(x,z)||houses.at(x,z)){dropped++;return false;}it.x=x;it.z=z;moved++;}
+  it.yaw=Math.atan2(-ux,-uz);turned++;return true;}); // the seat faces +Z in the bench model: towards the street
+ // One bench seen from several photos lands as two or three a metre or two apart, and the kerb snap above lines them
+ // up on the same spot (end to end and through each other on Langebro): the first stays, one overlapping it is dropped.
+ let doubled=0;{const grid=new Map(),G=4;items=items.filter(it=>{if(it.k!=='bench')return true;const gx=Math.floor(it.x/G),gz=Math.floor(it.z/G);
+  for(let i=-1;i<=1;i++)for(let j=-1;j<=1;j++)for(const q of grid.get((gx+i)+','+(gz+j))||[])if(benchesOverlap(q,it)){doubled++;return false;}
+  const k=gx+','+gz;if(!grid.has(k))grid.set(k,[]);grid.get(k).push(it);return true;});}
+ return {items,moved,turned,dropped,parked,doubled};
+}
+// Two benches closer than a seat's length and BENCH_GAP (SOLIDS.bench: 1.8 m) are one bench seen twice: end to end they
+// touch, side by side they stand one behind the other.
+export const BENCH_GAP=.6;
+export const benchesOverlap=(a,b,w=SOLIDS.bench[0])=>Math.hypot(a.x-b.x,a.z-b.z)<w+BENCH_GAP;
 // A stable id per object: Mapillary feature id, else its source and place in the file.
 const itemId=(it,i)=>`mapped-${it.k}-${it.mly?.[0]??`${it.src||'item'}-${i}`}`;
 export const KNOCKABLE={bin:{radius:.26},barrier:{radius:.35},cone:{radius:.2}};
@@ -82,25 +112,31 @@ function postParts(kind){
  return [];
 }
 // One wire lamp: wire points (pairs for LineSegments) rising from the shade to anchors a and b metres either
-// side, plus pole positions where no wall was in reach. The shade itself is instanced.
-const WIRE_LOW=7.1;
-function wireLines(it,out,poles,{poleAllowed=()=>true,wallAt=null}={}){
- const yaw=it.yaw||0,gy=groundAt(it.x,it.z),c=Math.cos(yaw),s=Math.sin(yaw);let drawn=0;
+// side, plus pole positions where no wall was in reach. The shade itself is instanced. A lamp hangs from two wires
+// or not at all: with one anchor missing it hung from a single wire to one facade, in the air over the street.
+// crowded(it): new poles are not wanted here (the caller's forest rule); then the lamp is left out. → wires drawn (0 or 2)
+const WIRE_LOW=7.1,WALL_REACH=3;
+export function wireLines(it,out,poles,{poleAllowed=()=>true,wallAt=null,crowded=()=>false}={}){
+ const yaw=it.yaw||0,gy=groundAt(it.x,it.z),c=Math.cos(yaw),s=Math.sin(yaw),g=poles.grid??=new Map(),ends=[];
+ const standing=(ex,ez)=>{const gx=Math.floor(ex/3),gz=Math.floor(ez/3);for(let i=-1;i<=1;i++)for(let j=-1;j<=1;j++){const p=(g.get((gx+i)+','+(gz+j))||[]).find(p=>Math.hypot(p[0]-ex,p[1]-ez)<3);if(p)return p;}return null;};
  for(let [len,dir,pole] of [[it.a||7,1,it.pa],[it.b||7,-1,it.pb]]){
   // Every wire must end on something: a wall (searched a few metres either side of the mapped anchor) or a
   // pole that is allowed where it stands (moved back toward the lamp if the mapped spot is in a lane).
   // Wires that ended in mid-air, where a pole was dropped from a lane or no wall stood, read as cut lines.
   const at=d=>[it.x+s*dir*d,it.z+c*dir*d];
-  if(!pole&&wallAt){let hit=0;for(let d=Math.max(1.5,len-3);d<=len+6;d+=.5)if(wallAt(...at(d))){hit=d;break;}if(hit)len=hit;else pole=true;}
-  if(pole&&!poleAllowed(...at(len))){let ok=0;for(let d=len-.5;d>=2;d-=.5)if(poleAllowed(...at(d))){ok=d;break;}if(!ok)continue;len=ok;}
+  if(!pole&&wallAt){let hit=0;for(let d=Math.max(1.5,len-3);d<=len+WALL_REACH;d+=.5)if(wallAt(...at(d))){hit=d;break;}if(hit)len=hit;else pole=true;} // reach: a facade 6 m past the anchor strung the wire across the whole pavement
+  if(pole&&!poleAllowed(...at(len))){let ok=0;for(let d=len-.5;d>=2;d-=.5)if(poleAllowed(...at(d))){ok=d;break;}if(!ok)return 0;len=ok;}
   // several wires ending together share one pole: snap to a pole already standing within 3 m
-  let [ex,ez]=at(len);if(pole){const g=poles.grid??=new Map(),gx=Math.floor(ex/3),gz=Math.floor(ez/3);let near=null;for(let i=-1;i<=1&&!near;i++)for(let j=-1;j<=1&&!near;j++)near=(g.get((gx+i)+','+(gz+j))||[]).find(p=>Math.hypot(p[0]-ex,p[1]-ez)<3)||null;
-   if(near)[ex,ez]=near;else{const p=[ex,ez];poles.push(p);const k=gx+','+gz;if(!g.has(k))g.set(k,[]);g.get(k).push(p);}}
+  let [ex,ez]=at(len),fresh=false;if(pole){const near=standing(ex,ez);if(near)[ex,ez]=near;else fresh=true;}
+  ends.push([ex,ez,pole,fresh]);
+ }
+ if(ends.some(e=>e[3])&&crowded(it))return 0;
+ for(const [ex,ez,pole,fresh] of ends){
+  if(fresh&&!standing(ex,ez)){const p=[ex,ez],k=Math.floor(ex/3)+','+Math.floor(ez/3);poles.push(p);if(!g.has(k))g.set(k,[]);g.get(k).push(p);}
   const top=pole?8.2:8.9,steps=4;let px=it.x,pz=it.z,py=gy+WIRE_LOW+.55;
   for(let k=1;k<=steps;k++){const t=k/steps,x=it.x+(ex-it.x)*t,z=it.z+(ez-it.z)*t,y=gy+WIRE_LOW+.55+(top-WIRE_LOW-.55)*Math.pow(t,1.6);out.push(px,py,pz,x,y,z);px=x;py=y;pz=z;}
-  drawn++;
  }
- return drawn;
+ return ends.length;
 }
 const LENSES={'traffic-light':[[3.35,'red'],[3.1,'amber'],[2.85,'green']],'crossing-light':[[2.62,'red'],[2.38,'green']]};
 const LENS_ON={red:'#ff392b',amber:'#ffb43a',green:'#47ec9b'},LENS_OFF={red:'#382927',amber:'#3a3322',green:'#233a32'};
@@ -183,10 +219,10 @@ export function createMappedFurniture(layer,{rangeScale=1,player=()=>null,mobili
  // (register span to the nearest wall on each side; a slim pole where no wall is in reach).
  const wireLamps=items.filter(it=>it.k==='wire-lamp'),wirePoles=[];
  if(wireLamps.length){
-  {const hung=[],poled=[];for(const it of wireLamps){const chunk=chunkOf(it.x,it.z),w=chunk.wires??=[],w0=w.length,p0=wirePoles.length;if(!wireLines(it,w,wirePoles,{poleAllowed,wallAt}))continue;
+  {const hung=[],poled=[],crowded=it=>poled.some(q=>Math.hypot(q.x-it.x,q.z-it.z)<24);for(const it of wireLamps){const chunk=chunkOf(it.x,it.z),w=chunk.wires??=[],p0=wirePoles.length;if(!wireLines(it,w,wirePoles,{poleAllowed,wallAt,crowded}))continue;
    // Open squares (Nørreport, Rådhuspladsen): the register lists a wire lamp every few metres, and with no facade
-   // in reach each one stood on its own new poles, a forest of masts. Keep one pole-hung lamp per 24 m there.
-   if(wirePoles.length>p0){if(poled.some(q=>Math.hypot(q.x-it.x,q.z-it.z)<24)){w.length=w0;wirePoles.length=p0;continue;}poled.push(it);}
+   // in reach each one stood on its own new poles, a forest of masts. Keep one pole-hung lamp per 24 m there (crowded).
+   if(wirePoles.length>p0)poled.push(it);
    hung.push(it);}wireLamps.length=0;wireLamps.push(...hung);} // a shade with no wire is left out
   const shade=models['wire-shade']?models['wire-shade'].clone().translate(0,WIRE_LOW+.18,0):mergeGeometries([cyl(.012,.012,.5,WIRE_LOW+.3,'#24282a',4),cyl(.06,.06,.1,WIRE_LOW+.5,'#2c3033',8),cyl(.09,.42,.24,WIRE_LOW+.32,'#2c3033',8),cyl(.3,.3,.03,WIRE_LOW+.19,'#fff3d6',8)]);
   chunkedInstances(wireLamps,shade,painted,'Wire lamp shades',it=>[it.x,it.z,it.yaw],{shadow:false});

@@ -28,12 +28,16 @@ export function createCycleCrossings({pavement=[],world}){
    const [bx,bz]=axisOf(far);if(Math.abs(bx*ax+bz*az)<Math.cos(25*Math.PI/180))continue;
    const key=[poly.id??poly.bbox?.join(),far.id??far.bbox?.join()].sort().join('|');if(done.has(key))continue;done.add(key);
    {let lo2=landed-.5,hi2=landed;for(let k=0;k<5;k++){const m=(lo2+hi2)/2;world.roads.at(ex+ox*m,ez+oz*m)?lo2=m:hi2=m;}landed=hi2;}
-   const w=Math.min(2.4,Math.max(1.6,width)),px=-oz*w/2,pz=ox*w/2,e=landed-.05,s0=-.1;
+   // The carriageway is drawn over a track polygon that runs on into the junction: the crossing starts where the track
+   // is last seen, not at the polygon's end out in the road (blue squares floated mid-road by Langebro, cut off from both tracks).
+   let s0=-.1;if(world.roads.at(ex-ox*.3,ez-oz*.3)){let lo3=-(hi-lo),hi3=0;if(world.roads.at(ex+ox*lo3,ez+oz*lo3))continue;for(let k=0;k<8;k++){const m=(lo3+hi3)/2;world.roads.at(ex+ox*m,ez+oz*m)?hi3=m:lo3=m;}s0=lo3-.1;}
+   if(landed-s0>30)continue;
+   const w=Math.min(2.4,Math.max(1.6,width)),px=-oz*w/2,pz=ox*w/2,e=landed-.05;
    const corners=[[ex+px+ox*s0,ez+pz+oz*s0],[ex-px+ox*s0,ez-pz+oz*s0],[ex-px+ox*e,ez-pz+oz*e],[ex+px+ox*e,ez+pz+oz*e]];
    const g=new THREE.BufferGeometry(),y=.118,pos=[],tri=[[0,1,2],[0,2,3]];
    const up=(corners[1][0]-corners[0][0])*(corners[2][1]-corners[0][1])-(corners[1][1]-corners[0][1])*(corners[2][0]-corners[0][0]);
    for(const tr of tri)for(const k of (up>0?[tr[0],tr[2],tr[1]]:tr))pos.push(corners[k][0],y,corners[k][1]);
-   g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));g.computeVertexNormals();quads.push(g);at.push([Math.round(ex+ox*e/2),Math.round(ez+oz*e/2),Math.round(Math.atan2(ox,oz)*100)/100]);}
+   g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));g.computeVertexNormals();quads.push(g);at.push([Math.round(ex+ox*(e+s0)/2),Math.round(ez+oz*(e+s0)/2),Math.round(Math.atan2(ox,oz)*100)/100,Math.round((e-s0)*10)/10]);}
  }
  const group=new THREE.Group();group.name='Blue cycle crossings';
  if(quads.length){const m=new THREE.Mesh(drapeGeometry(mergeGeometries(quads),{maxEdge:2}),new THREE.MeshStandardMaterial({color:'#2f6db5',roughness:.9,polygonOffset:true,polygonOffsetFactor:-2}));quads.forEach(g=>g.dispose());m.receiveShadow=true;group.add(m);}
