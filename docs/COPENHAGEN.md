@@ -61,6 +61,8 @@ python3 scripts/surface-fill.py copenhagen          # after fit-colliders, and a
                                                     # unmapped strips between the streets and the houses (below)
 node scripts/furniture-ground.mjs copenhagen        # after surface-fill and mapillary-features: flags the furniture with no
                                                     # surface under it, set down onto the bare ground or lawn (main.js)
+node scripts/indoor-items.mjs copenhagen            # after furniture-ground, kk-collision and collision-trim: drops furniture
+                                                    # inside the model's drawn houses, lists such trees (indoor-trees.json)
 ```
 
 Most of today's pavements are not mapped as areas (OpenStreetMap draws them as lines or not at all), so the rendered
