@@ -18,7 +18,7 @@ export const FLAT_TYRES={speed:3.2,drag:11,power:.3,wobble:.35};
 // No battery: the car never runs out (the city is for exploring, not for range anxiety).
 export function makeCar(x,z,heading=0){return settleOnGround({x,z,heading,speed:0,steer:0,distance:0});}
 // Height, pitch and roll from the ground under the wheels (all 0 in a flat city).
-export function settleOnGround(car){const p=groundPose(car.x,car.z,car.heading,1.4,.8);car.y=p.y;car.pitch=p.pitch;car.roll=p.roll;return car;}
+export function settleOnGround(car){const p=groundPose(car.x,car.z,car.heading,car.front>2.3?2.2:1.4,.8); /* a longer vehicle (the 1760 coach, front 3.3) takes the slope over its own length */car.y=p.y;car.pitch=p.pitch;car.roll=p.roll;return car;}
 // out: an array of nine [x,z] pairs to fill instead of allocating them (the 10 cm substep loop below runs it 5-10 times a step).
 const SAMPLE_OFFSETS=[[0,0],[-.9,-2.15],[.9,-2.15],[-.9,2.15],[.9,2.15],[0,-2.3],[0,2.3],[-1,0],[1,0]],STEP_SAMPLES=SAMPLE_OFFSETS.map(()=>[0,0]);
 export function carSamples(car,x=car.x,z=car.z,out=null) {

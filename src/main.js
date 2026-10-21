@@ -1268,7 +1268,7 @@ function frame(now){
    treeFocus.value.set(car.x,car.z);
    treeFade.value=chaseCamera&&started?0:1;
    surfaceNow=world?surfaceDetailAt(world,car.x,car.z):surfaceNow;rumbleNow=rumbleFor(travel.mode==='car'&&started&&!paused&&!mapOpen&&!cinematic?.driving?surfaceNow.surface:'asphalt',travel.mode==='car'?car.speed:0,paused||mapOpen?0:dt,roadRumble,surfaceNow.roughness);
-   const slope=groundPose(vehicle.x,vehicle.z,vehicle.heading,1.4,.8); // terrain: wheels on the ground, body pitched and rolled with the slope
+   const slope=groundPose(vehicle.x,vehicle.z,vehicle.heading,vehicle.front>2.3?2.2:1.4,.8); /* the 1760 coach and pair reach 3.3 m ahead: pitched over 1.4 m their horses ran into the rampart banks */ // terrain: wheels on the ground, body pitched and rolled with the slope
    carGroup.position.set(vehicle.x,.12+rumbleNow.bob+slope.y,vehicle.z);carGroup.rotation.y=vehicle.heading;carGroup.rotation.x=rumbleNow.pitch+slope.pitch;
    carGroup.rotation.z=(started?-vehicle.steer*Math.min(Math.abs(vehicle.speed)*.002,.04):0)+rumbleNow.roll+slope.roll;
    animateVehicle(carGroup,vehicle.speed,vehicle.steer,paused||mapOpen?0:dt,keys.has('Space')||keys.has('KeyS')||keys.has('ArrowDown'));
