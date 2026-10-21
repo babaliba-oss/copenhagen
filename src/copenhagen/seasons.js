@@ -75,7 +75,7 @@ function treeGeometry(){
 // come from the map's footprints, and the model's walls stand up to 2 m off them, so a quarter of the pumpkins stood in
 // or against a shopfront. A pumpkin within PUMPKIN_CLEAR of a drawn wall is left out, on placement or when the tile
 // arrives later. Segments are kept in 8 m cells: [x0,z0,x1,z1,...].
-export const PUMPKIN_CLEAR=.5;const WALL_CELL=8,drawnWalls=new Map(),wallListeners=new Set(),notedTiles=new Set();
+export const PUMPKIN_CLEAR=.5,DEEP_BARE=.15;const WALL_CELL=8,drawnWalls=new Map(),wallListeners=new Set(),notedTiles=new Set();
 export function noteDrawnWalls(array,parts,key=null){ /* key: the tile, noted once (tiles stream out and back in) */
  if(key!=null){if(notedTiles.has(key))return 0;notedTiles.add(key);}
  let added=0;
@@ -102,14 +102,18 @@ export function pumpkinDoorsteps(buildings,world,places,r,{open=(x,z)=>!world.ro
     for(const sg of [1,-1]){const x=mx+nx*out*sg,z=mz+nz*out*sg;if(open(x,z)&&!world.buildings.at(x+nx*sg*1.2,z+nz*sg*1.2)){doorsteps.push([x,z,Math.atan2(nx*sg,nz*sg)]);break;}}}}}
  return doorsteps;
 }
-export function createSeasonalDecor(season,{buildings=[],world,places=[],cafes=[],walks=[],seed=1031,pumpkins=null,phone=false}={}){
+export function createSeasonalDecor(season,{buildings=[],world,places=[],cafes=[],walks=[],seed=1031,pumpkins=null,phone=false,bare=null}={}){ /* bare: the terrain ground's height drawn off the paving (main.js 'Terrain ground' heightAt) */
  const group=new THREE.Group();group.name=`Seasonal decorations (${season})`;
  if(!season||!world)return {group,update(){},season:null};
  const r=rnd(seed),m4=new THREE.Matrix4(),q=new THREE.Quaternion(),v=new THREE.Vector3(),s=new THREE.Vector3(1,1,1),UP=new THREE.Vector3(0,1,0);
  const solid=new THREE.MeshStandardMaterial({vertexColors:true,roughness:.7});
  const glow=hex=>new THREE.MeshBasicMaterial({color:hex,toneMapped:false,fog:true});
  const onPavement=(x,z)=>!!world.pavement?.at(x,z)&&!world.roads.at(x,z)&&!world.buildings.at(x,z),open=(x,z)=>!world.roads.at(x,z)&&!world.buildings.at(x,z); // pavement or unmapped quay/square
- const doorsteps=season==='halloween'?pumpkinDoorsteps(buildings,world,places,r,{open}):[];
+ // Off the mapped paving, where the bare ground is drawn deep under the field (the cells touching a lawn, up to 50 cm), a
+ // doorstep pumpkin at the field's height floated unless strip paving happens to be drawn there: those spots are skipped
+ // (within 2.5 km of the centre, pumpkins floating over 20 cm 315 -> 0 of ~2,900).
+ const deep=(x,z)=>!!bare&&!world.pavement?.at(x,z)&&groundAt(x,z)-(bare(x,z)??groundAt(x,z))>DEEP_BARE;
+ const doorsteps=season==='halloween'?pumpkinDoorsteps(buildings,world,places,r,{open:(x,z)=>open(x,z)&&!deep(x,z)}):[];
  // Instanced in 200 m chunks, each hidden beyond `range` (small things far away are sub-pixel and cost the same).
  const chunks=[];
  const instanced=(geometry,material,list,name,{scale=()=>1,y=0,range=260}={})=>{if(!list.length)return null;const by=new Map();list.forEach((p,i)=>{const k=Math.floor(p[0]/200)+','+Math.floor(p[1]/200);if(!by.has(k))by.set(k,[]);by.get(k).push([p,i]);});
