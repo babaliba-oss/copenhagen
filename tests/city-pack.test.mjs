@@ -45,3 +45,15 @@ test('1760: the bridges listed as built later are left out, with the footways al
  assert.ok(![...city.roads,...city.pavement].some(p=>p.id in gone));
  assert.ok(city.pavement.some(p=>p.name==='Ved Norgesporten')&&city.pavement.some(p=>p.name==='Grønne Bro'),'the citadel\'s Norway Gate and Rosenborg\'s bridge stay');
 });
+
+test('a road dead end at a house is cut back until a coach standing at it is clear of the wall; a short one goes with its way back',async()=>{
+ const {trimDeadEndsAtHouses}=await import('../src/mobility-pack.js'),{SpatialIndex}=await import('../src/geo.js');
+ const houses=new SpatialIndex([{rings:[[[20,-5],[30,-5],[30,5],[20,5]]]},{rings:[[[-5,6],[5,6],[5,14],[-5,14]]]}]);
+ const nodes=[[0,0],[20,0],[-10,0],[0,5]],e=(from,to)=>({from,to,points:[nodes[from],nodes[to]].map(p=>[...p]),length:Math.hypot(nodes[to][0]-nodes[from][0],nodes[to][1]-nodes[from][1]),lane:1.45,crossing:false,signal:null});
+ const roads={nodes:nodes.map(p=>[...p]),edges:[e(2,0),e(0,2),e(0,1),e(1,0),e(0,3),e(3,0)]};
+ assert.deepEqual(trimDeadEndsAtHouses(roads,houses),{trimmed:1,dropped:2});
+ const drive=roads.edges.find(x=>x.from===0&&x.to===1);assert.ok(drive.points.at(-1)[0]<=20-3.3&&drive.points.at(-1)[0]>15,'cut back to 3.3 m from the wall');
+ assert.deepEqual(roads.nodes[1],drive.points.at(-1));assert.deepEqual(roads.edges.find(x=>x.from===1).points,[...drive.points].reverse());
+ assert.ok(!roads.edges.some(x=>x.from===3||x.to===3),'the 5 m spur ending 1 m from a house went (under 4 m once cut back)');
+ assert.equal(roads.edges.filter(x=>x.from===2||x.to===2).length,2,'a dead end in the open stays');
+});

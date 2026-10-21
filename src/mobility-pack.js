@@ -78,6 +78,27 @@ export function dropWalksThroughBuildings(walks,houses,{clearance=.5,run=1,ends=
   return true;});
  return before-walks.edges.length;
 }
+// Road dead ends at a house (a driveway mapped up to a door or a courtyard gate the model draws shut): traffic drives to
+// the end node and turns there, and its front stood in the wall (1760: 37 of 147 dead ends, the coach 3.3 m ahead of its
+// centre). Each dead end is cut back (in place) until a vehicle standing at it, `front` metres ahead and `half` either side,
+// is clear of `houses` ({at(x,z)}); one with under `keep` metres left goes, with its way back. Returns {trimmed,dropped}.
+export function trimDeadEndsAtHouses(roads,houses,{front=3.3,half=1.1,keep=4,step=.5}={}){
+ if(!roads?.edges?.length||!houses)return {trimmed:0,dropped:0};
+ const nb=new Map(),add=(a,b)=>{let s=nb.get(a);if(!s)nb.set(a,s=new Set());s.add(b);},pair=new Map();for(const e of roads.edges){add(e.from,e.to);add(e.to,e.from);const k=e.from+'>'+e.to;let l=pair.get(k);if(!l)pair.set(k,l=[]);l.push(e);}
+ const clear=(x,z,ux,uz)=>{for(const f of [0,1,2,front])for(const w of [-half,0,half])if(houses.at(x+ux*f-uz*w,z+uz*f+ux*w))return false;return true;};
+ const at=(P,s)=>{for(let i=1;i<P.length;i++){const a=P[i-1],b=P[i],l=Math.hypot(b[0]-a[0],b[1]-a[1]);if(s<=l||i===P.length-1){const t=l?Math.min(1,s/l):0;return {i,x:a[0]+(b[0]-a[0])*t,z:a[1]+(b[1]-a[1])*t,ux:l?(b[0]-a[0])/l:0,uz:l?(b[1]-a[1])/l:0};}s-=l;}return null;};
+ const len=P=>{let l=0;for(let i=1;i<P.length;i++)l+=Math.hypot(P[i][0]-P[i-1][0],P[i][1]-P[i-1][1]);return l;};
+ const drop=new Set();let trimmed=0;
+ for(const e of roads.edges){if(nb.get(e.to)?.size!==1||e.crossing)continue;const L=len(e.points),end=at(e.points,L);if(!end||clear(end.x,end.z,end.ux,end.uz))continue;
+  let s=L;while(s>0){s-=step;const p=at(e.points,Math.max(0,s));if(clear(p.x,p.z,p.ux,p.uz))break;}
+  const back=pair.get(e.to+'>'+e.from)||[];
+  if(s<keep){drop.add(e);for(const r of back)drop.add(r);continue;}
+  const p=at(e.points,s),pts=[...e.points.slice(0,p.i).map(q=>[q[0],q[1]]),[+p.x.toFixed(2),+p.z.toFixed(2)]];
+  if(roads.nodes?.[e.to])roads.nodes[e.to]=[pts.at(-1)[0],pts.at(-1)[1]];e.points=pts;e.length=len(pts);trimmed++;
+  for(const r of back){r.points=pts.map(q=>[q[0],q[1]]).reverse();r.length=e.length;}}
+ if(drop.size)roads.edges=roads.edges.filter(e=>!drop.has(e));
+ return {trimmed,dropped:drop.size};
+}
 // Bridges built after the era a city is drawn for (era.json lateBridges: {id: why}, today's footbridges left in 1760):
 // their paving goes from the roads and footways (no deck, railings or plate over the water) and the footway edges
 // that ran along them go too, so no walker crosses the water where no bridge stands. Returns the polygons dropped.
