@@ -29,14 +29,18 @@ def poly(f):  # even-odd over all rings, as the game's pointInPolygon (a relatio
     return out
 streets = [poly(f) for k in ('roads', 'pavement') for f in pack.get(k, []) if f.get('rings') and len(f['rings'][0]) > 2 and 'island' not in str(f.get('kind', ''))]
 street_tree = shapely.STRtree(streets)
-# Every drawn roof triangle (any part: model houses, model houses matched to a mapped one, extruded mapped footprints).
+# Every drawn roof triangle (any part: model houses, model houses matched to a mapped one, extruded mapped footprints),
+# less the flat ones near the street that the game collapses at load (terrain_field.collapsed): a footprint over such a
+# plinth or paved deck was an invisible wall on the pavement (Kalvebod Brygge's decks, 3,000 m2 within 2.5 km).
+from terrain_field import load_ground, lift_parts, collapsed
+ground_at = load_ground(root)
 index = json.load(open(root + 'buildings3d-index.json'))
 tris = []
 for t in index['tiles']:
-    a = np.frombuffer(read(root + t['file']), np.float32).reshape(-1, 5)[:, :3].astype(np.float64)
+    a = lift_parts(np.frombuffer(read(root + t['file']), np.float32).reshape(-1, 5), t['parts'], ground_at)[:, :3]
     tri = a[:len(a) // 3 * 3].reshape(-1, 3, 3)
     n = np.cross(tri[:, 1] - tri[:, 0], tri[:, 2] - tri[:, 0]); ln = np.linalg.norm(n, axis=1)
-    tris.append(tri[(ln > 1e-6) & (np.abs(n[:, 1]) / np.maximum(ln, 1e-12) > .35)][:, :, [0, 2]])
+    tris.append(tri[(ln > 1e-6) & (np.abs(n[:, 1]) / np.maximum(ln, 1e-12) > .35) & ~collapsed(tri, ground_at)][:, :, [0, 2]])
 tris = np.concatenate(tris)
 lo, hi = tris.min(axis=1), tris.max(axis=1)
 tri_tree = shapely.STRtree([box(*l, *h) for l, h in zip(lo, hi)])

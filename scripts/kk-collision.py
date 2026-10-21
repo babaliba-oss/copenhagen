@@ -23,6 +23,8 @@ def read(path):
     raw = open(path, 'rb').read()
     return gzip.decompress(raw) if raw[:2] == b'\x1f\x8b' else raw
 pack = json.loads(read(root + 'city.pack'))
+from terrain_field import load_ground, lift_parts, collapsed  # flat triangles near the street are collapsed at load: no house there
+ground_at = load_ground(root)
 roads = [Polygon(r['rings'][0], r['rings'][1:]).buffer(0) for r in pack.get('roads', []) if r.get('rings') and len(r['rings'][0]) > 2]
 road_tree = shapely.STRtree(roads)
 print(city, len(roads), 'road polygons')
@@ -31,12 +33,12 @@ out, parts_n, dropped = [], 0, 0
 for t in index['tiles']:
     mine = [p for p in t['parts'] if p['id'].startswith('kk-') and not p['id'].startswith('kk-osm') and f"{t['file']}:{p['start']}" not in dup and p.get('height', 0) >= 2.2]
     if not mine: continue
-    a = np.frombuffer(read(root + t['file']), np.float32).reshape(-1, 5)
+    a = lift_parts(np.frombuffer(read(root + t['file']), np.float32).reshape(-1, 5), mine, ground_at)
     for p in mine:
-        v = a[p['start']:p['start'] + p['count'], :3].astype(np.float64)
+        v = a[p['start']:p['start'] + p['count'], :3]
         tri = v[:len(v) // 3 * 3].reshape(-1, 3, 3)
         n = np.cross(tri[:, 1] - tri[:, 0], tri[:, 2] - tri[:, 0]); ln = np.linalg.norm(n, axis=1)
-        roof = (ln > 1e-6) & (np.abs(n[:, 1]) / np.maximum(ln, 1e-12) > .35)
+        roof = (ln > 1e-6) & (np.abs(n[:, 1]) / np.maximum(ln, 1e-12) > .35) & ~collapsed(tri, ground_at)  # not the plinths and decks the game collapses
         if not roof.any(): continue
         polys = [Polygon(t2[:, [0, 2]]) for t2 in tri[roof]]
         shape = unary_union([q.buffer(.02) for q in polys if q.area > 1e-4]).buffer(-.02)
