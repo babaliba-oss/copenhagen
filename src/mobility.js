@@ -87,7 +87,7 @@ export class Mobility {
  // streamed region. Only derived junction and route lookup data is refreshed.
  appendRegion(data){
   const offset=this.signals.length,roads=this.roads.edges.length,walks=this.walks.edges.length;
-  this.signals.push(...data.signals);mergeGraph(this.roads,data.roads,offset);mergeGraph(this.walks,data.walks,offset);this.roads._grid=this.walks._grid=null;
+  this.signals.push(...data.signals);mergeGraph(this.roads,data.roads,offset);mergeGraph(this.walks,data.walks,offset);this.roads._grid=this.walks._grid=this.roads._long=null;this.parkedKey=null;
   for(const e of this.roads.edges)if(e.mappedSignal!==undefined)e.signal=e.mappedSignal;
   this.signalControl=annotateJunctions(this.roads,this.signals);annotateCrossings(this.walks,this.signalControl);this.signalAxes=this.signalControl.axes;
   this.stationEdges=this.roads.edges.filter(e=>e.points.some(([x,z])=>inStationTrafficArea({x,z})));
@@ -251,7 +251,8 @@ export class Mobility {
   let key='';for(const b of this.externalBodies)if(b.ref?.parked||b.ref?.standing)key+=`${Math.round(b.x)},${Math.round(b.z)};`;
   if(key===this.parkedKey)return;this.parkedKey=key;this.obstructed=new Set();
   const parked=this.standing=this.externalBodies.filter(b=>b.ref?.parked||b.ref?.standing);if(!parked.length)return;
-  for(const e of this.roads.edges){const m=e.points[Math.floor(e.points.length/2)];if(!parked.some(b=>Math.hypot(b.x-m[0],b.z-m[1])<e.length/2+15))continue;
+  const G=this.roads;G._long??=G.edges.filter(e=>e.length>200);const near=new Set(G._long);for(const b of parked)for(const e of this.edgesNear(G,b,115))if(e.length<=200)near.add(e); /* edges by midpoint around each body (+ the few long ones), not all 44k: a bus pulling in or out of a stand re-ran this over the whole city (5-28 ms) */
+  for(const e of near){const m=e.points[Math.floor(e.points.length/2)];if(!parked.some(b=>Math.hypot(b.x-m[0],b.z-m[1])<e.length/2+15))continue;
    for(let s=0;s<=e.length;s+=2){const p=routePoint(e,s);if(parked.some(b=>boxesOverlap(carBox(p),b))){this.obstructed.add(e);break;}}}
  }
  // An edge whose lane runs off the mapped carriageway somewhere would stop a car there for good: route
