@@ -233,6 +233,7 @@ const renderer=new THREE.WebGLRenderer({canvas:$('world'),antialias:OFF.has('pos
  if(!this.enabled||(!this.autoUpdate&&!this.needsUpdate))return render.call(this,lights,sc,cam);
  const shown=[];for(const g of loadedTiles.values())if(g.visible&&g.userData.level==='near')for(const c of g.userData.casters||[]){c.visible=true;shown.push(c);}
  try{return render.call(this,lights,sc,cam);}finally{for(const c of shown)c.visible=false;}};}
+renderer.debug.checkShaderErrors=!!import.meta.env?.DEV; /* the error check reads every shader's info log, which waits for the compile: a stall each time a new material first draws (boot and play) */
 const fpsMeter=createFpsMeter(renderer,()=>`${pacer.half?' · 30 cap':''} · ×${renderer.getPixelRatio().toFixed(2)} · q${governor?.level??'-'}${renderer.shadowMap.enabled?' · shadows':''}${post?' · post':''}`);
 // The GPU's name (shown on the error screen) and PowerVR (Pixel 10 and others): its driver lost the context while the start-up
 // shader warm-up compiled every program at once, so it skips that bulk compile (programs then compile as things first appear).
