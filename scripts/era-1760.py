@@ -195,7 +195,10 @@ mills = []
 for b in bastions:
     c = b.centroid; mills.append([round(c.x, 1), round(-c.y, 1)])
 os.makedirs('public/cities/copenhagen-1760', exist_ok=True)
-json.dump({'mills': mills}, open('public/cities/copenhagen-1760/era.json', 'w'))
-json.dump({'mills': mills}, open(f'{DST}/era-public.json', 'w'))  # city-build clears the public folder; anchors.py copies this back
+ERA_PUBLIC = 'public/cities/copenhagen-1760/era.json'
+era_public = json.load(open(ERA_PUBLIC)) if os.path.exists(ERA_PUBLIC) else {}  # keeps the hand-curated lists (anachronisms, lateBridges)
+era_public['mills'] = mills
+json.dump(era_public, open(ERA_PUBLIC, 'w'), ensure_ascii=False)
+json.dump(era_public, open(f'{DST}/era-public.json', 'w'), ensure_ascii=False)  # city-build clears the public folder; anchors.py copies this back
 json.dump({'zone': mapping(ZONE), 'rampart': mapping(rampart), 'moat': mapping(moat), 'wall': WALL}, open(f'{DST}/era.json', 'w'))
 print('starts', [s['name'] for s in c2['starts']])

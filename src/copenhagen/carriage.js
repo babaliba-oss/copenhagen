@@ -104,14 +104,17 @@ export function createCarriage(){
  ];
  // Coachman
  if(!MODELS)parts.push(box(.42,.55,.3,0,1.85,-.98,'#3a2c45'),box(.26,.26,.24,0,2.27,-.98,'#d9b49a'),box(.36,.12,.36,0,2.44,-.98,'#141414'),box(.42,.04,.42,0,2.38,-.98,'#141414'));
- const mesh=new THREE.Mesh(mergeGeometries(parts),mat);parts.forEach(g=>g.dispose());mesh.castShadow=true;group.add(mesh);
+ // The body as a one-instance gait mesh whose wheels turn in the vertex shader (wheelGeometry), as on the loaded models: they stood still
+ let merged=mergeGeometries(parts);parts.forEach(g=>g.dispose());if(merged.index){const n=merged.toNonIndexed();merged.dispose();merged=n;}
+ const body=gaitMesh({geometry:wheelGeometry(merged,COACH_WHEELS),materials:gaitMaterial(new THREE.MeshStandardMaterial({vertexColors:true,roughness:.55,metalness:.12}))},1),roll={phase:0,amp:0,roll:0};
+ body.mesh.setMatrixAt(0,new THREE.Matrix4());body.mesh.name='Coach body';group.add(body.mesh);
  // Legs swing about a pivot at the shoulder/hip, 1.05 m up: one instanced batch per horse (2 draws, not 8).
  const legs=[],batches=[],pose=new THREE.Matrix4();
  for(const [x,c] of [[-.62,'#5b3a24'],[.62,'#2e2520']]){const at=horse(x,-3.25,c).legs,batch=new THREE.InstancedMesh(legGeometry(c),mat,at.length);batch.name='Horse legs';batch.castShadow=true;batch.frustumCulled=false;batch.instanceMatrix.setUsage(THREE.DynamicDrawUsage);group.add(batch);batches.push(batch);
   at.forEach(([lx,lz],k)=>legs.push({batch,k,x:lx,z:lz}));}
  const swing=(phase,amp)=>{legs.forEach((l,i)=>l.batch.setMatrixAt(l.k,pose.makeRotationX(Math.sin(phase+(i%2?Math.PI:0)+(i>3?.6:0))*amp).setPosition(l.x,1.05,l.z)));for(const b of batches)b.instanceMatrix.needsUpdate=true;};
  swing(0,0);let phase=0;
- group.userData.update=(speed,dt)=>{const v=Math.min(Math.abs(speed),14);phase+=dt*v*1.4;swing(phase,Math.min(.55,v*.08));};
+ group.userData.update=(speed,dt)=>{const v=Math.min(Math.abs(speed),14);phase+=dt*v*1.4;swing(phase,Math.min(.55,v*.08));stepMotion(roll,speed,dt);body.motion.setXYZ(0,0,0,roll.roll);body.motion.needsUpdate=true;}; // the wheels roll as the loaded coach's do, capped at ROLL_SPEED (gait.js)
  return group;
 }
 
@@ -136,18 +139,17 @@ export function createCarriageTraffic(actors){
     m4.compose(v.set(a.x||0,groundAt(a.x,a.z),a.z||0),q.setFromAxisAngle(UP,a.heading||0),one).multiply(ahead);
     if(f&&d>COACH_NEAR){f.mesh.setMatrixAt(nf,m4);f.motion.setXYZ(nf,s.phase,s.amp,s.roll);nf++;}else{mesh.setMatrixAt(n,m4);motion.setXYZ(n,s.phase,s.amp,s.roll);n++;}});
    mesh.count=n;mesh.instanceMatrix.needsUpdate=true;motion.needsUpdate=true;if(f){f.mesh.count=nf;f.mesh.instanceMatrix.needsUpdate=true;f.motion.needsUpdate=true;}}};}
- const c=createCarriage();c.position.z=1.2;c.updateMatrixWorld(true);const gs=[],im=new THREE.Matrix4();
- c.traverse(o=>{if(!o.isMesh||o.name==='Horse legs')return;const n=o.isInstancedMesh?o.count:1;for(let i=0;i<n;i++){const g=o.geometry.clone();if(o.isInstancedMesh){o.getMatrixAt(i,im);g.applyMatrix4(im.premultiply(o.matrixWorld));}else g.applyMatrix4(o.matrixWorld);gs.push(g.index?g.toNonIndexed():g);}});
+ const c=createCarriage(),bodyGeo=c.getObjectByName('Coach body').geometry.clone();bodyGeo.deleteAttribute('motion'); // the coach body with its turning wheels (createCarriage); placed 1.2 m ahead per coach, as the gait coaches are
  const shared=new Set();c.traverse(o=>{if(o.isMesh){shared.add(o.geometry);shared.add(o.material);}});shared.forEach(x=>x.dispose());
  const material=new THREE.MeshStandardMaterial({vertexColors:true,roughness:.55,metalness:.12}),count=Math.max(1,actors.length);
- const mesh=new THREE.InstancedMesh(mergeGeometries(gs),material,count);mesh.castShadow=true;mesh.frustumCulled=false;mesh.name='Coaches';
+ const {mesh,motion}=gaitMesh({geometry:bodyGeo,materials:gaitMaterial(new THREE.MeshStandardMaterial({vertexColors:true,roughness:.55,metalness:.12}))},count);mesh.name='Coaches';const ahead=new THREE.Matrix4().makeTranslation(0,0,1.2),body=new THREE.Matrix4(),rolls=Array.from({length:count},(_,i)=>({phase:0,amp:0,roll:i*3.3}));
  const group=new THREE.Group();group.name='Coach traffic';group.add(mesh);
  const horses=[[-.62,'#5b3a24'],[.62,'#2e2520']].map(([x,coat])=>{const legs=horse(x,-3.25,coat).legs.map(([lx,lz])=>[lx,lz+1.2]),batch=new THREE.InstancedMesh(legGeometry(coat),material,count*legs.length);
   batch.name='Coach horse legs';batch.castShadow=true;batch.frustumCulled=false;batch.instanceMatrix.setUsage(THREE.DynamicDrawUsage);group.add(batch);return {legs,batch};});
  const m4=new THREE.Matrix4(),leg=new THREE.Matrix4(),swing=new THREE.Matrix4(),q=new THREE.Quaternion(),v=new THREE.Vector3(),one=new THREE.Vector3(1,1,1),zero=new THREE.Vector3(0,0,0),UP=new THREE.Vector3(0,1,0);
  const phase=new Float32Array(count);
- return {group,update(groundAt,dt=1/60){actors.forEach((a,i)=>{const on=!!a.edge&&!a.playerTaken;m4.compose(v.set(a.x||0,on?groundAt(a.x,a.z):-100,a.z||0),q.setFromAxisAngle(UP,a.heading||0),on?one:zero);mesh.setMatrixAt(i,m4);
+ return {group,update(groundAt,dt=1/60){actors.forEach((a,i)=>{const on=!!a.edge&&!a.playerTaken;m4.compose(v.set(a.x||0,on?groundAt(a.x,a.z):-100,a.z||0),q.setFromAxisAngle(UP,a.heading||0),on?one:zero);mesh.setMatrixAt(i,body.multiplyMatrices(m4,ahead));motion.setXYZ(i,0,0,stepMotion(rolls[i],on?a.speed||0:0,dt).roll);
    const speed=Math.min(Math.abs(a.speed||0),14);phase[i]+=dt*speed*1.4;const amp=Math.min(.55,speed*.08);
    for(const {legs,batch} of horses)legs.forEach(([lx,lz],k)=>{swing.makeRotationX(Math.sin(phase[i]+(k%2?Math.PI:0)+(k>1?.6:0))*amp).setPosition(lx,1.05,lz);batch.setMatrixAt(i*legs.length+k,leg.multiplyMatrices(m4,swing));});});
-  mesh.instanceMatrix.needsUpdate=true;for(const {batch} of horses)batch.instanceMatrix.needsUpdate=true;}};
+  mesh.instanceMatrix.needsUpdate=true;motion.needsUpdate=true;for(const {batch} of horses)batch.instanceMatrix.needsUpdate=true;}};
 }

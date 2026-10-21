@@ -34,3 +34,14 @@ test('footway edges through a drawn house, or hugging its wall, are dropped; cro
  assert.ok(dropped>500&&dropped<n*.04,`${dropped} of ${n} Copenhagen footway edges dropped`);
  assert.ok(!m.walks.edges.some(e=>e.points.some(([x,z])=>Math.abs(x-162.43)<.01&&Math.abs(z-377.18)<.01)),'the path along the Thorvaldsen Museum\'s wall is gone');
 });
+
+test('1760: the bridges listed as built later are left out, with the footways along them, and each is a footbridge in the data',async()=>{
+ const fs=await import('node:fs'),zlib=await import('node:zlib'),{dropLateBridges}=await import('../src/mobility-pack.js');
+ const era=JSON.parse(fs.readFileSync('public/cities/copenhagen-1760/era.json','utf8')),gone=era.lateBridges;assert.ok(Object.keys(gone).length>=20);
+ for(const [id,why] of Object.entries(gone))assert.ok(typeof why==='string'&&why.length>10,`${id} has a reason`);
+ const city=expandCity(JSON.parse(zlib.gunzipSync(fs.readFileSync('public/cities/copenhagen-1760/city.pack')))),walks=expandMobility(JSON.parse(fs.readFileSync('public/cities/copenhagen-1760/mobility.json','utf8'))).walks,n=walks.edges.length;
+ const late=dropLateBridges(city,walks,gone);assert.equal(late.length,Object.keys(gone).length,'every id is in the 1760 data');
+ assert.ok(late.every(p=>/\(Silta\)/.test(p.kind)&&!/Ajorata/.test(p.kind)),'only footbridges');assert.ok(walks.edges.length<n,'the footways across them go');
+ assert.ok(![...city.roads,...city.pavement].some(p=>p.id in gone));
+ assert.ok(city.pavement.some(p=>p.name==='Ved Norgesporten')&&city.pavement.some(p=>p.name==='Grønne Bro'),'the citadel\'s Norway Gate and Rosenborg\'s bridge stay');
+});

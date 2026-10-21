@@ -1,5 +1,5 @@
 import './cache-bust.js';
-import {installBootArt} from './boot-art.js';import {expandCity} from './city-pack.js';import {createCinematic,pickShots} from './cinematic.js';import {createPerfOverlay} from './perf-overlay.js';import {surfaceTile,setSurfaceBridges} from './surface-tiles.js';import {expandMobility,dropWalksThroughBuildings} from './mobility-pack.js';installBootArt();
+import {installBootArt} from './boot-art.js';import {expandCity} from './city-pack.js';import {createCinematic,pickShots} from './cinematic.js';import {createPerfOverlay} from './perf-overlay.js';import {surfaceTile,setSurfaceBridges} from './surface-tiles.js';import {expandMobility,dropWalksThroughBuildings,dropLateBridges} from './mobility-pack.js';installBootArt();
 import './style.css';
 import './loading-screen.css';
 import './speedometer.css';
@@ -1412,6 +1412,7 @@ async function boot(){
    const parkedData=city.id==='copenhagen'?json(dataUrl('parked.json')).catch(()=>null):null; // kerbside parked cars (scripts/parked-cars.py)
    const furnitureData=city.furniture?json(dataUrl(city.furniture)).catch(()=>null):null; // street furniture detected in street-level photos (optional, any city)
    let mobilityData,landcoverData,tramData;[data,roofIndex,surfaceIndex,mobilityData,landcoverData,tramData,extensions]=await Promise.all([d,json(dataUrl('buildings3d-index.json')),json(dataUrl('surface-index.json')),json(dataUrl('mobility.json')).then(expandMobility),json(dataUrl('landcover.json')),json(dataUrl('trams.json')),loadExtensionIndex(json)]);
+   if(eraData){const late=dropLateBridges(data,mobilityData?.walks,(await eraData)?.lateBridges);if(late.length)console.info('Bridges built after the era left out (era.json lateBridges)',late.length);} /* today's footbridges in 1760: Inderhavnsbroen, the 2016 bridge by the Bryghus, Kastellet's side bridges */
    if(city.id.startsWith('copenhagen'))tramData={...tramData,paths:[],stops:[]}; // no street trams: its trams.json holds S-train route relations (Boulevard tunnel); drawn as tram track they crossed Nørreport at street level
    if(city.id.startsWith('copenhagen')){const dup=new Set(await json(dataUrl('duplicates.json')).catch(()=>[]));const ins=new Set(await json(dataUrl('insets.json')).catch(()=>[]));const late=new Set((eraData&&(await eraData)?.anachronisms)||[]);let n=0;for(const t of roofIndex.tiles)for(const p of t.parts){const k=t.file+':'+p.start;if(dup.has(k)||late.has(p.id)){p.duplicate=true;n++;}else if(ins.has(k))p.inset=true;} /* anachronisms (era.json): models from today left in 1760, Knippelsbro's 1937 tower */
   {const kk=new Map();for(const t of roofIndex.tiles)for(const p of t.parts)if(p.id.startsWith('kk-osm-'))kk.set(p.id.slice(3),p.bbox);let n=0; // the OpenStreetMap box of a building the municipal model also has (kk-<same id>) stood inside it, two houses built into each other (10 m box through a 16 m model): the box goes when the model covers most of it

@@ -63,3 +63,13 @@ test('parts of a coach get the same attributes so they merge',()=>{
  assert.deepEqual(Object.keys(g.attributes).sort(),['anim','color','normal','pivot','position','uv']);
  assert.equal(g.attributes.color.getX(0),1,'white where a texture colours it');
 });
+
+test('the backup coach (no models loaded) turns its wheels with speed, capped like the loaded coach',async()=>{
+ const {createCarriage,createCarriageTraffic}=await import('../src/copenhagen/carriage.js');
+ const c=createCarriage(),body=c.getObjectByName('Coach body'),a=body.geometry.attributes.anim;let wheel=0;for(let i=0;i<a.count;i++)if(a.getX(i)===2)wheel++;
+ assert.ok(wheel>500,`wheel vertices marked: ${wheel}`);assert.ok(body.material.customProgramCacheKey?.()==='coach-gait','turned in the vertex shader');
+ for(let i=0;i<60;i++)c.userData.update(10,1/30);assert.ok(Math.abs(body.geometry.attributes.motion.getZ(0)-ROLL_SPEED*2)<1e-4,'rolled two seconds at the cap');
+ const actors=[{x:0,z:0,heading:0,speed:2,edge:{}},{x:5,z:0,heading:0,speed:0,edge:{}}],t=createCarriageTraffic(actors);
+ for(let i=0;i<30;i++)t.update(()=>0,1/30);const m=t.group.getObjectByName('Coaches').geometry.attributes.motion;
+ assert.ok(m.getZ(0)>1.9&&m.getZ(0)<2.1,`a moving coach's wheels roll: ${m.getZ(0)}`);assert.ok(Math.abs(m.getZ(1)-3.3)<1e-6,'a standing one\'s stay put');
+});

@@ -44,6 +44,7 @@ function subdivide(r,step){const out=[];for(let i=0;i<r.length;i++){const a=r[i]
 export function extractQuayEdges(water,land={},{extent=WORLD_EXTENT}={}){
  const inWater=waterLocator(water);
  const paved=[...(land.roads||[]),...(land.pavement||[])].filter(p=>p.rings?.[0]?.length>2&&!BRIDGE.test(`${p.kind||''} ${p.name||''}`));
+ const bridgeIndex=new SpatialIndex([...(land.roads||[]),...(land.pavement||[])].filter(p=>p.rings?.[0]?.length>2&&BRIDGE.test(`${p.kind||''} ${p.name||''}`)));
  const pavedIndex=new SpatialIndex(paved),buildIndex=new SpatialIndex((land.buildings||[]).filter(p=>p.rings?.[0]?.length>2)),parkIndex=new SpatialIndex((land.parks||[]).filter(p=>p.rings?.[0]?.length>2));
  const classify=(x,z,nx,nz)=>{
   let park=false;
@@ -88,6 +89,7 @@ export function extractQuayEdges(water,land={},{extent=WORLD_EXTENT}={}){
    const mx=(a[0]+c[0])/2,mz=(a[1]+c[1])/2,ox=mx-n[0]*.4,oz=mz-n[1]*.4;
    // Both sides over mapped water: a pier or quay deck, not paving that
    // merely touches the shoreline (which already has its own wall).
+   if([[0,0],[-1.5,0],[1.5,0]].some(([d])=>bridgeIndex.at(mx+n[0]*d,mz+n[1]*d)))return null; // the street's end reaching under or beside a bridge deck (1760: today's Højbro Plads and Holmens Kanal over the wider canals): a wall there stood as a block in the water by the bridge
    return inWater(ox,oz)&&inWater(mx+n[0]*.4,mz+n[1]*.4)&&!pavedIndex.at(ox,oz)&&!buildIndex.at(ox,oz)?'quay':null;
   });
  }
@@ -175,24 +177,29 @@ export function createGroundGeometry(water,size=groundSizeForExtent()){
 // stands on its edge (posts every 1.8 m, top and middle rails). Without it a deck over a canal read as a
 // road edge you could drive off into the water. Geometry at y=0 above the deck; drape it onto the ground.
 export function buildBridgeRailings(water,land={},{height=1.05,ground=()=>0}={}){ // ground(x,z): height of the land; a run stands at its higher (quay) end, not on the canal bed
- const inWater=waterLocator(water),decks=[...(land.roads||[]),...(land.pavement||[])].filter(p=>p.rings?.[0]?.length>2); // 'Silta' decks, and any paving mapped across the water (a bridge without the tag)
+ const tagged=p=>BRIDGE.test(`${p.kind||''} ${p.name||''}`),inWater=waterLocator(water),decks=[...(land.roads||[]),...(land.pavement||[])].filter(p=>p.rings?.[0]?.length>2).sort((a,b)=>tagged(b)-tagged(a)); // 'Silta' decks, and any paving mapped across the water (a bridge without the tag); the tagged ones first, so they keep their railings where an untagged deck runs along them
+ const placed=new Map(),cellOf=(x,z)=>Math.floor(x/4)+','+Math.floor(z/4),railedNear=(x,z,self,r=1.2)=>{for(let i=-1;i<=1;i++)for(let j=-1;j<=1;j++)for(const s of placed.get(cellOf(x+i*4,z+j*4))||[]){if(s[4]===self)continue;const dx=s[2]-s[0],dz=s[3]-s[1],l=dx*dx+dz*dz,t=l?Math.max(0,Math.min(1,((x-s[0])*dx+(z-s[1])*dz)/l)):0;if(Math.hypot(x-s[0]-dx*t,z-s[1]-dz*t)<r)return true;}return false;}; // railing already standing within r m on another deck (two decks' edges along each other: Højbro and Højbro Plads, Holmens Bro and Holmens Kanal had a railing each, side by side)
  const parts=[],box=(w,h,d,x,y,z,yaw)=>{const g=new THREE.BoxGeometry(w,h,d);g.rotateY(yaw);g.translate(x,y,z);parts.push(g.index?g.toNonIndexed():g);};
  const paved=new SpatialIndex(decks),otherPaving=(x,z,self)=>paved.near(x,z).some(p=>p!==self&&x>=p.bbox[0]&&x<=p.bbox[2]&&z>=p.bbox[1]&&z<=p.bbox[3]&&pointInPolygon(x,z,p.rings)); // where the deck meets the next road or footway: no railing across it
- let runs=0;const railed=new Set(),deckY=new Map(),rails=[];
+ let runs=0;const railed=new Set(),deckY=new Map(),rails=[],runList=[];
  for(const deck of decks)for(const ring of deck.rings){const n=ring.length;let ringTop=-Infinity;for(const p of ring){const g=ground(p[0],p[1]);if(Number.isFinite(g))ringTop=Math.max(ringTop,g);}
   for(let i=0;i<n;i++){const a=ring[i],b=ring[(i+1)%n],dx=b[0]-a[0],dz=b[1]-a[1],l=Math.hypot(dx,dz);if(l<1.5)continue;
    const ux=dx/l,uz=dz/l,nx=-uz,nz=ux,steps=Math.max(1,Math.round(l/1.8));let start=-1;
    // outer side: the one off the deck; a railing where that side is water and no other paving continues
    const inRing=(x,z)=>{let c=false;for(let j=0,m=ring.length,k2=m-1;j<m;k2=j++){const p=ring[j],q=ring[k2];if((p[1]>z)!==(q[1]>z)&&x<(q[0]-p[0])*(z-p[1])/(q[1]-p[1])+p[0])c=!c;}return c;};
    const wet=t=>{const x=a[0]+dx*t,z=a[1]+dz*t,s=inRing(x+nx*.6,z+nz*.6)?-1:1,ox=x+nx*s*1.5,oz=z+nz*s*1.5;if(!inWater(ox,oz)||otherPaving(ox,oz,deck))return false;return BRIDGE.test(`${deck.kind||''} ${deck.name||''}`)||inWater(x-nx*s*1.5,z-nz*s*1.5);};
-   for(let k=0;k<=steps;k++){const ok=k<steps&&wet((k+.5)/steps);
+   const shadow=[];for(let k=0;k<=steps;k++){const ok=k<steps&&wet((k+.5)/steps);
+    if(ok){const mx=a[0]+dx*(k+.5)/steps,mz=a[1]+dz*(k+.5)/steps;shadow[k]=railedNear(mx,mz,deck);if(!shadow[k]){const c=cellOf(mx,mz);if(!placed.has(c))placed.set(c,[]);placed.get(c).push([a[0]+dx*k/steps,a[1]+dz*k/steps,a[0]+dx*(k+1)/steps,a[1]+dz*(k+1)/steps,deck]);}} /* shadowed: the deck still counts as railed (its plate and height), the railing is not drawn twice */
     if(ok&&start<0)start=k;
     else if(!ok&&start>=0){const t0=start/steps,t1=k/steps,x0=a[0]+dx*t0,z0=a[1]+dz*t0,x1=a[0]+dx*t1,z1=a[1]+dz*t1,len=Math.hypot(x1-x0,z1-z0),yaw=Math.atan2(ux,uz);
      // set in 25 cm from the deck edge
      const cx=(x0+x1)/2,cz=(z0+z1)/2,y0=Math.max(ground(x0,z0),ground(x1,z1),ground(a[0],a[1]),ground(b[0],b[1])),y1=y0<ringTop-2?ringTop:y0,y=Number.isFinite(y1)?y1:0; /* all over sunk canal bed: the deck's highest corner */deckY.set(deck,Math.max(deckY.get(deck)??-Infinity,y));
-     const posts=[];for(let p=0;p<=k-start;p++){const t=(start+p)/steps;posts.push(a[0]+dx*t,a[1]+dz*t);}
-     rails.push({deck,cx,cz,len,yaw,y,posts}); // drawn once the deck heights are settled (a span is lifted to the decks it joins)
-     runs++;railed.add(deck);start=-1;}
+     for(let s=start;s<k;){if(shadow[s]){s++;continue;}let e=s;while(e<k&&!shadow[e])e++; /* the stretches no other deck's railing already lines */
+      const u0=s/steps,u1=e/steps,sx0=a[0]+dx*u0,sz0=a[1]+dz*u0,sx1=a[0]+dx*u1,sz1=a[1]+dz*u1,sl=Math.hypot(sx1-sx0,sz1-sz0),posts=[];
+      for(let p=s;p<=e;p++){const t=p/steps;posts.push(a[0]+dx*t,a[1]+dz*t);}
+      rails.push({deck,cx:(sx0+sx1)/2,cz:(sz0+sz1)/2,len:sl,yaw,y,posts}); // drawn once the deck heights are settled (a span is lifted to the decks it joins)
+      runs++;runList.push([sx0,sz0,sx1,sz1,deck.id||'']);s=e;}
+     railed.add(deck);start=-1;}
    }
   }
  }
@@ -228,7 +235,7 @@ export function buildBridgeRailings(water,land={},{height=1.05,ground=()=>0}={})
  const deck=[];for(const d of railed){const r=d.rings[0];
   const flat=r.flat(),ids=earcut(flat),y=deckY.get(d)+.035,at=plateHeight.get(d);for(const i of ids)deck.push(r[i][0],at?at(r[i][0],r[i][1]):y,r[i][1]);}
  const pos=[];for(const g of parts){pos.push(...g.attributes.position.array);g.dispose();}
- const geometry=new THREE.BufferGeometry();geometry.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));geometry.computeVertexNormals();geometry.userData.runs=runs;
+ const geometry=new THREE.BufferGeometry();geometry.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));geometry.computeVertexNormals();geometry.userData.runs=runs;geometry.userData.rails=runList; // [x0,z0,x1,z1,deck id] per run
  geometry.userData.bridges=[...railed].map(d=>({rings:d.rings,y:deckY.get(d)+.035,...(plateHeight.has(d)?{heightAt:plateHeight.get(d)}:{}),name:d.name||'',kind:d.kind||''})); // the plates as drawn: what the ground under them must carry (raiseBridgeDecks); heightAt: a plate that follows its quay
  if(deck.length){const g=new THREE.BufferGeometry(),uv=new Float32Array(deck.length/3*2);for(let i=0,j=0;i<deck.length;i+=3,j+=2){uv[j]=deck[i]/2.6;uv[j+1]=deck[i+2]/2.6;}g.setAttribute('position',new THREE.Float32BufferAttribute(deck,3));g.setAttribute('uv',new THREE.BufferAttribute(uv,2));const base=new Float32Array(deck.length/3);for(let i=0;i<base.length;i++)base[i]=deck[i*3+1];g.setAttribute('deckBase',new THREE.BufferAttribute(base,1));g.computeVertexNormals();geometry.userData.deck=g;}
  return geometry;

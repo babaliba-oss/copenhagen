@@ -78,3 +78,12 @@ export function dropWalksThroughBuildings(walks,houses,{clearance=.5,run=1,ends=
   return true;});
  return before-walks.edges.length;
 }
+// Bridges built after the era a city is drawn for (era.json lateBridges: {id: why}, today's footbridges left in 1760):
+// their paving goes from the roads and footways (no deck, railings or plate over the water) and the footway edges
+// that ran along them go too, so no walker crosses the water where no bridge stands. Returns the polygons dropped.
+export function dropLateBridges(city,walks,gone){
+ const ids=new Set(Object.keys(gone||{}));if(!ids.size||!city)return [];const late=[];
+ for(const key of ['roads','pavement']){if(!city[key])continue;city[key]=city[key].filter(p=>{if(!ids.has(p.id))return true;late.push(p);return false;});}
+ if(late.length&&walks?.edges)dropWalksThroughBuildings(walks,late,{clearance:0});
+ return late;
+}

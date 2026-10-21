@@ -24,3 +24,14 @@ test('a tagged deck with paving along both sides (no railing of its own) still g
  assert.ok(g.userData.bridges.some(b=>b.rings===road.rings),'the carriageway has a plate: no hole down to the water');
 });
 
+// Today's street running out along a bridge over a wider (1760) canal: its edge lies half a metre inside the bridge's.
+// One railing, the bridge's; the street keeps its plate. No quay wall round the street's end under the bridge.
+test('an untagged deck along a bridge adds no second railing beside the bridge\'s, and no wall in the water',async()=>{
+ const street={id:'street',kind:'Ajorata',rings:[[[-25,-4.5],[25,-4.5],[25,4.5],[-25,4.5]]]};
+ const g=buildBridgeRailings(water,{roads:[street,deck]});
+ assert.equal(g.userData.rails.filter(r=>r[4]==='street').length,0,'the street\'s railing would stand 0.5 m inside the bridge\'s');
+ assert.equal(g.userData.rails.length,2);assert.equal(g.userData.bridges.length,2,'both still have their plates');
+ const {extractQuayEdges}=await import('../src/quay.js'),inBridge=e=>[e.a,e.b].some(([x,z])=>Math.abs(z)<5.5&&Math.abs(x)<20);
+ assert.equal(extractQuayEdges(water,{roads:[street,deck]}).filter(inBridge).length,0,'no wall round the street end inside the bridge');
+ const pier={kind:'Ajorata',rings:[[[-25,-40],[0,-40],[0,-30],[-25,-30]]]};assert.ok(extractQuayEdges(water,{roads:[pier,deck]}).some(e=>e.a[1]<-29&&e.a[0]>-20),'a pier away from bridges keeps its walls');
+});
