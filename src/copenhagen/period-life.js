@@ -39,7 +39,7 @@ export function createPeriodLife({city,world,water=[],squares=[],gates=[],animal
  const parked=bare&&parks.length?new SpatialIndex(parks):null,ground=(x,z)=>{const g=groundAt(x,z);if(!bare||world.roads.at(x,z)||world.pavement?.at(x,z)||parked?.at(x,z))return g;const b=bare(x,z);return b==null?g:Math.min(g,b);};
  const crowds=new Map(),props={},animals=[];
  const cellOf=(x,z)=>`${Math.floor(x/350)},${Math.floor(z/350)}`;
- const person=(x,z,extra={})=>{if(!free(x,z))return false;const k=cellOf(x,z);if(!crowds.has(k))crowds.set(k,[]);crowds.get(k).push({x,z,heading:r()*Math.PI*2,pose:r()<.6?'chat':'browse',walking:false,...extra});return true;};
+ const person=(x,z,extra={})=>{if(!free(x,z))return false;const k=cellOf(x,z);if(!crowds.has(k))crowds.set(k,[]);const p={x,z,heading:r()*Math.PI*2,pose:r()<.6?'chat':'browse',walking:false,...extra},drop=ground(x,z)-groundAt(x,z);if(drop<-.05)p.groundY=drop+.02;crowds.get(k).push(p);return true;}; // groundY: off the paving (the sailors on the quays) on the bare ground drawn there, not .13 over the field
  const prop=(kind,x,z,yaw=r()*6.28)=>{if(!free(x,z,.5))return;(props[kind]??=[]).push([x,z,yaw]);};
  // squares: market crowd in small groups facing each other, a cart or two, hens about
  for(const sq of squares){
