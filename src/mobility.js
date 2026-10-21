@@ -57,8 +57,8 @@ export function approachingPedestrian(person,car,lateral=5.5){ // lateral: how f
 // set the whole pavement running.
 export function threatens(person,player,roads){
  if(player.travelMode&&player.travelMode!=='car')return false;
- const lateral=roads?.at(player.x,player.z)&&!roads.at(person.x,person.z)?2:5.5;
- return approachingPedestrian(person,player,lateral);
+ if(!approachingPedestrian(person,player,5.5))return false; /* the wide test first: two road lookups a walker a frame (300 walkers) for nobody near the car's line */
+ return !(roads?.at(player.x,player.z)&&!roads.at(person.x,person.z))||approachingPedestrian(person,player,2);
 }
 // Recycle a car that has made no real progress this long when it is away from the player (last resort).
 const STALLED_AFTER=40;
