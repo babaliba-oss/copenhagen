@@ -93,7 +93,7 @@ import {createRails} from './copenhagen/rails.js';
 import {createBoats} from './copenhagen/boats.js';
 import {createHarbourBath} from './copenhagen/harbour-bath.js';
 import {createCycleCrossings} from './copenhagen/cycle-crossings.js';
-import {createLandmarks,HIDE_1760,REDRAWN_1760} from './copenhagen/landmarks.js';
+import {createLandmarks,HIDE_1760} from './copenhagen/landmarks.js';
 import {isRampart,raiseRamparts,drapeRampart,RAMPART_DRAPE} from './ramparts.js';
 import {CityCyclists} from './copenhagen/city-cyclists.js';
 import {createTrains} from './copenhagen/trains.js';
@@ -531,7 +531,7 @@ function partOnRay(tile,w,ray,far){
  return false;
 }
 // Footprints the fallback pass never draws (when no model covers them): kept out of collision, they were invisible walls.
-function undrawnFootprint(b){const bb=b.bbox;return /^(roof|construction|carport|bridge)$/.test(b.kind||'')||city.era===1760&&(!!bb&&(bb[2]-bb[0])*(bb[3]-bb[1])<60&&!(b.cover>=.5)||isRampart(b)||(placeHidden.has('kk-'+b.id)||placeHidden.has(b.id))&&!REDRAWN_1760.includes('kk-'+b.id));} /* 1760: a small house the model draws (cover) stays solid (507 kiosks, sheds and booths were drive-through boxes); a building taken out of 1760 (HIDE_1760, GONE) leaves no wall where nothing is drawn */ /* 1760's ramparts: earthworks in the height field you drive over (ramparts.js), not walls */
+function undrawnFootprint(b){const bb=b.bbox;return /^(roof|construction|carport|bridge)$/.test(b.kind||'')||city.era===1760&&(!!bb&&(bb[2]-bb[0])*(bb[3]-bb[1])<60&&!(b.cover>=.5)||isRampart(b)||placeHidden.has('kk-'+b.id)||placeHidden.has(b.id));} /* 1760: a small house the model draws (cover) stays solid (507 kiosks, sheds and booths were drive-through boxes); a building taken out of 1760 (HIDE_1760, GONE) leaves no wall where nothing is drawn (the Gothic Vor Frue drawn instead brings its own outline: landmarks.obstacles) */ /* 1760's ramparts: earthworks in the height field you drive over (ramparts.js), not walls */
 function createFallbackBuildings(buildings=data.buildings){
  const geoms=[],modelled=[];
  const models=roofIndex.tiles.flatMap(t=>t.parts),ratus=new Set(models.filter(m=>m.ratu>0).map(m=>String(m.ratu))),index=new SpatialIndex(models);
@@ -1556,7 +1556,7 @@ async function boot(){
    const {streetObstacles,ads,crossingSigns,routeCrossingSigns,roadworks,senateProps,furniture,micromobility,market,kaivokatuDetails}=helsinki?await buildHelsinkiScenery():genericScenery();
    staticCars=[...(furniture.enterableCars||[]),...(harbour.enterableCars||[]),...(stationStreetLife?.enterableCars||[])];
    // Detected street furniture: solid boxes join the obstacles; posts, bins and barriers can be knocked down.
-   {const an=anchorData&&await anchorData;if(an){const ed=eraData&&await eraData;landmarks=createLandmarks({era:city.era,anchors:an,mills:ed?.mills||[],statues:blenderLoads?await blenderLoads.statues:{}});cityModel.add(landmarks.group);}}
+   {const an=anchorData&&await anchorData;if(an){const ed=eraData&&await eraData;landmarks=createLandmarks({era:city.era,anchors:an,mills:ed?.mills||[],statues:blenderLoads?await blenderLoads.statues:{}});cityModel.add(landmarks.group);streetObstacles.push(...landmarks.obstacles);}}
    // HDMS Gorm (Danish armoured gunboat, 1870; model by martyn169, CC BY 4.0) lies at the Opera's quay, an easter egg for today's
    // harbour. Moored boats in her berth go; she loads after the city, out of the start-up path.
    const GORM={x:1468,z:-256,yaw:1.134,half:[39,9]},gc=Math.cos(GORM.yaw),gs=Math.sin(GORM.yaw),inBerth=(x,z)=>{const dx=x-GORM.x,dz=z-GORM.z;return Math.abs(dx*gc-dz*gs)<GORM.half[0]+3&&Math.abs(dx*gs+dz*gc)<GORM.half[1]+3;};
@@ -1639,7 +1639,7 @@ async function boot(){
    if(city.era===1760){const gateNames=/Vesterport|Nørreport|Østerport/,lm=data.landmarks||[];periodLife=createPeriodLife({city,world,animalModels:await loadColouredModels('/models/animals/',['pig','hen','goose']),propModels:await loadColouredModels('/models/props/',['farm-wagon','covered-wagon','barrel','crate','watchman','spinner']),water:data.water,squares:lm.filter(l=>!gateNames.test(l.name)&&!/^(Little Mermaid|Langelinie)$/.test(l.name)),gates:lm.filter(l=>gateNames.test(l.name))});cityModel.add(periodLife.group);console.info('1760 life',periodLife.group.userData);}
    else if(city.id==='copenhagen'){periodLife=createSquareCrowds({world,water:data.water,places:data.landmarks||[]});cityModel.add(periodLife.group);const cc=createCycleCrossings({pavement:data.pavement,world});cityModel.add(cc);console.info('Blue cycle crossings',cc.userData.crossings);}
    if(city.id.startsWith('copenhagen')){parkGeese=createParkGeese({parks:data.parks||[],water:data.water||[],clear:(x,z)=>!world.roads.at(x,z)&&!world.buildings.at(x,z)&&!inWaterPolygons(data.water||[],x,z),model:blenderLoads?await loadColouredModel('/models/animals/goose.glb'):null,count:city.era===1760?6:14,seed:city.era===1760?17:7});cityModel.add(parkGeese.group);console.info('Park geese',parkGeese.count);} // geese on the park lawns (park-geese.js)
-   world.cameraBuildings=new SpatialIndex(data.buildings.filter(b=>!undrawnFootprint(b)));world.sightBuildings=world.cameraBuildings; // mapped buildings only: the camera boom and the police surge's line of sight ignore street furniture
+   world.cameraBuildings=new SpatialIndex([...data.buildings.filter(b=>!undrawnFootprint(b)),...(city.era===1760&&landmarks?landmarks.obstacles:[])]);world.sightBuildings=world.cameraBuildings; // mapped buildings only: the camera boom and the police surge's line of sight ignore street furniture
    const marketCameraObstacles=new SpatialIndex((market.stalls||[]).map(s=>solidBox({x:s.x,z:s.z,width:s.w+.5,depth:s.d+.5,yaw:s.facing||0})));
    world.travelCameraBuildings={at:(x,z)=>world.cameraBuildings.at(x,z)||marketCameraObstacles.at(x,z)}; // walking cameras must stay outside canopy roofs and counters
    world.collisionBuildings=world.cameraBuildings;

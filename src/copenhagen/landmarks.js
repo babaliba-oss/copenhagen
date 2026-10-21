@@ -136,7 +136,6 @@ function buildingSite(r=17,h=13){
 // (1896), the English Church (1887), Sankt Pauls (1877), Kong Haakons Kirke (1958), Alexander Nevsky (1883),
 // Sankt Ansgar (1842) and Ny Christiansborg (modern).
 export const HIDE_1760=['kk-osm-relation-19856927','kk-osm-way-25451190','kk-osm-way-134471983','kk-osm-way-36790389','kk-osm-way-26604470','kk-osm-way-89752515','kk-osm-way-55601707','kk-osm-way-133986381','kk-osm-relation-8833442'];
-export const REDRAWN_1760=['kk-osm-way-25451190']; // hidden but drawn anew here (the Gothic Vor Frue): its footprint stays solid; the others leave bare ground
 export function createLandmarks({era=null,mills=[],anchors={},statues={}}={}){ // statues: scanned models where loaded (frederikV), else the hand-built riders
  const group=new THREE.Group();group.name='Hand-built landmarks';
  const mat=new THREE.MeshStandardMaterial({vertexColors:true,roughness:.45,metalness:.35}),built=facadeGrain(new THREE.MeshStandardMaterial({vertexColors:true,roughness:.6,metalness:.2})); // built: brick, plaster and roof courses like the city's own buildings (statues and rides keep the plain finish)
@@ -156,14 +155,20 @@ export function createLandmarks({era=null,mills=[],anchors={},statues={}}={}){ /
  }
  add(rider(3.2,era===1760?'#b8a46a':'#55715f'),624.6,-57.9,{rot:.6}); // in the middle of Krinsen (the mapped lawn's centroid) // Christian V (1688; gilded lead until 1940s)
  for(const [x,z,h] of flagTops){const pole=add(mergeGeometries([paint(new THREE.CylinderGeometry(.08,.1,8,6).translate(0,4,0),'#e9e6dc')]),x,z,{y:groundAt(x,z)+h});const f=flag();f.position.set(x,groundAt(x,z)+h+7.2,z);group.add(f);flags.push(f);}
+ // 1760's hand-built buildings are solid (obstacles: plan outlines for the collision index); the building site and the mills had none, coaches drove through them
+ const obstacles=[],solid=(name,ring)=>{const xs=ring.map(p=>p[0]),zs=ring.map(p=>p[1]);obstacles.push({id:`landmark-${obstacles.length}`,name,rings:[ring],bbox:[Math.min(...xs),Math.min(...zs),Math.max(...xs),Math.max(...zs)]});};
+ const rect=(name,x,z,rot,cx,cz,hx,hz)=>{const c=Math.cos(rot),s=Math.sin(rot);solid(name,[[-hx,-hz],[hx,-hz],[hx,hz],[-hx,hz]].map(([u,v])=>[x+(cx+u)*c+(cz+v)*s,z-(cx+u)*s+(cz+v)*c]));}; // local (cx+u, cz+v) turned as mesh.rotation.y=rot
  if(era===1760){
   add(gothicChurch(),-205,66.3,{rot:.318,material:built}); // Vor Frue (old church, spire to ~110 m; lost in 1807)
-  add(spireTower(),336,158,{material:built}); // Sankt Nikolaj tower and spire (lost in 1795)
-  if(anchors.marmorkirken)add(buildingSite(),anchors.marmorkirken[0],anchors.marmorkirken[2]); // Frederik's Church, building site
+  for(const [cx,hx,hz] of [[0,32,14.9],[40,8,8.4],[-37.5,6.9,6.9]])rect('Vor Frue Kirke',-205,66.3,.318,cx,0,hx,hz); // nave with buttresses, choir, west tower (gothicChurch's defaults); today's larger footprint is not solid in 1760
+  add(spireTower(),336,158,{material:built});rect('Sankt Nikolaj',336,158,0,0,0,5.9,5.9); // Sankt Nikolaj tower and spire (lost in 1795)
+  if(anchors.marmorkirken){const [x,,z]=anchors.marmorkirken;add(buildingSite(),x,z); // Frederik's Church, building site
+   solid('Frederiks Kirke building site',Array.from({length:28},(_,k)=>[x+Math.cos(k/28*Math.PI*2)*18.9,z+Math.sin(k/28*Math.PI*2)*18.9])); // scaffold ring (r 17 + 1.6) round the half-built rotunda
+   rect('treadwheel crane',x,z,0,26,.7,3.2,.9);rect('stone blocks',x,z,0,-21.6,8.2,3.6,.9);rect('stone blocks',x,z,0,21.2,-10,2.4,.7);}
  }
  // The ramparts are in the height field (ramparts.js): a mill stands on the ground under it, moved onto the bastion's top
  // when its mapped spot is just beside one (a guessed 7 m over the field left mills floating off the banks).
- if(era===1760)for(const [mx,mz] of mills){const [x,z]=onRampartTop(mx,mz),y=groundAt(x,z)+RAMPART_DRAPE;add(windmill(),x,z,{y,material:built});const r=new THREE.Mesh(sails(),mat);r.position.set(x,y+7.6,z+2.3);group.add(r);rotors.push(r);}
+ if(era===1760)for(const [mx,mz] of mills){const [x,z]=onRampartTop(mx,mz),y=groundAt(x,z)+RAMPART_DRAPE;add(windmill(),x,z,{y,material:built});rect('windmill post',x,z,0,0,0,.55,.55);const r=new THREE.Mesh(sails(),mat);r.position.set(x,y+7.6,z+2.3);group.add(r);rotors.push(r);}
  // Static landmarks merge into one mesh per material (1760's windmills, churches, statues and flagpoles were ~20
  // draws) and the windmill sails turn as one instanced batch. Tivoli's rides and the flags keep their own meshes.
  const moving=new Set([...rotors,...flags,...spinners.map(sp=>sp.m)]),byMaterial=new Map();group.updateMatrixWorld(true);
@@ -177,5 +182,5 @@ export function createLandmarks({era=null,mills=[],anchors={},statues={}}={}){ /
  if(rotors.length){sailBatch=new THREE.InstancedMesh(rotors[0].geometry,mat,rotors.length);sailBatch.name='Windmill sails';sailBatch.instanceMatrix.setUsage(THREE.DynamicDrawUsage);sailBatch.frustumCulled=false;
   for(const r of rotors){group.remove(r);if(r.geometry!==sailBatch.geometry)r.geometry.dispose();}group.add(sailBatch);}
  let t=0,acc=0;
- return {group,update(dt){t+=dt;acc+=dt;if(sailBatch){turn-=dt*.6;rotors.forEach((r,i)=>sailBatch.setMatrixAt(i,spin.makeRotationZ(turn).setPosition(r.position)));sailBatch.instanceMatrix.needsUpdate=true;}for(const sp of spinners){if(sp.axis==='z')sp.m.rotation.z+=dt*sp.rate;else sp.m.rotation.y+=dt*sp.rate;}if(acc>.05){acc=0;for(const f of flags)f.userData.wave?.(t);}}};
+ return {group,obstacles,update(dt){t+=dt;acc+=dt;if(sailBatch){turn-=dt*.6;rotors.forEach((r,i)=>sailBatch.setMatrixAt(i,spin.makeRotationZ(turn).setPosition(r.position)));sailBatch.instanceMatrix.needsUpdate=true;}for(const sp of spinners){if(sp.axis==='z')sp.m.rotation.z+=dt*sp.rate;else sp.m.rotation.y+=dt*sp.rate;}if(acc>.05){acc=0;for(const f of flags)f.userData.wave?.(t);}}};
 }
