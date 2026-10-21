@@ -5,6 +5,7 @@ import './loading-screen.css';
 import './speedometer.css';
 import {createSpeedometer} from './speedometer.js';
 import {createFpsMeter} from './fps-meter.js';
+import {createFramePacer} from './frame-pacer.js';
 import {createBigMap} from './copenhagen/big-map.js';
 import {createSoundscape} from './copenhagen/soundscape.js';
 import {createPeriodLife,createSquareCrowds} from './copenhagen/period-life.js';
@@ -231,14 +232,15 @@ const renderer=new THREE.WebGLRenderer({canvas:$('world'),antialias:OFF.has('pos
  if(!this.enabled||(!this.autoUpdate&&!this.needsUpdate))return render.call(this,lights,sc,cam);
  const shown=[];for(const g of loadedTiles.values())if(g.visible&&g.userData.level==='near')for(const c of g.userData.casters||[]){c.visible=true;shown.push(c);}
  try{return render.call(this,lights,sc,cam);}finally{for(const c of shown)c.visible=false;}};}
-const fpsMeter=createFpsMeter(renderer);
+const fpsMeter=createFpsMeter(renderer,()=>`${pacer.half?' · 30 cap':''} · ×${renderer.getPixelRatio().toFixed(2)} · q${governor?.level??'-'}${renderer.shadowMap.enabled?' · shadows':''}${post?' · post':''}`);
 // The GPU's name (shown on the error screen) and PowerVR (Pixel 10 and others): its driver lost the context while the start-up
 // shader warm-up compiled every program at once, so it skips that bulk compile (programs then compile as things first appear).
 const gpuName=(()=>{try{const gl=renderer.getContext(),e=gl.getExtension('WEBGL_debug_renderer_info');return String(gl.getParameter(e?e.UNMASKED_RENDERER_WEBGL:gl.RENDERER));}catch{return '';}})();globalThis.__gpu=gpuName;
 const powerVR=/PowerVR|Imagination/i.test(gpuName);
 // After the graphics connection was lost, starts in the next 30 days run without shadow maps (below); ?quality= overrides.
 const gpuLostRecently=(()=>{try{return Date.now()-Number(localStorage.getItem('gpu-lost')||0)<30*864e5&&!new URLSearchParams(location.search).has('quality');}catch{return false;}})();
-const maxPixelRatio=Math.min(devicePixelRatio,1.5),resolution=createAdaptiveResolution({max:maxPixelRatio,min:Math.min(maxPixelRatio,.75)});
+const PHONE=matchMedia('(pointer:coarse)').matches,maxPixelRatio=Math.min(devicePixelRatio,1.5),resolution=createAdaptiveResolution({max:maxPixelRatio,min:Math.min(maxPixelRatio,PHONE?1:.75)}); /* phones: never below 1 (0.75 on a 2.6x screen was a blur) */
+const pacer=createFramePacer({enabled:PHONE&&!/[?&]fps60\b/.test(location.search)}); /* phones that can't hold 60: an even 30 (frame-pacer.js) */
 renderer.setPixelRatio(maxPixelRatio);
 if(FIXED){captureMode=true;resolution.lock(1);renderer.setPixelRatio(1);globalThis.__skyClock=()=>frameNow;} /* frame-by-frame capture: full quality at the window's size, clouds on the trailer's clock */
 renderer.setSize(captureFrame.w,captureFrame.h);
@@ -1162,7 +1164,7 @@ const SCRATCH={people:[],riders:[],hitCars:[],tram:[],bus:[],ext:[],npc:[],polic
 function fillList(out,...lists){out.length=0;for(const l of lists)if(l)for(let i=0;i<l.length;i++)out.push(l[i]);return out;}
 function frame(now){
  if(gameIsStopped())return;
- if(!fixedCall){requestAnimationFrame(frame);if(FIXED){fixedNow=now;if(cinematic?.phase==='play')return;}} /* ?fixed: while a shot plays, only the capture script advances the world */frameNow=now;
+ if(!fixedCall){requestAnimationFrame(frame);if(FIXED){fixedNow=now;if(cinematic?.phase==='play')return;}if(started&&pacer.skip(now))return;} /* ?fixed: while a shot plays, only the capture script advances the world */frameNow=now;
  const cpu0=performance.now(),frameMs=fixedCall?1000/FIXED:lastTime?now-lastTime:0;fpsMeter?.tick(frameMs);perfOverlay?.tick(frameMs,now);const steps=fixedCall?[1/FIXED]:simulationSteps(lastTime?(now-lastTime)/1000:0),dt=steps.reduce((a,b)=>a+b,0);if(!fixedCall)lastTime=now;
  // A saga card, treasure map or the journal is read with the world held (their timers, traffic, the car) and the keys let go.
  const reading=!!(cph?.blocking?.()&&!cinematic);if(reading!==wasReading){wasReading=reading;if(reading){keys.clear();keys.tilt=0;}}
@@ -1313,7 +1315,8 @@ function frame(now){
  marketScene?.update(now/1000,car);
  stationStreetLife?.update(car,ready&&!paused&&!mapOpen?dt:0);
  // Resize before drawing: changing the pixel ratio clears the canvas, which flashed a blank frame when done after.
- if(ready&&!FIXED&&resolution.update(frameMs,dt,lastCpuMs))renderer.setPixelRatio(resolution.scale); // last frame's CPU time: CPU-bound frames keep their resolution
+ if(started&&!FIXED)pacer.record(frameMs,dt);
+ if(ready&&!FIXED&&resolution.update(pacer.effective(frameMs),dt,lastCpuMs))renderer.setPixelRatio(resolution.scale); // last frame's CPU time: CPU-bound frames keep their resolution
  if(ready&&!captureMode&&!FIXED&&governor.update(dt,resolution))console.info('Quality step',governor.level,'to hold the frame rate');
  look.update(dt,now/1000); // blends the active look and re-applies its sun offset after the shadow target above
  flushPeople(scene); // every crowd's instances into the shared person batches (person-model.js)
