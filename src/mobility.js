@@ -229,7 +229,7 @@ export class Mobility {
    const distance=Math.hypot(p.x-player.x,p.z-player.z);
    if(distance<12||(this.visibilityTest?.(p)&&(a.walking?this.time>3&&!this.resetting&&distance<70:!(a.corridorOnly&&distance>300))))continue; // walkers too: people appeared on the pavement ahead
    if(!a.walking){const dx=p.x-player.x,dz=p.z-player.z,along=-dx*Math.sin(player.heading||0)-dz*Math.cos(player.heading||0),side=Math.abs(dx*Math.cos(player.heading||0)-dz*Math.sin(player.heading||0));if(along>-24&&along<(this.time<3?95:45)&&side<4.5)continue;} // a clear first 95 m when the drive starts
-   if(!a.walking&&this.cars.some(b=>b!==a&&b.edge&&Math.hypot(p.x-b.x,p.z-b.z)<8))continue;
+   if(!a.walking&&(this.cars.some(b=>b!==a&&b.edge&&Math.hypot(p.x-b.x,p.z-b.z)<8)||this.externalObstacles.some(o=>o.edge!==null&&Math.hypot(p.x-o.x,p.z-o.z)<8)))continue; // nor on a police unit, bus or tram (they blocked each other until one retired)
    Object.assign(a,p);a.offset=undefined;a.prevDir=undefined;a.speed=edgeCruise(a.edge,a.cruise);a.waiting=0;a.passing=null;a.unjam=null;a.gridlock=0;a.hold=null;a.holdBy=null;a.deadlocked=false;a.hiddenFor=0;a.panicUntil=0;a.running=false;a.stuck=0;a.progressPoint={x:p.x,z:p.z};return;
   }
   a.edge=null;a.speed=0;
