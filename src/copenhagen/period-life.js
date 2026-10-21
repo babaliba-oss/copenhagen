@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';
 import {groundAt} from '../terrain.js';
-import {pointInPolygon} from '../geo.js';
+import {pointInPolygon,SpatialIndex} from '../geo.js';
 import {createInstancedPeople} from '../market-life.js';
 import {solidBox} from '../world-objects.js';
 const WAGONS=/^(handcart|haywagon|farm-wagon|covered-wagon)$/;
@@ -29,11 +29,13 @@ const ANIMALS={
  pig:()=>mergeGeometries([paint(new THREE.SphereGeometry(.35,10,8).scale(1.5,.9,.9).translate(0,.45,0),'#e2a99a'),paint(new THREE.SphereGeometry(.18,8,6).translate(.55,.5,0),'#e2a99a'),paint(new THREE.CylinderGeometry(.08,.08,.08,8).rotateZ(Math.PI/2).translate(.72,.5,0),'#c98a80')])};
 const rnd=seed=>()=>{seed=(seed*16807)%2147483647;return (seed-1)/2147483646;};
 
-export function createPeriodLife({city,world,water=[],squares=[],gates=[],animalModels={},propModels={}}){ // animalModels: Blender pig/hen/goose (scripts/blender/animals.py) where loaded; propModels: farm-wagon, covered-wagon (CC BY agt14032013), and Daniel's barrel and crate (CC BY RipeR / SomeKevin) for the cargo on the quays
+export function createPeriodLife({city,world,water=[],squares=[],gates=[],animalModels={},propModels={},bare=null,parks=[]}){ // animalModels: Blender pig/hen/goose (scripts/blender/animals.py) where loaded; propModels: farm-wagon, covered-wagon (CC BY agt14032013), and Daniel's barrel and crate (CC BY RipeR / SomeKevin) for the cargo on the quays
  const group=new THREE.Group();group.name='1760 street life';const r=rnd(1760);
  const wet=(x,z)=>water.some(w=>{const b=w.bbox;return (!b||x>=b[0]&&x<=b[2]&&z>=b[1]&&z<=b[3])&&pointInPolygon(x,z,w.rings);});
  // off the roads too: wagons, crowds and pigs stood in the coaches' lanes, and nothing there collides with them
  const free=(x,z,rad=.6)=>!world.roads.at(x,z)&&!world.buildings.at(x,z)&&!wet(x,z)&&!world.buildings.at(x+rad,z)&&!world.buildings.at(x-rad,z)&&!world.buildings.at(x,z+rad)&&!world.buildings.at(x,z-rad);
+ // bare (the terrain ground's heightAt): off the roads, pavements and parks no surface is drawn and the bare ground lies under the height field (8 cm plus its triangles' sag, 50 cm beside lawns): cargo on the quays stood up to 1.2 m over it
+ const parked=bare&&parks.length?new SpatialIndex(parks):null,ground=(x,z)=>{const g=groundAt(x,z);if(!bare||world.roads.at(x,z)||world.pavement?.at(x,z)||parked?.at(x,z))return g;const b=bare(x,z);return b==null?g:Math.min(g,b);};
  const crowds=new Map(),props={},animals=[];
  const cellOf=(x,z)=>`${Math.floor(x/350)},${Math.floor(z/350)}`;
  const person=(x,z,extra={})=>{if(!free(x,z))return false;const k=cellOf(x,z);if(!crowds.has(k))crowds.set(k,[]);crowds.get(k).push({x,z,heading:r()*Math.PI*2,pose:r()<.6?'chat':'browse',walking:false,...extra});return true;};
@@ -81,7 +83,7 @@ export function createPeriodLife({city,world,water=[],squares=[],gates=[],animal
    list.splice(0,list.length,...kept);}
   for(const it of list){const k=`${Math.floor(it[0]/400)},${Math.floor(it[1]/400)}`;if(!by.has(k))by.set(k,[]);by.get(k).push(it);}
   for(const its of by.values()){const im=new THREE.InstancedMesh(geo,mat,its.length);im.name=`1760 ${kind}`;im.castShadow=true;im.receiveShadow=true;
-   its.forEach(([x,z,yaw],i)=>im.setMatrixAt(i,m4.compose(v.set(x,groundAt(x,z),z),q.setFromAxisAngle(UP,yaw),one)));im.computeBoundingSphere();group.add(im);
+   its.forEach(([x,z,yaw],i)=>im.setMatrixAt(i,m4.compose(v.set(x,ground(x,z),z),q.setFromAxisAngle(UP,yaw),one)));im.computeBoundingSphere();group.add(im);
    chunks.push({im,x:its.reduce((s,p)=>s+p[0],0)/its.length,z:its.reduce((s,p)=>s+p[1],0)/its.length});}}
  // animals: flocks pecking about an anchor
  const flocks=[];
