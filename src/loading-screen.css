@@ -137,3 +137,22 @@ body.game-failed #intro{z-index:1000;pointer-events:auto}
 
 /* The game's logo (the trailer's title art) on the welcome and error card, in place of the globe and the name. */
 #intro.boot-screen .boot-brand .boot-logo{display:block;width:min(170px,60%);height:auto;margin:-4px 0 -2px -2px}
+
+/* Upright phones: the start card covered three quarters of the screen, hiding the loading picture's subject behind it.
+   A compact card (smaller logo, one-line tagline, small credit line) leaves the top of the screen to the picture, and is
+   a little see-through so the picture runs on behind it. */
+@media(max-width:700px) and (orientation:portrait){
+ #intro.boot-screen{--pad:20px;padding:var(--s-20,20px);background:#f6f3eceb;-webkit-backdrop-filter:blur(14px) saturate(1.1);backdrop-filter:blur(14px) saturate(1.1)}
+ #intro.boot-screen .boot-brand{margin-bottom:var(--s-8,8px)}
+ #intro.boot-screen .boot-logo{width:138px;height:auto}
+ #intro.boot-screen .boot-tagline{font-size:20px;line-height:25px;margin-bottom:var(--s-12,12px)}
+ #intro.boot-screen .boot-era{font-size:15px;line-height:20px;margin-top:2px}
+ #intro.boot-screen .boot-place-label{margin-bottom:var(--s-8,8px)}
+ #intro.boot-screen #boot-launch .primary-btn{margin-top:var(--s-12,12px)}
+ #intro.boot-screen .boot-enter{display:none}
+ #intro.boot-screen .boot-help summary{padding-top:var(--s-8,8px);padding-bottom:var(--s-8,8px)}
+ #intro.boot-screen>.boot-footer{margin-top:var(--s-8,8px);padding-top:var(--s-8,8px)}
+ #intro .boot-credit{font-size:11.5px;line-height:16px;margin:0}
+ #intro .boot-footer a{min-height:32px}
+ #intro .boot-credit a{min-height:0}
+}
