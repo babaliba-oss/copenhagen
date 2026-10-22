@@ -275,7 +275,8 @@ export class Mobility {
  trap(e,depth){
   if(!this.fits(e))return true;if(!depth)return false;
   const key=depth*1e6+e.id;this.traps??=new Map();if(this.traps.has(key))return this.traps.get(key);
-  this.traps.set(key,false);const next=this.roads.outgoing[e.to].filter(o=>o.to!==e.from),result=next.length>0&&next.every(o=>this.trap(o,depth-1));
+  this.traps.set(key,false);let next=this.roads.outgoing[e.to].filter(o=>o.to!==e.from);if(!next.length)next=this.roads.outgoing[e.to]; // a dead end goes on by its U-turn: a trap when that lane is (1760: the way back along a wall)
+  const result=next.length>0&&next.every(o=>this.trap(o,depth-1));
   this.traps.set(key,result);return result;
  }
  pickNext(edge){

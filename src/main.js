@@ -1416,7 +1416,7 @@ async function boot(){
    const cycleMarkData=city.id==='copenhagen'?json(dataUrl('cycle-marks.json')).catch(()=>null):null; // bicycles painted on the cycle tracks (scripts/surface-dissolve.mjs)
    const radioData=city.id==='copenhagen'?json(dataUrl('radio-stations.json')).catch(()=>null):null; // car radio playlists (public domain / CC recordings, streamed)
    const parkedData=city.id==='copenhagen'?json(dataUrl('parked.json')).catch(()=>null):null; // kerbside parked cars (scripts/parked-cars.py)
-   const roadWallData=city.id==='copenhagen'?json(dataUrl('road-walls.json')).catch(()=>null):null; // the model's walls standing on the roads (scripts/road-walls.mjs)
+   const roadWallData=city.id.startsWith('copenhagen')?json(dataUrl('road-walls.json')).catch(()=>null):null; // the model's walls standing on the roads (scripts/road-walls.mjs; 1760: gateways and house ends drawn shut across the carriageway)
    const furnitureData=city.furniture?json(dataUrl(city.furniture)).catch(()=>null):null; // street furniture detected in street-level photos (optional, any city)
    let mobilityData,landcoverData,tramData;[data,roofIndex,surfaceIndex,mobilityData,landcoverData,tramData,extensions]=await Promise.all([d,json(dataUrl('buildings3d-index.json')),json(dataUrl('surface-index.json')),json(dataUrl('mobility.json')).then(expandMobility),json(dataUrl('landcover.json')),json(dataUrl('trams.json')),loadExtensionIndex(json)]);
    if(eraData){const late=dropLateBridges(data,mobilityData?.walks,(await eraData)?.lateBridges);if(late.length)console.info('Bridges built after the era left out (era.json lateBridges)',late.length);} /* today's footbridges in 1760: Inderhavnsbroen, the 2016 bridge by the Bryghus, Kastellet's side bridges */
