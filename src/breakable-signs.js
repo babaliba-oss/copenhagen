@@ -122,11 +122,11 @@ export function createBreakableSigns(name='Breakable signs',{register=true}={}){
 
  // Thousands of posts stand still almost all the time: each frame only steps the posts near the car (an 8 m
  // grid) and the ones still moving, waiting to respawn or touching the car.
- let grid=null,gridSize=-1;const active=new Set(),near=[];
+ let grid=null,gridSize=-1;const active=new Set(),near=[],bounds=[Infinity,Infinity,-Infinity,-Infinity];
  const cellKey=(x,z)=>Math.floor(x/8)*100003+Math.floor(z/8);
  function nearCar(car){
-  if(gridSize!==posts.length){grid=new Map();for(const s of posts){const k=cellKey(s.x,s.z);if(!grid.has(k))grid.set(k,[]);grid.get(k).push(s);}gridSize=posts.length;}
-  near.length=0;const cx=Math.floor(car.x/8),cz=Math.floor(car.z/8);
+  if(gridSize!==posts.length){grid=new Map();bounds[0]=bounds[1]=Infinity;bounds[2]=bounds[3]=-Infinity;for(const s of posts){const k=cellKey(s.x,s.z);if(!grid.has(k))grid.set(k,[]);grid.get(k).push(s);bounds[0]=Math.min(bounds[0],s.x);bounds[1]=Math.min(bounds[1],s.z);bounds[2]=Math.max(bounds[2],s.x);bounds[3]=Math.max(bounds[3],s.z);}gridSize=posts.length;}
+  near.length=0;if(car.x<bounds[0]-16||car.x>bounds[2]+16||car.z<bounds[1]-16||car.z>bounds[3]+16)return near; /* the set's posts are all out of reach: no grid cells to look up (phones have ~300 sets, one per 250 m chunk, each stepped every frame) */const cx=Math.floor(car.x/8),cz=Math.floor(car.z/8);
   for(let i=-1;i<=1;i++)for(let j=-1;j<=1;j++){const c=grid.get((cx+i)*100003+cz+j);if(c)for(const s of c)near.push(s);}
   return near;
  }
