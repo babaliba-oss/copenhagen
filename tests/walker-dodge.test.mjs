@@ -14,3 +14,13 @@ test('walkers meeting head on in view step round each other',()=>{
  for(let i=0;i<60*12;i++){sim.step(1/60,player);if(a.edge&&b.edge)min=Math.min(min,Math.hypot(a.x-b.x,a.z-b.z));}
  assert.ok(min>.5,`closest ${min.toFixed(2)} m`);assert.ok(a.x>5&&b.x<-5,'both walked on past each other');
 });
+// A footway mapped down the carriageway with a stub of pavement at one end (a spur to a doorway, 510,-303 today): walkers
+// spawned on the stub could never leave it, turned at the kerb every few seconds and stood in one another there.
+test('walkers are not spawned on a stub of pavement they could not walk off',()=>{
+ const n=[[-40,0],[40,0],[1,4],[1,14]],e=(a,b)=>({from:a,to:b,points:[n[a],n[b]],lane:0,signal:-1,crossing:false});
+ const pave=(x,z)=>z<2||z>=12&&x>=0&&x<=2;
+ const sim=new Mobility({roads:{nodes:[],edges:[]},walks:{nodes:n,edges:[e(0,1),e(1,0),e(2,3),e(3,2)]},signals:[]},{roads:{at:(x,z)=>!pave(x,z)},pavement:{at:pave},buildings:{at:()=>false}},{cars:0,people:14,random:(s=>()=>(s=s*16807%2147483647)/2147483647)(7)});
+ sim.reset({x:0,z:-30,heading:0,speed:0});
+ const placed=sim.people.filter(a=>a.edge);assert.ok(placed.length>=10,`${placed.length} placed`);
+ assert.equal(placed.filter(a=>a.edge.from>=2).length,0,'none on the stub');
+});

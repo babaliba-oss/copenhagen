@@ -10,7 +10,7 @@ const hypot=(x,z)=>Math.sqrt(x*x+z*z); // not Math.hypot: in optimised code it a
 // optimised code ('wrong map') every few seconds, running at half speed and twice the garbage until optimised again.
 const newAgent=(id,walking,cruise,side,stationOnly,corridorOnly)=>({id,stationOnly,corridorOnly,walking,edge:null,s:0,speed:0,cruise,side,dodge:0,yieldSide:undefined,yieldHeld:0,unpocket:false,x:0,z:0,heading:0,playerTaken:undefined,conversation:undefined,knocked:undefined,damage:undefined,plan:[],prevDir:undefined,ox:undefined,oz:undefined,gapBy:null,gapHeld:0,offset:undefined,waiting:0,passing:null,unjam:null,unjamUntil:0,gridlock:0,hold:null,holdBy:null,atSignal:false,deadlocked:false,hiddenFor:0,panicUntil:0,turnAfter:0,turnedAt:undefined,holdUntil:0,retryAt:0,running:false,stuck:0,progressPoint:null,waitFrom:null,kerbUntil:0});
 const STANDING_PROBES=[3,6,10,15]; // metres ahead checked for a standing bus
-const NEXT_ONE=[null],NO_EDGES=[]; // the next planned edge, passed to cornerSpeedLimit without a fresh array per car
+const NEXT_ONE=[null],NO_EDGES=[],REACH_P={x:0,z:0,heading:0}; // the next planned edge, passed to cornerSpeedLimit without a fresh array per car
 // Walker grid cells (mobility step): a 1024-slot hash of 1.5 m cells; collisions only cost a distance test.
 const TRAFFIC_CELLS=256,trafficCell=(gx,gz)=>(Math.imul(gx,73856093)^Math.imul(gz,19349663))&(TRAFFIC_CELLS-1),KIND_CELLS=65536,WALK_CELLS=1024,walkCell=(gx,gz)=>(Math.imul(gx,73856093)^Math.imul(gz,19349663))&(WALK_CELLS-1);
 import {mergeGraph} from './graph-extension.js';
@@ -257,6 +257,21 @@ export class Mobility {
   for(let i=1,n=Math.max(1,Math.ceil(distance/.25));i<=n;i++)if(!this.walkable(a.x+(p.x-a.x)*i/n,a.z+(p.z-a.z)*i/n,edge))return false;
   return true;
  }
+ // Metres a walker at s on e can walk on (each way, by any branch, up to `need`) before ground it may not step on. A
+ // footway mapped down the carriageway with a stub of pavement at one end (a spur to a doorway, 88072 by 510,-303) let
+ // walkers spawn on that stub and never leave it: in view each turned back at the kerb every 3 s, and six stood in one
+ // another on 2 m of pavement (~110 overlap pair-seconds a minute there). Spawning asks for room both ways together.
+ walkReach(e,s,need,budget={n:40}){
+  for(let d=s;d<e.length;d+=.5){const p=routePoint(e,d,0,undefined,undefined,REACH_P);if(!this.walkable(p.x,p.z,e))return d-s;}
+  let best=e.length-s;if(best>=need)return best;
+  for(const o of this.walks.outgoing[e.to]){if(o.to===e.from&&Math.abs(o.length-e.length)<.8||budget.n--<=0)continue;best=Math.max(best,e.length-s+this.walkReach(o,0,need-(e.length-s),budget));if(best>=need)break;}
+  return best;
+ }
+ walkRoom(e,s,need=10){
+  const k=Math.round(s*2);if(e._roomOf!==this.world.buildings){e._room=new Map();e._roomOf=this.world.buildings;}let v=e._room.get(k);if(v!==undefined)return v;
+  const back=this.walks.outgoing[e.to].find(o=>o.to===e.from&&Math.abs(o.length-e.length)<.8),f=this.walkReach(e,s,need);
+  v=f>=need||f+(back?this.walkReach(back,Math.max(0,back.length-s),need-f):0)>=need;e._room.set(k,v);return v;
+ }
  // Edges whose midpoint lies near the player, from a 100 m grid built once per graph (spawning used to scan
  // every edge in the city per agent: a long frame whenever many respawned at once).
  edgesNear(graph,player,r){
@@ -290,7 +305,7 @@ export class Mobility {
    // canals) the 300 walkers otherwise all landed on the same few edges and moved about as one clump.
    if(a.walking){if(!occupancy){occupancy=new Map();for(const b of this.people)if(b!==a&&b.edge)occupancy.set(b.edge,(occupancy.get(b.edge)||0)+1);}if((occupancy.get(a.edge)||0)>=Math.max(1,a.edge.length/8))continue;}
    if(this.streetWalking&&(a.walking?this.cars:this.people).some(b=>b.edge&&Math.abs(b.x-p.x)<4.5&&Math.abs(b.z-p.z)<4.5))continue; // 1760: not under a coach, nor a coach on top of someone
-   if(this.world.buildings.at(p.x,p.z)||(a.walking?!this.walkable(p.x,p.z,a.edge):!vehicleFitsRoad(p,this.world)))continue;
+   if(this.world.buildings.at(p.x,p.z)||(a.walking?!this.walkable(p.x,p.z,a.edge)||!this.walkRoom(a.edge,a.s):!vehicleFitsRoad(p,this.world)))continue;
    // A long straight main road is almost always in view; corridor cars may appear there, but only in the far haze.
    const distance=hypot(p.x-player.x,p.z-player.z);
    if(distance<12||(this.visibilityTest?.(p)&&(a.walking?this.time>3&&!this.resetting&&distance<70:!(a.corridorOnly&&distance>300))))continue; // walkers too: people appeared on the pavement ahead
