@@ -506,14 +506,15 @@ export class Mobility {
     if(!running){const x=player.x-a.x,z=player.z-a.z,forward=x*dx+z*dz;if(forward>0&&forward<5&&Math.abs(x*dz-z*dx)<(this.streetWalking?(player.halfWidth??1)+.45:1.7))desired=Math.min(desired,Math.max(0,(forward-2.8)*.85));}
     if(a.edge.crossing&&a.s<.35&&!running&&!this.world.roads.at(a.x,a.z)&&!this.crossingClear(a.edge,player))desired=0;
     // Never on a crossing: someone waiting for a gap out on the carriageway would hold up the cars (and the cars them).
-    if(!running&&desired>0&&!a.edge.crossing){const g=this.walkGap(a,dx,dz);
+    // 1760: people running from the coach keep their distance and step round each other too (in the street they ran through one another).
+    if((!running||this.streetWalking)&&desired>0&&!a.edge.crossing){const g=this.walkGap(a,dx,dz);
      if(g<desired){a.gapHeld=(a.gapHeld||0)+dt;let ring=false;
       // Walkers each waiting for the next round a ring would never move: after a while the lowest id in it steps on.
       if(a.gapHeld>4){let b=a.gapBy,min=a.id;for(let k=0;k<8&&b;k++){if(b===a){ring=min===a.id;break;}min=Math.min(min,b.id);b=b.gapBy;}}
       if(!ring)desired=g;}
      else a.gapHeld=0;}
     else{a.gapBy=null;a.gapHeld=0;}
-    if(!running&&!a.edge.crossing&&a.hiddenFor===0)this.walkDodge(a,dx,dz);else a.dodge=0;
+    if((!running||this.streetWalking)&&!a.edge.crossing&&a.hiddenFor===0)this.walkDodge(a,dx,dz);else a.dodge=0;
     if(this.streetWalking){if(!a.edge.crossing&&(coachCells.has(Math.floor(a.x/25)*65536+Math.floor(a.z/25))||Math.abs(player.x-a.x)<25&&Math.abs(player.z-a.z)<25)){const v=this.coachYield(a,player,desired);if(!running)desired=v;}else a.yieldSide=undefined;} // running from the player's coach, out of its way too
    }else{
     const plan=this.plan(a);let hold=null,holdBy=null;
