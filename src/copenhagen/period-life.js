@@ -94,6 +94,7 @@ export function createPeriodLife({city,world,water=[],squares=[],gates=[],animal
   for(const its of by.values()){const im=new THREE.InstancedMesh(geo,mat,its.length);im.name=`1760 ${kind}`;im.castShadow=true;im.receiveShadow=true;
    its.forEach(([x,z,yaw],i)=>im.setMatrixAt(i,m4.compose(v.set(x,ground(x,z),z),q.setFromAxisAngle(UP,yaw),one)));im.computeBoundingSphere();group.add(im);
    chunks.push({im,x:its.reduce((s,p)=>s+p[0],0)/its.length,z:its.reduce((s,p)=>s+p[1],0)/its.length});}}
+ paths.clear(); // the footway grid was only for placing the wagons: update() shares this scope and kept it (~7 MB on a phone)
  // animals: flocks pecking about an anchor
  const flocks=[];
  for(const kind of Object.keys(ANIMALS)){const fl=animals.filter(a=>a.kind===kind);if(kind==='pig')for(const sq of squares.slice(0,6))fl.push({kind:'pig',x:sq.x+(r()-.5)*24,z:sq.z+(r()-.5)*24,n:1+Math.floor(r()*2)});
