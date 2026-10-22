@@ -82,7 +82,7 @@ function createRouteLine(scene,{historic=false}={}){
  mat.onBeforeCompile=sh=>{sh.uniforms.uProg=u.uProg;
   sh.vertexShader=sh.vertexShader.replace('void main() {','attribute float rd; varying float vRd;\nvoid main() { vRd = rd;');
   sh.fragmentShader=sh.fragmentShader.replace('void main() {','uniform float uProg; varying float vRd;\nvoid main() { if (vRd < uProg) discard;').replace('vec4 diffuseColor = vec4( diffuse, opacity );','vec4 diffuseColor = vec4( diffuse, opacity * clamp((vRd - uProg) / 6.0, 0.0, 1.0) );');};
- let mesh=null,pts=null,cum=null,seg=0;const out={points:null};
+ let mesh=null,pts=null,cum=null,seg=0;const out={points:null,off:0};
  out.set=points=>{if(mesh){scene.remove(mesh);mesh.geometry.dispose();mesh=null;}pts=points;out.points=points;seg=0;u.uProg.value=0;if(!points||points.length<2)return;
   cum=[0];for(let i=1;i<pts.length;i++)cum.push(cum[i-1]+dist(pts[i],pts[i-1]));
   // One continuous strip with mitred joins: separate quads per segment overlapped at every bend, and the
@@ -101,7 +101,7 @@ function createRouteLine(scene,{historic=false}={}){
  // Progress: project the player onto the next few segments; returns the distance off the line.
  out.progress=(x,z)=>{if(!pts||pts.length<2)return Infinity;let best=1e9,bi=seg,bt=0;
   for(let i=Math.max(0,seg-2);i<Math.min(pts.length-1,seg+40);i++){const [ax,az]=pts[i],[bx,bz]=pts[i+1],dx=bx-ax,dz=bz-az,l2=dx*dx+dz*dz||1,t=clamp(((x-ax)*dx+(z-az)*dz)/l2,0,1),d=Math.hypot(ax+dx*t-x,az+dz*t-z);if(d<best){best=d;bi=i;bt=t;}}
-  if(best<30){seg=bi;u.uProg.value=cum[bi]+(cum[bi+1]-cum[bi])*bt-1.5;}return best;};
+  out.off=best;if(best<30){seg=bi;u.uProg.value=cum[bi]+(cum[bi+1]-cum[bi])*bt-1.5;}return best;};
  out.remaining=()=>pts?Math.max(0,cum.at(-1)-u.uProg.value):0;
  out.ahead=()=>pts?pts.slice(seg):null;
  return out;
@@ -350,7 +350,7 @@ export function createCopenhagenGame({scene,city,mobilityData,cityData,toast,sou
    setHtml($('cph-money'),`<b>${fmtKr(save.money)} ${UNIT}</b>${save.nisser?.length?` · nisser ${save.nisser.length}/${nisser.length}`:''}${save.pant?` · pant ${save.pant}`:''}<span class="cph-rank">${esc(RANKS[r][0])}${save.streak>1?` · streak ×${save.streak}`:''}<i style="--p:${pct}%"></i></span>`);}
   if(race){const r=race.r,b=save.best[r.id];setHtml($('cph-job'),`<p class="cph-kick">Race · checkpoint ${Math.min(race.k+1,r.cps.length)}/${r.cps.length}${TOUCH?'':' · <kbd>X</kbd> quit'}</p><h3>${esc(r.title)}</h3><p class="cph-race-time">${race.countdown>0?Math.ceil(race.countdown):fmtT(race.t)}</p><p>Gold ${fmtT(r.par[0])} · silver ${fmtT(r.par[1])} · bronze ${fmtT(r.par[2])}${b!=null?` · best ${fmtT(b)}`:''}</p>`);}
   else{
-  const j=job(),t=state==='a'?j.A:j.B,d=line.points&&target().kind==='job'?line.remaining():dist(t,[player.x,player.z]); // the line may lead to a saga step or a character instead
+  const j=job(),t=state==='a'?j.A:j.B,d=line.points&&target().kind==='job'&&line.off<30?line.remaining():dist(t,[player.x,player.z]); // the line may lead to a saga step or a character instead; a line left behind (a teleport or start switch, until the lazy rebuild lands) gives the straight distance, not the old line's 140 m
   setHtml($('cph-job'),`<p class="cph-kick">Job ${save.job%jobs.length+1}/${jobs.length}</p><h3>${esc(j.t)}</h3><p>${esc(j.d)}</p><p class="cph-go">${state==='a'?'Pick up at':'Deliver to'} <b>${esc(state==='a'?j.aName:j.bName)}</b> · ${d>1000?(d/1000).toFixed(1)+' km':Math.round(d/10)*10+' m'}${state==='b'?` · <span class="${timer<15?'cph-low':''}">${Math.max(0,timer).toFixed(0)} s</span>`:''}</p>`);
   }
   {let near=null,nd=Infinity;for(const c of postcards){if(save.cards[c.id])continue;const d=dist(c.p,[player.x,player.z]);if(d<200&&d<nd){nd=d;near=c;}}
