@@ -9,6 +9,7 @@ const NEXT_ONE=[null],NO_EDGES=[]; // the next planned edge, passed to cornerSpe
 // Walker grid cells (mobility step): a 1024-slot hash of 1.5 m cells; collisions only cost a distance test.
 const WALK_CELLS=1024,walkCell=(gx,gz)=>(Math.imul(gx,73856093)^Math.imul(gz,19349663))&(WALK_CELLS-1);
 import {mergeGraph} from './graph-extension.js';
+import {inWaterPolygons} from './geo.js';
 export const TRAFFIC_MAX_SPEED=50/3.6;
 export const nearStation=p=>Math.hypot(p.x+620,p.z+45)<430;
 export const inStationTrafficArea=p=>p.x>-885&&p.x<-440&&p.z>-145&&p.z<55;
@@ -68,8 +69,8 @@ const LOOKAHEAD=45;
 // Side by side, the lower id goes first. Previously both refused to move and deadlocked forever.
 const yieldsTo=(a,b)=>{if(Math.cos(a.heading-b.heading)<.9)return true;const forward=(b.x-a.x)*-Math.sin(a.heading)+(b.z-a.z)*-Math.cos(a.heading);return forward>.3||(forward>-.3&&b.id<a.id);};
 export class Mobility {
- constructor(data,world,{cars=52,people=100,stationCars=0,corridorCars=0,corridor=null,random=Math.random,walkSpawn=200,walkRecycle=330}={}){
-  this.walkSpawn=walkSpawn;this.walkRecycle=walkRecycle;this.spawnBudget=6; // walkers appear within walkSpawn m of the player and are recycled past walkRecycle
+ constructor(data,world,{cars=52,people=100,stationCars=0,corridorCars=0,corridor=null,random=Math.random,walkSpawn=200,walkRecycle=330,streetWalking=false}={}){
+  this.walkSpawn=walkSpawn;this.walkRecycle=walkRecycle;this.streetWalking=streetWalking; /* 1760: no pavements, people walk in the street (walkable) and give way to coaches (coachYield) */this.spawnBudget=6; // walkers appear within walkSpawn m of the player and are recycled past walkRecycle
   this.roads=prepareGraph(data.roads);this.walks=prepareGraph(data.walks);this.signals=data.signals;this.signalControl=annotateJunctions(this.roads,data.signals||[]);annotateCrossings(this.walks,this.signalControl);this.signalAxes=this.signalControl.axes;this.world=world;this.random=random;this.time=0;this.collisions=0;this.externalObstacles=[];this.externalBodies=[];this.trams=null;this.edgeCars=new Map();this.boxCars=new Map();this.approaching=new Map();
   if(world?.laneWalls)this.walledLanes=markWalledLanes(this.roads.edges,world.laneWalls); // lanes through a wall the model draws on the road (road-walls.json) are routed round
   this.stationEdges=this.roads.edges.filter(e=>e.points.some(([x,z])=>inStationTrafficArea({x,z})));
@@ -78,7 +79,7 @@ export class Mobility {
   this.corridorIds=new Set(this.corridorEdges.map(e=>e.id));
   this.cars=Array.from({length:cars+stationCars+(this.corridorEdges.length?corridorCars:0)},(_,id)=>({id,stationOnly:id>=cars&&id<cars+stationCars,corridorOnly:id>=cars+stationCars,walking:false,edge:null,s:0,speed:0,cruise:6+random()*5,x:0,z:0,heading:0}));
   // side: each walker's own distance to the right of the path's line (0.2-0.9 m, spread by id so seeded runs keep their random sequence)
-  this.people=Array.from({length:people},(_,id)=>({id,walking:true,edge:null,s:0,speed:0,dodge:0,unpocket:false,cruise:.85+random()*.65,side:.2+(id*.6180339887%1)*.7,x:0,z:0,heading:0}));
+  this.people=Array.from({length:people},(_,id)=>({id,walking:true,edge:null,s:0,speed:0,dodge:0,yieldSide:undefined,yieldHeld:0,unpocket:false,cruise:.85+random()*.65,side:.2+(id*.6180339887%1)*.7,x:0,z:0,heading:0}));
  }
  // Trams share the street: tracks are related to lanes once, and their positions are read every step.
  attachTrams(trams){this.trams=trams;annotateTramRelations(this.roads.edges,trams.paths);annotateTramSignals(trams.paths,this.signals||[],this.signalControl);}
@@ -155,12 +156,12 @@ export class Mobility {
  // path is too narrow for it, and eased (round corners, onto a reversed edge) rather than jumped. Everybody used
  // to walk the line itself, so people walking together, or waiting at the same kerb, stood inside one another.
  walkerPlace(a,p){
-  const rx=Math.cos(p.heading),rz=-Math.sin(p.heading);let side=(a.side||0)+(a.dodge||0); // dodge: a step aside for someone in the way (walkDodge)
+  const rx=Math.cos(p.heading),rz=-Math.sin(p.heading);let side=a.yieldSide??(a.side||0)+(a.dodge||0); // dodge: a step aside for someone in the way (walkDodge); yieldSide: out of a coach's way (coachYield)
   while(Math.abs(side)>.08&&!this.walkable(p.x+rx*side,p.z+rz*side,a.edge))side*=.5;
   if(Math.abs(side)<=.08)side=0;
   const tx=rx*side,tz=rz*side;
   if(a.ox===undefined||!(this.dt>0)){a.ox=tx;a.oz=tz;}
-  else{const ex=tx-a.ox,ez=tz-a.oz,l=Math.hypot(ex,ez),max=(a.dodge?1.2:.7)*this.dt;if(l>max){a.ox+=ex/l*max;a.oz+=ez/l*max;}else{a.ox=tx;a.oz=tz;}}
+  else{const ex=tx-a.ox,ez=tz-a.oz,l=Math.hypot(ex,ez),max=(a.yieldSide!==undefined?1.8:a.dodge?1.2:.7)*this.dt;if(l>max){a.ox+=ex/l*max;a.oz+=ez/l*max;}else{a.ox=tx;a.oz=tz;}}
   if(!this.walkable(p.x+a.ox,p.z+a.oz,a.edge)){a.ox=tx;a.oz=tz;}
   p.x+=a.ox;p.z+=a.oz;return p;
  }
@@ -189,17 +190,52 @@ export class Mobility {
    const w=(1-Math.max(0,forward)/reach)*(1-Math.abs(right)/.9);push+=(right>.05?-w:right<-.05||toward||a.id>b.id?w:-w);}
   a.dodge=push>1?.6:push<-1?-.6:push*.6;
  }
+ // 1760 (streetWalking): a walker in the street gives way to a coach coming along it, the player's or a traffic coach.
+ // It steps to whichever side of the coach's line it is already on, far enough for the coach to pass (eased by walkerPlace),
+ // and while it cannot get clear with the coach close it waits, or turns back when the coach has stopped for it (an oncoming
+ // coach in a lane too narrow to step out of). Traffic coaches stop for anyone still in their way (step: walkers in the
+ // street join the traffic list). Returns the speed the walker may go.
+ coachYield(a,player,desired){
+  let side,wait=false;const rx=Math.cos(a.heading),rz=-Math.sin(a.heading),bx=a.x-(a.ox||0),bz=a.z-(a.oz||0);
+  for(let i=-1;i<this.cars.length;i++){const c=i<0?player:this.cars[i];if(i<0?c.travelMode&&c.travelMode!=='car':!c.edge||c.knocked)continue;
+   const x=a.x-c.x,z=a.z-c.z;if(x>25||x<-25||z>25||z<-25)continue;
+   const hx=-Math.sin(c.heading||0),hz=-Math.cos(c.heading||0),v=c.speed||0,hl=c.halfLength??CAR_HALF_LENGTH,hw=c.halfWidth??1,ahead=x*hx+z*hz;
+   const standing=v<.3&&c.holdBy!==a; // standing (not for this walker): only walked round
+   if(ahead<-hl-.5||ahead>hl+2+(standing?0:Math.max(0,v)*2.5))continue; // behind it or too far ahead
+   const lat=-x*hz+z*hx,clear=hw+.6;if(Math.abs(lat)>=clear+.4)continue;
+   const k=-hz*rx+hx*rz;if(Math.abs(k)<.5){if(v>=.3&&ahead>-hl-.5&&(Math.abs(lat)<clear||Math.abs(lat)<clear+1.5&&lat*(-hz*rz-hx*rx)<0))wait=true;continue;} // its path crosses the coach's: wait at the side for it to pass (one stopped for it is crossed in front of)
+   const toward=Math.abs(lat)>.1?Math.sign(lat):(a.side||0)*k>=0?1:-1,base=-(bx-c.x)*hz+(bz-c.z)*hx;side=Math.max(-3,Math.min(3,(toward*(clear+(a.side||0)*.6)-base)/k)); /* each a little further by its own side, so two meeting there do not stand in one another */
+   if(!standing&&Math.abs(lat)<clear-.05&&ahead>0&&ahead<hl+3){wait=true;if(c.holdBy===a&&v<.5&&(a.yieldHeld=(a.yieldHeld||0)+this.dt)>1.5){a.yieldHeld=0;this.scare(a,c,3);}}}
+  a.yieldSide=side;if(!wait)a.yieldHeld=0;
+  return wait?0:desired;
+ }
+ // The first walker (from step's traffic list) inside coach a's box at pose p, 10 cm grown.
+ walkerUnder(p,a,traffic){
+  const hx=-Math.sin(p.heading),hz=-Math.cos(p.heading),hl=(a.halfLength??CAR_HALF_LENGTH)+.1,hw=(a.halfWidth??1)+.1;
+  for(let i=0;i<traffic.length;i++){const b=traffic[i];if(!b.walking)continue;const x=b.x-p.x,z=b.z-p.z;if(x>6||x<-6||z>6||z<-6)continue;const f=x*hx+z*hz,l=-x*hz+z*hx;if(f<hl&&f>-hl&&l<hw&&l>-hw)return b;}
+  return null;
+ }
+ // Whether walker a's step to p goes into a traffic coach (one it is not already inside: it may walk out).
+ coachOver(p,a){
+  for(let i=0;i<this.cars.length;i++){const c=this.cars[i];if(!c.edge)continue;const x=p.x-c.x,z=p.z-c.z;if(x>6||x<-6||z>6||z<-6)continue;
+   const hx=-Math.sin(c.heading),hz=-Math.cos(c.heading),hl=c.halfLength??CAR_HALF_LENGTH,hw=c.halfWidth??1,f=x*hx+z*hz,l=-x*hz+z*hx;if(f>=hl||f<=-hl||l>=hw||l<=-hw)continue;
+   const ax=a.x-c.x,az=a.z-c.z,g=ax*hx+az*hz,m=-ax*hz+az*hx;if(g>=hl||g<=-hl||m>=hw||m<=-hw)return true;}
+  return false;
+ }
  // What lies under a point (0 building, 1 road, 2 pavement, 3 neither), memoised on a 25 cm grid: walkers ask
  // this for every 25 cm of every step, and three polygon lookups each was the biggest cost in a frame.
  groundKind(x,z){
   const w=this.world;if(this._kindOf!==w.buildings||this._kindRoads!==w.roads||this._kindPave!==w.pavement||this._kinds.size>80000){this._kinds=new Map(); /* 80k: a 500k map (~20 MB) freed at once stalled phones */this._kindOf=w.buildings;this._kindRoads=w.roads;this._kindPave=w.pavement;}
   const X=Math.round(x*4),Z=Math.round(z*4),k=(X+60000)*120000+(Z+60000);let v=this._kinds.get(k);
-  if(v===undefined){const px=X/4,pz=Z/4;v=w.buildings.at(px,pz)?0:w.roads.at(px,pz)?1:w.pavement?.at(px,pz)?2:3;this._kinds.set(k,v);}
+  if(v===undefined){const px=X/4,pz=Z/4;v=w.buildings.at(px,pz)?0:w.roads.at(px,pz)?1:w.pavement?.at(px,pz)?2:this.streetWalking&&inWaterPolygons(w.water,px,pz)?4:3;this._kinds.set(k,v);}
   return v;
  }
+ // Today walkers keep to the pavement and use the carriageway only on a crossing. In 1760 there were no pavements: the
+ // cobbled street and open ground are walkable too (houses, solid objects and water are not). Walkers there stood for good
+ // at every "kerb" where a footway ran onto the carriageway or ground no pavement polygon covers (3,906 of 7,090 footways).
  walkable(x,z,edge){
   const v=this.groundKind(x,z);
-  return v===2||v===1&&!!edge?.crossing;
+  return v===2||v===1&&(this.streetWalking||!!edge?.crossing)||v===3&&this.streetWalking;
  }
  safeWalkSegment(a,p,edge){
   const distance=Math.hypot(p.x-a.x,p.z-a.z);if(distance>2)return false;
@@ -238,6 +274,7 @@ export class Mobility {
    // Walkers spread out: at most one per 8 m of footway. Where few paths are near (a pier, a quay between
    // canals) the 300 walkers otherwise all landed on the same few edges and moved about as one clump.
    if(a.walking){if(!occupancy){occupancy=new Map();for(const b of this.people)if(b!==a&&b.edge)occupancy.set(b.edge,(occupancy.get(b.edge)||0)+1);}if((occupancy.get(a.edge)||0)>=Math.max(1,a.edge.length/8))continue;}
+   if(this.streetWalking&&(a.walking?this.cars:this.people).some(b=>b.edge&&Math.abs(b.x-p.x)<4.5&&Math.abs(b.z-p.z)<4.5))continue; // 1760: not under a coach, nor a coach on top of someone
    if(this.world.buildings.at(p.x,p.z)||(a.walking?!this.walkable(p.x,p.z,a.edge):!vehicleFitsRoad(p,this.world)))continue;
    // A long straight main road is almost always in view; corridor cars may appear there, but only in the far haze.
    const distance=Math.hypot(p.x-player.x,p.z-player.z);
@@ -309,7 +346,7 @@ export class Mobility {
  }
  hold(a,seconds){if(a.walking&&!a.edge?.crossing)a.holdUntil=this.time+seconds;} // never frozen on a zebra crossing (cars queued behind them)
  flee(a,player){
-  const threatened=threatens(a,player,this.world.roads);
+  const threatened=this.streetWalking?(!player.travelMode||player.travelMode==='car')&&approachingPedestrian(a,player,2.2):threatens(a,player,this.world.roads); // 1760: everyone is in the street; only those about to be run down run, the rest step aside (coachYield)
   if(threatened){
    if(!a.running||this.time>(a.turnAfter||0)){
     const ahead=routePoint(a.edge,Math.min(a.edge.length,a.s+5),0),behind=routePoint(a.edge,Math.max(0,a.s-5),0),px=player.x-Math.sin(player.heading)*player.speed*.5,pz=player.z-Math.cos(player.heading)*player.speed*.5;
@@ -426,7 +463,9 @@ export class Mobility {
   // Indexed loops and reused lists in here: this runs every step for every agent, and for-of iteration and spread
   // copies were most of the garbage the game made per frame (collection pauses while driving).
   const traffic=this._traffic||(this._traffic=[]);traffic.length=0;traffic.push(player);for(let i=0;i<this.cars.length;i++)traffic.push(this.cars[i]);for(let i=0;i<this.externalObstacles.length;i++)traffic.push(this.externalObstacles[i]);
-  for(let i=0;i<this.people.length;i++){const p=this.people[i];if(p.edge?.crossing&&this.world.roads.at(p.x,p.z))traffic.push(p);}
+  // 1760: anyone walking (the cobbles are mapped as pavement too) within a 25 m cell of a coach's (every coach looks through this list)
+  const coachCells=this.streetWalking?(this._coachCells||=new Set()):null;if(coachCells){coachCells.clear();for(let i=0;i<this.cars.length;i++){const c=this.cars[i];if(!c.edge)continue;const gx=Math.floor(c.x/25),gz=Math.floor(c.z/25);for(let u=-1;u<=1;u++)for(let w=-1;w<=1;w++)coachCells.add((gx+u)*65536+gz+w);}}
+  for(let i=0;i<this.people.length;i++){const p=this.people[i];if(coachCells?p.edge&&!p.knockdown&&coachCells.has(Math.floor(p.x/25)*65536+Math.floor(p.z/25)):p.edge?.crossing&&this.world.roads.at(p.x,p.z))traffic.push(p);}
   // Walkers by 1.5 m cell in a fixed hash table (no garbage), for walkGap.
   {const head=this._walkHead||(this._walkHead=new Int32Array(WALK_CELLS)),chain=this._walkNext?.length>=this.people.length?this._walkNext:(this._walkNext=new Int32Array(this.people.length));head.fill(-1);
   for(let i=0;i<this.people.length;i++){const p=this.people[i];if(!p.edge||p.knockdown)continue;const h=walkCell(Math.floor(p.x/1.5),Math.floor(p.z/1.5));chain[i]=head[h];head[h]=i;}}
@@ -464,7 +503,7 @@ export class Mobility {
    const running=a.walking&&this.flee(a,player);
    let desired=running?4.2+a.id%4*.2:a.cruise;const remaining=a.edge.length-a.s,dx=-Math.sin(a.heading),dz=-Math.cos(a.heading);
    if(a.walking){
-    if(!running){const x=player.x-a.x,z=player.z-a.z,forward=x*dx+z*dz;if(forward>0&&forward<5&&Math.abs(x*dz-z*dx)<1.7)desired=Math.min(desired,Math.max(0,(forward-2.8)*.85));}
+    if(!running){const x=player.x-a.x,z=player.z-a.z,forward=x*dx+z*dz;if(forward>0&&forward<5&&Math.abs(x*dz-z*dx)<(this.streetWalking?(player.halfWidth??1)+.45:1.7))desired=Math.min(desired,Math.max(0,(forward-2.8)*.85));}
     if(a.edge.crossing&&a.s<.35&&!running&&!this.world.roads.at(a.x,a.z)&&!this.crossingClear(a.edge,player))desired=0;
     // Never on a crossing: someone waiting for a gap out on the carriageway would hold up the cars (and the cars them).
     if(!running&&desired>0&&!a.edge.crossing){const g=this.walkGap(a,dx,dz);
@@ -475,6 +514,7 @@ export class Mobility {
      else a.gapHeld=0;}
     else{a.gapBy=null;a.gapHeld=0;}
     if(!running&&!a.edge.crossing&&a.hiddenFor===0)this.walkDodge(a,dx,dz);else a.dodge=0;
+    if(this.streetWalking){if(!a.edge.crossing&&(coachCells.has(Math.floor(a.x/25)*65536+Math.floor(a.z/25))||Math.abs(player.x-a.x)<25&&Math.abs(player.z-a.z)<25)){const v=this.coachYield(a,player,desired);if(!running)desired=v;}else a.yieldSide=undefined;} // running from the player's coach, out of its way too
    }else{
     const plan=this.plan(a);let hold=null,holdBy=null;
     if(plan.length)NEXT_ONE[0]=plan[0];desired=cornerSpeedLimit(a.edge,a.s,approachCruise(edgeCruise(a.edge,desired),plan[0],desired,remaining),plan.length?NEXT_ONE:NO_EDGES);
@@ -494,8 +534,8 @@ export class Mobility {
     if(a.passing!=null&&!(this.cars[a.passing]?.edge&&trafficFootprintsOverlap(a,this.cars[a.passing])))a.passing=null;
     for(let ti=0;ti<traffic.length;ti++){const b=traffic[ti];if(b===a||b.edge===null)continue;const x=b.x-a.x,z=b.z-a.z;if(x>20||x<-20||z>20||z<-20)continue;
      if(b.ref?.parked||b.ref?.standing)continue; // standing buses: checked along the lane actually driven, below
-     const forward=x*dx+z*dz;if(forward<=0||forward>=20||Math.abs(x*dz-z*dx)>=2.1||this.passes(a,b)||oncomingPasses(a,b))continue;
-     const v=Math.max(0,(forward-(a.halfLength??CAR_HALF_LENGTH)-(b.halfLength??CAR_HALF_LENGTH)-1.3)*.85);if(v<desired){desired=v;hold='follow';holdBy=b.ref||b;} // stops ~1.3 m behind (6 m centres for two cars)
+     const forward=x*dx+z*dz,street=b.walking&&!b.edge.crossing;if(forward<=(street?(a.halfLength??CAR_HALF_LENGTH)-.3:0)||forward>=20||Math.abs(x*dz-z*dx)>=(street?(a.halfWidth??1)+.45:2.1)||this.passes(a,b)||oncomingPasses(a,b))continue;
+     const v=Math.max(0,(forward-(a.halfLength??CAR_HALF_LENGTH)-(street?.5:b.halfLength??CAR_HALF_LENGTH)-1.3)*.85);if(v<desired){desired=v;hold='follow';holdBy=b.ref||b;} // stops ~1.3 m behind (6 m centres for two cars)
     }
     if(this.standing?.length)for(const d of STANDING_PROBES){if(a.s+d>a.edge.length)break;const q=routePoint(a.edge,a.s+d,a.offset??a.edge.lane);if(this.standingAt(q)){const v=Math.max(0,(d-3.5)*.85);if(v<desired){desired=v;hold='follow';holdBy=null;}break;}}
     a.hold=hold;a.holdBy=holdBy;a.atSignal=hold==='signal';
@@ -509,11 +549,12 @@ export class Mobility {
    if(!a.walking){let by=sweptContact(a,p,player)?player:null;
     if(!by)for(let bi=0;bi<nCars;bi++){const b=this.cars[bi];if(b===a||!b.edge)continue;const x=b.x-p.x,z=b.z-p.z,r=(a.halfLength??CAR_HALF_LENGTH)+(b.halfLength??CAR_HALF_LENGTH)+.5;if(x>r||x<-r||z>r||z<-r||!trafficFootprintsOverlap(p,b)||!yieldsTo(a,b))continue;if(this.passes(a,b)){a.passing=b.id;continue;}by=b;break;}
     by||=this.bodyBlocking(a,p);
+    if(!by&&this.streetWalking){const b=this.walkerUnder(p,a,traffic);if(b&&this.walkerUnder(a,a,traffic)!==b)by=b;} // 1760: a coach stops rather than drive into someone in the street (moving off one is allowed)
     if(by){undo(a,oldS,oldEdge,oldPrev,by);if(a.stuck>4)this.retire(a,player);continue;}}
    // The last half-step out of a crossing is still part of that crossing. Testing
    // it as an ordinary footway strands pedestrians on the road and blocks cars.
    const segmentEdge=a.walking&&oldEdge.crossing?oldEdge:a.edge;
-   if(this.world.buildings.at(p.x,p.z)||(a.walking?(!this.walkable(p.x,p.z,a.edge)||!a.unpocket&&!this.safeWalkSegment(a,p,segmentEdge)):!safeVehicleSegment(a,p,this.world)&&!this.kerbCorner(a,p,oldEdge))){undo(a,oldS,oldEdge,oldPrev,null);
+   if(this.world.buildings.at(p.x,p.z)||(a.walking?(!this.walkable(p.x,p.z,a.edge)||!a.unpocket&&!this.safeWalkSegment(a,p,segmentEdge)||coachCells?.has(Math.floor(p.x/25)*65536+Math.floor(p.z/25))&&this.coachOver(p,a)):!safeVehicleSegment(a,p,this.world)&&!this.kerbCorner(a,p,oldEdge))){undo(a,oldS,oldEdge,oldPrev,null);
     // A walker whose step aside put it in a pocket of pavement between house corners (the 25 cm ground grid) could step
     // neither on nor back: it turned round every 3 s for good at the door end of a path. After a second and a half it steps
     // back onto the path's line.
