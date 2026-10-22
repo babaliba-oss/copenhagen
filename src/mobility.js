@@ -78,7 +78,7 @@ export class Mobility {
   this.corridorIds=new Set(this.corridorEdges.map(e=>e.id));
   this.cars=Array.from({length:cars+stationCars+(this.corridorEdges.length?corridorCars:0)},(_,id)=>({id,stationOnly:id>=cars&&id<cars+stationCars,corridorOnly:id>=cars+stationCars,walking:false,edge:null,s:0,speed:0,cruise:6+random()*5,x:0,z:0,heading:0}));
   // side: each walker's own distance to the right of the path's line (0.2-0.9 m, spread by id so seeded runs keep their random sequence)
-  this.people=Array.from({length:people},(_,id)=>({id,walking:true,edge:null,s:0,speed:0,cruise:.85+random()*.65,side:.2+(id*.6180339887%1)*.7,x:0,z:0,heading:0}));
+  this.people=Array.from({length:people},(_,id)=>({id,walking:true,edge:null,s:0,speed:0,dodge:0,cruise:.85+random()*.65,side:.2+(id*.6180339887%1)*.7,x:0,z:0,heading:0}));
  }
  // Trams share the street: tracks are related to lanes once, and their positions are read every step.
  attachTrams(trams){this.trams=trams;annotateTramRelations(this.roads.edges,trams.paths);annotateTramSignals(trams.paths,this.signals||[],this.signalControl);}
@@ -155,12 +155,12 @@ export class Mobility {
  // path is too narrow for it, and eased (round corners, onto a reversed edge) rather than jumped. Everybody used
  // to walk the line itself, so people walking together, or waiting at the same kerb, stood inside one another.
  walkerPlace(a,p){
-  const rx=Math.cos(p.heading),rz=-Math.sin(p.heading);let side=a.side||0;
-  while(side>.08&&!this.walkable(p.x+rx*side,p.z+rz*side,a.edge))side*=.5;
-  if(side<=.08)side=0;
+  const rx=Math.cos(p.heading),rz=-Math.sin(p.heading);let side=(a.side||0)+(a.dodge||0); // dodge: a step aside for someone in the way (walkDodge)
+  while(Math.abs(side)>.08&&!this.walkable(p.x+rx*side,p.z+rz*side,a.edge))side*=.5;
+  if(Math.abs(side)<=.08)side=0;
   const tx=rx*side,tz=rz*side;
   if(a.ox===undefined||!(this.dt>0)){a.ox=tx;a.oz=tz;}
-  else{const ex=tx-a.ox,ez=tz-a.oz,l=Math.hypot(ex,ez),max=.7*this.dt;if(l>max){a.ox+=ex/l*max;a.oz+=ez/l*max;}else{a.ox=tx;a.oz=tz;}}
+  else{const ex=tx-a.ox,ez=tz-a.oz,l=Math.hypot(ex,ez),max=(a.dodge?1.2:.7)*this.dt;if(l>max){a.ox+=ex/l*max;a.oz+=ez/l*max;}else{a.ox=tx;a.oz=tz;}}
   if(!this.walkable(p.x+a.ox,p.z+a.oz,a.edge)){a.ox=tx;a.oz=tz;}
   p.x+=a.ox;p.z+=a.oz;return p;
  }
@@ -175,6 +175,19 @@ export class Mobility {
    if(same?lateral>=.5:forward*forward+lateral*lateral>=.6||a.id<b.id)continue;
    const u=Math.max(0,(forward-.7)*1.5);if(u<v){v=u;a.gapBy=b;}}
   return v;
+ }
+ // A step aside for a walker in view (the player sees people meet): from anyone within 90 cm across its way and a
+ // little ahead (2.5 m when coming the other way), it moves to the side away from them, both keeping right when they
+ // meet head on; walkerPlace eases it there. Walkers walked through each other where paths cross or come back the other
+ // way (the riding ground, the squares): walkGap only holds back someone following, or the higher id about to touch.
+ walkDodge(a,dx,dz){
+  let push=0;const head=this._walkHead,next=this._walkNext,gx=Math.floor(a.x/1.5),gz=Math.floor(a.z/1.5);
+  for(let ix=-2;ix<=2;ix++)for(let iz=-2;iz<=2;iz++)for(let j=head[walkCell(gx+ix,gz+iz)];j>=0;j=next[j]){const b=this.people[j];if(b===a)continue;
+   const x=b.x-a.x,z=b.z-a.z;if(x>2.5||x<-2.5||z>2.5||z<-2.5)continue;
+   const forward=x*dx+z*dz,right=x*-dz+z*dx,toward=-Math.sin(b.heading)*dx-Math.cos(b.heading)*dz<-.3&&b.speed>.1,reach=toward?2.5:.9;
+   if(forward<-.3||forward>reach||right>.9||right<-.9)continue;
+   const w=(1-Math.max(0,forward)/reach)*(1-Math.abs(right)/.9);push+=(right>.05?-w:right<-.05||toward||a.id>b.id?w:-w);}
+  a.dodge=push>1?.6:push<-1?-.6:push*.6;
  }
  // What lies under a point (0 building, 1 road, 2 pavement, 3 neither), memoised on a 25 cm grid: walkers ask
  // this for every 25 cm of every step, and three polygon lookups each was the biggest cost in a frame.
@@ -460,6 +473,7 @@ export class Mobility {
       if(!ring)desired=g;}
      else a.gapHeld=0;}
     else{a.gapBy=null;a.gapHeld=0;}
+    if(!running&&!a.edge.crossing&&a.hiddenFor===0)this.walkDodge(a,dx,dz);else a.dodge=0;
    }else{
     const plan=this.plan(a);let hold=null,holdBy=null;
     if(plan.length)NEXT_ONE[0]=plan[0];desired=cornerSpeedLimit(a.edge,a.s,approachCruise(edgeCruise(a.edge,desired),plan[0],desired,remaining),plan.length?NEXT_ONE:NO_EDGES);
