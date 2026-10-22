@@ -36,3 +36,13 @@ test('walkers reaching a kerb turn back and do not stand in one another there',(
  for(const a of sim.people)assert.ok(a.x<-12,`walked back from the kerb (x ${a.x.toFixed(1)})`);
  assert.ok(close<1.5,`${close.toFixed(1)} pair-seconds within 50 cm`);
 });
+// Your car standing on the footway: walkers coming to it stood in front of it for good, everyone behind them queued
+// (seven stood over 20 s at -90,360). They wait a moment and turn back, as at a dead end.
+test('walkers held up by the player\'s standing car turn back',()=>{
+ const n=[[-30,0],[30,0]],e=(a,b)=>({from:a,to:b,points:[n[a],n[b]],lane:0,signal:-1,crossing:false});
+ const sim=new Mobility({roads:{nodes:[],edges:[]},walks:{nodes:n,edges:[e(0,1),e(1,0)]},signals:[]},{roads:{at:()=>false},pavement:{at:()=>true},buildings:{at:()=>false}},{cars:0,people:1});
+ const [a]=sim.people;Object.assign(a,{edge:sim.walks.edges[0],s:20,cruise:1.2,side:0});Object.assign(a,sim.position(a),{speed:1.2});
+ const player={x:0,z:0,heading:Math.PI/2,speed:0,travelMode:'car'};let held=0;
+ for(let i=0;i<60*20;i++){sim.step(1/60,player);if(a.edge&&a.speed<.05)held+=1/60;}
+ assert.ok(a.x<-6,`walked back from the car (x ${a.x.toFixed(1)})`);assert.ok(held<5,`stood ${held.toFixed(1)} s`);
+});

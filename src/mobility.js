@@ -8,7 +8,7 @@ const hypot=(x,z)=>Math.sqrt(x*x+z*z); // not Math.hypot: in optimised code it a
 // Every car and walker is made with all the fields step() and spawn() give it, in one order: they were added as each
 // first came up, in different orders, so the agents had dozens of shapes and step() was thrown back out of its
 // optimised code ('wrong map') every few seconds, running at half speed and twice the garbage until optimised again.
-const newAgent=(id,walking,cruise,side,stationOnly,corridorOnly)=>({id,stationOnly,corridorOnly,walking,edge:null,s:0,speed:0,cruise,side,dodge:0,yieldSide:undefined,yieldHeld:0,unpocket:false,x:0,z:0,heading:0,playerTaken:undefined,conversation:undefined,knocked:undefined,damage:undefined,plan:[],prevDir:undefined,ox:undefined,oz:undefined,gapBy:null,gapHeld:0,offset:undefined,waiting:0,passing:null,unjam:null,unjamUntil:0,gridlock:0,hold:null,holdBy:null,atSignal:false,deadlocked:false,hiddenFor:0,panicUntil:0,turnAfter:0,turnedAt:undefined,holdUntil:0,retryAt:0,running:false,stuck:0,progressPoint:null,waitFrom:null,kerbUntil:0});
+const newAgent=(id,walking,cruise,side,stationOnly,corridorOnly)=>({id,stationOnly,corridorOnly,walking,edge:null,s:0,speed:0,cruise,side,dodge:0,yieldSide:undefined,yieldHeld:0,unpocket:false,x:0,z:0,heading:0,playerTaken:undefined,conversation:undefined,knocked:undefined,damage:undefined,plan:[],prevDir:undefined,ox:undefined,oz:undefined,gapBy:null,gapHeld:0,offset:undefined,waiting:0,passing:null,unjam:null,unjamUntil:0,gridlock:0,hold:null,holdBy:null,atSignal:false,deadlocked:false,hiddenFor:0,panicUntil:0,turnAfter:0,turnedAt:undefined,holdUntil:0,retryAt:0,running:false,stuck:0,progressPoint:null,waitFrom:null,kerbUntil:0,playerHeld:0});
 const STANDING_PROBES=[3,6,10,15]; // metres ahead checked for a standing bus
 const NEXT_ONE=[null],NO_EDGES=[],REACH_P={x:0,z:0,heading:0}; // the next planned edge, passed to cornerSpeedLimit without a fresh array per car
 // Walker grid cells (mobility step): a 1024-slot hash of 1.5 m cells; collisions only cost a distance test.
@@ -540,7 +540,10 @@ export class Mobility {
    const running=a.walking&&this.flee(a,player);
    let desired=running?4.2+a.id%4*.2:a.cruise;const remaining=a.edge.length-a.s,dx=-Math.sin(a.heading),dz=-Math.cos(a.heading);
    if(a.walking){
-    if(!running){const x=player.x-a.x,z=player.z-a.z,forward=x*dx+z*dz;if(forward>0&&forward<5&&Math.abs(x*dz-z*dx)<(this.streetWalking?(player.halfWidth??1)+.45:1.7))desired=Math.min(desired,Math.max(0,(forward-2.8)*.85));}
+    if(!running){const x=player.x-a.x,z=player.z-a.z,forward=x*dx+z*dz;if(forward>0&&forward<5&&Math.abs(x*dz-z*dx)<(this.streetWalking?(player.halfWidth??1)+.45:1.7)){desired=Math.min(desired,Math.max(0,(forward-2.8)*.85));
+      // Your car standing on the path: they wait a moment and turn back, as at a dead end. They stood in front of it for good,
+      // and everyone coming the same way queued behind them (seven stood over 20 s on the footway at -90,360).
+      if(desired<.1&&Math.abs(player.speed||0)<.5&&(a.playerHeld+=dt)>2.5){a.playerHeld=0;this.retire(a,player);continue;}}else a.playerHeld=0;}
     if(a.edge.crossing&&a.s<.35&&!running&&!this.world.roads.at(a.x,a.z)&&!this.crossingClear(a.edge,player))desired=0;
     // Never on a crossing: someone waiting for a gap out on the carriageway would hold up the cars (and the cars them).
     // 1760: people running from the coach keep their distance and step round each other too (in the street they ran through one another).
