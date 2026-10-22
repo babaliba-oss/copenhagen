@@ -26,43 +26,53 @@ function makeGraph(g,undirected){
  for(const e of g.edges){const len=e.length||e.points.reduce((s,p,i)=>i?s+dist(p,e.points[i-1]):0,0);adj[e.from].push({to:e.to,len,points:e.points});if(undirected)adj[e.to].push({to:e.from,len,points:[...e.points].reverse()});}
  const cell=new Map(),C=60;g.nodes.forEach((p,i)=>{if(!adj[i].length)return;const k=Math.floor(p[0]/C)+','+Math.floor(p[1]/C);if(!cell.has(k))cell.set(k,[]);cell.get(k).push(i);});
  function nearest(x,z){let best=-1,bd=1e18;for(let r=0;r<6&&best<0;r++)for(let i=-r;i<=r;i++)for(let j=-r;j<=r;j++){if(Math.max(Math.abs(i),Math.abs(j))!==r)continue;for(const k of cell.get((Math.floor(x/C)+i)+','+(Math.floor(z/C)+j))||[]){const d=(g.nodes[k][0]-x)**2+(g.nodes[k][1]-z)**2;if(d<bd){bd=d;best=k;}}}return best;}
- // Routes come from a shortest-path tree grown back from the target once (Dijkstra over the reversed edges, a binary heap
- // in typed arrays), kept for the last few targets: a rebuild then only walks the tree from the player's node. A* from the
+ // Routes come from a shortest-path tree grown back from the target (Dijkstra over the reversed edges, a binary heap in
+ // typed arrays), kept for the last few targets: a rebuild then only walks the tree from the player's node. A* from the
  // player ran on every rebuild (every few seconds off the line) and, to a target behind water such as the Opera, it
- // searched most of the city: 30-90 ms each time, a hitch while driving the first job.
+ // searched most of the city: 30-90 ms each time, a hitch while driving the first job. A tree is grown only as far as the
+ // player's node (Dijkstra settles the nodes nearest the target first) and picks up where it stopped next time; warm()
+ // grows the next target's tree a slice at a time in idle time, so a pick-up or delivery does not build one in a frame.
  const radj=Array.from({length:n},()=>[]);adj.forEach((l,v)=>{for(const e of l)radj[e.to].push(v,e);});
- let hf=new Float64Array(4096),hv=new Int32Array(4096),wallsSeen=0;const trees=new Map();
+ const trees=new Map();
  function tree(b,avoid){
-  const key=b*2+(avoid?1:0),had=trees.get(key);if(had&&(!avoid||had.walls===wallsSeen)){trees.delete(key);trees.set(key,had);return had;}
-  const d=new Float64Array(n).fill(Infinity),next=new Array(n).fill(null);d[b]=0;let hn=0;
-  const push=(f,v)=>{if(hn===hf.length){const F=new Float64Array(hn*2),V=new Int32Array(hn*2);F.set(hf);V.set(hv);hf=F;hv=V;}let i=hn++;while(i>0){const p=(i-1)>>1;if(hf[p]<=f)break;hf[i]=hf[p];hv[i]=hv[p];i=p;}hf[i]=f;hv[i]=v;};
-  push(0,b);
-  while(hn>0){const f=hf[0],u=hv[0];hn--;if(hn>0){const lf=hf[hn],lv=hv[hn];let i=0;for(;;){const L=i*2+1,R=L+1;let m=-1,mf=lf;if(L<hn&&hf[L]<mf){m=L;mf=hf[L];}if(R<hn&&hf[R]<mf)m=R;if(m<0)break;hf[i]=hf[m];hv[i]=hv[m];i=m;}hf[i]=lf;hv[i]=lv;}
-   if(f>d[u])continue;const into=radj[u];for(let k=0;k<into.length;k+=2){const v=into[k],e=into[k+1];if(avoid&&e.walled)continue;const nd=f+e.len;if(nd<d[v]){d[v]=nd;next[v]=e;push(nd,v);}}}
-  const t={next,walls:wallsSeen};trees.set(key,t);if(trees.size>4)trees.delete(trees.keys().next().value);return t;
+  const key=b*2+(avoid?1:0),had=trees.get(key);if(had){trees.delete(key);trees.set(key,had);return had;}
+  const t={key,avoid,d:new Float64Array(n).fill(Infinity),next:new Array(n).fill(null),done:new Uint8Array(n),hf:new Float64Array(1024),hv:new Int32Array(1024),hn:0,finished:false};t.d[b]=0;push(t,0,b);
+  trees.set(key,t);if(trees.size>6)trees.delete(trees.keys().next().value);return t;
  }
+ function push(t,f,v){if(t.hn===t.hf.length){const F=new Float64Array(t.hn*2),V=new Int32Array(t.hn*2);F.set(t.hf);V.set(t.hv);t.hf=F;t.hv=V;}const hf=t.hf,hv=t.hv;let i=t.hn++;while(i>0){const p=(i-1)>>1;if(hf[p]<=f)break;hf[i]=hf[p];hv[i]=hv[p];i=p;}hf[i]=f;hv[i]=v;}
+ // Settle nodes until `until` is settled (-1: none), the tree is complete or `pops` nodes have come off the heap.
+ function grow(t,until,pops){const {d,next,done,avoid}=t;
+  while(t.hn>0&&pops-->0){const hf=t.hf,hv=t.hv,f=hf[0],u=hv[0];let hn=--t.hn;if(hn>0){const lf=hf[hn],lv=hv[hn];let i=0;for(;;){const L=i*2+1,R=L+1;let m=-1,mf=lf;if(L<hn&&hf[L]<mf){m=L;mf=hf[L];}if(R<hn&&hf[R]<mf)m=R;if(m<0)break;hf[i]=hf[m];hv[i]=hv[m];i=m;}hf[i]=lf;hv[i]=lv;}
+   if(done[u])continue;done[u]=1;const into=radj[u];for(let k=0;k<into.length;k+=2){const v=into[k],e=into[k+1];if(avoid&&e.walled)continue;const nd=f+e.len;if(nd<d[v]){d[v]=nd;next[v]=e;push(t,nd,v);}}
+   if(u===until)return;}
+  if(t.hn===0){t.finished=true;t.d=t.done=t.hf=t.hv=null;}} /* complete: only next[] is needed from here on */
+ // Grow the tree to b (as route(..., blocked) uses it) for about `ms`; true once it is complete.
+ function warm(b,ms,avoid=true){if(b<0)return true;const t=tree(b,avoid),end=performance.now()+ms;while(!t.finished&&performance.now()<end)grow(t,-1,512);return t.finished;}
  // blocked(x,z): what the player's car runs into. An edge whose line runs through it (over 0.3 m: the model's road walls
  // are 0.6 m thick; a passage the model draws shut, a courtyard gate, a footway main.js drops as running through a house)
- // is left out: the route found is checked
- // edge by edge (each judged once, then remembered) and found again without the walled ones, up to 6 times. The GPS line
- // and the races led straight into the wall (Christians Brygge under the Black Diamond).
+ // is left out: the route found is checked edge by edge (each judged once, then remembered) and, when it uses a walled one,
+ // found again from a fresh tree that leaves those out, up to 6 times. The GPS line and the races led straight into the
+ // wall (Christians Brygge under the Black Diamond).
  const walled=(P,blocked)=>{let run=0;for(let i=1;i<P.length;i++){const L=dist(P[i],P[i-1]),k=Math.ceil(L/.5);for(let j=0;j<k;j++){if(blocked(P[i-1][0]+(P[i][0]-P[i-1][0])*(j+.5)/k,P[i-1][1]+(P[i][1]-P[i-1][1])*(j+.5)/k)){run+=L/k;if(run>.3)return true;}else run=0;}}return false;};
  function route(a,b,blocked){
   if(a<0||b<0)return null;let edges=null;
-  for(let t=0;t<6;t++){const {next}=tree(b,!!blocked);edges=[];for(let v=a,k=0;v!==b;k++){const e=next[v];if(!e||k>n){edges=null;break;}edges.push(e);v=e.to;}
-   if(!edges||!blocked)break;let hit=false;for(const e of edges)if(e.walled===undefined&&(e.walled=walled(e.points,blocked))){hit=true;wallsSeen++;}if(!hit)break;if(t===5)edges=null;}
+  for(let t=0;t<6;t++){const T=tree(b,!!blocked);if(!T.finished&&!T.done[a])grow(T,a,Infinity);const next=T.next;edges=[];for(let v=a,k=0;v!==b;k++){const e=next[v];if(!e||k>n){edges=null;break;}edges.push(e);v=e.to;}
+   if(!edges||!blocked)break;let hit=false;for(const e of edges){if(e.walled===undefined)e.walled=walled(e.points,blocked);if(e.walled)hit=true;}if(!hit)break;trees.delete(T.key);if(t===5)edges=null;}
   if(!edges)return null;const pts=[g.nodes[a]];for(const e of edges)for(let i=1;i<e.points.length;i++)pts.push(e.points[i]);return pts;
  }
  // The node nearest a target is often across a block (the road graph misses the pedestrian streets): the line then
  // ran its last stretch straight through the houses. Take the nearest node within 180 m with a clear straight run to the target.
- function nearestOpen(x,z,blocked){if(!blocked)return nearest(x,z);const gx=Math.floor(x/C),gz=Math.floor(z/C),c=[];
+ // Remembered per spot (every rebuild asks again for the same target; up to 13 ms where no node is in clear sight).
+ const opened=new Map();let openedFor=null;
+ function nearestOpen(x,z,blocked){if(!blocked)return nearest(x,z);if(openedFor!==blocked){opened.clear();openedFor=blocked;}const key=x+','+z;let k=opened.get(key);if(k===undefined){k=findOpen(x,z,blocked);if(opened.size>64)opened.clear();opened.set(key,k);}return k;}
+ function findOpen(x,z,blocked){const gx=Math.floor(x/C),gz=Math.floor(z/C),c=[];
   for(let i=-3;i<=3;i++)for(let j=-3;j<=3;j++)for(const k of cell.get((gx+i)+','+(gz+j))||[])c.push([Math.hypot(g.nodes[k][0]-x,g.nodes[k][1]-z),k]);
   c.sort((a,b)=>a[0]-b[0]);
   for(let q=0;q<c.length&&q<24;q++)if(clear(c[q][1],x,z,blocked))return c[q][1];
   return nearest(x,z);}
  // A straight run from node k to (x,z) with nothing solid on it (every 25 cm: the model's road walls are 0.6 m thick).
  function clear(k,x,z,blocked){if(k<0)return false;const [nx,nz]=g.nodes[k],m=Math.ceil(Math.hypot(x-nx,z-nz)*4);for(let s=1;s<m;s++)if(blocked(nx+(x-nx)*s/m,nz+(z-nz)*s/m))return false;return true;}
- return {nearest,nearestOpen,clear,route,nodes:g.nodes};
+ return {nearest,nearestOpen,clear,route,warm,nodes:g.nodes};
 }
 
 // ---------- the line on the street (eaten from behind as you ride it) ----------
@@ -312,6 +322,14 @@ export function createCopenhagenGame({scene,city,mobilityData,cityData,toast,sou
  function rebuild(){const t=target();routeFor=t.p;const G=mode==='car'?road:walk;const a=G.nearest(player.x,player.z);let b=G.nearestOpen(t.p[0],t.p[1],blocked),pts=G.route(a,b,blocked)||G.route(a,b);if(!pts){b=G.nearest(t.p[0],t.p[1]);pts=G.route(a,b,blocked)||G.route(a,b);} /* a one-way node that leads nowhere: the plain nearest; no way round a wall: through it, rather than no line */
   if(pts&&G===road&&dist(road.nodes[b],t.p)>25){const wa=walk.nearestOpen(...road.nodes[b],blocked),wb=walk.nearestOpen(t.p[0],t.p[1],blocked),tail=walk.route(wa,wb,blocked)||walk.route(wa,wb);if(tail)pts=[...pts,...tail];} /* a target off the roads (Købmagergade, the squares, the quays): the last stretch along the footways the car can also take, not straight over the block */
   if(pts&&G===walk&&blocked&&!walk.clear(b,t.p[0],t.p[1],blocked)){const rb=road.nearestOpen(t.p[0],t.p[1],blocked);if(road.clear(rb,t.p[0],t.p[1],blocked))for(let i=pts.length-1,s=25;i>=0;i--){if(i<pts.length-1&&(s+=dist(pts[i],pts[i+1]))<10)continue;s=0;const ra=road.nearest(pts[i][0],pts[i][1]);if(ra<0||dist(road.nodes[ra],pts[i])>40||!road.clear(ra,pts[i][0],pts[i][1],blocked))continue;const q=road.route(ra,rb,blocked);if(q){pts=[...pts.slice(0,i+1),...q];break;}}} /* on foot with no footway in clear sight of the target (Tivoli's gate, the Opera): the line went its last stretch through the houses; from the last point along it (every 10 m) with a street node in clear sight, along the streets instead */const on=pts&&trimStart(pts,player.x,player.z);line.set(on?[...(on.length&&dist(on[0],[player.x,player.z])>3?[[player.x,player.z]]:[]),...on,t.p]:null);}
+ // The first route to a new target grew its whole tree in one frame (10-40 ms: a hitch at every pick-up and delivery).
+ // The current and the next target's trees (both graphs, and the plain walk tree the pick-up times the delivery by) grow
+ // in idle time instead, a slice at a time.
+ let warmFor=[],warmJobs=[],warmQueued=false;
+ function warmNext(p){if(!blocked||typeof requestIdleCallback!=='function')return;const next=race?race.r.cps[race.k+1]:state==='a'?job().B:save.active?null:jobs[(save.job+1)%jobs.length].A;
+  if(p!==warmFor[0]||next!==warmFor[1]||mode!==warmFor[2]){warmFor=[p,next,mode];const G=mode==='car'?road:walk,H=G===road?walk:road;warmJobs=[];for(const q of [p,next])if(q)warmJobs.push({G,q,b:null},{G:H,q,b:null});if(state==='a'&&!race)warmJobs.push({G:walk,q:job().B,b:null,plain:true});}
+  if(warmJobs.length&&!warmQueued){warmQueued=true;requestIdleCallback(runWarm);}}
+ function runWarm(dl){warmQueued=false;while(warmJobs.length&&dl.timeRemaining()>2){const j=warmJobs[0];if(j.b===null){j.b=j.plain?j.G.nearest(j.q[0],j.q[1]):j.G.nearestOpen(j.q[0],j.q[1],blocked);continue;}if(j.G.warm(j.b,dl.timeRemaining()-1.5,!j.plain))warmJobs.shift();}}
  // The nearest graph node is often behind the car: the route then ran back to it and returned past the car
  // (a loop around the player). Start from the closest point of the route's first 60 m instead.
  function trimStart(pts,x,z){if(pts.length<2)return pts;let best=-1,bd=Infinity,bp=null,run=0;
@@ -418,6 +436,7 @@ export function createCopenhagenGame({scene,city,mobilityData,cityData,toast,sou
   // GPS line
   routeT-=dt;const tg=target();
   if(!routeFor||dist(routeFor,tg.p)>1||routeT<=0&&line.progress(actor.x,actor.z)>25){routeT=3;rebuild();}
+  warmNext(tg.p);
   line.progress(actor.x,actor.z);
   hudClock+=dt;if(hudClock>.2){hudClock=0;updateHud();} // 5 Hz is plenty for distances and timers
  }
