@@ -3,7 +3,7 @@
 moor a boat parallel to the quay (sailboats and small motor boats; wooden boats in Nyhavn and the
 Christianshavn canal). Also a few loops for moving canal tour boats along the harbour.
 Writes public/cities/<id>/boats.json.   python3 scripts/boats.py copenhagen [--era 1760]"""
-import gzip, json, math, random, sys
+import gzip, json, math, random, re, sys
 import numpy as np
 from PIL import Image, ImageDraw
 from pyproj import Transformer
@@ -55,6 +55,24 @@ for w in city['water']:
                             boats.append([round(px, 2), round(pz, 2), round(math.atan2(ux, uz) + (math.pi if rnd.random() < .5 else 0), 3), kind, round(.8 + rnd.random() * .3, 2)])
                         break
                 s += 7.5 + rnd.random() * 5
+# A boat moored on the edge of navigable water can still lie out over a moat or lake that shares the shore
+# (1760: a ship at Nørreport on an unnamed pond's edge, out in the Voldgrav): drop any boat whose hull
+# centre or ends are in water that takes no boats.
+im3 = Image.new('1', (N, N), 0); d3 = ImageDraw.Draw(im3)
+STILL = re.compile(r'(vold|stads|kastels)grav|(sø|søen|søerne|dam|spring)$')  # moats and lakes by name (Holmen's -graven are canals)
+for w in city['water']:
+    if w.get('kind') not in NOBOATS and not STILL.search((w.get('name') or '').lower()): continue
+    for k, ring in enumerate(w['rings']):
+        if len(ring) > 2: d3.polygon([((x + EXT) / G, (z + EXT) / G) for x, z in ring], fill=0 if k else 1)
+# ... and water not joined to the harbour at all (the Botanical Garden's lake took eight sail and motor boats)
+reach = im.convert('L'); ImageDraw.floodfill(reach, ((NYHAVN[0] + EXT) / G, (NYHAVN[1] + EXT) / G), 128)
+still = np.array(im3, dtype=bool) | water & (np.array(reach) != 128)
+def in_still(x, z):
+    i, j = int((z + EXT) / G), int((x + EXT) / G)
+    return 0 <= i < N and 0 <= j < N and still[i, j]
+before = len(boats)
+boats = [b for b in boats if not any(in_still(b[0] + math.sin(b[2]) * t, b[1] + math.cos(b[2]) * t) for t in (-6, 0, 6))]
+print('boats on still water dropped', before - len(boats))
 # Tour boat loops through the inner harbour (lon, lat), checked against the water mask
 LOOPS = [[(12.5905, 55.6796), (12.5960, 55.6794), (12.5995, 55.6830), (12.5965, 55.6870), (12.5990, 55.6910), (12.5985, 55.6870), (12.5960, 55.6810), (12.5915, 55.6760), (12.5860, 55.6735), (12.5810, 55.6712), (12.5860, 55.6740), (12.5920, 55.6775)]]
 routes = []
