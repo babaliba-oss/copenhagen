@@ -1777,6 +1777,7 @@ async function boot(){
    };
    if(import.meta.env.DEV)window.openCityDrive.waterMask=WATER_MASK;
    if(import.meta.env.DEV)window.openCityDrive.tileLod=(bands={})=>{Object.assign(TILE_LOD,bands);for(const g of loadedTiles.values())applyTileLod(g,g.userData.level||'near',focus);return {...TILE_LOD};}; // tune LOD bands live
+   if(import.meta.env.DEV)window.openCityDrive.travelTo=name=>travelTo(data.landmarks.find(l=>l.name===name)); // tests: the big map's jump to a named place (M, click)
    if(import.meta.env.DEV)window.openCityDrive.teleport=(x,z,heading=0)=>{let best=null,d=Infinity;for(const n of mobility.roads.nodes){const q=(n[0]-x)**2+(n[1]-z)**2;if(q<d){d=q;best=n;}}setStart({name:'Teleport',district:city.name,x:best[0],z:best[1],heading});};
    if(import.meta.env.DEV)window.openCityDrive.inspectCamera=(view)=>{
     if(!view){inspectionCamera=null;setPaused(false);return;} // back to the chase camera
