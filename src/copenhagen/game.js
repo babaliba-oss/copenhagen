@@ -34,7 +34,14 @@ function makeGraph(g,undirected){
    for(const e of adj[v]){const ng=gs[v]+e.len;if(ng<gs[e.to]){gs[e.to]=ng;came[e.to]=v;via[e.to]=e;push(ng+dist(g.nodes[e.to],g.nodes[b]),e.to);}}}
   if(!Number.isFinite(gs[b]))return null;const pts=[];for(let v=b;v!==a;v=came[v]){const e=via[v];for(let i=e.points.length-1;i>0;i--)pts.push(e.points[i]);}pts.push(g.nodes[a]);return pts.reverse();
  }
- return {nearest,route,nodes:g.nodes};
+ // The node nearest a target is often across a block (the road graph misses the pedestrian streets): the line then
+ // ran its last stretch straight through the houses. Take the nearest node within 180 m with a clear straight run to the target.
+ function nearestOpen(x,z,blocked){if(!blocked)return nearest(x,z);const gx=Math.floor(x/C),gz=Math.floor(z/C),c=[];
+  for(let i=-3;i<=3;i++)for(let j=-3;j<=3;j++)for(const k of cell.get((gx+i)+','+(gz+j))||[])c.push([Math.hypot(g.nodes[k][0]-x,g.nodes[k][1]-z),k]);
+  c.sort((a,b)=>a[0]-b[0]);
+  for(let q=0;q<c.length&&q<24;q++){const [d,k]=c[q],[nx,nz]=g.nodes[k],m=Math.ceil(d);let ok=true;for(let s=1;s<m&&ok;s++)if(blocked(nx+(x-nx)*s/m,nz+(z-nz)*s/m))ok=false;if(ok)return k;}
+  return nearest(x,z);}
+ return {nearest,nearestOpen,route,nodes:g.nodes};
 }
 
 // ---------- the line on the street (eaten from behind as you ride it) ----------
@@ -78,7 +85,7 @@ function beam(scene,color,h=80){
  g.add(col,ring);g.visible=false;scene.add(g);return g;
 }
 
-export function createCopenhagenGame({scene,city,mobilityData,cityData,toast,soundOn=()=>true}){
+export function createCopenhagenGame({scene,city,mobilityData,cityData,toast,soundOn=()=>true,blocked=null}){ // blocked(x,z): a solid house there (the GPS line's last stretch)
  const proj=proj4('EPSG:4326',city.projection);
  const ll=([lat,lon])=>{const [x,y]=proj.forward([lon,lat]);return [x,-y];};
  const walk=makeGraph(mobilityData.walks,true),road=makeGraph(mobilityData.roads,false);
@@ -279,7 +286,8 @@ export function createCopenhagenGame({scene,city,mobilityData,cityData,toast,sou
   if(state!=='b'&&save.active){const q=byId[save.active.id],f=frontier().filter(k=>!q.steps[k].clue);if(f.length){let best=f[0];for(const k of f)if(dist(q.steps[k].p,[player.x,player.z])<dist(q.steps[best].p,[player.x,player.z]))best=k;return {p:q.steps[best].p,kind:'saga'};}}
   return {p:state==='a'?job().A:job().B,kind:'job'};
  }
- function rebuild(){const t=target();routeFor=t.p;const G=mode==='car'?road:walk;const a=G.nearest(player.x,player.z),b=G.nearest(t.p[0],t.p[1]);const pts=G.route(a,b);const on=pts&&trimStart(pts,player.x,player.z);line.set(on?[...(on.length&&dist(on[0],[player.x,player.z])>3?[[player.x,player.z]]:[]),...on,t.p]:null);}
+ function rebuild(){const t=target();routeFor=t.p;const G=mode==='car'?road:walk;const a=G.nearest(player.x,player.z);let b=G.nearestOpen(t.p[0],t.p[1],blocked),pts=G.route(a,b);if(!pts){b=G.nearest(t.p[0],t.p[1]);pts=G.route(a,b);} /* a one-way node that leads nowhere: the plain nearest */
+  if(pts&&G===road&&dist(road.nodes[b],t.p)>25){const tail=walk.route(walk.nearestOpen(...road.nodes[b],blocked),walk.nearestOpen(t.p[0],t.p[1],blocked));if(tail)pts=[...pts,...tail];} /* a target off the roads (Købmagergade, the squares, the quays): the last stretch along the footways the car can also take, not straight over the block */const on=pts&&trimStart(pts,player.x,player.z);line.set(on?[...(on.length&&dist(on[0],[player.x,player.z])>3?[[player.x,player.z]]:[]),...on,t.p]:null);}
  // The nearest graph node is often behind the car: the route then ran back to it and returned past the car
  // (a loop around the player). Start from the closest point of the route's first 60 m instead.
  function trimStart(pts,x,z){if(pts.length<2)return pts;let best=-1,bd=Infinity,bp=null,run=0;
