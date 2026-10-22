@@ -178,11 +178,15 @@ export function createCopenhagenGame({scene,city,mobilityData,cityData,toast,sou
  const NISSE_SPOTS=[[55.6797,12.5935],[55.6855,12.5805],[55.6857,12.5772],[55.6871,12.5731],[55.6918,12.5945],[55.6925,12.5988],[55.6866,12.5985],[55.6840,12.5926],[55.6851,12.5893],[55.6765,12.5785],[55.6776,12.5786],[55.6813,12.5760],[55.6837,12.5700],[55.6810,12.5665],[55.6760,12.5690],[55.6738,12.5985],[55.6728,12.5947],[55.6705,12.5760],[55.6880,12.5640],[55.6735,12.5820],[55.6818,12.6000],[55.6770,12.5885]];
  // Each stands by the footpath node nearest its spot whose corner is on a pavement, clear of roads, houses and water: the
  // nearest node was often a crossing, which stood 8 of the 22 in the road (one in a house, two in the 1760 water).
- const nisser=(()=>{const spots=NISSE_SPOTS.map(ll),near=list=>new SpatialIndex((list||[]).filter(q=>q.rings?.length&&(q.bbox??=bounds(q.rings))&&spots.some(([x,z])=>x>q.bbox[0]-70&&x<q.bbox[2]+70&&z>q.bbox[1]-70&&z<q.bbox[3]+70)));
-  const road=near(cityData?.roads),pave=near(cityData?.pavement),house=near(cityData?.buildings),clear=(x,z)=>!road.at(x,z)&&!house.at(x,z)&&!inWaterPolygons(cityData?.water,x,z);
+ // Roads, pavements and houses are indexed within 70 m of the spots, or within 410 m for a spot whose search has to reach
+ // further (1760's nisse 4 at Nyboder stood inside a house 300 m from its spot: the house was not in the 70 m index).
+ const nisser=(()=>{const spots=NISSE_SPOTS.map(ll),near=(list,m)=>new SpatialIndex((list||[]).filter(q=>q.rings?.length&&(q.bbox??=bounds(q.rings))&&spots.some(([x,z])=>x>q.bbox[0]-m&&x<q.bbox[2]+m&&z>q.bbox[1]-m&&z<q.bbox[3]+m)));
+  const ix=m=>({road:near(cityData?.roads,m),pave:near(cityData?.pavement,m),house:near(cityData?.buildings,m)}),small=ix(70);let big=null,road,pave,house;
+  const use=reach=>{const t=reach>60?(big=big||ix(410)):small;road=t.road;pave=t.pave;house=t.house;},clear=(x,z)=>!road.at(x,z)&&!house.at(x,z)&&!inWaterPolygons(cityData?.water,x,z);
   const OFF=[[.9,.6],[-.9,-.6],[1.5,0],[-1.5,0],[0,1.5],[0,-1.5],[1.1,-1.1],[-1.1,1.1]];
-  return spots.map((p,i)=>{let best=null,score=Infinity;for(const reach of [60,150,400]){for(const q of walk.nodes){const d=dist(q,p);if(d>reach)continue;
+  return spots.map((p,i)=>{let best=null,score=Infinity;for(const reach of [60,150,400]){use(reach);for(const q of walk.nodes){const d=dist(q,p);if(d>reach)continue;
     for(let k=0;k<OFF.length;k++){const x=q[0]+OFF[k][0],z=q[1]+OFF[k][1];if(!clear(x,z))continue;const sc=d+(pave.at(x,z)?0:25)+k*.2;if(sc<score){score=sc;best=[x,z];}break;}}if(best)break;}
+   if(!best){use(400);for(let r=0;r<=80&&!best;r++)for(let k=0;k<16;k++){const x=p[0]+r*Math.cos(k*Math.PI/8),z=p[1]+r*Math.sin(k*Math.PI/8);if(clear(x,z)){best=[x,z];break;}}} /* no footpath within 400 m (1760: the spot by the lakes, far outside the ramparts, stood in Sankt Jørgens Sø): the nearest clear ground */
    if(!best){const n=walk.nearest(p[0],p[1]),q=n>=0&&dist(walk.nodes[n],p)<60?walk.nodes[n]:p;best=[q[0]+.9,q[1]+.6];}return {i,p:best};});})();
  const nisseGeo=(()=>{const parts=[new THREE.ConeGeometry(.17,.42,10).translate(0,.62,0),new THREE.SphereGeometry(.13,10,8).translate(0,.4,0),new THREE.CylinderGeometry(.14,.18,.34,10).translate(0,.17,0),new THREE.SphereGeometry(.035,6,5).translate(0,.84,0)];
   const cols=['#c8202a','#e9e3d4','#5a6b8a','#f2f2f2'],out=[];parts.forEach((g,k)=>{const n=g.toNonIndexed();const c=new THREE.Color(cols[k]),a=new Float32Array(n.attributes.position.count*3);for(let i=0;i<a.length;i+=3)a.set([c.r,c.g,c.b],i);n.setAttribute('color',new THREE.BufferAttribute(a,3));n.deleteAttribute('uv');out.push(n);});return mergeGeometries(out).scale(1.6,1.6,1.6);})();
