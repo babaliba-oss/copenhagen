@@ -1,7 +1,7 @@
 #people-interaction{position:absolute;top:90px;left:20px;z-index:28;max-width:min(310px,calc(100% - 40px));color:#293b36;font-size:12px}
 #people-interaction[hidden],#people-interaction [hidden]{display:none}
 #people-talk-button{min-height:40px;padding:9px 13px;border:1px solid #ffffffb3;border-radius:9px;background:#f8f5eceb;color:#293b36;box-shadow:0 2px 12px #20362b18;font-size:12px}
-#people-chat{padding:13px;background:#f8f5ecf5;border:1px solid #ffffffd9;border-radius:12px;box-shadow:0 3px 18px #20362b20;max-height:calc(100dvh - 185px);overflow:auto;overscroll-behavior:contain}
+#people-chat{padding:13px;background:#f8f5ecf5;border:1px solid #ffffffd9;border-radius:12px;box-shadow:0 3px 18px #20362b20;max-height:calc(var(--app-h,100dvh) - 185px);overflow:auto;overscroll-behavior:contain}
 #people-chat-title{font-size:12px}#people-chat-response{font-size:13px;line-height:1.5;margin:8px 0 12px}.people-chat-options{display:flex;gap:6px;flex-wrap:wrap}.people-chat-options button{min-height:38px;padding:7px 10px;border:1px solid #ced8d0;background:#fff;color:#293b36;border-radius:7px;font-size:11px}.people-chat-options button[data-reply=bye]{background:transparent}
 #people-interaction button:focus-visible{outline:3px solid #28795f;outline-offset:2px}
 .people-chat-heading{display:flex;align-items:center;justify-content:space-between;gap:10px}#people-chat-title{font-size:14px}.people-chat-description,#people-chat-voice-status{font-size:10px;line-height:1.4;color:#5e6e66;margin:2px 0 0}.people-chat-previous{font-size:11px;line-height:1.4;margin:10px 0 0;color:#52665b;border-left:2px solid #b4c6b7;padding-left:7px}#people-chat-voice{flex-shrink:0;min-height:34px;padding:5px 8px;border:1px solid #ced8d0;border-radius:7px;background:transparent;color:#344c40;font:inherit;font-size:10px}#people-chat-voice-status{margin-top:10px}#people-chat-response{overflow-wrap:anywhere}
@@ -12,7 +12,7 @@
  body.mobile-controls-ready #people-interaction{top:auto;bottom:calc(var(--mobile-bottom,16px) + 163px);left:50%;transform:translateX(-50%);width:max-content;max-width:min(320px,calc(100% - 28px));z-index:28}
  body.mobile-controls-ready #people-talk-button{min-width:110px;min-height:44px;padding:10px 14px;border-radius:9px;background:#f8f5eeee;color:#30312e;border:1px solid #fff9;font:600 12px 'DM Sans',sans-serif;touch-action:manipulation}
  body.mobile-controls-ready #people-interaction:has(#people-chat:not([hidden])){bottom:calc(var(--mobile-bottom,16px) + 108px);width:320px}
- body.mobile-controls-ready #people-chat{padding:14px;border-radius:11px;background:#f8f5eef7;color:#30312e;max-height:calc(100dvh - 230px);overflow:auto}
+ body.mobile-controls-ready #people-chat{padding:14px;border-radius:11px;background:#f8f5eef7;color:#30312e;max-height:calc(var(--app-h,100dvh) - 230px);overflow:auto}
  body.mobile-controls-ready #people-chat-title{font-size:13px}
  body.mobile-controls-ready #people-chat-response{font:400 14px/1.5 'DM Sans',sans-serif;margin:8px 0 12px}
  body.mobile-controls-ready .people-chat-options{gap:7px}
@@ -21,7 +21,7 @@
 @media(pointer:coarse) and (max-height:500px){
  body.mobile-controls-ready #people-interaction{left:auto;right:var(--mobile-right,16px);bottom:calc(var(--mobile-bottom,10px) + 160px);transform:none}
  body.mobile-controls-ready #people-interaction:has(#people-chat:not([hidden])){bottom:calc(var(--mobile-bottom,10px) + 108px);width:min(280px,calc(100% - 350px));max-width:280px}
- body.mobile-controls-ready #people-chat{max-height:calc(100dvh - var(--mobile-bottom,10px) - 176px);padding:12px}
+ body.mobile-controls-ready #people-chat{max-height:calc(var(--app-h,100dvh) - var(--mobile-bottom,10px) - 176px);padding:12px}
  body.mobile-controls-ready #people-chat-response{font-size:13px;margin:6px 0 9px}
 }
 @media (hover:hover) and (pointer:fine){#people-interaction{left:auto;right:76px;top:96px}} /* desktop: the job and saga cards sit where it was (top left) */

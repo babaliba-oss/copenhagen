@@ -10,7 +10,7 @@ body.booting :is(.topbar,.location-tag,.dashboard,.right-tools,.landmark-label,#
  --t-12:12px;--t-14:14px;--t-16:16px;--t-20:20px;--t-28:28px;
  --s-4:4px;--s-8:8px;--s-12:12px;--s-16:16px;--s-24:24px;--s-32:32px;
  --pad:32px;--muted:#67645c;--soft:#30312e14;
- position:absolute;inset:auto auto 38px 38px;width:384px;max-width:calc(100% - 32px);max-height:calc(100dvh - 76px);height:auto;overflow:auto;overscroll-behavior:contain;
+ position:absolute;inset:auto auto 38px 38px;width:384px;max-width:calc(100% - 32px);max-height:calc(var(--app-h,100dvh) - 76px);height:auto;overflow:auto;overscroll-behavior:contain;
  padding:var(--pad) var(--pad) var(--s-24);background:#f8f5eef7;color:var(--ink);border:1px solid #fffc;border-radius:12px;box-shadow:0 8px 32px #25241f20;transform:none;transition:opacity .25s,visibility .25s;z-index:40;scrollbar-width:thin;
  font-family:var(--ui);font-size:var(--t-14);line-height:20px;
 }
@@ -101,7 +101,7 @@ body.game-failed #intro{z-index:1000;pointer-events:auto}
 
 /* Phones (portrait) */
 @media(max-width:700px){
- #intro.boot-screen{--pad:24px;left:16px;bottom:max(16px,env(safe-area-inset-bottom));width:358px;max-width:calc(100% - 32px);max-height:calc(100dvh - 32px);padding-bottom:var(--s-16)}
+ #intro.boot-screen{--pad:24px;left:16px;bottom:max(16px,env(safe-area-inset-bottom));width:358px;max-width:calc(100% - 32px);max-height:calc(var(--app-h,100dvh) - 32px);padding-bottom:var(--s-16)}
 }
 @media(pointer:coarse){
  .boot-footer a{display:inline-flex;align-items:center;min-height:44px}
@@ -114,7 +114,7 @@ body.game-failed #intro{z-index:1000;pointer-events:auto}
    Left: wordmark, tagline, footer. Right: starting point, button, how to play.
    Both columns start on the card's top line and end on its bottom line. */
 @media(max-height:540px) and (min-width:560px){
- #intro.boot-screen{--pad:24px;left:max(16px,env(safe-area-inset-left));bottom:max(16px,env(safe-area-inset-bottom));width:min(600px,calc(100% - 32px));max-height:calc(100dvh - 32px);padding:var(--s-24);display:grid;grid-template-columns:1fr 1fr;grid-template-rows:auto auto 1fr;column-gap:var(--s-32);align-items:start}
+ #intro.boot-screen{--pad:24px;left:max(16px,env(safe-area-inset-left));bottom:max(16px,env(safe-area-inset-bottom));width:min(600px,calc(100% - 32px));max-height:calc(var(--app-h,100dvh) - 32px);padding:var(--s-24);display:grid;grid-template-columns:1fr 1fr;grid-template-rows:auto auto 1fr;column-gap:var(--s-32);align-items:start}
  #intro.boot-screen>.boot-brand{grid-column:1;grid-row:1;margin-bottom:var(--s-16)}
  #intro.boot-screen>.boot-tagline{grid-column:1;grid-row:2;margin:0;font-size:24px;line-height:28px}
  #intro.boot-screen .boot-era{margin-top:var(--s-4);font-size:var(--t-16);line-height:24px}
@@ -130,7 +130,7 @@ body.game-failed #intro{z-index:1000;pointer-events:auto}
  .boot-enter{display:none}
 }
 @media(max-height:540px) and (max-width:559px){
- #intro.boot-screen{--pad:24px;bottom:16px;max-height:calc(100dvh - 32px)}
+ #intro.boot-screen{--pad:24px;bottom:16px;max-height:calc(var(--app-h,100dvh) - 32px)}
  #intro.boot-screen .boot-brand{margin-bottom:var(--s-16)}#intro.boot-screen .boot-tagline{margin-bottom:var(--s-16)}
 }
 @media(prefers-reduced-motion:reduce){#intro.boot-screen,#intro #load-fill,.boot-help summary>span,#intro #boot-title{transition:none}#boot-title.slide-next,#boot-title.slide-prev{animation:none}}
