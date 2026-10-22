@@ -2,14 +2,14 @@ import * as THREE from 'three';
 import {litWindows} from './night-windows.js';
 import {facadeGrain} from './facade-grain.js';
 import {signMaterial} from './shop-signs.js';
-import {shellColourAttribute,shellHeightAttribute,creasedShellNormals} from './shell-colors.js';
+import {shellColourAttribute,shellHeightAttribute,shellOriginAttribute,creasedShellNormals} from './shell-colors.js';
 let worker,id=0;const pending=new Map();
 // Cheap, measured textured shells are visible before the worker infers details.
 // Copy the part data: the original tile buffer is transferred to the worker.
 export function createSourceShell(array,part,texture){
  const data=array.slice(part.start*5,(part.start+part.count)*5),buffer=new THREE.InterleavedBuffer(data,5),geometry=new THREE.BufferGeometry();
  geometry.setAttribute('position',new THREE.InterleavedBufferAttribute(buffer,3,0));geometry.setAttribute('uv',new THREE.InterleavedBufferAttribute(buffer,2,3));creasedShellNormals(geometry);geometry.computeBoundingSphere();
- if(!texture){geometry.setAttribute('color',shellColourAttribute(array,[part],part.start,part.start+part.count));geometry.setAttribute('aRel',shellHeightAttribute(array,[part],part.start,part.start+part.count));}
+ if(!texture){geometry.setAttribute('color',shellColourAttribute(array,[part],part.start,part.start+part.count));geometry.setAttribute('aRel',shellHeightAttribute(array,[part],part.start,part.start+part.count));geometry.setAttribute('aOrg',shellOriginAttribute(array,[part],part.start,part.start+part.count));}
  const material=texture?new THREE.MeshStandardMaterial({map:texture,roughness:.8,side:THREE.DoubleSide,forceSinglePass:true}):facadeGrain(new THREE.MeshStandardMaterial({vertexColors:true,roughness:.8,side:THREE.DoubleSide,forceSinglePass:true}),{windows:true});
  const mesh=new THREE.Mesh(geometry,material);mesh.castShadow=true;mesh.receiveShadow=true;mesh.userData={shell:true,source:true,id:part.id,occlusion:{opacity:1,clearTime:1},box:new THREE.Box3(new THREE.Vector3(part.bbox[0]-.5,(part.base||0)-.5,part.bbox[1]-.5),new THREE.Vector3(part.bbox[2]+.5,(part.base||0)+part.height+.5,part.bbox[3]+.5))};return mesh;
 }

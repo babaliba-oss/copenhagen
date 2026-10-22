@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import {shellColourAttribute,shellHeightAttribute,creasedShellNormals} from './shell-colors.js';
+import {shellColourAttribute,shellHeightAttribute,shellOriginAttribute,creasedShellNormals} from './shell-colors.js';
 import {facadeGrain} from './facade-grain.js';
 
 // Creased normals of a tile's merged shell ranges (and all their positions in one array, for the tile's shadow
@@ -70,7 +70,7 @@ export function createMergedShells(array,parts,textures,mask=null,normals=null){
   const data=array.slice(r.start*5,r.end*5),buffer=new THREE.InterleavedBuffer(data,5),geometry=new THREE.BufferGeometry();
   geometry.setAttribute('position',new THREE.InterleavedBufferAttribute(buffer,3,0));geometry.setAttribute('uv',new THREE.InterleavedBufferAttribute(buffer,2,3));if(normals?.[ri]?.length===(r.end-r.start)*3)geometry.setAttribute('normal',new THREE.BufferAttribute(normals[ri],3));else creasedShellNormals(geometry);geometry.computeBoundingSphere();
   const texture=r.texture?textures.get(r.texture)||null:null;
-  if(!texture){geometry.setAttribute('color',shellColourAttribute(array,parts,r.start,r.end));geometry.setAttribute('aRel',shellHeightAttribute(array,parts,r.start,r.end));}
+  if(!texture){geometry.setAttribute('color',shellColourAttribute(array,parts,r.start,r.end));geometry.setAttribute('aRel',shellHeightAttribute(array,parts,r.start,r.end));geometry.setAttribute('aOrg',shellOriginAttribute(array,parts,r.start,r.end));}
   const material=texture?new THREE.MeshStandardMaterial({map:texture,roughness:.86,side:THREE.DoubleSide}):facadeGrain(new THREE.MeshStandardMaterial({vertexColors:true,roughness:.86,side:THREE.DoubleSide}),{windows:true});
   const mesh=new THREE.Mesh(geometry,material);mesh.castShadow=false;mesh.receiveShadow=true;mesh.userData.range=[r.start,r.end]; // source vertex range (occlusion tests per part)
   if(mask){const bid=new Float32Array(r.end-r.start);for(const p of parts)if(p.start>=r.start&&p.start<r.end)bid.fill(index.get(p),p.start-r.start,p.start-r.start+p.count);geometry.setAttribute('aBid',new THREE.BufferAttribute(bid,1));

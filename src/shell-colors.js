@@ -56,6 +56,17 @@ export function shellHeightAttribute(array,parts,start,end){
  }
  return new THREE.BufferAttribute(out,2);
 }
+// The part's centre (x, z, whole metres) per vertex: the window grid measures its bays from there (facade-grain.js
+// aOrg). Measured from the city's origin, a wall 600 m out and a normal 5° off made a 50 m error: the grid ran diagonally.
+export function shellOriginAttribute(array,parts,start,end){
+ const out=new Int16Array((end-start)*2);
+ for(const p of parts){
+  const a=Math.max(start,p.start),b=Math.min(end,p.start+p.count);if(b<=a)continue;
+  let x0=Infinity,z0=Infinity,x1=-Infinity,z1=-Infinity;if(p.bbox)[x0,z0,x1,z1]=p.bbox;else for(let v=p.start;v<p.start+p.count;v++){const x=array[v*5],z=array[v*5+2];x0=Math.min(x0,x);x1=Math.max(x1,x);z0=Math.min(z0,z);z1=Math.max(z1,z);}
+  const ox=Math.round((x0+x1)/2),oz=Math.round((z0+z1)/2);for(let v=a;v<b;v++){out[(v-start)*2]=ox;out[(v-start)*2+1]=oz;}
+ }
+ return new THREE.BufferAttribute(out,2);
+}
 
 // Normals for a non-indexed shell: each corner averages the face normals of the triangles meeting at that
 // point whose faces are within `crease` radians of its own. The city model's walls are often slightly twisted

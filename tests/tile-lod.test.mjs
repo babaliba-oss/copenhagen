@@ -27,6 +27,7 @@ test('merged shells join contiguous parts per atlas and split at gaps',()=>{
  const meshes=createMergedShells(array,parts,textures);
  assert.equal(meshes.length,3);assert.equal(meshes[0].geometry.attributes.position.count,12);assert.equal(meshes[0].material.map,textures.get('a.jpg'));
  assert.equal(meshes[1].material.map,null);assert.ok(meshes.every(m=>m.userData.lod&&!m.castShadow&&m.userData.box.isEmpty()));
+ const org=meshes[1].geometry.attributes.aOrg;assert.equal(org.count,6);assert.deepEqual([org.getX(0),org.getY(5)],[5,5],'untextured shell: window grid measured from the part centre');assert.equal(meshes[0].geometry.attributes.aOrg,undefined);
  array.fill(7);assert.equal(meshes[2].geometry.attributes.position.getX(1),7);array.set([...tri(0),...tri(2),...tri(4),...tri(6)]);
 });
 

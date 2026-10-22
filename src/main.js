@@ -554,9 +554,9 @@ function createFallbackBuildings(buildings=data.buildings){
   // Houses without a 3D model: a plausible town-house colour, a darker roof and the shader's storey-and-bay
   // window grid (aRel = height above the base, total height), so they read as buildings, not blank boxes.
   const k=Math.abs(Math.sin(bb[0]*12.9898+bb[1]*78.233)*43758.5453)%1,wall=new THREE.Color(FALLBACK_WALLS[Math.floor(k*FALLBACK_WALLS.length)]),roof=new THREE.Color(small?'#4a4744':'#5a3a30'); // hex strings are already converted to linear
-  const pos=g.attributes.position,nor=g.attributes.normal,col=new Float32Array(pos.count*3),rel=new Float32Array(pos.count*2);
-  for(let i=0;i<pos.count;i++){const c=nor.getY(i)>.5?roof:wall;col.set([c.r,c.g,c.b],i*3);rel[i*2]=pos.getY(i)-base;rel[i*2+1]=h;}
-  g.setAttribute('color',new THREE.BufferAttribute(col,3));g.setAttribute('aRel',new THREE.BufferAttribute(rel,2));geoms.push(g);
+  const pos=g.attributes.position,nor=g.attributes.normal,col=new Float32Array(pos.count*3),rel=new Float32Array(pos.count*2),org=new Int16Array(pos.count*2).fill(Math.round((bb[0]+bb[2])/2)); /* org: the house's centre, where the window grid counts its bays from (facade-grain.js) */
+  for(let i=0;i<pos.count;i++){const c=nor.getY(i)>.5?roof:wall;col.set([c.r,c.g,c.b],i*3);rel[i*2]=pos.getY(i)-base;rel[i*2+1]=h;org[i*2+1]=Math.round((bb[1]+bb[3])/2);}
+  g.setAttribute('color',new THREE.BufferAttribute(col,3));g.setAttribute('aRel',new THREE.BufferAttribute(rel,2));g.setAttribute('aOrg',new THREE.BufferAttribute(org,2));geoms.push(g);
  }
  if(geoms.length){const mesh=new THREE.Mesh(mergeGeometries(geoms),facadeGrain(new THREE.MeshStandardMaterial({vertexColors:true,roughness:.88}),{windows:true}));mesh.name='Unmodelled houses';console.info('Unmodelled houses',geoms.length);mesh.castShadow=true;mesh.receiveShadow=true;cityModel.add(mesh);geoms.forEach(g=>g.dispose());}
  createFarCity(modelled);

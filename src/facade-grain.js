@@ -21,14 +21,14 @@ export function facadeGrain(material,{windows=false,stone=false}={}){
  const prev=material.onBeforeCompile;
  material.onBeforeCompile=(shader,renderer)=>{prev?.(shader,renderer);
   shader.vertexShader=shader.vertexShader
-   .replace('#include <common>','#include <common>\nvarying vec3 vGrainPos;varying vec3 vGrainNormal;'+(windows?'attribute vec2 aRel;varying vec2 vRel;':''))
-   .replace('#include <project_vertex>','#include <project_vertex>\nvGrainPos=(modelMatrix*vec4(transformed,1.)).xyz;vGrainNormal=normalize(mat3(modelMatrix)*objectNormal);'+(windows?'vRel=aRel;':''));
+   .replace('#include <common>','#include <common>\nvarying vec3 vGrainPos;varying vec3 vGrainNormal;'+(windows?'attribute vec2 aRel;varying vec2 vRel;attribute vec2 aOrg;varying vec3 vLocal;':''))
+   .replace('#include <project_vertex>','#include <project_vertex>\nvGrainPos=(modelMatrix*vec4(transformed,1.)).xyz;vGrainNormal=normalize(mat3(modelMatrix)*objectNormal);'+(windows?'vRel=aRel;vLocal=vGrainPos-vec3(aOrg.x,0.,aOrg.y);':''));
   shader.uniforms.uNight=WEATHER_UNIFORMS.night;const tex=grainTextures();if(tex)Object.assign(shader.uniforms,tex);
   shader.fragmentShader=shader.fragmentShader
    .replace('#include <common>',`#include <common>
 #define GRAIN_WINDOWS ${windows?1:0}
 #define GRAIN_STONE ${stone?1:0}
-uniform float uNight;uniform sampler2D tBrickC,tBrickN,tPlasterC,tPlasterN,tRoofC,tRoofN;${windows?'varying vec2 vRel;':''}
+uniform float uNight;uniform sampler2D tBrickC,tBrickN,tPlasterC,tPlasterN,tRoofC,tRoofN;${windows?'varying vec2 vRel;varying vec3 vLocal;':''}
 varying vec3 vGrainPos;varying vec3 vGrainNormal;
 float gHash(vec2 p){return fract(sin(mod(dot(p,vec2(1.,57.)),997.)*1.371)*4375.85);}
 float gNoise(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);return mix(mix(gHash(i),gHash(i+vec2(1,0)),f.x),mix(gHash(i+vec2(0,1)),gHash(i+vec2(1,1)),f.x),f.y);}`)
@@ -37,6 +37,11 @@ float vWinLit=0.;vec3 fN=vec3(0.,0.,1.),fT=vec3(1.,0.,0.),fB=vec3(0.,1.,0.);floa
 {
  vec3 n=normalize(vGrainNormal);vec3 p=vGrainPos;vec3 PDX=dFdx(vGrainPos),PDY=dFdy(vGrainPos); // derivatives before any branch: the textures below use textureGrad
  vec2 tg=normalize(vec2(-n.z,n.x)+vec2(1e-5,0.));float along=dot(p.xz,tg);
+#if GRAIN_WINDOWS
+ // along the wall from the part's centre (aOrg), on the triangle's own plane: the creased normal turns across a face, and
+ // measured from the city's origin that turn sheared the window grid into diagonal bands (City Hall, 600 m out: 50 m)
+ {vec3 fl=cross(dFdx(vLocal),dFdy(vLocal));vec2 fh=vec2(-fl.z,fl.x);float lf=length(fh);if(lf>.5*length(fl)){fh/=lf;tg=dot(fh,tg)<0.?-fh:fh;along=dot(vLocal.xz,tg);}}
+#endif
  vec3 c=diffuseColor.rgb;
  if(abs(n.y)<.35){
   float brick=smoothstep(.04,.16,c.r-max(c.g,c.b)*1.1);
