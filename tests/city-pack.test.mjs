@@ -35,6 +35,25 @@ test('footway edges through a drawn house, or hugging its wall, are dropped; cro
  assert.ok(!m.walks.edges.some(e=>e.points.some(([x,z])=>Math.abs(x-162.43)<.01&&Math.abs(z-377.18)<.01)),'the path along the Thorvaldsen Museum\'s wall is gone');
 });
 
+test('the walkers\' footways are cut to the pavement: stretches on the carriageway go, short spurs left at a kerb are pruned, crossings stay; the full graph stays for the GPS',async()=>{
+ const {kerbPieces,cutWalksAtKerbs}=await import('../src/mobility-pack.js');
+ /* pavement z<10, carriageway 10..20, pavement beyond; a footway along the pavement (0,5)-(40,5) with a 4 m spur (20,5)-(20,9) running on to the centreline (20,15), a crossing (30,9)-(30,21) */
+ const walkable=(x,z)=>z<10||z>20,N=[[0,5],[20,5],[40,5],[20,15],[30,9],[30,21],[30,5]];
+ const E=[],pair=(f,t,crossing=false)=>{const P=[N[f],N[t]],l=Math.hypot(P[1][0]-P[0][0],P[1][1]-P[0][1]);E.push({from:f,to:t,points:P.map(p=>[...p]),length:l,lane:0,crossing,signal:-1},{from:t,to:f,points:P.map(p=>[...p]).reverse(),length:l,lane:0,crossing,signal:-1});};
+ pair(0,1);pair(1,6);pair(6,2);pair(1,3);pair(4,5,true);pair(6,4);
+ const full={nodes:N.map(p=>[...p]),edges:E},r=cutWalksAtKerbs(full,kerbPieces(full,walkable)),walks=r.walks;
+ assert.equal(full.edges.length,12,'the full graph is left as it is');assert.equal(full.nodes.length,7);
+ assert.equal(r.cut,1,'the spur is cut at the kerb');assert.equal(r.pruned,1,'and the 4 m left of it pruned back to the footway');
+ assert.ok(!walks.edges.some(e=>e.from===3||e.to===3),'nothing reaches the centreline');
+ assert.equal(walks.edges.filter(e=>e.crossing).length,2,'the crossing stays');assert.equal(walks.edges.length,10);
+ for(const e of walks.edges){assert.deepEqual(e.points[0],walks.nodes[e.from]);assert.deepEqual(e.points.at(-1),walks.nodes[e.to]);}
+ /* Copenhagen as shipped (scripts/kerb-walks.mjs): no walker's footway runs onto the carriageway any more; the GPS's graph keeps the street */
+ const {SpatialIndex}=await import('../src/geo.js'),c=expandCity(JSON.parse(gunzipSync(fs.readFileSync('public/cities/copenhagen/city.pack')))),m=expandMobility(JSON.parse(fs.readFileSync('public/cities/copenhagen/mobility.json','utf8'))),w=cutWalksAtKerbs(m.walks,m.walkerCut).walks,mid=e=>!e.crossing&&e.points.some(([x,z],i)=>i&&Math.hypot((x+e.points[i-1][0])/2-525.5,(z+e.points[i-1][1])/2+333.5)<1);
+ const roads=new SpatialIndex(c.roads.filter(r=>!/Koroke/.test(r.kind||''))),on=w.edges.filter(e=>!e.crossing&&e.points.some(([x,z],i)=>i&&roads.at((x+e.points[i-1][0])/2,(z+e.points[i-1][1])/2)));
+ assert.ok(w.edges.length<m.walks.edges.length/2);assert.ok(on.length<w.edges.length*.002,`${on.length} footway edges with a segment midpoint on the carriageway`);
+ assert.ok(!w.edges.some(mid)&&m.walks.edges.some(mid),'the street centreline by 507,-304 is gone for walkers, there for the GPS');
+});
+
 test('1760: the bridges listed as built later are left out, with the footways along them, and each is a footbridge in the data',async()=>{
  const fs=await import('node:fs'),zlib=await import('node:zlib'),{dropLateBridges}=await import('../src/mobility-pack.js');
  const era=JSON.parse(fs.readFileSync('public/cities/copenhagen-1760/era.json','utf8')),gone=era.lateBridges;assert.ok(Object.keys(gone).length>=20);

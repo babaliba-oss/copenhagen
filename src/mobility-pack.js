@@ -111,3 +111,51 @@ export function dropLateBridges(city,walks,gone){
  if(late.length&&walks?.edges)dropWalksThroughBuildings(walks,late,{clearance:0});
  return late;
 }
+// Footways mapped on the carriageway (today's walks graph carries every street's centreline and the last metres of each
+// footway out to it): walkers keep to the pavement, so they walked up to the kerb, were refused and turned back there
+// (by 507,-304: a 67 m centreline edge entered from a 5 m doorway spur). The walker simulation gets the graph cut to the
+// pavement; the full graph stays for the player's on-foot GPS (which crosses streets anywhere). kerbPieces (build time,
+// scripts/kerb-walks.mjs) finds, for each non-crossing edge with its way back, the stretches whose line lies on ground
+// walkable(x,z) allows, `margin` short of the kerb, pieces under `min` metres left out: {n: edges, e: [edge index], p:
+// [[from, to, ...] metres along it, -1 for its end; [] where nothing is left]} (mobility.json walkerCut). Others stay whole.
+const cumLen=P=>{const c=[0];for(let i=1;i<P.length;i++)c.push(c[i-1]+Math.hypot(P[i][0]-P[i-1][0],P[i][1]-P[i-1][1]));return c;};
+const pointAlong=(P,c,s)=>{let i=1;while(i<P.length-1&&c[i]<s)i++;const l=c[i]-c[i-1]||1,t=Math.max(0,Math.min(1,(s-c[i-1])/l));return [P[i-1][0]+(P[i][0]-P[i-1][0])*t,P[i-1][1]+(P[i][1]-P[i-1][1])*t,i];};
+const ptsKey=P=>P.map(p=>p[0]+','+p[1]).join(';');
+function walkTwins(E){const map=new Map();for(const e of E)if(!e.crossing)map.set(e.from+'>'+e.to+':'+ptsKey(e.points),e);
+ const done=new Set(),pairs=[];E.forEach((e,i)=>{if(e.crossing||done.has(e))return;done.add(e);const b=map.get(e.to+'>'+e.from+':'+ptsKey([...e.points].reverse()));if(b)done.add(b);pairs.push([i,e,b]);});return pairs;} /* each footway once, with its way back */
+export function kerbPieces(walks,walkable,{step=.25,margin=.3,min=1}={}){
+ const E=walks?.edges||[],out={n:E.length,e:[],p:[]};
+ for(const [i,e] of walkTwins(E)){const P=e.points,c=cumLen(P),L=c.at(-1),n=Math.max(1,Math.ceil(L/step)),ok=[];for(let k=0;k<=n;k++){const q=pointAlong(P,c,L*k/n);ok.push(walkable(q[0],q[1]));}
+  if(ok.every(Boolean))continue;const pieces=[];
+  for(let k=0;k<=n;){if(!ok[k]){k++;continue;}let j=k;while(j<n&&ok[j+1])j++;const a=k?L*k/n+margin:0,b=j<n?L*j/n-margin:L;if(b-a>=min)pieces.push(+a.toFixed(2),j<n?+b.toFixed(2):-1);k=j+1;}
+  out.e.push(i);out.p.push(pieces);}
+ return out;
+}
+// The walker graph from the full one and kerbPieces' cut (the full graph is left as it is). A dead end left at a kerb is
+// pruned back to its junction when that spur is under `spur` metres (walkers then keep to the pavement it branched from),
+// and a piece cut off on both sides under `island` metres goes. Crossings stay as mapped (they are how walkers get over),
+// and so do edges added after the cut was made (extensions). Returns {walks:{nodes,edges},cut,dropped,pruned,km:[before,after]}.
+export function cutWalksAtKerbs(walks,cut,{spur=15,island=10}={}){
+ const E=walks?.edges||[],N=(walks?.nodes||[]).slice(),fx=v=>+v.toFixed(2),km=l=>+(l.reduce((s,e)=>s+(e.crossing?0:e.length),0)/2000).toFixed(1),before=km(E);
+ if(!cut?.e?.length||cut.n>E.length)return {walks:{nodes:N,edges:E.slice()},cut:0,dropped:0,pruned:0,km:[before,before]};
+ const slice=(P,c,a,b)=>{const A=pointAlong(P,c,a),B=pointAlong(P,c,b),out=[[fx(A[0]),fx(A[1])]];for(let i=A[2];i<B[2];i++)out.push(P[i]);out.push([fx(B[0]),fx(B[1])]);return out.filter((p,i)=>!i||p[0]!==out[i-1][0]||p[1]!==out[i-1][1]);};
+ const pieces=new Map();cut.e.forEach((i,k)=>pieces.set(i,cut.p[k]));
+ const cutNodes=new Set(),node=p=>{N.push([p[0],p[1]]);cutNodes.add(N.length-1);return N.length-1;},repl=new Map();let nCut=0,dropped=0;
+ for(const [i,e,back] of walkTwins(E.slice(0,cut.n))){const q=pieces.get(i);if(!q)continue;const out=[];repl.set(e,out);if(back)repl.set(back,[]);if(!q.length){dropped++;continue;}nCut++;
+  const P=e.points,c=cumLen(P),L=c.at(-1);
+  for(let k=0;k<q.length;k+=2){const a=q[k],b=q[k+1]<0?L:Math.min(L,q[k+1]),pts=slice(P,c,a,b),f=a>0?node(pts[0]):e.from,t=q[k+1]>=0?node(pts.at(-1)):e.to;pts[0]=[N[f][0],N[f][1]];pts[pts.length-1]=[N[t][0],N[t][1]]; /* ends exactly on their nodes (compactGraph) */
+   const len=fx(cumLen(pts).at(-1));out.push({...e,from:f,to:t,points:pts,length:len});if(back)out.push({...back,from:t,to:f,points:pts.map(p=>[p[0],p[1]]).reverse(),length:len});}}
+ const out=E.flatMap(e=>repl.get(e)||[e]); /* in the graph's order, a footway's pieces where it stood */
+ /* spurs left at a kerb: from each cut dead end along nodes of two neighbours to a junction */
+ const nb=new Map(),add=(a,b,e)=>{let m=nb.get(a);if(!m)nb.set(a,m=new Map());let l=m.get(b);if(!l)m.set(b,l=[]);l.push(e);};
+ for(const e of out){add(e.from,e.to,e);add(e.to,e.from,e);}
+ const deg=new Map();for(const e of E){deg.set(e.from,(deg.get(e.from)||new Set()).add(e.to));}
+ for(const [k,m] of nb)if(m.size===1&&deg.get(k)?.size>1)cutNodes.add(k); /* a node whose way on (on the carriageway) went whole */
+ const gone=new Set();let pruned=0;
+ for(const s of cutNodes){const m=nb.get(s);if(!m||m.size!==1)continue;let prev=s,cur=[...m.keys()][0],len=0,chain=[],crossing=false;
+  for(;;){const l=nb.get(prev).get(cur);chain.push(...l);if(l.some(e=>e.crossing))crossing=true;len+=Math.min(...l.map(e=>e.length));const mm=nb.get(cur);if(mm.size!==2||chain.length>200)break;const nx=[...mm.keys()].find(k=>k!==prev);prev=cur;cur=nx;}
+  const end=nb.get(cur).size;if(crossing||chain.some(e=>gone.has(e)))continue;
+  if(end>2&&len<spur||end===1&&len<island){for(const e of chain)gone.add(e);pruned++;}}
+ const edges=out.filter(e=>!gone.has(e));
+ return {walks:{nodes:N,edges},cut:nCut,dropped,pruned,km:[before,km(edges)]};
+}
