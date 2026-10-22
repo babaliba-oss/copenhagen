@@ -12,7 +12,7 @@ const newAgent=(id,walking,cruise,side,stationOnly,corridorOnly)=>({id,stationOn
 const STANDING_PROBES=[3,6,10,15]; // metres ahead checked for a standing bus
 const NEXT_ONE=[null],NO_EDGES=[]; // the next planned edge, passed to cornerSpeedLimit without a fresh array per car
 // Walker grid cells (mobility step): a 1024-slot hash of 1.5 m cells; collisions only cost a distance test.
-const KIND_CELLS=65536,WALK_CELLS=1024,walkCell=(gx,gz)=>(Math.imul(gx,73856093)^Math.imul(gz,19349663))&(WALK_CELLS-1);
+const TRAFFIC_CELLS=256,trafficCell=(gx,gz)=>(Math.imul(gx,73856093)^Math.imul(gz,19349663))&(TRAFFIC_CELLS-1),KIND_CELLS=65536,WALK_CELLS=1024,walkCell=(gx,gz)=>(Math.imul(gx,73856093)^Math.imul(gz,19349663))&(WALK_CELLS-1);
 import {mergeGraph} from './graph-extension.js';
 import {inWaterPolygons} from './geo.js';
 export const TRAFFIC_MAX_SPEED=50/3.6;
@@ -474,6 +474,10 @@ export class Mobility {
   // 1760: anyone walking (the cobbles are mapped as pavement too) within a 25 m cell of a coach's (every coach looks through this list)
   const coachCells=this.streetWalking?(this._coachCells||=new Set()):null;if(coachCells){coachCells.clear();for(let i=0;i<this.cars.length;i++){const c=this.cars[i];if(!c.edge)continue;const gx=Math.floor(c.x/25),gz=Math.floor(c.z/25);for(let u=-1;u<=1;u++)for(let w=-1;w<=1;w++)coachCells.add((gx+u)*65536+gz+w);}}
   for(let i=0;i<this.people.length;i++){const p=this.people[i];if(coachCells?p.edge&&!p.knockdown&&coachCells.has(Math.floor(p.x/25)*65536+Math.floor(p.z/25)):p.edge?.crossing&&this.world.roads.at(p.x,p.z))traffic.push(p);}
+  // Traffic by 20 m cell in a fixed hash table, for the follow test: each car looked at all ~75 others every step (and
+  // that scan alone made ~160 KB of garbage a step in the optimised step(), boxed coordinates); now the 3 x 3 cells round it.
+  {const head=this._trafficHead||(this._trafficHead=new Int32Array(TRAFFIC_CELLS)),chain=this._trafficNext?.length>=traffic.length?this._trafficNext:(this._trafficNext=new Int32Array(traffic.length+64));head.fill(-1);
+   for(let i=0;i<traffic.length;i++){const b=traffic[i],h=trafficCell(Math.floor(b.x/20),Math.floor(b.z/20));chain[i]=head[h];head[h]=i;}}
   // Walkers by 1.5 m cell in a fixed hash table (no garbage), for walkGap.
   {const head=this._walkHead||(this._walkHead=new Int32Array(WALK_CELLS)),chain=this._walkNext?.length>=this.people.length?this._walkNext:(this._walkNext=new Int32Array(this.people.length));head.fill(-1);
   for(let i=0;i<this.people.length;i++){const p=this.people[i];if(!p.edge||p.knockdown)continue;const h=walkCell(Math.floor(p.x/1.5),Math.floor(p.z/1.5));chain[i]=head[h];head[h]=i;}}
@@ -541,11 +545,11 @@ export class Mobility {
     const zone=this.zoneLimit(a,plan,tramList);
     if(zone<desired){desired=zone;hold=this.zoneWhy;holdBy=this.zoneBy;}
     if(a.passing!=null&&!(this.cars[a.passing]?.edge&&trafficFootprintsOverlap(a,this.cars[a.passing])))a.passing=null;
-    for(let ti=0;ti<traffic.length;ti++){const b=traffic[ti];if(b===a||b.edge===null)continue;const x=b.x-a.x,z=b.z-a.z;if(x>20||x<-20||z>20||z<-20)continue;
+    {const head=this._trafficHead,chain=this._trafficNext,gx=Math.floor(a.x/20),gz=Math.floor(a.z/20);for(let ix=-1;ix<=1;ix++)for(let iz=-1;iz<=1;iz++)for(let ti=head[trafficCell(gx+ix,gz+iz)];ti>=0;ti=chain[ti]){const b=traffic[ti];if(b===a||b.edge===null)continue;const x=b.x-a.x,z=b.z-a.z;if(x>20||x<-20||z>20||z<-20)continue;
      if(b.ref?.parked||b.ref?.standing)continue; // standing buses: checked along the lane actually driven, below
      const forward=x*dx+z*dz,street=b.walking&&!b.edge.crossing;if(forward<=(street?(a.halfLength??CAR_HALF_LENGTH)-.3:0)||forward>=20||Math.abs(x*dz-z*dx)>=(street?(a.halfWidth??1)+.45:2.1)||this.passes(a,b)||oncomingPasses(a,b))continue;
      const v=Math.max(0,(forward-(a.halfLength??CAR_HALF_LENGTH)-(street?.5:b.halfLength??CAR_HALF_LENGTH)-1.3)*.85);if(v<desired){desired=v;hold='follow';holdBy=b.ref||b;} // stops ~1.3 m behind (6 m centres for two cars)
-    }
+    }}
     if(this.standing?.length)for(const d of STANDING_PROBES){if(a.s+d>a.edge.length)break;const q=routePoint(a.edge,a.s+d,a.offset??a.edge.lane);if(this.standingAt(q)){const v=Math.max(0,(d-3.5)*.85);if(v<desired){desired=v;hold='follow';holdBy=null;}break;}}
     a.hold=hold;a.holdBy=holdBy;a.atSignal=hold==='signal';
    }
