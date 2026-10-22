@@ -132,6 +132,64 @@ function buildingSite(r=17,h=13){
  for(let k=0;k<4;k++)p.push(bx(2.2,.9,1.2,r+3+(k%2)*2.4,.45+Math.floor(k/2)*.9,-10,STONE));
  return mergeGeometries(p);
 }
+// The first Christiansborg (1733-45, burned 1794): E. D. Häusser's palace for Christian VI, fitted out by Eigtved and
+// Thurah. Four wings round a closed court, five storeys, 36 m to the top of a copper roof, sandstone fronts, and an 84 m
+// steepled tower over the main portal facing the riding ground (en.wikipedia "Christiansborg Palace (1st)"; lex.dk
+// "Christiansborg Slot"). Drawn on today's main block, which stands on its foundations (C. F. Hansen reused the old walls,
+// dac.dk); the tower's stages follow the engravings (Thurah, Den Danske Vitruvius 1746). Local x runs from the riding
+// ground (-x, west) to Slotsholmskanalen; the court is 87 x 76 m inside 22 m deep wings.
+export const CB1760={x:246.54,z:439.1,rot:.5772,hx:65.5,hz:60,depth:22,eave:25,top:36,tower:84};
+const quad=(a,b,c,d,n,hex)=>{const g=new THREE.BufferGeometry(),e1=b.map((v,i)=>v-a[i]),e2=c.map((v,i)=>v-a[i]),cr=[e1[1]*e2[2]-e1[2]*e2[1],e1[2]*e2[0]-e1[0]*e2[2],e1[0]*e2[1]-e1[1]*e2[0]],flip=n&&cr[0]*n[0]+cr[1]*n[1]+cr[2]*n[2]<0,P=flip?[a,c,b,a,d,c]:[a,b,c,a,c,d];
+ g.setAttribute('position',new THREE.Float32BufferAttribute(P.flat(),3));g.computeVertexNormals();return paint(g,hex);};
+function christiansborg1760(){
+ const {hx:ax,hz:az,depth:D,eave:E,top:T}=CB1760,ix=ax-D,iz=az-D,B=-1.5,p=[];
+ const WALL='#d3c6a6',PLINTH='#9b9283',TRIM='#e6ddc8',GLASS='#2b2e33',GATE='#1f1d1b';
+ // wings, plinth, string course and cornice (each as four boxes: north and south full length, west and east between)
+ const ring=(grow,y0,y1,hex)=>{const h=y1-y0,y=(y0+y1)/2;for(const s of [-1,1]){p.push(bx(2*ax+2*grow,h,D+2*grow,0,y,s*(az-D/2),hex),bx(D+2*grow,h,2*iz,s*(ax-D/2),y,0,hex));}};
+ ring(0,B,E,WALL);ring(.3,B,1,PLINTH);ring(.2,9.1,9.45,TRIM);ring(.5,E-.9,E,TRIM);
+ // risalits: the main front on the riding ground (west), the canal front (east), north and south with pediments
+ const ris=[[-1,0,16,1.8],[1,0,13,1.2],[0,-1,12,1.2],[0,1,12,1.2]]; // [nx,nz,half width,projection]
+ for(const [nx,nz,w,pr] of ris){if(nx)p.push(bx(pr,E-B,2*w,nx*(ax+pr/2),(E+B)/2,0,WALL),bx(pr+.4,.9,2*w+.4,nx*(ax+pr/2),E-.45,0,TRIM));else p.push(bx(2*w,E-B,pr,0,(E+B)/2,nz*(az+pr/2),WALL),bx(2*w+.4,.9,pr+.4,0,E-.45,nz*(az+pr/2),TRIM));
+  if(nx<0)continue;const sh=new THREE.Shape();sh.moveTo(-w,0);sh.lineTo(0,5.5);sh.lineTo(w,0);sh.closePath();const g=new THREE.ExtrudeGeometry(sh,{depth:pr,bevelEnabled:false});g.translate(0,E,-pr/2);if(nx)g.rotateY(Math.PI/2);p.push(paint(g.translate(nx*(ax+pr/2),0,nz*(az+pr/2)),TRIM));}
+ // mansard roof round the court: a steep lower slope, then hips up to the ridge over the middle of each wing
+ const prof=[[0,E],[2.6,E+6.2],[D/2,T],[D-2.6,E+6.2],[D,E]],corner=(i,y)=>[[-ax+i,y,-az+i],[ax-i,y,-az+i],[ax-i,y,az-i],[-ax+i,y,az-i]];
+ for(let k=0;k<prof.length-1;k++){const A=corner(...prof[k]),C=corner(...prof[k+1]);for(let j=0;j<4;j++)p.push(quad(A[j],A[(j+1)%4],C[(j+1)%4],C[j],[0,1,0],COPPER));}
+ // windows: five storeys of bays 4.4 m apart, a light surround behind dark glass; dormers on the outer lower slope
+ const ST=[[1.2,2.6,1.5],[5.3,2.8,1.5],[10.2,3.8,1.7],[15.3,3.4,1.6],[20.3,2.4,1.5]];
+ const win=(o,t,n,s,y0,h,w)=>{for(const [dw,off,hex] of [[.5,.05,TRIM],[0,.09,GLASS]]){const c=o.map((v,i)=>v+t[i]*s+n[i]*off),W=(w+dw)/2,y=y0-dw/2,H=h+dw,pt=(a,b)=>[c[0]+t[0]*a,y+b,c[2]+t[2]*a];p.push(quad(pt(-W,0),pt(W,0),pt(W,H),pt(-W,H),n,hex));}};
+ const facade=(o,t,n,len,skip=0)=>{const k=Math.floor((len-6)/4.4);for(let b=0;b<k;b++){const s=(b-(k-1)/2)*4.4;if(Math.abs(s)<skip)continue;for(const st of ST)win(o,t,n,s,...st);}};
+ for(const sg of [-1,1]){facade([0,0,sg*az],[1,0,0],[0,0,sg],2*ax,13);facade([sg*ax,0,0],[0,0,1],[sg,0,0],2*az,sg<0?17:14); // outer fronts, risalits skipped
+  facade([0,0,sg*iz],[1,0,0],[0,0,-sg],2*ix);facade([sg*ix,0,0],[0,0,1],[-sg,0,0],2*iz);} // court
+ for(const [nx,nz,w,pr] of ris){const n=[nx,0,nz],t=[nz?1:0,0,nx?1:0],o=[nx*(ax+pr),0,nz*(az+pr)],k=Math.round(2*w/4.4)-1;for(let b=0;b<k;b++){const s=(b-(k-1)/2)*4.4;if(nx<0&&Math.abs(s)<7.5)continue;for(const st of ST)win(o,t,n,s,...st);}}
+ for(const sg of [-1,1])for(const [len,along] of [[2*ax,'x'],[2*az,'z']]){const k=Math.floor((len-10)/8.8);for(let b=0;b<k;b++){const s=(b-(k-1)/2)*8.8;if(Math.abs(s)<(along==='x'?13:sg<0?17:14))continue;
+  const g=[bx(1.8,2.4,2.6,0,E+2.8,0,TRIM),paint(new THREE.ConeGeometry(1.45,1.3,4,1,true).rotateY(Math.PI/4).scale(1,1,1.6).translate(0,E+4.6,0),COPPER),quad([-.6,E+2,-1.31],[.6,E+2,-1.31],[.6,E+3.6,-1.31],[-.6,E+3.6,-1.31],[0,0,-1],GLASS)];
+  for(const d of g){if(along==='x'){d.translate(s,0,-(az-1.7));if(sg>0)d.rotateY(Math.PI);}else{d.rotateY(sg<0?Math.PI/2:-Math.PI/2);d.translate(sg*(ax-1.7),0,s);}p.push(d);}}}
+ // the portal under the tower, the tower: square to 45 m with clock faces, an open octagon, copper helm, lantern and spire to 84 m
+ const tx=-ax-2.3+7;p.push(bx(14,45-B,14,tx,(45+B)/2,0,WALL),bx(14.8,1,14.8,tx,44.5,0,TRIM),bx(14.6,.9,14.6,tx,E-.45,0,TRIM),bx(14.6,1.2,14.6,tx,B+.6+1.2,0,PLINTH));
+ p.push(quad([-ax-2.36,0,-2.6],[-ax-2.36,0,2.6],[-ax-2.36,7.2,2.6],[-ax-2.36,7.2,-2.6],[-1,0,0],GATE));
+ for(const st of ST.slice(2))win([-ax-2.3,0,0],[0,0,1],[-1,0,0],0,...st);
+ for(const [nx,nz] of [[-1,0],[1,0],[0,-1],[0,1]]){const o=[tx+nx*7,0,nz*7],t=[nz?1:0,0,nx?1:0],n=[nx,0,nz];if(nx<0)win(o,t,n,0,36.5,4,2); // a window over the roof on the front, clock faces above
+  p.push(paint(new THREE.CircleGeometry(1.7,16).rotateY(Math.atan2(nx,nz)).translate(o[0]+nx*.12,41.6,o[2]+nz*.12),'#ece6d6'),paint(new THREE.CircleGeometry(1.2,16).rotateY(Math.atan2(nx,nz)).translate(o[0]+nx*.16,41.6,o[2]+nz*.16),GOLD));}
+ p.push(paint(new THREE.CylinderGeometry(6,6,10,8).rotateY(Math.PI/8).translate(tx,50,0),WALL),paint(new THREE.CylinderGeometry(6.6,6.6,.8,8).rotateY(Math.PI/8).translate(tx,55.4,0),TRIM));
+ for(let k=0;k<8;k++){const a=k/8*Math.PI*2,r=6*Math.cos(Math.PI/8),n=[Math.cos(a),0,Math.sin(a)],t=[-Math.sin(a),0,Math.cos(a)];win([tx+n[0]*r,0,n[2]*r],t,n,0,47,5.2,1.5);}
+ const lathe=(pts,y,hex)=>paint(new THREE.LatheGeometry(pts.map(([r,h])=>new THREE.Vector2(r,h)),8).rotateY(Math.PI/8).translate(tx,y,0),hex);
+ p.push(lathe([[6.4,0],[5.6,1.6],[3.2,4.6],[3.6,6.2],[2.6,8.4],[1.6,9.2]],55.8,COPPER),paint(new THREE.CylinderGeometry(1.7,1.9,4.6,8).rotateY(Math.PI/8).translate(tx,67.3,0),TRIM),lathe([[2.1,0],[1.2,1.2],[.9,2.4]],69.6,COPPER));
+ p.push(paint(new THREE.ConeGeometry(.9,11.2,8).translate(tx,77.6,0),COPPER),at(paint(new THREE.SphereGeometry(.55,10,8),GOLD),tx,83.4,0),bx(.12,.8,.12,tx,84,0,GOLD));
+ return mergeGeometries(p);
+}
+// Today's model draws the palace complex as one part: in 1760 its main block (the third palace, 1907-28) is taken out and
+// the first palace drawn in its place; the riding ground's wings (1738-46, which survived 1794) stay. region: the cut in
+// the palace's frame; footprint: the mapped outline less that region (shapely), for the collision and walkers' indexes.
+export const CUT_1760={'kk-osm-way-25992657':{x:CB1760.x,z:CB1760.z,rot:CB1760.rot,hx:66,hz:60.5,footprint:[
+ [[175.2,403.1],[177.5,401.9],[176.1,399.2],[177.8,398],[171.7,388.8],[170.3,389.7],[169.4,388.2],[135.9,409.5],[119.1,420.3],[57,460],[50.5,465.4],[44.9,471.9],[42.2,476.5],[40.1,480.4],[38.7,485],[38,490.1],[38,495.1],[38.3,500.2],[39,504.8],[40.2,509.7],[42.2,514.8],[44.9,519.7],[40.9,522.1],[61.6,554.1],[66.7,550.9],[62.6,544.4],[62.4,543.9],[62.4,543.4],[62.5,542.9],[62.9,542.5],[68.8,538.5],[56.3,518.4],[63.3,513.8],[60.5,508.7],[58.4,503.2],[57.1,497.2],[58,490.8],[58.8,488],[60.1,485.4],[62.3,483.5],[65.3,482.8],[68,483.5],[70,485.6],[131.1,446.6],[129.4,443.7],[128.9,442.6],[128.7,440.6],[129.1,438.5],[130.4,436.5],[132.5,434.8],[166.7,412.5],[169.4,417.1],[179.6,410.5]],
+ [[315.1,466.6],[335.7,498.4],[346.7,491.4],[326.1,459.5]],
+ [[235.6,521.1],[237.5,524.6],[201.9,547.1],[200.1,547.6],[198.4,547.5],[196.7,546.8],[195.5,545.7],[193.3,542.4],[132.1,581.8],[133.3,583.6],[133.8,585.6],[133,587.5],[132,589.1],[129.6,590.7],[126.8,591.4],[122.8,591],[119,590],[115.5,588.6],[111.9,586.5],[107.6,582],[103.6,576],[96.8,580.4],[84.2,561.1],[79,564.8],[78.2,565.3],[77.2,565.3],[76.7,565],[75.3,563.4],[71.8,558.1],[66.6,561.5],[86.9,593],[91.1,590.3],[96.4,597.2],[99,600],[101.6,602.1],[104.9,604.4],[108.8,606.5],[113,608],[117.4,609.2],[121.9,610.1],[126.3,610.4],[132.3,609.9],[138.3,609],[144.2,606.8],[149.8,603.8],[247.9,540.1],[254.7,550.6],[262.1,545.9],[241.7,514.4],[234.4,519.2]]]}};
+const inCut=(c,x,z,m=0)=>{const dx=x-c.x,dz=z-c.z,co=Math.cos(c.rot),s=Math.sin(c.rot);return Math.abs(dx*co-dz*s)<=c.hx+m&&Math.abs(dx*s+dz*co)<=c.hz+m;};
+// A cut part's triangles lying wholly in its region collapse to points (the riding ground's wings reaching in keep theirs).
+export function cutParts1760(a,parts){let n=0;for(const p of parts){const c=CUT_1760[p.id];if(!c)continue;for(let v=p.start;v+2<p.start+p.count;v+=3){const o=v*5;if(!inCut(c,a[o],a[o+2],1)||!inCut(c,a[o+5],a[o+7],1)||!inCut(c,a[o+10],a[o+12],1))continue;for(const k of [5,10]){a[o+k]=a[o];a[o+k+1]=a[o+1];a[o+k+2]=a[o+2];}n++;}}return n;}
+// The mapped footprint of a cut part becomes what is left of it; its road walls inside the region go.
+export function cutFootprints1760(buildings){for(let i=buildings.length-1;i>=0;i--){const c=CUT_1760['kk-'+buildings[i].id];if(!c)continue;const b=buildings[i];buildings.splice(i,1,...c.footprint.map(r=>{const xs=r.map(q=>q[0]),zs=r.map(q=>q[1]);return {...b,rings:[r],bbox:[Math.min(...xs),Math.min(...zs),Math.max(...xs),Math.max(...zs)]};}));}return buildings;}
+export const cutRoadWalls1760=walls=>walls.filter(w=>{const c=CUT_1760[w.id];if(!c)return true;const r=w.rings[0],x=r.reduce((s,q)=>s+q[0],0)/r.length,z=r.reduce((s,q)=>s+q[1],0)/r.length;return !inCut(c,x,z);});
 // Buildings that did not exist in 1760: today's Vor Frue (1829, the Gothic church is drawn instead), Jerusalemskirken
 // (1896), the English Church (1887), Sankt Pauls (1877), Kong Haakons Kirke (1958), Alexander Nevsky (1883),
 // Sankt Ansgar (1842) and Ny Christiansborg (modern).
@@ -144,7 +202,7 @@ export function createLandmarks({era=null,mills=[],anchors={},statues={}}={}){ /
  const scaled=(geo,a,design)=>{const m=add(geo,a[0],a[2],{material:built});m.scale.y=a[1]/design;return m;};
  if(anchors.vorFrelsers?.[3]>60)scaled(vorFrelsers(),anchors.vorFrelsers,86);
  if(anchors.borsen?.[3]>35)scaled(borsen(),anchors.borsen,53);
- const flagTops=[];if(anchors.christiansborg?.[3]>80)flagTops.push([anchors.christiansborg[0],anchors.christiansborg[2],anchors.christiansborg[1]]);
+ const flagTops=[];if(today&&anchors.christiansborg?.[3]>80)flagTops.push( /* today's tower (1760: the first palace is drawn instead) */[anchors.christiansborg[0],anchors.christiansborg[2],anchors.christiansborg[1]]);
  const spinners=[];
  if(today){
   for(const m of tivoli(add,mat,spinners)){m.castShadow=true;group.add(m);}
@@ -162,6 +220,8 @@ export function createLandmarks({era=null,mills=[],anchors={},statues={}}={}){ /
   add(gothicChurch(),-205,66.3,{rot:.318,material:built}); // Vor Frue (old church, spire to ~110 m; lost in 1807)
   for(const [cx,hx,hz] of [[0,32,14.9],[40,8,8.4],[-37.5,6.9,6.9]])rect('Vor Frue Kirke',-205,66.3,.318,cx,0,hx,hz); // nave with buttresses, choir, west tower (gothicChurch's defaults); today's larger footprint is not solid in 1760
   add(spireTower(),336,158,{material:built});rect('Sankt Nikolaj',336,158,0,0,0,5.9,5.9); // Sankt Nikolaj tower and spire (lost in 1795)
+  {const {x,z,rot,hx,hz}=CB1760;add(christiansborg1760(),x,z,{rot,material:built}); // the first Christiansborg (main.js cuts today's main block out of the model: cutParts1760)
+   rect('Christiansborg',x,z,rot,0,0,hx,hz);rect('Christiansborg',x,z,rot,-hx-.9,0,.9,16);rect('Christiansborg',x,z,rot,hx+.6,0,.6,13);for(const s of [-1,1])rect('Christiansborg',x,z,rot,0,s*(hz+.6),12,.6);rect('Christiansborg tower',x,z,rot,-hx-1.15,0,1.15,7);} // block, risalits (west, east, north, south), the tower's front
   if(anchors.marmorkirken){const [x,,z]=anchors.marmorkirken;add(buildingSite(),x,z); // Frederik's Church, building site
    solid('Frederiks Kirke building site',Array.from({length:28},(_,k)=>[x+Math.cos(k/28*Math.PI*2)*18.9,z+Math.sin(k/28*Math.PI*2)*18.9])); // scaffold ring (r 17 + 1.6) round the half-built rotunda
    rect('treadwheel crane',x,z,0,26,.7,3.2,.9);rect('stone blocks',x,z,0,-21.6,8.2,3.6,.9);rect('stone blocks',x,z,0,21.2,-10,2.4,.7);}
