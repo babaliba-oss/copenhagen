@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import * as THREE from 'three';
-import {validateFacades,normaliseFacade,storeyBands,storeyStyle,attachFacades,applyFacadeHeights,facadeFor} from '../src/facade-data.js';
+import {validateFacades,normaliseFacade,storeyBands,storeyStyle,attachFacades,applyFacadeHeights,facadeFor,unknownHeight} from '../src/facade-data.js';
 import {createFacade,bays} from '../src/facade-renderer.js';
 import {analyseBuilding,createModelledBuilding} from '../src/building-detail.js';
 import {streetLine,alongStreet,frontingBuildings,photosShowing,pickPhotos} from '../src/facade-photos.js';
@@ -58,6 +58,14 @@ test('groups and height fixes attach to building parts and survive tile reloads'
   assert.ok(Math.abs(Math.min(...a.filter((_,i)=>i%5===1))-foot)<1e-6,'the foot stays on the ground');
  }
  assert.equal(shelter.height,3);
+});
+
+test('an OpenStreetMap shed of unknown height is no 10 m pillar',()=>{
+ const R=[[0,0],[0,3],[3,3],[3,0],[0,0]],shed={id:'osm-way-9',bbox:[0,0,3,3],height:10,start:0,count:R.length*6};
+ for(let reload=0;reload<2;reload++){const a=extrude(R,10);applyFacadeHeights(a,[shed]);const ys=a.filter((_,i)=>i%5===1);assert.ok(Math.abs(Math.max(...ys)-Math.min(...ys)-3)<.01);}
+ assert.equal(shed.height,3);
+ assert.equal(unknownHeight({id:'osm-way-9',bbox:[0,0,6,4],height:10}),6);
+ for(const p of [{id:'kk-osm-way-9',bbox:[0,0,3,3],height:10},{id:'osm-way-9',bbox:[0,0,3,3],height:12},{id:'osm-way-9',bbox:[0,0,24,3],height:10}])assert.equal(unknownHeight(p),null); // measured, tagged, or long enough for 10 m
 });
 
 test('described buildings get coloured walls, real window bays, shop glazing and roof colour',()=>{

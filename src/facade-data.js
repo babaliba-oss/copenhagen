@@ -93,9 +93,13 @@ export function attachFacades(index,data){
 // Measured shells use OSM or estimated heights. When the photos (facade.height) or the city's 3D
 // building parts (measuredHeight, set from a place file) give a different height, stretch the
 // part's vertices (in place, before any mesh is built) so every level of detail agrees.
+// An OpenStreetMap building with no height or levels gets city-build's default 10 m (levelsHeight); on a
+// shed, kiosk or gate post a few metres across that stood as a 10 m pillar (a 3 m brick column on 1760 Nyholm,
+// 360 parts of 5 m or less in today's Copenhagen). Unknown heights stand no taller than the footprint is long, 3 m at least.
+export const unknownHeight=p=>{if(!/^osm-/.test(p.id||'')||(p.sourceHeight??p.height)!==10||!p.bbox)return null;const s=Math.max(p.bbox[2]-p.bbox[0],p.bbox[3]-p.bbox[1]);return s<10?Math.max(3,s):null;};
 export function applyFacadeHeights(array,parts){
  for(const p of parts){
-  const want=p.facade?.height??p.measuredHeight;if(!want)continue;
+  const want=p.facade?.height??p.measuredHeight??unknownHeight(p);if(!want)continue;
   p.sourceHeight??=p.height;if(Math.abs(want-p.sourceHeight)<.05)continue; // tiles reload from the original data
   const k=want/p.sourceHeight;let lo=Infinity;for(let i=p.start;i<p.start+p.count;i++)lo=Math.min(lo,array[i*5+1]);if(!Number.isFinite(lo))lo=0; // stretched from the part's own foot (surveyed parts stand at their terrain height)
   for(let i=p.start;i<p.start+p.count;i++)array[i*5+1]=lo+(array[i*5+1]-lo)*k;
