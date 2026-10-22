@@ -19,20 +19,38 @@ const clamp=(v,a,b)=>v<a?a:v>b?b:v;
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const fmtKr=n=>Math.round(n).toLocaleString('en-GB'); /* English UI: 1,500 kr (da-DK wrote 1.500, read as 1.5) */let UNIT='kr'; // 1760: skilling (96 to the rigsdaler)
 const dist=(a,b)=>Math.hypot(a[0]-b[0],a[1]-b[1]);
-
+// ---------- routing (shortest paths over the city's walk or road graph) ----------
 // ---------- routing (A* over the city's walk or road graph) ----------
 function makeGraph(g,undirected){
  const n=g.nodes.length,adj=Array.from({length:n},()=>[]);
  for(const e of g.edges){const len=e.length||e.points.reduce((s,p,i)=>i?s+dist(p,e.points[i-1]):0,0);adj[e.from].push({to:e.to,len,points:e.points});if(undirected)adj[e.to].push({to:e.from,len,points:[...e.points].reverse()});}
  const cell=new Map(),C=60;g.nodes.forEach((p,i)=>{if(!adj[i].length)return;const k=Math.floor(p[0]/C)+','+Math.floor(p[1]/C);if(!cell.has(k))cell.set(k,[]);cell.get(k).push(i);});
  function nearest(x,z){let best=-1,bd=1e18;for(let r=0;r<6&&best<0;r++)for(let i=-r;i<=r;i++)for(let j=-r;j<=r;j++){if(Math.max(Math.abs(i),Math.abs(j))!==r)continue;for(const k of cell.get((Math.floor(x/C)+i)+','+(Math.floor(z/C)+j))||[]){const d=(g.nodes[k][0]-x)**2+(g.nodes[k][1]-z)**2;if(d<bd){bd=d;best=k;}}}return best;}
- function route(a,b){
-  if(a<0||b<0)return null;const gs=new Float64Array(n).fill(Infinity),came=new Int32Array(n).fill(-1),via=new Array(n),heap=[[0,a]];gs[a]=0;let it=0;
-  const push=(f,v)=>{heap.push([f,v]);let i=heap.length-1;while(i>0){const p=(i-1)>>1;if(heap[p][0]<=heap[i][0])break;[heap[p],heap[i]]=[heap[i],heap[p]];i=p;}};
-  const pop=()=>{const t=heap[0],l=heap.pop();if(heap.length){heap[0]=l;let i=0;for(;;){const L=i*2+1,R=L+1;let m=i;if(L<heap.length&&heap[L][0]<heap[m][0])m=L;if(R<heap.length&&heap[R][0]<heap[m][0])m=R;if(m===i)break;[heap[m],heap[i]]=[heap[i],heap[m]];i=m;}}return t;};
-  while(heap.length&&it++<200000){const [f,v]=pop();if(v===b)break;if(f-dist(g.nodes[v],g.nodes[b])>gs[v]+1e-6)continue;
-   for(const e of adj[v]){const ng=gs[v]+e.len;if(ng<gs[e.to]){gs[e.to]=ng;came[e.to]=v;via[e.to]=e;push(ng+dist(g.nodes[e.to],g.nodes[b]),e.to);}}}
-  if(!Number.isFinite(gs[b]))return null;const pts=[];for(let v=b;v!==a;v=came[v]){const e=via[v];for(let i=e.points.length-1;i>0;i--)pts.push(e.points[i]);}pts.push(g.nodes[a]);return pts.reverse();
+ // Routes come from a shortest-path tree grown back from the target once (Dijkstra over the reversed edges, a binary heap
+ // in typed arrays), kept for the last few targets: a rebuild then only walks the tree from the player's node. A* from the
+ // player ran on every rebuild (every few seconds off the line) and, to a target behind water such as the Opera, it
+ // searched most of the city: 30-90 ms each time, a hitch while driving the first job.
+ const radj=Array.from({length:n},()=>[]);adj.forEach((l,v)=>{for(const e of l)radj[e.to].push(v,e);});
+ let hf=new Float64Array(4096),hv=new Int32Array(4096),wallsSeen=0;const trees=new Map();
+ function tree(b,avoid){
+  const key=b*2+(avoid?1:0),had=trees.get(key);if(had&&(!avoid||had.walls===wallsSeen)){trees.delete(key);trees.set(key,had);return had;}
+  const d=new Float64Array(n).fill(Infinity),next=new Array(n).fill(null);d[b]=0;let hn=0;
+  const push=(f,v)=>{if(hn===hf.length){const F=new Float64Array(hn*2),V=new Int32Array(hn*2);F.set(hf);V.set(hv);hf=F;hv=V;}let i=hn++;while(i>0){const p=(i-1)>>1;if(hf[p]<=f)break;hf[i]=hf[p];hv[i]=hv[p];i=p;}hf[i]=f;hv[i]=v;};
+  push(0,b);
+  while(hn>0){const f=hf[0],u=hv[0];hn--;if(hn>0){const lf=hf[hn],lv=hv[hn];let i=0;for(;;){const L=i*2+1,R=L+1;let m=-1,mf=lf;if(L<hn&&hf[L]<mf){m=L;mf=hf[L];}if(R<hn&&hf[R]<mf)m=R;if(m<0)break;hf[i]=hf[m];hv[i]=hv[m];i=m;}hf[i]=lf;hv[i]=lv;}
+   if(f>d[u])continue;const into=radj[u];for(let k=0;k<into.length;k+=2){const v=into[k],e=into[k+1];if(avoid&&e.walled)continue;const nd=f+e.len;if(nd<d[v]){d[v]=nd;next[v]=e;push(nd,v);}}}
+  const t={next,walls:wallsSeen};trees.set(key,t);if(trees.size>4)trees.delete(trees.keys().next().value);return t;
+ }
+ // blocked(x,z): what the player's car runs into. An edge whose line runs over 1 m through it (a passage the model draws
+ // shut, a courtyard gate, a footway main.js drops as running through a house) is left out: the route found is checked
+ // edge by edge (each judged once, then remembered) and found again without the walled ones, up to 6 times. The GPS line
+ // and the races led straight into the wall (Christians Brygge under the Black Diamond).
+ const walled=(P,blocked)=>{let run=0;for(let i=1;i<P.length;i++){const L=dist(P[i],P[i-1]),k=Math.ceil(L/.5);for(let j=0;j<k;j++){if(blocked(P[i-1][0]+(P[i][0]-P[i-1][0])*(j+.5)/k,P[i-1][1]+(P[i][1]-P[i-1][1])*(j+.5)/k)){run+=L/k;if(run>1)return true;}else run=0;}}return false;};
+ function route(a,b,blocked){
+  if(a<0||b<0)return null;let edges=null;
+  for(let t=0;t<6;t++){const {next}=tree(b,!!blocked);edges=[];for(let v=a,k=0;v!==b;k++){const e=next[v];if(!e||k>n){edges=null;break;}edges.push(e);v=e.to;}
+   if(!edges||!blocked)break;let hit=false;for(const e of edges)if(e.walled===undefined&&(e.walled=walled(e.points,blocked))){hit=true;wallsSeen++;}if(!hit)break;if(t===5)edges=null;}
+  if(!edges)return null;const pts=[g.nodes[a]];for(const e of edges)for(let i=1;i<e.points.length;i++)pts.push(e.points[i]);return pts;
  }
  // The node nearest a target is often across a block (the road graph misses the pedestrian streets): the line then
  // ran its last stretch straight through the houses. Take the nearest node within 180 m with a clear straight run to the target.
@@ -175,12 +193,14 @@ export function createCopenhagenGame({scene,city,mobilityData,cityData,toast,sou
    {id:'mermaid-run',title:'Tivoli to the Mermaid',via:['Tivoli','Rådhuspladsen','Kongens Nytorv','Amalienborg','Little Mermaid']},
    {id:'brygge-blast',title:'Brygge Blast',via:['Islands Brygge','Christiansborg','Nyhavn']}];
  const lms=cityData?.landmarks||[],lm=n=>lms.find(l=>l.name===n);
- const races=RACE_DEFS.map(d=>{const pts=d.via.map(lm);if(pts.some(p=>!p))return null;
-  let path=[];for(let i=1;i<pts.length;i++){const leg=road.route(road.nearest(pts[i-1].x,pts[i-1].z),road.nearest(pts[i].x,pts[i].z));if(!leg)return null;path.push(...(path.length?leg.slice(1):leg));}
+ // Planned once here and again, round the walls (blocked: the world exists by then), when the race starts.
+ const planRace=(d,bl)=>{const pts=d.via.map(lm);if(pts.some(p=>!p))return null;
+  let path=[];for(let i=1;i<pts.length;i++){const a=road.nearest(pts[i-1].x,pts[i-1].z),b=road.nearest(pts[i].x,pts[i].z),leg=bl&&road.route(a,b,bl)||road.route(a,b);if(!leg)return null;path.push(...(path.length?leg.slice(1):leg));}
   let len=0;const cps=[];let acc=0;for(let i=1;i<path.length;i++){const l=dist(path[i],path[i-1]);len+=l;acc+=l;if(acc>330&&len<9e9){cps.push(path[i]);acc=0;}}
   if(cps.length&&dist(cps.at(-1),path.at(-1))<150)cps.pop();cps.push(path.at(-1));
   const speed=ERA==='h'?7:11.5,gold=Math.round(len/speed+8);
-  return {...d,start:path[0],cps,len,par:[gold,Math.round(gold*1.25),Math.round(gold*1.6)],pay:Math.round((ERA==='h'?60:500)*len/1500)};}).filter(Boolean);
+  return {...d,start:path[0],cps,len,par:[gold,Math.round(gold*1.25),Math.round(gold*1.6)],pay:Math.round((ERA==='h'?60:500)*len/1500)};};
+ const races=RACE_DEFS.map(d=>planRace(d)).filter(Boolean);
  save.best??={};
  // ---- postcards: photograph the famous views (N); each subject pays once and goes into the album (J) ----
  const POSTCARD_DEFS=ERA==='h'?[
@@ -218,7 +238,7 @@ export function createCopenhagenGame({scene,city,mobilityData,cityData,toast,sou
  let race=null,hopped=false; // race: {r, k (next checkpoint), t, countdown}; hopped: the job's delivery leg crossed a map jump or reset (no speed bonus)
  const H=ERA==='h',mkStart=races.map(()=>beam(scene,H?0xb5462e:0x9b5de5,60)),mkCp=beam(scene,H?0xe0a040:0xff4fd8,90),mkCp2=beam(scene,H?0xe0a040:0xff4fd8,40); // 1760: sealing-wax red and lantern gold, not neon
  const fmtT=t=>`${Math.floor(t/60)}:${String(Math.floor(t%60)).padStart(2,'0')}.${Math.floor(t%1*10)}`;
- function startRace(r){race={r,k:0,t:0,countdown:3.4};routeFor=null;banner(r.title,`${r.cps.length} checkpoints · ${(r.len/1000).toFixed(1)} km · gold ${fmtT(r.par[0])}`,'pick');}
+ function startRace(r){if(blocked&&!r.walls){r.walls=true;const q=planRace(r,blocked);if(q)Object.assign(r,{cps:q.cps,len:q.len,par:q.par,pay:q.pay});}race={r,k:0,t:0,countdown:3.4};routeFor=null;banner(r.title,`${r.cps.length} checkpoints · ${(r.len/1000).toFixed(1)} km · gold ${fmtT(r.par[0])}`,'pick');}
  function finishRace(){const r=race.r,t=race.t,medal=t<=r.par[0]?0:t<=r.par[1]?1:t<=r.par[2]?2:3;const names=['Gold','Silver','Bronze'];
   const prev=save.best[r.id],best=medal<3&&(prev==null||t<prev);if(best)save.best[r.id]=t; // a 'too slow' run is not a best time
   if(medal<3){const pay=Math.round(r.pay*[1,.6,.35][medal]*payBonus());save.money+=pay;banner(`${names[medal]}!`,`${esc(r.title)} · ${fmtT(t)}${best?' · new best':''} · +${fmtKr(pay)} ${UNIT}`,medal===0?'rank':'pass');}
@@ -286,8 +306,8 @@ export function createCopenhagenGame({scene,city,mobilityData,cityData,toast,sou
   if(state!=='b'&&save.active){const q=byId[save.active.id],f=frontier().filter(k=>!q.steps[k].clue);if(f.length){let best=f[0];for(const k of f)if(dist(q.steps[k].p,[player.x,player.z])<dist(q.steps[best].p,[player.x,player.z]))best=k;return {p:q.steps[best].p,kind:'saga'};}}
   return {p:state==='a'?job().A:job().B,kind:'job'};
  }
- function rebuild(){const t=target();routeFor=t.p;const G=mode==='car'?road:walk;const a=G.nearest(player.x,player.z);let b=G.nearestOpen(t.p[0],t.p[1],blocked),pts=G.route(a,b);if(!pts){b=G.nearest(t.p[0],t.p[1]);pts=G.route(a,b);} /* a one-way node that leads nowhere: the plain nearest */
-  if(pts&&G===road&&dist(road.nodes[b],t.p)>25){const tail=walk.route(walk.nearestOpen(...road.nodes[b],blocked),walk.nearestOpen(t.p[0],t.p[1],blocked));if(tail)pts=[...pts,...tail];} /* a target off the roads (Købmagergade, the squares, the quays): the last stretch along the footways the car can also take, not straight over the block */const on=pts&&trimStart(pts,player.x,player.z);line.set(on?[...(on.length&&dist(on[0],[player.x,player.z])>3?[[player.x,player.z]]:[]),...on,t.p]:null);}
+ function rebuild(){const t=target();routeFor=t.p;const G=mode==='car'?road:walk;const a=G.nearest(player.x,player.z);let b=G.nearestOpen(t.p[0],t.p[1],blocked),pts=G.route(a,b,blocked)||G.route(a,b);if(!pts){b=G.nearest(t.p[0],t.p[1]);pts=G.route(a,b,blocked)||G.route(a,b);} /* a one-way node that leads nowhere: the plain nearest; no way round a wall: through it, rather than no line */
+  if(pts&&G===road&&dist(road.nodes[b],t.p)>25){const wa=walk.nearestOpen(...road.nodes[b],blocked),wb=walk.nearestOpen(t.p[0],t.p[1],blocked),tail=walk.route(wa,wb,blocked)||walk.route(wa,wb);if(tail)pts=[...pts,...tail];} /* a target off the roads (Købmagergade, the squares, the quays): the last stretch along the footways the car can also take, not straight over the block */const on=pts&&trimStart(pts,player.x,player.z);line.set(on?[...(on.length&&dist(on[0],[player.x,player.z])>3?[[player.x,player.z]]:[]),...on,t.p]:null);}
  // The nearest graph node is often behind the car: the route then ran back to it and returned past the car
  // (a loop around the player). Start from the closest point of the route's first 60 m instead.
  function trimStart(pts,x,z){if(pts.length<2)return pts;let best=-1,bd=Infinity,bp=null,run=0;
