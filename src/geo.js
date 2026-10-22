@@ -80,8 +80,10 @@ export function insidePlayable(x,z,margin=0){
  return false;
 }
 const NONE=Object.freeze([]);
-// Numeric cell key (no string allocation); cell coordinates stay well inside ±2^20.
-const cellKey=(x,z)=>(x+1048576)*2097152+(z+1048576);
+// Numeric cell key (no string allocation). Within ±16384 cells (±98 km at the smallest 6 m cells) it is a small
+// integer: the wide key above 2^30 was a heap number boxed for every Map lookup (a 16-byte allocation per at() call,
+// tens of thousands a frame). Outside that, the wide key (cell coordinates well inside ±2^20; the two never collide).
+const cellKey=(x,z)=>x>-16384&&x<16384&&z>-16384&&z<16384?(x+16384)*32768+(z+16384):(x+1048576)*2097152+(z+1048576);
 export class SpatialIndex {
   constructor(items, size=64) {
     this.size=size; this.cells=new Map();this.items=new WeakSet();this.add(items);

@@ -1,5 +1,6 @@
 import {routePoint} from './mobility.js';
 
+const hypot=(x,z)=>Math.sqrt(x*x+z*z); // not Math.hypot: in optimised code it allocated ~80 bytes a call (its arguments boxed), thousands of calls a step
 // Adjacent road polygons do not always meet exactly; a hair-thin unmapped sliver with road on both sides
 // of it is still road (the same tolerance buses use). Cars used to stop for good at such a seam.
 const SEAM=.4;
@@ -17,7 +18,7 @@ const along={x:0,z:0,heading:0};
 export function safeVehicleSegment(a,b,world){
  if(!vehicleFitsRoad(b,world))return false;
  if(!world.trafficForbidden)return true;
- const distance=Math.hypot(b.x-a.x,b.z-a.z),turn=Math.atan2(Math.sin(b.heading-a.heading),Math.cos(b.heading-a.heading));
+ const distance=hypot(b.x-a.x,b.z-a.z),turn=Math.atan2(Math.sin(b.heading-a.heading),Math.cos(b.heading-a.heading));
  const n=Math.max(1,Math.ceil(distance/.5),Math.ceil(Math.abs(turn)/.15));
  for(let i=1;i<n;i++){const t=i/n;along.x=a.x+(b.x-a.x)*t;along.z=a.z+(b.z-a.z)*t;along.heading=a.heading+turn*t;if(!vehicleFitsRoad(along,world))return false;}
  return true;
@@ -30,12 +31,12 @@ export function markWalledLanes(edges,list,REACH=.9+.3){
  const C=16,grid=new Map(),cell=(x,z)=>Math.floor(x/C)*65536+Math.floor(z/C);
  for(const w of list){const r=w.rings[0],s=[(r[0][0]+r[3][0])/2,(r[0][1]+r[3][1])/2,(r[1][0]+r[2][0])/2,(r[1][1]+r[2][1])/2];
   for(let x=Math.floor((Math.min(s[0],s[2])-REACH)/C);x<=Math.floor((Math.max(s[0],s[2])+REACH)/C);x++)for(let z=Math.floor((Math.min(s[1],s[3])-REACH)/C);z<=Math.floor((Math.max(s[1],s[3])+REACH)/C);z++){const k=x*65536+z;let l=grid.get(k);if(!l)grid.set(k,l=[]);l.push(s);}}
- const ptSeg=(px,pz,ax,az,bx,bz)=>{const dx=bx-ax,dz=bz-az,l=dx*dx+dz*dz,t=l?Math.max(0,Math.min(1,((px-ax)*dx+(pz-az)*dz)/l)):0;return Math.hypot(px-ax-dx*t,pz-az-dz*t);};
+ const ptSeg=(px,pz,ax,az,bx,bz)=>{const dx=bx-ax,dz=bz-az,l=dx*dx+dz*dz,t=l?Math.max(0,Math.min(1,((px-ax)*dx+(pz-az)*dz)/l)):0;return hypot(px-ax-dx*t,pz-az-dz*t);};
  const cross=(ax,az,bx,bz,cx,cz,dx,dz)=>{const d=(bx-ax)*(dz-cz)-(bz-az)*(dx-cx);if(!d)return false;const t=((cx-ax)*(dz-cz)-(cz-az)*(dx-cx))/d,u=((cx-ax)*(bz-az)-(cz-az)*(bx-ax))/d;return t>=0&&t<=1&&u>=0&&u<=1;};
  const near=(ax,az,bx,bz,s)=>!(Math.min(ax,bx)-REACH>Math.max(s[0],s[2])||Math.max(ax,bx)+REACH<Math.min(s[0],s[2])||Math.min(az,bz)-REACH>Math.max(s[1],s[3])||Math.max(az,bz)+REACH<Math.min(s[1],s[3]))&&(cross(ax,az,bx,bz,...s)||Math.min(ptSeg(ax,az,...s),ptSeg(bx,bz,...s),ptSeg(s[0],s[1],ax,az,bx,bz),ptSeg(s[2],s[3],ax,az,bx,bz))<REACH);
  let n=0;
  for(const e of edges){if(e.fits===false)continue;const lane=e.lane||0;let hit=false;
-  for(let i=1;i<e.points.length&&!hit;i++){const a=e.points[i-1],b=e.points[i],L=Math.hypot(b[0]-a[0],b[1]-a[1])||1,ox=-(b[1]-a[1])/L*lane,oz=(b[0]-a[0])/L*lane,ax=a[0]+ox,az=a[1]+oz,bx=b[0]+ox,bz=b[1]+oz;
+  for(let i=1;i<e.points.length&&!hit;i++){const a=e.points[i-1],b=e.points[i],L=hypot(b[0]-a[0],b[1]-a[1])||1,ox=-(b[1]-a[1])/L*lane,oz=(b[0]-a[0])/L*lane,ax=a[0]+ox,az=a[1]+oz,bx=b[0]+ox,bz=b[1]+oz;
    for(let x=Math.floor((Math.min(ax,bx))/C);x<=Math.floor((Math.max(ax,bx))/C)&&!hit;x++)for(let z=Math.floor((Math.min(az,bz))/C);z<=Math.floor((Math.max(az,bz))/C)&&!hit;z++){const l=grid.get(x*65536+z);if(l)for(const s of l)if(near(ax,az,bx,bz,s)){hit=true;break;}}}
   if(hit){e.fits=false;n++;}}
  return n;
@@ -73,7 +74,7 @@ export function correctHarbourLanes(data){
    const arc={...e,lane:0,roundabout:true,separateCarriageway:true,signal:-1};
    // The southern approach node sits part-way along an arc but was never
    // connected to it. Split at that existing point, not across the garden.
-   if(e.from===3469&&e.to===4404){const i=e.points.findIndex(p=>Math.hypot(p[0]-data.roads.nodes[145][0],p[1]-data.roads.nodes[145][1])<.05);if(i>0)return [{...arc,to:145,points:e.points.slice(0,i+1)},{...arc,from:145,points:e.points.slice(i)}];}
+   if(e.from===3469&&e.to===4404){const i=e.points.findIndex(p=>hypot(p[0]-data.roads.nodes[145][0],p[1]-data.roads.nodes[145][1])<.05);if(i>0)return [{...arc,to:145,points:e.points.slice(0,i+1)},{...arc,from:145,points:e.points.slice(i)}];}
    return [arc];
   }
   return [ids.has(key)?{...e,lane:0,separateCarriageway:true}:{...e}];

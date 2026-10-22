@@ -4,18 +4,19 @@ import {vehicleFitsRoad,safeVehicleSegment,trafficFootprintsOverlap,markWalledLa
 import {cornerSpeedLimit,edgeCruise,approachCruise,edgeTopSpeed,carLane} from './traffic-driving.js';
 import {sweptContact} from './contact-geometry.js';
 import {annotateJunctions,annotateCrossings,annotateTramRelations,annotateTramSignals,signalGreen as phaseGreen,tramThreat,boxesOverlap,carBox,oncomingPasses,CAR_HALF_LENGTH} from './lane-model.js';
+const hypot=(x,z)=>Math.sqrt(x*x+z*z); // not Math.hypot: in optimised code it allocated ~80 bytes a call (its arguments boxed), thousands of calls a step
 const STANDING_PROBES=[3,6,10,15]; // metres ahead checked for a standing bus
 const NEXT_ONE=[null],NO_EDGES=[]; // the next planned edge, passed to cornerSpeedLimit without a fresh array per car
 // Walker grid cells (mobility step): a 1024-slot hash of 1.5 m cells; collisions only cost a distance test.
-const WALK_CELLS=1024,walkCell=(gx,gz)=>(Math.imul(gx,73856093)^Math.imul(gz,19349663))&(WALK_CELLS-1);
+const KIND_CELLS=65536,WALK_CELLS=1024,walkCell=(gx,gz)=>(Math.imul(gx,73856093)^Math.imul(gz,19349663))&(WALK_CELLS-1);
 import {mergeGraph} from './graph-extension.js';
 import {inWaterPolygons} from './geo.js';
 export const TRAFFIC_MAX_SPEED=50/3.6;
-export const nearStation=p=>Math.hypot(p.x+620,p.z+45)<430;
+export const nearStation=p=>hypot(p.x+620,p.z+45)<430;
 export const inStationTrafficArea=p=>p.x>-885&&p.x<-440&&p.z>-145&&p.z<55;
 export function prepareGraph(graph){
  const outgoing=Array.from({length:graph.nodes.length},()=>[]);
- graph.edges.forEach((e,id)=>{e.id=id;e.cumulative=[0];for(let i=1;i<e.points.length;i++)e.cumulative.push(e.cumulative.at(-1)+Math.hypot(e.points[i][0]-e.points[i-1][0],e.points[i][1]-e.points[i-1][1]));e.length=e.cumulative.at(-1);outgoing[e.from].push(e);});
+ graph.edges.forEach((e,id)=>{e.id=id;e.cumulative=[0];for(let i=1;i<e.points.length;i++)e.cumulative.push(e.cumulative.at(-1)+hypot(e.points[i][0]-e.points[i-1][0],e.points[i][1]-e.points[i-1][1]));e.length=e.cumulative.at(-1);outgoing[e.from].push(e);});
  return {...graph,outgoing};
 }
 // Lane positions are offset sideways from the centreline. The offset direction is blended across polyline
@@ -37,7 +38,7 @@ export function routePoint(edge,distance,offset=edge.lane,nextDir,prevDir){
  else if(i>1&&fromPrev<CORNER_BLEND){const o=pts[i-2],l=cum[i-1]-cum[i-2]||1,k=.5*(1-fromPrev/CORNER_BLEND);dx+=((a[0]-o[0])/l-dx)*k;dz+=((a[1]-o[1])/l-dz)*k;}
  else if(nextDir&&i===pts.length-1&&toNext<CORNER_BLEND){const k=.5*(1-toNext/CORNER_BLEND);dx+=(nextDir[0]-dx)*k;dz+=(nextDir[1]-dz)*k;}
  else if(prevDir&&i===1&&fromPrev<CORNER_BLEND){const k=.5*(1-fromPrev/CORNER_BLEND);dx+=(prevDir[0]-dx)*k;dz+=(prevDir[1]-dz)*k;}
- const n=Math.hypot(dx,dz)||1;dx/=n;dz/=n;
+ const n=hypot(dx,dz)||1;dx/=n;dz/=n;
  return {x:a[0]+(b[0]-a[0])*t-dz*offset,z:a[1]+(b[1]-a[1])*t+dx*offset,heading:Math.atan2(-dx,-dz)};
 }
 export function signalGreen(edge,time){
@@ -49,7 +50,7 @@ export function approachingPedestrian(person,car,lateral=5.5){ // lateral: how f
  const speed=Math.abs(car.speed||0);if(speed<2)return false;
  const vx=-Math.sin(car.heading||0)*car.speed,vz=-Math.cos(car.heading||0)*car.speed,dx=person.x-car.x,dz=person.z-car.z;
  const t=(dx*vx+dz*vz)/(speed*speed);
- return t>-.15&&t<2.2&&Math.hypot(dx-vx*Math.max(0,t),dz-vz*Math.max(0,t))<lateral&&Math.hypot(dx,dz)<Math.min(28,8+speed*1.7);
+ return t>-.15&&t<2.2&&hypot(dx-vx*Math.max(0,t),dz-vz*Math.max(0,t))<lateral&&hypot(dx,dz)<Math.min(28,8+speed*1.7);
 }
 // Whether the player's approach makes a walker run (flee below). Only a car (or the 1760 coach) does: on foot, on a bike
 // or a scooter the player passes without anyone running. A walker on the pavement beside a car that keeps to the road
@@ -147,7 +148,7 @@ export class Mobility {
  // faces roughly that way; the lateral offset then eases back to the lane (position()) instead of jumping.
  rejoinLane(a){
   const e=a.edge;if(!e?.points?.length)return false;let best=Infinity,bs=0,acc=0;
-  for(let i=1;i<e.points.length;i++){const [ax,az]=e.points[i-1],[bx,bz]=e.points[i],dx=bx-ax,dz=bz-az,l=Math.hypot(dx,dz);if(!l)continue;const t=Math.max(0,Math.min(1,((a.x-ax)*dx+(a.z-az)*dz)/(l*l))),d=Math.hypot(a.x-ax-dx*t,a.z-az-dz*t);if(d<best){best=d;bs=acc+t*l;}acc+=l;}
+  for(let i=1;i<e.points.length;i++){const [ax,az]=e.points[i-1],[bx,bz]=e.points[i],dx=bx-ax,dz=bz-az,l=hypot(dx,dz);if(!l)continue;const t=Math.max(0,Math.min(1,((a.x-ax)*dx+(a.z-az)*dz)/(l*l))),d=hypot(a.x-ax-dx*t,a.z-az-dz*t);if(d<best){best=d;bs=acc+t*l;}acc+=l;}
   const c=routePoint(e,Math.min(e.length,bs),0),turn=Math.abs(Math.atan2(Math.sin(a.heading-c.heading),Math.cos(a.heading-c.heading)));
   if(best>4||turn>1.1)return false;
   a.s=Math.min(e.length-.01,bs);a.offset=(a.x-c.x)*Math.cos(c.heading)-(a.z-c.z)*Math.sin(c.heading);a.speed=0;a.waiting=0;a.stuck=0;return true;
@@ -161,7 +162,7 @@ export class Mobility {
   if(Math.abs(side)<=.08)side=0;
   const tx=rx*side,tz=rz*side;
   if(a.ox===undefined||!(this.dt>0)){a.ox=tx;a.oz=tz;}
-  else{const ex=tx-a.ox,ez=tz-a.oz,l=Math.hypot(ex,ez),max=(a.yieldSide!==undefined?1.8:a.dodge?1.2:.7)*this.dt;if(l>max){a.ox+=ex/l*max;a.oz+=ez/l*max;}else{a.ox=tx;a.oz=tz;}}
+  else{const ex=tx-a.ox,ez=tz-a.oz,l=hypot(ex,ez),max=(a.yieldSide!==undefined?1.8:a.dodge?1.2:.7)*this.dt;if(l>max){a.ox+=ex/l*max;a.oz+=ez/l*max;}else{a.ox=tx;a.oz=tz;}}
   if(!this.walkable(p.x+a.ox,p.z+a.oz,a.edge)){a.ox=tx;a.oz=tz;}
   p.x+=a.ox;p.z+=a.oz;return p;
  }
@@ -223,11 +224,14 @@ export class Mobility {
   return false;
  }
  // What lies under a point (0 building, 1 road, 2 pavement, 3 neither), memoised on a 25 cm grid: walkers ask
- // this for every 25 cm of every step, and three polygon lookups each was the biggest cost in a frame.
+ // this for every 25 cm of every step, and three polygon lookups each was the biggest cost in a frame. The memo is a
+ // fixed direct-mapped table (64k cells, typed arrays): a Map keyed by a number over 2^30 boxed a heap number for every
+ // lookup and grew to 80k entries before it was dropped at once.
  groundKind(x,z){
-  const w=this.world;if(this._kindOf!==w.buildings||this._kindRoads!==w.roads||this._kindPave!==w.pavement||this._kinds.size>80000){this._kinds=new Map(); /* 80k: a 500k map (~20 MB) freed at once stalled phones */this._kindOf=w.buildings;this._kindRoads=w.roads;this._kindPave=w.pavement;}
-  const X=Math.round(x*4),Z=Math.round(z*4),k=(X+60000)*120000+(Z+60000);let v=this._kinds.get(k);
-  if(v===undefined){const px=X/4,pz=Z/4;v=w.buildings.at(px,pz)?0:w.roads.at(px,pz)?1:w.pavement?.at(px,pz)?2:this.streetWalking&&inWaterPolygons(w.water,px,pz)?4:3;this._kinds.set(k,v);}
+  const w=this.world;if(this._kindOf!==w.buildings||this._kindRoads!==w.roads||this._kindPave!==w.pavement){this._kindV=(this._kindV||new Int8Array(KIND_CELLS)).fill(-1);this._kindX??=new Int32Array(KIND_CELLS);this._kindZ??=new Int32Array(KIND_CELLS);this._kindOf=w.buildings;this._kindRoads=w.roads;this._kindPave=w.pavement;}
+  const X=Math.round(x*4),Z=Math.round(z*4),h=(Math.imul(X,73856093)^Math.imul(Z,19349663))&(KIND_CELLS-1);
+  if(this._kindV[h]>=0&&this._kindX[h]===X&&this._kindZ[h]===Z)return this._kindV[h];
+  const px=X/4,pz=Z/4,v=w.buildings.at(px,pz)?0:w.roads.at(px,pz)?1:w.pavement?.at(px,pz)?2:this.streetWalking&&inWaterPolygons(w.water,px,pz)?4:3;this._kindV[h]=v;this._kindX[h]=X;this._kindZ[h]=Z;
   return v;
  }
  // Today walkers keep to the pavement and use the carriageway only on a crossing. In 1760 there were no pavements: the
@@ -238,7 +242,7 @@ export class Mobility {
   return v===2||v===1&&(this.streetWalking||!!edge?.crossing)||v===3&&this.streetWalking;
  }
  safeWalkSegment(a,p,edge){
-  const distance=Math.hypot(p.x-a.x,p.z-a.z);if(distance>2)return false;
+  const distance=hypot(p.x-a.x,p.z-a.z);if(distance>2)return false;
   for(let i=1,n=Math.max(1,Math.ceil(distance/.25));i<=n;i++)if(!this.walkable(a.x+(p.x-a.x)*i/n,a.z+(p.z-a.z)*i/n,edge))return false;
   return true;
  }
@@ -256,7 +260,7 @@ export class Mobility {
   if(!this._spawnCache||this._spawnCache.time!==this.time)this._spawnCache={time:this.time,lists:new Map()};
   let l=this._spawnCache.lists.get(key);if(!l)this._spawnCache.lists.set(key,l=compute());return l;
  }
- nearCorridor(player){return this.corridorEdges.some(e=>{const p=e.points[Math.floor(e.points.length/2)];return Math.hypot(p[0]-player.x,p[1]-player.z)<420;});}
+ nearCorridor(player){return this.corridorEdges.some(e=>{const p=e.points[Math.floor(e.points.length/2)];return hypot(p[0]-player.x,p[1]-player.z)<420;});}
  spawn(a,player){
   if(a.playerTaken){a.edge=null;a.speed=0;return;}
   a.knocked=undefined;a.damage=undefined; // not delete: a deleted property turns the agent into a slow dictionary object (and deoptimises step)
@@ -264,7 +268,7 @@ export class Mobility {
   if(a.corridorOnly&&!this.nearCorridor(player)){a.edge=null;a.speed=0;return;}
   const graph=a.walking?this.walks:this.roads;
   // Prefer nearby routes; edge midpoint avoids choosing a remote end of a long road.
-  const nearby=this.spawnCandidates(a,player,graph,()=>(a.stationOnly?this.stationEdges:a.corridorOnly?this.corridorEdges:this.edgesNear(graph,player,a.walking?this.walkSpawn:320)).filter(e=>{const p=e.points[Math.floor(e.points.length/2)],d=Math.hypot(p[0]-player.x,p[1]-player.z);return (!a.walking||!e.crossing)&&d<(a.walking?200:a.corridorOnly?520:320)&&e.length>(a.walking?3:10)&&!(!a.walking&&(this.obstructed?.has(e)||this.trap(e,2)));}));
+  const nearby=this.spawnCandidates(a,player,graph,()=>(a.stationOnly?this.stationEdges:a.corridorOnly?this.corridorEdges:this.edgesNear(graph,player,a.walking?this.walkSpawn:320)).filter(e=>{const p=e.points[Math.floor(e.points.length/2)],d=hypot(p[0]-player.x,p[1]-player.z);return (!a.walking||!e.crossing)&&d<(a.walking?200:a.corridorOnly?520:320)&&e.length>(a.walking?3:10)&&!(!a.walking&&(this.obstructed?.has(e)||this.trap(e,2)));}));
   let occupancy=null; // walkers per edge, counted once per spawn rather than once per trial
   for(let trial=0;trial<80&&nearby.length;trial++){
    a.edge=nearby[Math.floor(this.random()*nearby.length)];a.s=this.random()*a.edge.length;a.plan=[];a.prevDir=undefined;a.ox=undefined;a.gapBy=null;a.gapHeld=0;
@@ -277,21 +281,21 @@ export class Mobility {
    if(this.streetWalking&&(a.walking?this.cars:this.people).some(b=>b.edge&&Math.abs(b.x-p.x)<4.5&&Math.abs(b.z-p.z)<4.5))continue; // 1760: not under a coach, nor a coach on top of someone
    if(this.world.buildings.at(p.x,p.z)||(a.walking?!this.walkable(p.x,p.z,a.edge):!vehicleFitsRoad(p,this.world)))continue;
    // A long straight main road is almost always in view; corridor cars may appear there, but only in the far haze.
-   const distance=Math.hypot(p.x-player.x,p.z-player.z);
+   const distance=hypot(p.x-player.x,p.z-player.z);
    if(distance<12||(this.visibilityTest?.(p)&&(a.walking?this.time>3&&!this.resetting&&distance<70:!(a.corridorOnly&&distance>300))))continue; // walkers too: people appeared on the pavement ahead
    if(!a.walking){const dx=p.x-player.x,dz=p.z-player.z,along=-dx*Math.sin(player.heading||0)-dz*Math.cos(player.heading||0),side=Math.abs(dx*Math.cos(player.heading||0)-dz*Math.sin(player.heading||0));if(along>-24&&along<(this.time<3?95:45)&&side<4.5)continue;} // a clear first 95 m when the drive starts
-   if(!a.walking&&(this.cars.some(b=>b!==a&&b.edge&&Math.hypot(p.x-b.x,p.z-b.z)<8)||this.externalObstacles.some(o=>o.edge!==null&&Math.hypot(p.x-o.x,p.z-o.z)<8)))continue; // nor on a police unit, bus or tram (they blocked each other until one retired)
+   if(!a.walking&&(this.cars.some(b=>b!==a&&b.edge&&hypot(p.x-b.x,p.z-b.z)<8)||this.externalObstacles.some(o=>o.edge!==null&&hypot(p.x-o.x,p.z-o.z)<8)))continue; // nor on a police unit, bus or tram (they blocked each other until one retired)
    Object.assign(a,p);a.offset=undefined;a.prevDir=undefined;a.speed=edgeCruise(a.edge,a.cruise);a.waiting=0;a.passing=null;a.unjam=null;a.gridlock=0;a.hold=null;a.holdBy=null;a.deadlocked=false;a.hiddenFor=0;a.panicUntil=0;a.running=false;a.stuck=0;a.progressPoint={x:p.x,z:p.z};return;
   }
   a.edge=null;a.speed=0;
  }
  // A reset (restart, map jump) respawns everyone against the old view's frustum: no visibility rule for walkers then.
  reset(player){this.resetting=true;try{this.updateParked();for(const a of [...this.cars,...this.people]){a.edge=null;a.playerTaken=undefined;a.conversation=undefined;}for(const a of [...this.cars,...this.people])this.spawn(a,player);}finally{this.resetting=false;}}
- canRecycle(a,player){return Math.hypot(a.x-player.x,a.z-player.z)>80&&(a.hiddenFor||0)>2;}
+ canRecycle(a,player){return hypot(a.x-player.x,a.z-player.z)>80&&(a.hiddenFor||0)>2;}
  retire(a,player,force=false){a.speed=0;
   // A walker at the end of its path or stuck there turns back (or stands) while you can see it: recycled on the spot it
   // vanished in front of you (two walkers met on a path, stood inside each other and were gone; the 1760 riding ground).
-  if(a.walking&&!force&&a.edge&&(a.hiddenFor||0)<1.5&&Math.hypot(a.x-player.x,a.z-player.z)<120){const back=this.walks.outgoing[a.edge.to]?.find(e=>e.to===a.edge.from&&Math.abs(e.length-a.edge.length)<.8);if(back&&(a.turnedAt===undefined||this.time-a.turnedAt>2)){a.s=Math.max(0,back.length-a.s);a.edge=back;a.turnedAt=this.time;a.stuck=0;a.progressPoint=null;}return;}
+  if(a.walking&&!force&&a.edge&&(a.hiddenFor||0)<1.5&&hypot(a.x-player.x,a.z-player.z)<120){const back=this.walks.outgoing[a.edge.to]?.find(e=>e.to===a.edge.from&&Math.abs(e.length-a.edge.length)<.8);if(back&&(a.turnedAt===undefined||this.time-a.turnedAt>2)){a.s=Math.max(0,back.length-a.s);a.edge=back;a.turnedAt=this.time;a.stuck=0;a.progressPoint=null;}return;}
   if(force||a.walking||this.canRecycle(a,player))a.edge=null;}
  // Lanes a parked bus stands in (mapped bays on the carriageway) are avoided when routing allows; a car that
  // must pass one steers around it (position()).
@@ -303,7 +307,7 @@ export class Mobility {
   if(key===this.parkedKey)return;this.parkedKey=key;this.obstructed=new Set();
   const parked=this.standing=this.externalBodies.filter(b=>b.ref?.parked||b.ref?.standing);if(!parked.length)return;
   const G=this.roads;G._long??=G.edges.filter(e=>e.length>200);const near=new Set(G._long);for(const b of parked)for(const e of this.edgesNear(G,b,115))if(e.length<=200)near.add(e); /* edges by midpoint around each body (+ the few long ones), not all 44k: a bus pulling in or out of a stand re-ran this over the whole city (5-28 ms) */
-  for(const e of near){const m=e.points[Math.floor(e.points.length/2)];if(!parked.some(b=>Math.hypot(b.x-m[0],b.z-m[1])<e.length/2+15))continue;
+  for(const e of near){const m=e.points[Math.floor(e.points.length/2)];if(!parked.some(b=>hypot(b.x-m[0],b.z-m[1])<e.length/2+15))continue;
    for(let s=0;s<=e.length;s+=2){const p=routePoint(e,s);if(parked.some(b=>boxesOverlap(carBox(p),b))){this.obstructed.add(e);break;}}}
  }
  // An edge whose lane runs off the mapped carriageway somewhere would stop a car there for good: route
@@ -341,7 +345,7 @@ export class Mobility {
  scare(a,from,seconds){
   if(!a.walking||!a.edge)return;
   const ahead=routePoint(a.edge,Math.min(a.edge.length,a.s+5),0),behind=routePoint(a.edge,Math.max(0,a.s-5),0);
-  if(Math.hypot(behind.x-from.x,behind.z-from.z)>Math.hypot(ahead.x-from.x,ahead.z-from.z)+.2){const reverse=this.walks.outgoing[a.edge.to].find(e=>e.to===a.edge.from&&Math.abs(e.length-a.edge.length)<.8);if(reverse){a.s=reverse.length-a.s;a.edge=reverse;}}
+  if(hypot(behind.x-from.x,behind.z-from.z)>hypot(ahead.x-from.x,ahead.z-from.z)+.2){const reverse=this.walks.outgoing[a.edge.to].find(e=>e.to===a.edge.from&&Math.abs(e.length-a.edge.length)<.8);if(reverse){a.s=reverse.length-a.s;a.edge=reverse;}}
   a.panicUntil=this.time+seconds;a.turnAfter=this.time+Math.min(2,seconds);a.holdUntil=0;
  }
  hold(a,seconds){if(a.walking&&!a.edge?.crossing)a.holdUntil=this.time+seconds;} // never frozen on a zebra crossing (cars queued behind them)
@@ -350,7 +354,7 @@ export class Mobility {
   if(threatened){
    if(!a.running||this.time>(a.turnAfter||0)){
     const ahead=routePoint(a.edge,Math.min(a.edge.length,a.s+5),0),behind=routePoint(a.edge,Math.max(0,a.s-5),0),px=player.x-Math.sin(player.heading)*player.speed*.5,pz=player.z-Math.cos(player.heading)*player.speed*.5;
-    const score=p=>Math.hypot(p.x-px,p.z-pz)+(this.world.roads.at(p.x,p.z)?-5:0);
+    const score=p=>hypot(p.x-px,p.z-pz)+(this.world.roads.at(p.x,p.z)?-5:0);
     if(score(behind)>score(ahead)+.2){const reverse=this.walks.outgoing[a.edge.to].find(e=>e.to===a.edge.from&&Math.abs(e.length-a.edge.length)<.8);if(reverse){a.s=reverse.length-a.s;a.edge=reverse;}}
     a.turnAfter=this.time+.65;
    }
@@ -448,7 +452,7 @@ export class Mobility {
  crossingClear(edge,player){
   if(!signalGreen(edge,this.time))return false;
   const middle=routePoint(edge,edge.length/2,0);
-  return ![player,...this.cars,...this.externalObstacles].some(c=>c.edge!==null&&(Math.hypot(c.x-middle.x,c.z-middle.z)<(Math.abs(c.speed||0)<.5?3:5)||approachingPedestrian(middle,c)));
+  return ![player,...this.cars,...this.externalObstacles].some(c=>c.edge!==null&&(hypot(c.x-middle.x,c.z-middle.z)<(Math.abs(c.speed||0)<.5?3:5)||approachingPedestrian(middle,c)));
  }
  step(dt,player){
   this.time+=dt;this.dt=dt;let spawns=0;
@@ -474,7 +478,7 @@ export class Mobility {
   const nCars=this.cars.length,nAgents=nCars+this.people.length;
   for(let ai=0;ai<nAgents;ai++){const a=ai<nCars?this.cars[ai]:this.people[ai-nCars];
    if(a.playerTaken)continue;
-   a.hiddenFor=(this.visibilityTest?this.visibilityTest(a):Math.hypot(a.x-player.x,a.z-player.z)<350)?0:(a.hiddenFor||0)+dt;
+   a.hiddenFor=(this.visibilityTest?this.visibilityTest(a):hypot(a.x-player.x,a.z-player.z)<350)?0:(a.hiddenFor||0)+dt;
    if(a.knockdown){a.speed=0;a.running=false;continue;}
    if(a.walking&&this.time<(a.holdUntil||0)){a.speed=0;a.running=false;continue;}
    if(a.walking&&a.conversation){a.speed=0;continue;}
@@ -483,7 +487,7 @@ export class Mobility {
    // A coach (1760: recoverKnocked set) that was shoved and has come to rest pulls back into its lane after a few seconds;
    // like a wrecked car it used to stand in the street, horses frozen, until you drove 80 m away.
    if(a.knocked&&this.recoverKnocked&&a.knocked.rest!=null&&this.time-a.knocked.rest>this.recoverKnocked&&this.rejoinLane(a)){a.knocked=undefined;continue;}
-   if(a.knocked){if(!stepKnocked(a,dt,this.world,this.time,{cars:this.cars,obstacles:this.externalObstacles,knock:(b,pose,impulse)=>{if(this.cars[b.id]===b&&b.edge){knockCar(b,impulse,this.time);this.collisions++;}}})&&(this.time-a.knocked.rest>REST_RECYCLE_AFTER&&Math.hypot(a.x-player.x,a.z-player.z)>80&&!this.visibilityTest?.(a)||/* not while in view: wrecks vanished in front of the player */this.canRecycle(a,player)&&Math.hypot(a.x-player.x,a.z-player.z)>160)){a.knocked=undefined;a.damage=undefined;a.edge=null;this.spawn(a,player);}continue;}
+   if(a.knocked){if(!stepKnocked(a,dt,this.world,this.time,{cars:this.cars,obstacles:this.externalObstacles,knock:(b,pose,impulse)=>{if(this.cars[b.id]===b&&b.edge){knockCar(b,impulse,this.time);this.collisions++;}}})&&(this.time-a.knocked.rest>REST_RECYCLE_AFTER&&hypot(a.x-player.x,a.z-player.z)>80&&!this.visibilityTest?.(a)||/* not while in view: wrecks vanished in front of the player */this.canRecycle(a,player)&&hypot(a.x-player.x,a.z-player.z)>160)){a.knocked=undefined;a.damage=undefined;a.edge=null;this.spawn(a,player);}continue;}
    if(a.stationOnly){
     if(!nearStation(player)){this.retire(a,player);continue;}
     // Leaving the area: keep driving normally and recycle once unseen. (retire() would zero the speed every
@@ -496,10 +500,10 @@ export class Mobility {
     if(a.edge&&!this.corridorIds.has(a.edge.id)&&this.canRecycle(a,player))a.edge=null;
     if(!a.edge){if(this.time<(a.retryAt||0))continue;a.retryAt=this.time+.5;this.spawn(a,player);continue;}
    }
-   if(!a.edge||(Math.hypot(a.x-player.x,a.z-player.z)>(a.walking?this.walkRecycle:500)&&(a.walking||this.canRecycle(a,player)))){if(spawns++<this.spawnBudget||!a.edge&&this.time<3)this.spawn(a,player);continue;} // a few respawns per frame: after a turn dozens went at once (a hitch)
+   if(!a.edge||(hypot(a.x-player.x,a.z-player.z)>(a.walking?this.walkRecycle:500)&&(a.walking||this.canRecycle(a,player)))){if(spawns++<this.spawnBudget||!a.edge&&this.time<3)this.spawn(a,player);continue;} // a few respawns per frame: after a turn dozens went at once (a hitch)
    // A car that has made no progress for a long time is holding up a queue: recycle it unless it is close by.
    // Away from the player a deadlocked car is recycled rather than squeezing through another one.
-   if(!a.walking&&((a.waiting||0)>STALLED_AFTER||a.deadlocked)&&Math.hypot(a.x-player.x,a.z-player.z)>60){a.deadlocked=false;this.spawn(a,player);continue;}
+   if(!a.walking&&((a.waiting||0)>STALLED_AFTER||a.deadlocked)&&hypot(a.x-player.x,a.z-player.z)>60){a.deadlocked=false;this.spawn(a,player);continue;}
    const running=a.walking&&this.flee(a,player);
    let desired=running?4.2+a.id%4*.2:a.cruise;const remaining=a.edge.length-a.s,dx=-Math.sin(a.heading),dz=-Math.cos(a.heading);
    if(a.walking){
@@ -522,14 +526,14 @@ export class Mobility {
     if(a.edge.roundabout)desired=Math.min(desired,6);
     // Yield to circulating traffic before entering, never to an imaginary signal in the middle of the roundabout.
     if(!a.edge.roundabout&&remaining<10&&this.roads.outgoing[a.edge.to].some(e=>e.roundabout)){
-     const entry=routePoint(a.edge,a.edge.length),b=this.cars.find(b=>b!==a&&b.edge?.roundabout&&Math.hypot(b.x-entry.x,b.z-entry.z)<13)||this.externalObstacles.find(b=>b.edge?.roundabout&&Math.hypot(b.x-entry.x,b.z-entry.z)<13);
+     const entry=routePoint(a.edge,a.edge.length),b=this.cars.find(b=>b!==a&&b.edge?.roundabout&&hypot(b.x-entry.x,b.z-entry.z)<13)||this.externalObstacles.find(b=>b.edge?.roundabout&&hypot(b.x-entry.x,b.z-entry.z)<13);
      if(b){const v=Math.max(0,(remaining-4)*1.2);if(v<desired){desired=v;hold='give way';holdBy=b;}}
     }
     // Gridlock (cars waiting on each other in a closed loop): the lowest id squeezes past the car it waits
     // for when the player is near, and is recycled elsewhere. Junction and track rules keep this rare.
     if(a.unjam&&(this.time>a.unjamUntil||a.unjam.edge===null))a.unjam=null;
     a.gridlock=this.inGridlock(a)?(a.gridlock||0)+dt:0;
-    if(a.gridlock>1.5){a.gridlock=0;if(Math.hypot(a.x-player.x,a.z-player.z)>60)a.deadlocked=true;else{a.unjam=a.holdBy;a.unjamUntil=this.time+5;}}
+    if(a.gridlock>1.5){a.gridlock=0;if(hypot(a.x-player.x,a.z-player.z)>60)a.deadlocked=true;else{a.unjam=a.holdBy;a.unjamUntil=this.time+5;}}
     const zone=this.zoneLimit(a,plan,tramList);
     if(zone<desired){desired=zone;hold=this.zoneWhy;holdBy=this.zoneBy;}
     if(a.passing!=null&&!(this.cars[a.passing]?.edge&&trafficFootprintsOverlap(a,this.cars[a.passing])))a.passing=null;
@@ -544,7 +548,7 @@ export class Mobility {
    a.speed+=Math.max(-7*dt,Math.min((running?8:a.walking?2:2.2)*dt,desired-a.speed));
    if(!a.walking)a.speed=Math.min(edgeTopSpeed(a.edge,TRAFFIC_MAX_SPEED),a.speed);
    const oldS=a.s,oldEdge=a.edge,oldPrev=a.prevDir;a.s+=a.speed*dt;
-   if(a.s>=a.edge.length){const next=a.walking?this.nextEdge(a):a.plan.length?a.plan.shift():this.pickNext(a.edge);if(!a.walking)a.prevDir=edgeEndDirection(a.edge);if(!next){a.s=oldS;this.retire(a,player,!a.walking&&Math.hypot(a.x-player.x,a.z-player.z)>40);continue;}if(a.walking&&next.crossing&&!this.world.roads.at(a.x,a.z)&&!this.crossingClear(next,player)){a.s=oldS;a.speed=0;continue;}a.s-=a.edge.length;a.edge=next;}
+   if(a.s>=a.edge.length){const next=a.walking?this.nextEdge(a):a.plan.length?a.plan.shift():this.pickNext(a.edge);if(!a.walking)a.prevDir=edgeEndDirection(a.edge);if(!next){a.s=oldS;this.retire(a,player,!a.walking&&hypot(a.x-player.x,a.z-player.z)>40);continue;}if(a.walking&&next.crossing&&!this.world.roads.at(a.x,a.z)&&!this.crossingClear(next,player)){a.s=oldS;a.speed=0;continue;}a.s-=a.edge.length;a.edge=next;}
    const p=this.position(a);
    // A step that cannot be taken is undone (undo, above the loop); a car keeps its planned route.
    if(!a.walking){let by=sweptContact(a,p,player)?player:null;
@@ -561,12 +565,12 @@ export class Mobility {
     // back onto the path's line.
     if(a.walking&&a.stuck>1.5&&(a.ox||a.oz)){a.ox=0;a.oz=0;a.unpocket=true;}
     // A lane that runs off the mapped carriageway never clears; recycle it once it is not right beside the player.
-    if(a.stuck>3)this.retire(a,player,!a.walking&&a.stuck>8&&Math.hypot(a.x-player.x,a.z-player.z)>40);continue;}
+    if(a.stuck>3)this.retire(a,player,!a.walking&&a.stuck>8&&hypot(a.x-player.x,a.z-player.z)>40);continue;}
    // Tiny successful steps between repeated failures are not real progress.
    // Previously they reset the recovery timer, leaving actors stuck indefinitely.
-   if(!a.progressPoint||Math.hypot(p.x-a.progressPoint.x,p.z-a.progressPoint.z)>.5){a.stuck=0;if(a.progressPoint){a.progressPoint.x=p.x;a.progressPoint.z=p.z;}else a.progressPoint={x:p.x,z:p.z};}
+   if(!a.progressPoint||hypot(p.x-a.progressPoint.x,p.z-a.progressPoint.z)>.5){a.stuck=0;if(a.progressPoint){a.progressPoint.x=p.x;a.progressPoint.z=p.z;}else a.progressPoint={x:p.x,z:p.z};}
    // Time spent without real progress (2 m), red lights included: a queue that never clears is stalled.
-   if(!a.walking){if(!a.waitFrom||Math.hypot(p.x-a.waitFrom.x,p.z-a.waitFrom.z)>2){if(a.waitFrom){a.waitFrom.x=p.x;a.waitFrom.z=p.z;}else a.waitFrom={x:p.x,z:p.z};a.waiting=0;}else a.waiting=(a.waiting||0)+dt;}
+   if(!a.walking){if(!a.waitFrom||hypot(p.x-a.waitFrom.x,p.z-a.waitFrom.z)>2){if(a.waitFrom){a.waitFrom.x=p.x;a.waitFrom.z=p.z;}else a.waitFrom={x:p.x,z:p.z};a.waiting=0;}else a.waiting=(a.waiting||0)+dt;}
    a.unpocket=false;Object.assign(a,p);
   }
   // The impact pass owns contact resolution. Do not push the player sideways

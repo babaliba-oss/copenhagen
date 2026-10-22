@@ -9,6 +9,7 @@
 //    tram and never stops on the rails); where a lane runs along a track the car shares it and follows
 //    trams; where a lane joins a track it gives way to a tram coming along it.
 import {SpatialIndex} from './geo.js';
+const hypot=(x,z)=>Math.sqrt(x*x+z*z); // not Math.hypot: in optimised code it allocated ~80 bytes a call (its arguments boxed), thousands of calls a step
 export const CAR_HALF_LENGTH=2.36,CAR_HALF_WIDTH=.98,TRACK_HALF_WIDTH=1.35;
 // Oncoming vehicles more than this apart sideways are on parallel tracks or lanes and pass each other. The
 // mapped opposite tracks are sometimes closer than a tram's width, and trams on them already pass.
@@ -30,21 +31,21 @@ export function annotateJunctions(graph,signals=[]){
  // Signals within 35 m of each other run as one junction (one phase plan), so a car is not stopped
  // again a few metres after the first stop line by an unsynchronised neighbour.
  const canon=signals.map((_,i)=>i);
- for(let i=0;i<signals.length;i++)if(canon[i]===i)for(let j=i+1;j<signals.length;j++)if(canon[j]===j&&Math.hypot(signals[i].p[0]-signals[j].p[0],signals[i].p[1]-signals[j].p[1])<35)canon[j]=i;
+ for(let i=0;i<signals.length;i++)if(canon[i]===i)for(let j=i+1;j<signals.length;j++)if(canon[j]===j&&hypot(signals[i].p[0]-signals[j].p[0],signals[i].p[1]-signals[j].p[1])<35)canon[j]=i;
  for(const e of edges){e.mappedSignal=e.signal;if(e.signal>=0&&signals[e.signal])e.signal=canon[e.signal];}
  // Each junction node belongs to the nearest signal whose mapped edges end around it.
  const owner=new Int32Array(n).fill(-1),best=new Float64Array(n).fill(Infinity),used=new Set();
  for(const e of edges){const p=signals[e.signal]?.p;if(!p)continue;used.add(e.signal);
-  for(const k of [e.from,e.to]){if(!junction[k])continue;const d=Math.hypot(nodes[k][0]-p[0],nodes[k][1]-p[1]);if(d<30&&d<best[k]){best[k]=d;owner[k]=e.signal;}}}
+  for(const k of [e.from,e.to]){if(!junction[k])continue;const d=hypot(nodes[k][0]-p[0],nodes[k][1]-p[1]);if(d<30&&d<best[k]){best[k]=d;owner[k]=e.signal;}}}
  // A signal with no junction around it (a mid-block crossing) controls the mapped node nearest to it.
  const owned=new Set(owner);
  for(const i of used){if(owned.has(i))continue;const p=signals[i].p;let k=-1,d=30;
-  for(const e of edges)if(e.signal===i){const q=nodes[e.to],dd=Math.hypot(q[0]-p[0],q[1]-p[1]);if(dd<d&&owner[e.to]<0){d=dd;k=e.to;}}
+  for(const e of edges)if(e.signal===i){const q=nodes[e.to],dd=hypot(q[0]-p[0],q[1]-p[1]);if(dd<d&&owner[e.to]<0){d=dd;k=e.to;}}
   if(k>=0)owner[k]=i;}
  // Signals owning the two ends of one short edge are one junction too: a boulevard's two carriageways (H.C. Andersens Boulevard: mapped lights 56 m apart, their nodes 13 m) ran out of step, and a car let through the first was held again in the middle.
  const root=i=>{while(canon[i]!==i)i=canon[i]=canon[canon[i]];return i;},box=new Map(),joined=new Set();
  for(let k=0;k<n;k++){const i=owner[k];if(i<0)continue;const [x,z]=nodes[k],b=box.get(i);if(b){b[0]=Math.min(b[0],x);b[1]=Math.min(b[1],z);b[2]=Math.max(b[2],x);b[3]=Math.max(b[3],z);}else box.set(i,[x,z,x,z]);}
- for(const e of edges){const a=owner[e.from],b=owner[e.to];if(a<0||b<0||a===b||e.length>=JOIN_EDGE)continue;const ra=root(a),rb=root(b);if(ra===rb)continue;const p=box.get(ra),q=box.get(rb),u=[Math.min(p[0],q[0]),Math.min(p[1],q[1]),Math.max(p[2],q[2]),Math.max(p[3],q[3])];if(Math.hypot(u[2]-u[0],u[3]-u[1])>JOIN_SPAN)continue;const r=Math.min(ra,rb);canon[Math.max(ra,rb)]=r;box.set(r,u);joined.add(r);} /* not a chain of junctions down a whole street */
+ for(const e of edges){const a=owner[e.from],b=owner[e.to];if(a<0||b<0||a===b||e.length>=JOIN_EDGE)continue;const ra=root(a),rb=root(b);if(ra===rb)continue;const p=box.get(ra),q=box.get(rb),u=[Math.min(p[0],q[0]),Math.min(p[1],q[1]),Math.max(p[2],q[2]),Math.max(p[3],q[3])];if(hypot(u[2]-u[0],u[3]-u[1])>JOIN_SPAN)continue;const r=Math.min(ra,rb);canon[Math.max(ra,rb)]=r;box.set(r,u);joined.add(r);} /* not a chain of junctions down a whole street */
  for(let i=0;i<canon.length;i++)canon[i]=root(i);for(let k=0;k<n;k++)if(owner[k]>=0)owner[k]=canon[owner[k]];
  const sums=new Map();
  for(const e of edges){
@@ -58,7 +59,7 @@ export function annotateJunctions(graph,signals=[]){
  for(const e of edges)if(e.signal>=0){e.signalAxis=axes[e.signal];e.signalGroup=signalGroup(e.endHeading,e.signalAxis);}
  // The controlled area: every node of the cluster plus the width of a junction box and its tracks.
  const centre=[];for(const i of joined){const b=box.get(i);centre[i]=[(b[0]+b[2])/2,(b[1]+b[3])/2];} // a joined junction is centred on its nodes, not on one of its mapped lights
- for(let k=0;k<n;k++){const id=owner[k];if(id<0||axes[id]===undefined)continue;const p=centre[id]||signals[id].p;radius[id]=Math.max(radius[id]||12,Math.hypot(nodes[k][0]-p[0],nodes[k][1]-p[1])+12);}
+ for(let k=0;k<n;k++){const id=owner[k];if(id<0||axes[id]===undefined)continue;const p=centre[id]||signals[id].p;radius[id]=Math.max(radius[id]||12,hypot(nodes[k][0]-p[0],nodes[k][1]-p[1])+12);}
  return {axes,radius,canon,centre};
 }
 // Signalled pedestrian crossings walk with the parallel car flow of the same junction, never across a green.
@@ -73,7 +74,7 @@ export function annotateTramSignals(paths,signals,{axes,radius,centre=[]}){
  for(const path of paths){path.signalStops=[];let x0=Infinity,z0=Infinity,x1=-Infinity,z1=-Infinity;for(const q of path.points){if(q[0]<x0)x0=q[0];if(q[0]>x1)x1=q[0];if(q[1]<z0)z0=q[1];if(q[1]>z1)z1=q[1];}
   for(const [id,axis] of axes.entries()){if(axis===undefined)continue;const [px,pz]=centre[id]||signals[id].p,r=radius[id];if(px+r<x0||px-r>x1||pz+r<z0||pz-r>z1)continue;let inside=false,stop=null; // signal nowhere near this path
    for(let i=1;i<path.points.length;i++){const a=path.points[i-1],b=path.points[i];if(Math.min(a[0],b[0])>px+r||Math.max(a[0],b[0])<px-r||Math.min(a[1],b[1])>pz+r||Math.max(a[1],b[1])<pz-r){inside=false;continue;}
-    const l=path.cumulative[i]-path.cumulative[i-1];for(let t=0;t<=l;t+=1){const x=a[0]+(b[0]-a[0])*t/(l||1),z=a[1]+(b[1]-a[1])*t/(l||1),now=Math.hypot(x-px,z-pz)<r;
+    const l=path.cumulative[i]-path.cumulative[i-1];for(let t=0;t<=l;t+=1){const x=a[0]+(b[0]-a[0])*t/(l||1),z=a[1]+(b[1]-a[1])*t/(l||1),now=hypot(x-px,z-pz)<r;
      const heading=Math.atan2(a[0]-b[0],a[1]-b[1]);
      if(now&&!inside)path.signalStops.push(stop={s:path.cumulative[i-1]+t,signal:id,group:signalGroup(heading,axis)});
      else if(now&&stop)stop.group=signalGroup(heading,axis); // the heading it leaves with: a turning tram runs with the street it turns into
@@ -109,22 +110,22 @@ function placeStopLines(graph,reach,junction,owner){
 // Oncoming tracks further than ONCOMING_PASS from the lane are passed, like trams pass each other.
 export function annotateTramRelations(edges,paths){
  const segments=[];
- for(const path of paths)for(let i=1;i<path.points.length;i++){const a=path.points[i-1],b=path.points[i],l=Math.hypot(b[0]-a[0],b[1]-a[1]);if(l<.01)continue;
+ for(const path of paths)for(let i=1;i<path.points.length;i++){const a=path.points[i-1],b=path.points[i],l=hypot(b[0]-a[0],b[1]-a[1]);if(l<.01)continue;
   segments.push({a,b,l,dx:(b[0]-a[0])/l,dz:(b[1]-a[1])/l,path,s0:path.cumulative[i-1],bbox:[Math.min(a[0],b[0])-3,Math.min(a[1],b[1])-3,Math.max(a[0],b[0])+3,Math.max(a[1],b[1])+3]});}
  const index=new SpatialIndex(segments,24),found=new Set(),best=new Map();
  const near=(x,z)=>{for(const s of index.near(x,z))found.add(s);};
  for(const e of edges){
   e.tramConflicts=null;e.tramShared=null;e.zones=null;if(!segments.length)continue;
   const lane=e.lane||0,pts=e.points,line=[];
-  for(let i=0;i<pts.length;i++){const a=pts[Math.max(0,i-1)],b=pts[Math.min(pts.length-1,i+1)],l=Math.hypot(b[0]-a[0],b[1]-a[1])||1,dx=(b[0]-a[0])/l,dz=(b[1]-a[1])/l;line.push([pts[i][0]-dz*lane,pts[i][1]+dx*lane]);}
+  for(let i=0;i<pts.length;i++){const a=pts[Math.max(0,i-1)],b=pts[Math.min(pts.length-1,i+1)],l=hypot(b[0]-a[0],b[1]-a[1])||1,dx=(b[0]-a[0])/l,dz=(b[1]-a[1])/l;line.push([pts[i][0]-dz*lane,pts[i][1]+dx*lane]);}
   found.clear();
-  for(let i=1;i<line.length;i++){const a=line[i-1],b=line[i],l=Math.hypot(b[0]-a[0],b[1]-a[1]);for(let t=0;t<=l;t+=8)near(a[0]+(b[0]-a[0])*t/l,a[1]+(b[1]-a[1])*t/l);near(b[0],b[1]);}
+  for(let i=1;i<line.length;i++){const a=line[i-1],b=line[i],l=hypot(b[0]-a[0],b[1]-a[1]);for(let t=0;t<=l;t+=8)near(a[0]+(b[0]-a[0])*t/l,a[1]+(b[1]-a[1])*t/l);near(b[0],b[1]);}
   if(!found.size)continue;
   const shared=[],conflicts=[],open=new Map();
   const close=(path,kind)=>{const k=kind+path.shapeId,run=open.get(k);if(run){(kind==='s'?shared:conflicts).push(run);open.delete(k);}};
-  for(let i=1;i<line.length;i++){const p=line[i-1],q=line[i],l=Math.hypot(q[0]-p[0],q[1]-p[1]);if(l<.01)continue;const ux=(q[0]-p[0])/l,uz=(q[1]-p[1])/l,s0=e.cumulative[i-1],k=(e.cumulative[i]-s0)/l;
+  for(let i=1;i<line.length;i++){const p=line[i-1],q=line[i],l=hypot(q[0]-p[0],q[1]-p[1]);if(l<.01)continue;const ux=(q[0]-p[0])/l,uz=(q[1]-p[1])/l,s0=e.cumulative[i-1],k=(e.cumulative[i]-s0)/l;
    for(let t=0;t<=l;t+=1){const x=p[0]+ux*t,z=p[1]+uz*t,s=s0+t*k;best.clear();
-    for(const g of found){const along=Math.max(0,Math.min(g.l,(x-g.a[0])*g.dx+(z-g.a[1])*g.dz)),d=Math.hypot(x-g.a[0]-g.dx*along,z-g.a[1]-g.dz*along);if(d>=CONFLICT)continue;const o=best.get(g.path);if(!o||d<o.d)best.set(g.path,{d,dot:ux*g.dx+uz*g.dz,trackS:g.s0+along});}
+    for(const g of found){const along=Math.max(0,Math.min(g.l,(x-g.a[0])*g.dx+(z-g.a[1])*g.dz)),d=hypot(x-g.a[0]-g.dx*along,z-g.a[1]-g.dz*along);if(d>=CONFLICT)continue;const o=best.get(g.path);if(!o||d<o.d)best.set(g.path,{d,dot:ux*g.dx+uz*g.dz,trackS:g.s0+along});}
     for(const [path,o] of best){
      // A same-direction track close beside the lane counts as shared: mobility.js puts the car either clear
      // of it or on it, never straddling its edge.
