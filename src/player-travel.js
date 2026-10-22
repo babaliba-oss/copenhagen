@@ -208,7 +208,7 @@ export class PlayerTravel{
   const base=brake?0:up===down?0:up?(sprint?spec.run:spec.speed):walk?-1.4:p.speed>.15?0:-1.3;
   const target=base*slopeFactor(this.mode,gradeAhead(p,Math.sign(base)));
   const acceleration=target===0||target*p.speed<0||Math.abs(target)<Math.abs(p.speed)?spec.braking:spec.acceleration;
-  p.speed+=clamp(target-p.speed,-acceleration*dt,acceleration*dt);p.steer+=(steer-p.steer)*(1-Math.exp(-dt*(walk?14:8)));
+  p.speed+=clamp(target-p.speed,-acceleration*dt,acceleration*dt);p.steer+=(steer-p.steer)*(1-Math.exp(-dt*(walk?14:keys.gentle&&steer*p.steer>=0&&Math.abs(steer)>Math.abs(p.steer)?3:8))); /* bike and scooter on a phone: a tapped steering button is a small correction, as in the car (physics.js) */
   const before={...p},turn=p.steer*(walk?2.8:1.6*clamp(Math.abs(p.speed)/2,.15,1))*dt*(p.speed<-.05?-1:1);
   const travel=p.speed*dt,n=Math.max(1,Math.ceil(Math.abs(travel)/.15),Math.ceil(Math.abs(turn)/.08));let collision=null;
   for(let i=0;i<n;i++){

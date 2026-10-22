@@ -89,6 +89,10 @@ test('steering turns the car: keys left/right, and analog tilt (keys win over ti
  assert.equal(straight,0);assert.ok(left>.05&&right<-.05,'arrow keys steer both ways');
  assert.ok(tiltLeft>0&&tiltLeft<tiltFull,'tilt steers in proportion');assert.ok(Math.abs(run(['ArrowRight'],1)-right)<1e-9,'a held key overrides tilt');
 });
+test('phone steering buttons: a short tap is a small correction, a hold builds up; the keyboard is unchanged',()=>{
+ const tap=(ms,gentle)=>{const car=makeCar(0,0),k=new Set(['KeyW','ArrowLeft']);k.gentle=gentle;car.speed=50/3.6;let peak=0;for(let t=0;t<2;t+=1/60){if(t>=ms/1000)k.delete('ArrowLeft');driveStep(car,k,1/60,world());peak=Math.max(peak,car.steer);}return peak;};
+ assert.ok(tap(100,true)<.25,`100 ms tap: ${tap(100,true)}`);assert.ok(tap(1500,true)>.5,'a held button still turns hard');assert.ok(tap(100,false)>.6,'keyboard steers in as before');
+});
 test('a car brushing a wall at a shallow angle slides along it instead of sticking',()=>{
  // a long wall along x = 3.2..4, the car heading 15 degrees into it (towards -z, drifting +x)
  const w=world([rect(3.2,-200,.8,200)]),car=makeCar(1.2,0,-.26);car.speed=12;
