@@ -1,4 +1,5 @@
 import {routePoint} from '../mobility.js';
+const hypot=(x,z)=>Math.sqrt(x*x+z*z); // not Math.hypot: in optimised code it allocated ~80 bytes a call (its arguments boxed)
 
 // Copenhagen's cyclists: riders on the cycle tracks along the car streets (the strip right of the traffic
 // lane, outside the parked cars where there is room). Each rider follows a random ~700 m route through the
@@ -26,7 +27,7 @@ export class CityCyclists{
   const E=this.roads.edges;
   for(let tries=0;tries<40;tries++){
    const e=E[Math.floor(this.random()*E.length)];if(e.length<15||e.crossing)continue;
-   const m=e.points[Math.floor(e.points.length/2)],d=Math.hypot(m[0]-player.x,m[1]-player.z);if(d<40||d>340)continue;
+   const m=e.points[Math.floor(e.points.length/2)],d=hypot(m[0]-player.x,m[1]-player.z);if(d<40||d>340)continue;
    if(d<160&&player.heading!==undefined){const fx=-Math.sin(player.heading),fz=-Math.cos(player.heading);if(((m[0]-player.x)*fx+(m[1]-player.z)*fz)/d>.2)continue;} // not popping up ahead
    if(this.visibilityTest&&d<260&&tries<30&&this.visibilityTest({x:m[0],z:m[1]}))continue; // nor anywhere else the camera looks
    if(this.offset(e)===null)continue;
@@ -37,7 +38,7 @@ export class CityCyclists{
   r.route=null;return false;
  }
  // visibilityTest: set by main.js (the camera frustum, as for the traffic); without one, anything within 160 m counts as seen.
- visible(r,player){const d=Math.hypot(r.x-player.x,r.z-player.z);return d<RANGE&&(this.visibilityTest?d<12||this.visibilityTest(r):d<160);}
+ visible(r,player){const d=hypot(r.x-player.x,r.z-player.z);return d<RANGE&&(this.visibilityTest?d<12||this.visibilityTest(r):d<160);}
  extend(r){const E=this.roads.edges,cur=r.route.at(-1),out=(this.roads.outgoing[cur.to]||[]).map(i=>typeof i==='number'?E[i]:i).filter(n=>n.length>4&&!n.crossing),on=out.filter(n=>n.to!==cur.from),usual=on.filter(n=>this.offset(n)!==null);
   const list=usual.length?usual:on.length?on:out;if(!list.length)return false;r.route.push(list[Math.floor(this.random()*list.length)]);return true;}
  snapshot(){return this.riders.filter(r=>!r.playerTaken&&r.route).map(({id,x,z,heading,speed})=>({id,x,z,heading,speed}));}
@@ -45,9 +46,9 @@ export class CityCyclists{
   if(!player)return;
   for(const r of this.riders){
    if(r.knockdown||r.playerTaken){r.speed=0;continue;}
-   if(!r.route||Math.hypot(r.x-player.x,r.z-player.z)>RANGE){if(!this.spawn(r,player)){r.x=r.z=1e6;continue;}}
+   if(!r.route||hypot(r.x-player.x,r.z-player.z)>RANGE){if(!this.spawn(r,player)){r.x=r.z=1e6;continue;}}
    const e=r.route[r.leg],o=this.offset(e)??e.lane+1.7;
-   const ahead=routePoint(e,Math.min(e.length,r.s+4),o),blocked=Math.hypot(ahead.x-player.x,ahead.z-player.z)<3;
+   const ahead=routePoint(e,Math.min(e.length,r.s+4),o),blocked=hypot(ahead.x-player.x,ahead.z-player.z)<3;
    r.speed+=Math.max(-5*dt,Math.min(1.5*dt,(blocked?0:r.cruise)-r.speed));
    r.s+=r.speed*dt;
    // End of the route: out of sight the rider is re-spawned elsewhere; in sight it rides on (the route is extended), so

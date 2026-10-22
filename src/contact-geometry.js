@@ -1,4 +1,5 @@
 // Shared conservative footprints for traffic, impacts and police.
+const hypot=(x,z)=>Math.sqrt(x*x+z*z); // not Math.hypot: in optimised code it allocated ~80 bytes a call (its arguments boxed)
 const axes=p=>{const h=p.heading||0;return [[Math.cos(h),-Math.sin(h)],[Math.sin(h),Math.cos(h)]];};
 const dot=(a,b)=>a[0]*b[0]+a[1]*b[1];
 const size=p=>({w:p.halfWidth??.98,l:p.halfLength??2.36});
@@ -7,7 +8,12 @@ function depths(a,b,pedestrian=false,basis=axes(a).concat(pedestrian?[]:axes(b))
  return basis.map(axis=>(sa.w+(pedestrian?.27:0))*Math.abs(dot(axis,aa[0]))+(sa.l+(pedestrian?.29:0))*Math.abs(dot(axis,aa[1]))+
   (pedestrian?0:sb.w*Math.abs(dot(axis,bb[0]))+sb.l*Math.abs(dot(axis,bb[1])))-Math.abs(dot(delta,axis)));
 }
-export const trafficFootprintsOverlap=(a,b)=>Math.hypot(b.x-a.x,b.z-a.z)<size(a).l+size(b).l+.5&&depths(a,b).every(d=>d>0); // 5.2 m for two cars; longer for coaches
+// depths(a,b).every(d=>d>0) in plain arithmetic (the same sums in the same order): called for every pair of cars near
+// each other every step (traffic, police), its axis and size arrays were a good part of the garbage a frame.
+const axisClear=(x,z,aw,al,ac,as,bw,bl,bc,bs,dx,dz)=>(aw*Math.abs(x*ac+z*-as)+al*Math.abs(x*as+z*ac))+(bw*Math.abs(x*bc+z*-bs)+bl*Math.abs(x*bs+z*bc))-Math.abs(dx*x+dz*z)>0;
+export const trafficFootprintsOverlap=(a,b)=>{const dx=b.x-a.x,dz=b.z-a.z,al=a.halfLength??2.36,bl=b.halfLength??2.36;if(!(hypot(dx,dz)<al+bl+.5))return false; // 5.2 m for two cars; longer for coaches
+ const aw=a.halfWidth??.98,bw=b.halfWidth??.98,ha=a.heading||0,hb=b.heading||0,ac=Math.cos(ha),as=Math.sin(ha),bc=Math.cos(hb),bs=Math.sin(hb);
+ return axisClear(ac,-as,aw,al,ac,as,bw,bl,bc,bs,dx,dz)&&axisClear(as,ac,aw,al,ac,as,bw,bl,bc,bs,dx,dz)&&axisClear(bc,-bs,aw,al,ac,as,bw,bl,bc,bs,dx,dz)&&axisClear(bs,bc,aw,al,ac,as,bw,bl,bc,bs,dx,dz);};
 // Overlap measure for the escape rule. Car against car: the actual overlap
 // area of the two footprints (convex clip). Car against a person: the point's
 // depth product inside the enlarged car box. Both are zero without contact,
@@ -32,9 +38,9 @@ const overlapMeasure=(p,actor,pedestrian)=>{
  const a=size(p),b=size(actor);return clipArea(corners(p,a.w,a.l),corners(actor,b.w,b.l));
 };
 export function sweptContact(from,to,actor,pedestrian=false){
- if(Math.hypot(actor.x-from.x,actor.z-from.z)>Math.hypot(to.x-from.x,to.z-from.z)+(pedestrian?3:5.2))return false;
+ if(hypot(actor.x-from.x,actor.z-from.z)>hypot(to.x-from.x,to.z-from.z)+(pedestrian?3:5.2))return false;
  const turn=Math.atan2(Math.sin((to.heading||0)-(from.heading||0)),Math.cos((to.heading||0)-(from.heading||0)));
- const n=Math.max(1,Math.ceil(Math.hypot(to.x-from.x,to.z-from.z)/.2),Math.ceil(Math.abs(turn)/.04));
+ const n=Math.max(1,Math.ceil(hypot(to.x-from.x,to.z-from.z)/.2),Math.ceil(Math.abs(turn)/.04));
  const initial=overlapMeasure(from,actor,pedestrian);
  for(let i=1;i<=n;i++){
   const t=i/n,current=overlapMeasure({...to,x:from.x+(to.x-from.x)*t,z:from.z+(to.z-from.z)*t,heading:(from.heading||0)+turn*t},actor,pedestrian);

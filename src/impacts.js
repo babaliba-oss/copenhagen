@@ -3,6 +3,7 @@ import {playerSpeedAfter} from './crash-physics.js';
 import {PIVOT} from './impact-pose.js';
 import {inWaterPolygons} from './geo.js';
 import {groundAt,waterAt,seaLevel} from './terrain.js';
+const hypot=(x,z)=>Math.sqrt(x*x+z*z); // not Math.hypot: in optimised code it allocated ~80 bytes a call (its arguments boxed)
 
 // Non-graphic reactions to hitting people, game-like but physically grounded:
 // what happens depends on the collision energy between the hitter (its mass
@@ -44,7 +45,7 @@ export function impactSeverity(hitter='car',speed=0,{mass,gentle=false}={}){
 export function startKnockdown(actor,hitter,severity,time=0){
  const hv=[-Math.sin(hitter.heading||0),-Math.cos(hitter.heading||0)],sign=Math.sign(hitter.speed||1),dx=actor.x-hitter.x,dz=actor.z-hitter.z;
  const side=dx*-hv[1]+dz*hv[0],aside=severity.level==='thrown'?.35:severity.level==='down'?.75:1.1,s=Math.sign(side)||1;
- let ux=hv[0]*sign+(-hv[1])*s*aside,uz=hv[1]*sign+hv[0]*s*aside;const l=Math.hypot(ux,uz)||1;ux/=l;uz/=l;
+ let ux=hv[0]*sign+(-hv[1])*s*aside,uz=hv[1]*sign+hv[0]*s*aside;const l=hypot(ux,uz)||1;ux/=l;uz/=l;
  const level=severity.level;
  const body={x:actor.x,y:PIVOT,z:actor.z,vx:ux*severity.out,vy:severity.lift,vz:uz*severity.out,heading:Math.atan2(-ux,-uz),pitch:0,roll:0,
   // Thrown: legs swept, the body rotates back over the bonnet and keeps rolling; knocked down: falls the way it is pushed.
@@ -97,7 +98,7 @@ export function stepKnockdown(actor,dt,world=null){
   if(b.y<=floor){
    b.y=floor;if(b.vy<0)b.vy=-b.vy*BOUNCE;if(b.vy<.6)b.vy=0;
    // Sliding and rolling on the ground: friction takes the speed off, the tumble settles flat.
-   const h=Math.hypot(b.vx,b.vz),d=Math.min(h,GROUND_FRICTION*dt*(1+lying));if(h>1e-6){b.vx-=b.vx/h*d;b.vz-=b.vz/h*d;}
+   const h=hypot(b.vx,b.vz),d=Math.min(h,GROUND_FRICTION*dt*(1+lying));if(h>1e-6){b.vx-=b.vx/h*d;b.vz-=b.vz/h*d;}
    b.wp*=Math.exp(-dt*3);b.wr*=Math.exp(-dt*3);
    if(lying>.25||k.phaseTime>.5){const t=lyingTarget(b);b.pitch=wrap(b.pitch);b.roll=wrap(b.roll);b.pitch=toward(b.pitch,t.pitch,5,dt);b.roll=toward(b.roll,t.roll,5,dt);}
    if(h<.12&&b.vy===0&&lying>.9){k.phase='rest';k.phaseTime=0;b.vx=b.vz=0;}
@@ -116,7 +117,7 @@ export function stepKnockdown(actor,dt,world=null){
  }
  if(k.phase==='return'){
   // Walk back to the path (the spot the walker was taken from), then carry on.
-  const dx=k.anchor.x-b.x,dz=k.anchor.z-b.z,d=Math.hypot(dx,dz);
+  const dx=k.anchor.x-b.x,dz=k.anchor.z-b.z,d=hypot(dx,dz);
   if(d<.12){k.walk=0;b.x=k.anchor.x;b.z=k.anchor.z;b.heading+=wrap((actor.heading||0)-b.heading)*Math.min(1,dt*8);
    return Math.abs(wrap((actor.heading||0)-b.heading))>.05&&k.phaseTime<6;}
   b.heading+=wrap(Math.atan2(-dx,-dz)-b.heading)*Math.min(1,dt*6);
@@ -169,15 +170,15 @@ export class ImpactSystem{
  }
  collide(from,car,people,cyclists,vehicles,police,{kind='car',mass}={}){
   const impactSpeed=Math.max(Math.abs(from.speed),Math.abs(car.speed));
-  if(Math.hypot(car.x-from.x,car.z-from.z)<1e-9&&Math.abs(car.heading-from.heading)<1e-9)return;
+  if(hypot(car.x-from.x,car.z-from.z)<1e-9&&Math.abs(car.heading-from.heading)<1e-9)return;
   const stop=()=>{car.x=from.x;car.z=from.z;car.heading=from.heading;car.speed=0;};
   for(const [label,actors]of [['pedestrian',people],['cyclist',cyclists]])for(const a of actors){
    if(a.edge===null)continue;
    const k=a.knockdown;
    // Someone lying on the road (or getting up) is solid: the car stops instead of driving over them.
    if(k?.body){if(k.phase==='flight'||k.phase==='stagger')continue;const b=k.body,p={x:b.x,z:b.z,heading:b.heading};
-    if(Math.hypot(p.x-car.x,p.z-car.z)<=Math.hypot(car.x-from.x,car.z-from.z)+6&&sweptContact(from,car,p,true))stop();continue;}
-   if(Math.hypot(a.x-car.x,a.z-car.z)>Math.hypot(car.x-from.x,car.z-from.z)+6||!sweptContact(from,car,a,true))continue;
+    if(hypot(p.x-car.x,p.z-car.z)<=hypot(car.x-from.x,car.z-from.z)+6&&sweptContact(from,car,p,true))stop();continue;}
+   if(hypot(a.x-car.x,a.z-car.z)>hypot(car.x-from.x,car.z-from.z)+6||!sweptContact(from,car,a,true))continue;
    if(!k&&this.time>=(a.impactCooldown||0)&&impactSpeed>=1.2){
     const severity=this.hit(a,{x:from.x,z:from.z,heading:from.heading,speed:from.speed||car.speed},{kind,mass,police,label});
     this.damage(car,impactSpeed,label,a);
@@ -187,7 +188,7 @@ export class ImpactSystem{
    stop();
   }
   for(const a of vehicles){
-   if(a.edge===null||Math.hypot(a.x-car.x,a.z-car.z)>Math.hypot(car.x-from.x,car.z-from.z)+9||!sweptContact(from,car,a))continue;
+   if(a.edge===null||hypot(a.x-car.x,a.z-car.z)>hypot(car.x-from.x,car.z-from.z)+9||!sweptContact(from,car,a))continue;
    this.damage(car,impactSpeed,'vehicle',a);car.x=from.x;car.z=from.z;car.heading=from.heading;
    // Both cars take the hit: the other one is shoved off its rail (crash-physics.js) and the player keeps
    // whatever speed the impact leaves, instead of stopping dead as against a wall.

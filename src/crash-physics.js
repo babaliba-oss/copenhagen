@@ -5,9 +5,10 @@
 import {carSamples} from './physics.js';
 import {inWaterPolygons} from './geo.js';
 import {trafficFootprintsOverlap} from './contact-geometry.js';
+const hypot=(x,z)=>Math.sqrt(x*x+z*z); // not Math.hypot: in optimised code it allocated ~80 bytes a call (its arguments boxed)
 
 export const RESTITUTION=.3,FRICTION=6.5,SPIN_FRICTION=2.5,REST_SPEED=.15,REST_RECYCLE_AFTER=30,MIN_KNOCK_SPEED=.05,HALF_WIDTH=.98,HALF_LENGTH=2.36,PUSH_SPEED=2,PUSH_MAX=3,PUSH_HOLD=.15;
-const unit=(x,z)=>{const l=Math.hypot(x,z)||1;return [x/l,z/l];};
+const unit=(x,z)=>{const l=hypot(x,z)||1;return [x/l,z/l];};
 // A knocked car slides, so its velocity is not along its heading; poses may carry an explicit vx/vz.
 const velocity=a=>{if(a.vx!==undefined)return [a.vx,a.vz];const s=a.speed||0;return [-Math.sin(a.heading||0)*s,-Math.cos(a.heading||0)*s];};
 // Impulse the player's car gives `npc` when its sweep from `from` to `car`
@@ -36,7 +37,7 @@ export function crashImpulse(from,car,npc){
 export function knockCar(npc,impulse,time){
  const [vx,vz]=velocity(npc);
  const k=npc.knocked={vx:vx+impulse.nx*impulse.dv,vz:vz+impulse.nz*impulse.dv,spin:impulse.spin,at:time,rest:null,pushedAt:impulse.push?time:-Infinity};
- npc.speed=Math.hypot(k.vx,k.vz);npc.braking=!impulse.push;if(!impulse.push)npc.damage=Math.min(1,(npc.damage||0)+impulse.closing/40);
+ npc.speed=hypot(k.vx,k.vz);npc.braking=!impulse.push;if(!impulse.push)npc.damage=Math.min(1,(npc.damage||0)+impulse.closing/40);
 }
 export function playerSpeedAfter(from,impulse){
  const [tx,tz]=unit(...velocity(from)),share=Math.max(0,tx*impulse.nx+tz*impulse.nz);
@@ -51,29 +52,29 @@ export function playerSpeedAfter(from,impulse){
 // Returns true while it is still moving.
 export function stepKnocked(a,dt,world,time,{cars=[],obstacles=[],knock=null}={}){
  const k=a.knocked;if(!k||k.rest!==null)return false;
- const speed=Math.hypot(k.vx,k.vz),pushed=time-k.pushedAt<PUSH_HOLD;
+ const speed=hypot(k.vx,k.vz),pushed=time-k.pushedAt<PUSH_HOLD;
  if(speed<REST_SPEED&&!pushed){k.vx=k.vz=0;k.spin=0;k.rest=time;a.speed=0;a.braking=false;return false;}
  if(!pushed){const decay=Math.max(0,speed-FRICTION*dt)/speed;k.vx*=decay;k.vz*=decay;}
  k.spin=Math.sign(k.spin)*Math.max(0,Math.abs(k.spin)-SPIN_FRICTION*dt);
  const nx=a.x+k.vx*dt,nz=a.z+k.vz*dt,heading=a.heading+k.spin*dt;
  const samples=carSamples({heading},nx,nz);
  const blocked=samples.some(([x,z])=>world.buildings.at(x,z))||samples.some(([x,z])=>!world.roads.at(x,z)&&!world.pavement.at(x,z)&&inWaterPolygons(world.water,x,z));
- if(blocked){k.vx*=-.15;k.vz*=-.15;k.spin*=.3;a.speed=Math.hypot(k.vx,k.vz);return true;}
- const pose={x:nx,z:nz,heading,vx:k.vx,vz:k.vz,speed:Math.hypot(k.vx,k.vz)};
+ if(blocked){k.vx*=-.15;k.vz*=-.15;k.spin*=.3;a.speed=hypot(k.vx,k.vz);return true;}
+ const pose={x:nx,z:nz,heading,vx:k.vx,vz:k.vz,speed:hypot(k.vx,k.vz)};
  for(const b of cars){
   if(b===a||!b.edge||b.walking||!trafficFootprintsOverlap(pose,b))continue;
   const impulse=crashImpulse(pose,pose,b);
   if(!impulse)continue; // already separating
   if(knock)knock(b,pose,impulse);
   // Equal masses: what the other car gains, this one loses along the contact normal.
-  k.vx-=impulse.nx*impulse.dv;k.vz-=impulse.nz*impulse.dv;k.spin*=.5;a.speed=Math.hypot(k.vx,k.vz);
+  k.vx-=impulse.nx*impulse.dv;k.vz-=impulse.nz*impulse.dv;k.spin*=.5;a.speed=hypot(k.vx,k.vz);
   return true; // hold position this step; next step the shunted car has moved on
  }
  for(const o of obstacles){
   if(o.edge===null||!trafficFootprintsOverlap(pose,o))continue;
   const [ux,uz]=unit(o.x-nx,o.z-nz);if(k.vx*ux+k.vz*uz<=0)continue; // moving away from it
-  k.vx*=-.2;k.vz*=-.2;k.spin*=.3;a.speed=Math.hypot(k.vx,k.vz);return true;
+  k.vx*=-.2;k.vz*=-.2;k.spin*=.3;a.speed=hypot(k.vx,k.vz);return true;
  }
- a.x=nx;a.z=nz;a.heading=heading;a.speed=Math.hypot(k.vx,k.vz);
+ a.x=nx;a.z=nz;a.heading=heading;a.speed=hypot(k.vx,k.vz);
  return true;
 }

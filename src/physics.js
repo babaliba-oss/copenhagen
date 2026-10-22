@@ -1,5 +1,6 @@
 import { insidePlayable, pointInPolygon, segmentDistance, inWaterPolygons } from './geo.js';
 import {groundPose,lakeAt} from './terrain.js';
+const hypot=(x,z)=>Math.sqrt(x*x+z*z); // not Math.hypot: in optimised code it allocated ~80 bytes a call (its arguments boxed)
 export const GRAVITY=9.81;
 export const PLAYER_MAX_SPEED=140/3.6,GENTLE_MAX_SPEED=90/3.6;
 // Intentionally stylised HUD speed. Physics, collisions
@@ -39,14 +40,14 @@ export function canExitBuildings(from,to,buildings){
   if(!pointInPolygon(from.x,from.z,p.rings)){
    let nearest=null,best=Infinity;
    for(const ring of p.rings)for(let j=0;j<ring.length;j++){
-    const v=ring[j],w=ring[(j+1)%ring.length],dx=w[0]-v[0],dz=w[1]-v[1],t=Math.max(0,Math.min(1,((from.x-v[0])*dx+(from.z-v[1])*dz)/(dx*dx+dz*dz||1))),q=[v[0]+t*dx,v[1]+t*dz],d=Math.hypot(from.x-q[0],from.z-q[1]);
+    const v=ring[j],w=ring[(j+1)%ring.length],dx=w[0]-v[0],dz=w[1]-v[1],t=Math.max(0,Math.min(1,((from.x-v[0])*dx+(from.z-v[1])*dz)/(dx*dx+dz*dz||1))),q=[v[0]+t*dx,v[1]+t*dz],d=hypot(from.x-q[0],from.z-q[1]);
     if(d<best){best=d;nearest=q;}
    }
    if((to.x-from.x)*(from.x-nearest[0])+(to.z-from.z)*(from.z-nearest[1])< -1e-9)return false;
   }
   contact=true;
  }
- return contact&&Math.hypot(to.x-from.x,to.z-from.z)>1e-9;
+ return contact&&hypot(to.x-from.x,to.z-from.z)>1e-9;
 }
 export const SLIDE_MAX=.6; // radians: the steepest angle of incidence the car slides off (about 35 degrees); squarer is a crash
 // The direction of whatever the car ran into, at the contact: a round object's tangent, or the nearest edge of the
@@ -54,8 +55,8 @@ export const SLIDE_MAX=.6; // radians: the steepest angle of incidence the car s
 // along (a lake from the elevation model).
 function contactTangent(world,buildings,car,item,kind){
  const samples=carSamples(car),edge=rings=>{let best=null,d=Infinity;for(const [x,z] of samples)for(const r of rings)for(let i=1;i<r.length;i++){const e=segmentDistance(x,z,r[i-1],r[i]);if(e<d){d=e;best=[r[i-1],r[i]];}}
-  if(!best)return null;const ex=best[1][0]-best[0][0],ez=best[1][1]-best[0][1],l=Math.hypot(ex,ez)||1;return [ex/l,ez/l];};
- if(item){if(item.radius>0&&!item.rings){let s=samples[0],d=Infinity;for(const p of samples){const e=Math.hypot(p[0]-item.x,p[1]-item.z);if(e<d){d=e;s=p;}}const nx=s[0]-item.x,nz=s[1]-item.z,l=Math.hypot(nx,nz)||1;return [-nz/l,nx/l];}
+  if(!best)return null;const ex=best[1][0]-best[0][0],ez=best[1][1]-best[0][1],l=hypot(ex,ez)||1;return [ex/l,ez/l];};
+ if(item){if(item.radius>0&&!item.rings){let s=samples[0],d=Infinity;for(const p of samples){const e=hypot(p[0]-item.x,p[1]-item.z);if(e<d){d=e;s=p;}}const nx=s[0]-item.x,nz=s[1]-item.z,l=hypot(nx,nz)||1;return [-nz/l,nx/l];}
   return item.rings?edge(item.rings):null;}
  if(kind==='building'){for(const [x,z] of samples){const b=buildings.at(x,z);if(b?.rings)return edge(b.rings);}return null;}
  const wet=(world.water||[]).filter(w=>w?.rings&&samples.some(([x,z])=>pointInPolygon(x,z,w.rings)));
@@ -121,7 +122,7 @@ export function driveStep(car,keys,dt,world) {
     const q=pose(n);car.distance+=len;car.x=q.x;car.z=q.z;car.heading=q.heading;
     scrape=Math.max(scrape,Math.abs(car.speed)*Math.sin(incidence));car.speed*=along;collision=null;continue;
    }
-   car.distance+=Math.hypot(nx-car.x,nz-car.z);car.x=nx;car.z=nz;
+   car.distance+=hypot(nx-car.x,nz-car.z);car.x=nx;car.z=nz;
  }
  if(collision){if(car.distance===distanceBefore)car.heading=oldHeading;car.speed=0;}
  settleOnGround(car);
@@ -135,7 +136,7 @@ export function nearestRoadPoint(x,z,roads,buildings) {
    // Search actual road interiors, accounting for irregular junctions and islands.
    const minX=Math.max(b[0],x-150), maxX=Math.min(b[2],x+150), minZ=Math.max(b[1],z-150), maxZ=Math.min(b[3],z+150);
    for(let px=minX+2;px<maxX;px+=3)for(let pz=minZ+2;pz<maxZ;pz+=3){
-     const dist=Math.hypot(px-x,pz-z);if(dist>=d||!insidePlayable(px,pz,10))continue;
+     const dist=hypot(px-x,pz-z);if(dist>=d||!insidePlayable(px,pz,10))continue;
      if(!pointInPolygon(px,pz,r.rings)||buildings.at(px,pz))continue;
      let clearance=Infinity;for(const ring of r.rings)for(let i=1;i<ring.length;i++)clearance=Math.min(clearance,segmentDistance(px,pz,ring[i-1],ring[i]));
      if(clearance<2.6)continue;

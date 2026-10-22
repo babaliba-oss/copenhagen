@@ -6,6 +6,7 @@ import {createPersonBatch,personLook,advanceGait} from './person-model.js';
 import {PLAYER_SCOOTER} from './player-ride-models.js';
 import {applyImpactPose} from './impact-pose.js';
 import {groundAt} from './terrain.js';
+const hypot=(x,z)=>Math.sqrt(x*x+z*z); // not Math.hypot: in optimised code it allocated ~80 bytes a call (its arguments boxed)
 
 export const SCOOTER_RIDER_LIMIT=12;
 export const SCOOTER_RIDER_RANGE=240;
@@ -44,7 +45,7 @@ function at(index,x,z){
 }
 const pathOf=edge=>{
  const points=edge.points,cumulative=[0];
- for(let i=1;i<points.length;i++)cumulative.push(cumulative.at(-1)+Math.hypot(points[i][0]-points[i-1][0],points[i][1]-points[i-1][1]));
+ for(let i=1;i<points.length;i++)cumulative.push(cumulative.at(-1)+hypot(points[i][0]-points[i-1][0],points[i][1]-points[i-1][1]));
  return {points,cumulative,length:cumulative.at(-1),lane:0};
 };
 
@@ -74,7 +75,7 @@ function* scooterRouteBatches(graph,world,focus,{limit=32,radius=320}={}){
   if(![a,b,mid].every(p=>p.every(Number.isFinite)))continue;
   const key=[`${a[0]},${a[1]}`,`${b[0]},${b[1]}`].sort().join('|')+`|${edge.points.length}`;
   if(seen.has(key))continue;seen.add(key);
-  const distance=Math.min(Math.hypot(a[0]-focus.x,a[1]-focus.z),Math.hypot(b[0]-focus.x,b[1]-focus.z),Math.hypot(mid[0]-focus.x,mid[1]-focus.z));
+  const distance=Math.min(hypot(a[0]-focus.x,a[1]-focus.z),hypot(b[0]-focus.x,b[1]-focus.z),hypot(mid[0]-focus.x,mid[1]-focus.z));
   if(distance>radius)continue;
   candidates.push({edge,distance,key});
  }
@@ -144,8 +145,8 @@ export class ScooterRiders{
   for(let i=0;i<this.routes.length;i++){
    const route=this.routes[(i+actor.index)%this.routes.length];
    for(let j=0;j<5;j++){
-    const s=route.start+route.length*(.12+.76*hash(actor.index*31+j*7+i*13)),p=routePoint(route.path,s,0),d=Math.hypot(p.x-player.x,p.z-player.z);
-    if(d<8||d>SCOOTER_RIDER_RANGE-15||!this.safety.footprint(p)||this.actors.some(a=>a!==actor&&a.edge&&!a.playerTaken&&Math.hypot(a.x-p.x,a.z-p.z)<8))continue;
+    const s=route.start+route.length*(.12+.76*hash(actor.index*31+j*7+i*13)),p=routePoint(route.path,s,0),d=hypot(p.x-player.x,p.z-player.z);
+    if(d<8||d>SCOOTER_RIDER_RANGE-15||!this.safety.footprint(p)||this.actors.some(a=>a!==actor&&a.edge&&!a.playerTaken&&hypot(a.x-p.x,a.z-p.z)<8))continue;
     actor.route=route;actor.edge=route.sourceEdge;actor.s=s;actor.cruise=route.cycleway?3.2+hash(actor.index)*.8:1.9+hash(actor.index)*.5;
     actor.wait=0;actor.blocked=0;Object.assign(actor,this.point(actor));return true;
    }
@@ -161,10 +162,10 @@ export class ScooterRiders{
  step(dt,player,{people=[],vehicles=[],impacts=null}={}){
   dt=clamp(dt,0,.1);this.time+=dt;if(!this.actors.length)return;
   if(!this.anchor)this.pool(player);
-  else if(this.pending||this.dirty||(this.time-this.refreshed>2&&Math.hypot(player.x-this.anchor.x,player.z-this.anchor.z)>140))this.refreshPool(player);
+  else if(this.pending||this.dirty||(this.time-this.refreshed>2&&hypot(player.x-this.anchor.x,player.z-this.anchor.z)>140))this.refreshPool(player);
   for(const actor of this.actors){
    if(actor.playerTaken||actor.disabled||actor.knockdown){actor.speed=0;continue;}
-   if(!actor.edge||Math.hypot(actor.x-player.x,actor.z-player.z)>SCOOTER_RIDER_RANGE+90){this.spawn(actor,player);if(!actor.edge)continue;}
+   if(!actor.edge||hypot(actor.x-player.x,actor.z-player.z)>SCOOTER_RIDER_RANGE+90){this.spawn(actor,player);if(!actor.edge)continue;}
    if(actor.wait>0){actor.wait=Math.max(0,actor.wait-dt);actor.speed=0;continue;}
    const forwardX=-Math.sin(actor.heading),forwardZ=-Math.cos(actor.heading),stopping=1.6+actor.speed*actor.speed/7;
    const ahead=(other,radius=.9)=>{
@@ -173,19 +174,19 @@ export class ScooterRiders{
     const along=dx*forwardX+dz*forwardZ,lateral=Math.abs(dx*forwardZ-dz*forwardX);
     return along>-radius&&along<stopping+radius&&lateral<radius;
    };
-   const approached=(player.walking||player.travelMode==='walk')&&Math.hypot(actor.x-player.x,actor.z-player.z)<3.4;
+   const approached=(player.walking||player.travelMode==='walk')&&hypot(actor.x-player.x,actor.z-player.z)<3.4;
    const blocked=approached||ahead(player,1.4)||people.some(p=>ahead(p,1))||vehicles.some(v=>ahead(v,1.7))||this.actors.some(a=>ahead(a,.85));
    actor.blocked=blocked?actor.blocked+dt:0;
    const target=blocked?0:actor.cruise;
    actor.speed+=clamp(target-actor.speed,-5*dt,1.5*dt);
    const nextS=clamp(actor.s+actor.direction*actor.speed*dt,actor.route.start,actor.route.end),p=this.point(actor,nextS);
-   const distance=Math.hypot(p.x-actor.x,p.z-actor.z),samples=Math.max(1,Math.ceil(distance/.2));
+   const distance=hypot(p.x-actor.x,p.z-actor.z),samples=Math.max(1,Math.ceil(distance/.2));
    let safe=true;
    for(let i=1;i<=samples;i++)if(!this.safety.footprint({x:actor.x+(p.x-actor.x)*i/samples,z:actor.z+(p.z-actor.z)*i/samples,heading:p.heading})){safe=false;break;}
    if(safe&&distance>.0001&&this.world.objects?.blocksStep(actor,p,BODY))safe=false;
    const contact=(other,radius)=>{
     if(!other||other===actor||other.playerTaken||other.disabled||other.edge===null)return false;
-    const body=other.knockdown?.body||other,old=Math.hypot(body.x-actor.x,body.z-actor.z),next=Math.hypot(body.x-p.x,body.z-p.z);
+    const body=other.knockdown?.body||other,old=hypot(body.x-actor.x,body.z-actor.z),next=hypot(body.x-p.x,body.z-p.z);
     return (old>=radius||next<=old)&&segmentDistance(body.x,body.z,[actor.x,actor.z],[p.x,p.z])<radius;
    };
    const touched=distance>.0001&&people.find(person=>!person.knockdown&&contact(person,.68));
@@ -197,7 +198,7 @@ export class ScooterRiders{
    if(!safe){actor.speed=0;actor.direction*=-1;actor.wait=.7;Object.assign(actor,this.point(actor));continue;}
    actor.distance+=distance;actor.s=nextS;Object.assign(actor,p);
    if(actor.s<=actor.route.start+.001||actor.s>=actor.route.end-.001){actor.direction*=-1;actor.speed=0;actor.wait=1;Object.assign(actor,this.point(actor));}
-   else if(actor.blocked>7&&Math.hypot(actor.x-player.x,actor.z-player.z)>4){actor.direction*=-1;actor.blocked=0;actor.wait=.7;Object.assign(actor,this.point(actor));}
+   else if(actor.blocked>7&&hypot(actor.x-player.x,actor.z-player.z)>4){actor.direction*=-1;actor.blocked=0;actor.wait=.7;Object.assign(actor,this.point(actor));}
   }
  }
  snapshot(){return {active:this.riders.length,capacity:this.capacity,routes:this.routes.length,collisions:this.collisions,riders:this.riders.map(({id,x,z,heading,speed,route,knockdown})=>({id,x,z,heading,speed,cycleway:route.cycleway,knockedDown:!!knockdown,safe:this.safety.footprint({x,z,heading})}))};}
@@ -216,7 +217,7 @@ export function createScooterRiderRenderer(scene,sim){
   let count=0;people.begin(player);
   for(const actor of sim.actors){
    const visible=actor.knockdown?.body||actor;
-   if(!actor.edge||actor.playerTaken||actor.disabled||Math.hypot(visible.x-player.x,visible.z-player.z)>SCOOTER_RIDER_RANGE)continue;
+   if(!actor.edge||actor.playerTaken||actor.disabled||hypot(visible.x-player.x,visible.z-player.z)>SCOOTER_RIDER_RANGE)continue;
    tmp.position.set(actor.x,.12+groundAt(actor.x,actor.z),actor.z);tmp.rotation.set(0,actor.heading,0);tmp.scale.setScalar(1);tmp.updateMatrix();
    scooters.setMatrixAt(count,tmp.matrix);scooters.setColorAt(count,color.set(actor.operator.accent));
    if(actor.knockdown)applyImpactPose(scooters,count,actor);count++;

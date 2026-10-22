@@ -3,6 +3,7 @@ import {prepareGraph,routePoint} from './mobility.js';
 import {SpatialIndex,segmentDistance} from './geo.js';
 import {BUS_DIMENSIONS} from './bus-simulation.js';
 import {boxesOverlap,carBox,oncomingPasses,signalGreen,untilGreen} from './lane-model.js';
+const hypot=(x,z)=>Math.sqrt(x*x+z*z); // not Math.hypot: in optimised code it allocated ~80 bytes a call (its arguments boxed)
 export const TRAM_DIMENSIONS={length:27.6,width:2.4,height:3.83,gauge:1,sections:[9.7,7.6,9.7],centres:[0,-8.95,-17.9],front:4.85,rear:22.75};
 // Raide-Jokeri (line 15): Škoda ForCity Smart Artic X54, five modules, 34 m, cabs at both ends.
 export const JOKERI_DIMENSIONS={length:34.3,width:2.4,height:3.7,gauge:1,sections:[7.9,5.5,6.3,5.5,7.9],centres:[0,-7,-13.2,-19.4,-26.4],front:3.95,rear:30.35,stopAhead:13};
@@ -35,7 +36,7 @@ const BODY_OFFSETS=[3,0,-4,-8.95,-13,-17.9,-21.5],JOKERI_OFFSETS=[2.5,0,-4,-8,-1
 // True when the player's velocity points clearly away from `point` (more than 120 degrees off the line to it).
 export function playerLeaving(player,point){
  const speed=player.speed||0;if(!speed)return false;
- const vx=-Math.sin(player.heading)*Math.sign(speed),vz=-Math.cos(player.heading)*Math.sign(speed),tx=point.x-player.x,tz=point.z-player.z,l=Math.hypot(tx,tz)||1;
+ const vx=-Math.sin(player.heading)*Math.sign(speed),vz=-Math.cos(player.heading)*Math.sign(speed),tx=point.x-player.x,tz=point.z-player.z,l=hypot(tx,tz)||1;
  return (vx*tx+vz*tz)/l<-.5;
 }
 export class TramSimulation{
@@ -44,8 +45,8 @@ export class TramSimulation{
   this.addPaths(data);
   this.hotspots=TRAM_HOTSPOTS.map(h=>{
    const groups=new Map();
-   for(const path of this.paths){let best=Infinity,s=0;path.points.forEach((q,i)=>{const d=Math.hypot(q[0]-h.x,q[1]-h.z);if(d<best){best=d;s=path.cumulative[i];}});if(best>45||s<h.approach*.5||path.length-s<h.approach*.5)continue;
-    const stop=path.stops.find(st=>Math.hypot(st.x-h.x,st.z-h.z)<60)||null;if(stop)s=stop.s-9;
+   for(const path of this.paths){let best=Infinity,s=0;path.points.forEach((q,i)=>{const d=hypot(q[0]-h.x,q[1]-h.z);if(d<best){best=d;s=path.cumulative[i];}});if(best>45||s<h.approach*.5||path.length-s<h.approach*.5)continue;
+    const stop=path.stops.find(st=>hypot(st.x-h.x,st.z-h.z)<60)||null;if(stop)s=stop.s-9;
     const dir=((Math.round(routePoint(path,s,0).heading*2/Math.PI)%4)+4)%4,feeder={path,s,entry:Math.max(10,s-h.approach),exit:Math.min(path.length-10,s+h.approach),stop};
     if(feeder.stop)feeder.stop.hotspot=h;if(!groups.has(dir))groups.set(dir,{feeders:[],next:0,index:0});groups.get(dir).feeders.push(feeder);}
    return {...h,groups:[...groups.values()]};
@@ -65,21 +66,21 @@ export class TramSimulation{
   // that would centre a car on the nearest same-direction track (a shared lane).
   const index=new SpatialIndex(segments,32),parallel=(p,s)=>Math.abs(Math.cos(s.heading-p.heading))>.88;
   world.railAvoidance={clear:p=>!index.near(p.x,p.z).some(s=>parallel(p,s)&&segmentDistance(p.x,p.z,s.a,s.b)<2.3),
-   onTrack:p=>{let best=null,d=2.6;for(const s of index.near(p.x,p.z)){if(Math.cos(s.heading-p.heading)<.88)continue;const dd=segmentDistance(p.x,p.z,s.a,s.b);if(dd<d){d=dd;const ux=s.b[0]-s.a[0],uz=s.b[1]-s.a[1],l=Math.hypot(ux,uz)||1,t=Math.max(0,Math.min(1,((p.x-s.a[0])*ux+(p.z-s.a[1])*uz)/(l*l))),qx=s.a[0]+ux*t-p.x,qz=s.a[1]+uz*t-p.z;best=qx*Math.cos(p.heading)-qz*Math.sin(p.heading);}}return best;}};
+   onTrack:p=>{let best=null,d=2.6;for(const s of index.near(p.x,p.z)){if(Math.cos(s.heading-p.heading)<.88)continue;const dd=segmentDistance(p.x,p.z,s.a,s.b);if(dd<d){d=dd;const ux=s.b[0]-s.a[0],uz=s.b[1]-s.a[1],l=hypot(ux,uz)||1,t=Math.max(0,Math.min(1,((p.x-s.a[0])*ux+(p.z-s.a[1])*uz)/(l*l))),qx=s.a[0]+ux*t-p.x,qz=s.a[1]+uz*t-p.z;best=qx*Math.cos(p.heading)-qz*Math.sin(p.heading);}}return best;}};
   // Stops are genuine HSL points. Project only close stops onto a path, and
   // only stops on the right-hand (door) side of travel (or on the track itself:
   // an OpenStreetMap stop position), so a southbound tram
   // does not also halt at the northbound platform. Stop assignment is spatial
   // rather than a complete timetable/stop-sequence import.
-  for(const path of added){path.stops=[];for(const stop of data.stops||[]){let best=7,at=null;for(let i=1;i<path.points.length;i++){const a=path.points[i-1],b=path.points[i],dx=b[0]-a[0],dz=b[1]-a[1],l2=dx*dx+dz*dz,t=Math.max(0,Math.min(1,((stop.x-a[0])*dx+(stop.z-a[1])*dz)/l2)),ox=stop.x-a[0]-dx*t,oz=stop.z-a[1]-dz*t,distance=Math.hypot(ox,oz);if(distance<best&&(ox*-dz+oz*dx>0||distance<1)){best=distance;at=path.cumulative[i-1]+Math.sqrt(l2)*t;}}if(at!==null)path.stops.push({s:at+(tramDims(path).stopAhead||9),name:stop.name,id:stop.id,x:stop.x,z:stop.z});}path.stops.sort((a,b)=>a.s-b.s);}
+  for(const path of added){path.stops=[];for(const stop of data.stops||[]){let best=7,at=null;for(let i=1;i<path.points.length;i++){const a=path.points[i-1],b=path.points[i],dx=b[0]-a[0],dz=b[1]-a[1],l2=dx*dx+dz*dz,t=Math.max(0,Math.min(1,((stop.x-a[0])*dx+(stop.z-a[1])*dz)/l2)),ox=stop.x-a[0]-dx*t,oz=stop.z-a[1]-dz*t,distance=hypot(ox,oz);if(distance<best&&(ox*-dz+oz*dx>0||distance<1)){best=distance;at=path.cumulative[i-1]+Math.sqrt(l2)*t;}}if(at!==null)path.stops.push({s:at+(tramDims(path).stopAhead||9),name:stop.name,id:stop.id,x:stop.x,z:stop.z});}path.stops.sort((a,b)=>a.s-b.s);}
   // Where another line's track crosses this one or joins it (within a tram's width), sampled every 2 m:
   // a tram gives way at the start of that stretch to a tram already on it or nearer to it. Afterwards
   // trams on a shared track simply follow each other; oncoming tracks are passed.
-  const tracks=[];for(const path of this.paths)for(let i=1;i<path.points.length;i++){const a=path.points[i-1],b=path.points[i],l=Math.hypot(b[0]-a[0],b[1]-a[1]);if(l>.01)tracks.push({a,b,l,dx:(b[0]-a[0])/l,dz:(b[1]-a[1])/l,path,s0:path.cumulative[i-1],bbox:[Math.min(a[0],b[0])-3,Math.min(a[1],b[1])-3,Math.max(a[0],b[0])+3,Math.max(a[1],b[1])+3]});}
+  const tracks=[];for(const path of this.paths)for(let i=1;i<path.points.length;i++){const a=path.points[i-1],b=path.points[i],l=hypot(b[0]-a[0],b[1]-a[1]);if(l>.01)tracks.push({a,b,l,dx:(b[0]-a[0])/l,dz:(b[1]-a[1])/l,path,s0:path.cumulative[i-1],bbox:[Math.min(a[0],b[0])-3,Math.min(a[1],b[1])-3,Math.max(a[0],b[0])+3,Math.max(a[1],b[1])+3]});}
   const trackIndex=new SpatialIndex(tracks,24),nearest=new Map();
   for(const path of this.paths){path.crossTracks=[];const open=new Map();
    for(let s=0;s<=path.length;s+=2){const p=routePoint(path,s,0),ux=-Math.sin(p.heading),uz=-Math.cos(p.heading);nearest.clear();
-    for(const g of trackIndex.near(p.x,p.z)){if(g.path===path)continue;const along=Math.max(0,Math.min(g.l,(p.x-g.a[0])*g.dx+(p.z-g.a[1])*g.dz)),d=Math.hypot(p.x-g.a[0]-g.dx*along,p.z-g.a[1]-g.dz*along);if(d>2.6)continue;const o=nearest.get(g.path);if(!o||d<o.d)nearest.set(g.path,{d,dot:ux*g.dx+uz*g.dz,s:g.s0+along});}
+    for(const g of trackIndex.near(p.x,p.z)){if(g.path===path)continue;const along=Math.max(0,Math.min(g.l,(p.x-g.a[0])*g.dx+(p.z-g.a[1])*g.dz)),d=hypot(p.x-g.a[0]-g.dx*along,p.z-g.a[1]-g.dz*along);if(d>2.6)continue;const o=nearest.get(g.path);if(!o||d<o.d)nearest.set(g.path,{d,dot:ux*g.dx+uz*g.dz,s:g.s0+along});}
     for(const [other,o] of nearest){if(o.dot<-.87&&o.d>1)continue;const run=open.get(other);if(run){run.to=s;run.otherTo=o.s;run.seen=s;}else open.set(other,{from:s,to:s,other,otherS:o.s,otherTo:o.s,merge:o.dot>.87,seen:s});}
     for(const [other,run] of open)if(run.seen!==s){open.delete(other);path.crossTracks.push(run);}
    }
@@ -93,19 +94,19 @@ export class TramSimulation{
  lastStopIndex(path,s){let i=-1;path.stops.forEach((st,j)=>{if(st.s<=s)i=j;});return i;}
  add(path,s,extra={}){const t={id:this.nextId++,path,s,speed:7,wait:0,lastStop:this.lastStopIndex(path,s),...routePoint(path,s,0),...extra};this.trams.push(t);return t;}
  // True when any part of a tram body at `s` on `path` comes within `radius` of the player.
- bodyNear(path,s,player,radius){return bodyOffsets(path).some(o=>{const p=routePoint(path,s+o,0);return Math.hypot(p.x-player.x,p.z-player.z)<radius;});}
- activeHotspots(player){return this.hotspots.filter(h=>Math.hypot(h.x-player.x,h.z-player.z)<h.active);}
- nearestHotspot(player){let best=null,bestD=Infinity;for(const h of this.hotspots){const d=Math.hypot(h.x-player.x,h.z-player.z);if(d<bestD){bestD=d;best=h;}}return best;}
+ bodyNear(path,s,player,radius){return bodyOffsets(path).some(o=>{const p=routePoint(path,s+o,0);return hypot(p.x-player.x,p.z-player.z)<radius;});}
+ activeHotspots(player){return this.hotspots.filter(h=>hypot(h.x-player.x,h.z-player.z)<h.active);}
+ nearestHotspot(player){let best=null,bestD=Infinity;for(const h of this.hotspots){const d=hypot(h.x-player.x,h.z-player.z);if(d<bestD){bestD=d;best=h;}}return best;}
  // True when a spawn at `p` would appear in front of a nearby player (within SPAWN_VIEW_DISTANCE, ahead of the car).
- inView(player,p,distance=SPAWN_VIEW_DISTANCE){const dx=p.x-player.x,dz=p.z-player.z;if(Math.hypot(dx,dz)>=distance)return false;return -dx*Math.sin(player.heading||0)-dz*Math.cos(player.heading||0)>-8;}
+ inView(player,p,distance=SPAWN_VIEW_DISTANCE){const dx=p.x-player.x,dz=p.z-player.z;if(hypot(dx,dz)>=distance)return false;return -dx*Math.sin(player.heading||0)-dz*Math.cos(player.heading||0)>-8;}
  reset(player){
   // A small fleet near the camera, never random street driving. Each car stays
   // on one of the dated HSL paths, including curves and road crossings.
   this.trams=[];this.nextId=0;
   const hot=this.activeHotspots(player),hotPaths=new Set(hot.flatMap(h=>h.groups.flatMap(g=>g.feeders.map(f=>f.path))));
-  const candidates=this.paths.filter(path=>!hotPaths.has(path)).map(path=>{let s=0,best=Infinity;path.points.forEach((p,i)=>{const d=Math.hypot(p[0]-player.x,p[1]-player.z);if(d<best){best=d;s=path.cumulative[i];}});return {path,s,best};}).filter(p=>p.best<650).sort((a,b)=>a.best-b.best);
+  const candidates=this.paths.filter(path=>!hotPaths.has(path)).map(path=>{let s=0,best=Infinity;path.points.forEach((p,i)=>{const d=hypot(p[0]-player.x,p[1]-player.z);if(d<best){best=d;s=path.cumulative[i];}});return {path,s,best};}).filter(p=>p.best<650).sort((a,b)=>a.best-b.best);
   for(const candidate of candidates){if(this.trams.length>=6)break;let s=Math.max(28,Math.min(candidate.path.length-40,candidate.s+80+this.trams.length*37)),p=routePoint(candidate.path,s,0);
-   for(let i=0;i<12&&this.trams.some(t=>Math.hypot(t.x-p.x,t.z-p.z)<65);i++){s=Math.min(candidate.path.length-40,s+80);p=routePoint(candidate.path,s,0);}
+   for(let i=0;i<12&&this.trams.some(t=>hypot(t.x-p.x,t.z-p.z)<65);i++){s=Math.min(candidate.path.length-40,s+80);p=routePoint(candidate.path,s,0);}
    this.add(candidate.path,s);
   }
   // Busy stretch: start with a tram dwelling at each platform and one
@@ -114,7 +115,7 @@ export class TramSimulation{
   for(const h of hot)for(const g of h.groups){
    const pick=()=>g.feeders[g.index++%g.feeders.length];
    // Lines sharing a platform must not both get a tram seeded on it (they would stand inside each other).
-   const free=(path,s)=>{const p=routePoint(path,s,0);return !this.trams.some(t=>Math.hypot(t.x-p.x,t.z-p.z)<34&&Math.cos(t.heading-p.heading)>.3&&Math.abs((t.x-p.x)*Math.cos(p.heading)-(t.z-p.z)*Math.sin(p.heading))<2.6);};
+   const free=(path,s)=>{const p=routePoint(path,s,0);return !this.trams.some(t=>hypot(t.x-p.x,t.z-p.z)<34&&Math.cos(t.heading-p.heading)>.3&&Math.abs((t.x-p.x)*Math.cos(p.heading)-(t.z-p.z)*Math.sin(p.heading))<2.6);};
    const atStop=pick();if(atStop.stop&&this.trams.length<this.capacity&&!this.bodyNear(atStop.path,atStop.stop.s,player,10)){
     if(free(atStop.path,atStop.stop.s))this.add(atStop.path,atStop.stop.s,{wait:this.range(4,10),lastStop:atStop.path.stops.indexOf(atStop.stop),hotspot:h,exit:atStop.exit,stop:atStop.stop.name});
     else if(free(atStop.path,atStop.stop.s-36))this.add(atStop.path,atStop.stop.s-36,{speed:0,hotspot:h,exit:atStop.exit});} // next in line behind the tram at the platform
@@ -135,9 +136,9 @@ export class TramSimulation{
  // entering behind the player or over 320 m ahead, and let those left far behind go.
  roam(player){
   if(this.time<(this.roamAt||0))return;this.roamAt=this.time+4;const lines=this.paths.filter(p=>p.roam);if(!lines.length)return;
-  const before=this.trams.length;this.trams=this.trams.filter(t=>!t.path.roam||Math.hypot(t.x-player.x,t.z-player.z)<900);
-  if(this.trams.filter(t=>t.path.roam&&Math.hypot(t.x-player.x,t.z-player.z)<650).length<4&&this.trams.length<this.capacity){
-   const options=[];for(const path of lines)for(let s=40;s<path.length-40;s+=30){const p=routePoint(path,s,0),d=Math.hypot(p.x-player.x,p.z-player.z);if(d>150&&d<600&&!this.inView(player,p,320)&&!this.trams.some(t=>Math.hypot(t.x-p.x,t.z-p.z)<90))options.push({path,s,d});}
+  const before=this.trams.length;this.trams=this.trams.filter(t=>!t.path.roam||hypot(t.x-player.x,t.z-player.z)<900);
+  if(this.trams.filter(t=>t.path.roam&&hypot(t.x-player.x,t.z-player.z)<650).length<4&&this.trams.length<this.capacity){
+   const options=[];for(const path of lines)for(let s=40;s<path.length-40;s+=30){const p=routePoint(path,s,0),d=hypot(p.x-player.x,p.z-player.z);if(d>150&&d<600&&!this.inView(player,p,320)&&!this.trams.some(t=>hypot(t.x-p.x,t.z-p.z)<90))options.push({path,s,d});}
    if(options.length){const o=options[Math.floor(this.random()*options.length)];this.add(o.path,o.s);}}
   if(this.trams.length!==before)this.refreshObstacles();
  }
@@ -145,7 +146,7 @@ export class TramSimulation{
   for(const h of this.activeHotspots(player))for(const g of h.groups){
    if(this.time<g.next)continue;
    const f=g.feeders[g.index%g.feeders.length],p=routePoint(f.path,f.entry,0);
-   const clear=this.trams.length<this.capacity&&Math.hypot(p.x-player.x,p.z-player.z)>SPAWN_VIEW_DISTANCE&&!this.trams.some(t=>Math.hypot(t.x-p.x,t.z-p.z)<70||t.path===f.path&&Math.abs(t.s-f.entry)<70);
+   const clear=this.trams.length<this.capacity&&hypot(p.x-player.x,p.z-player.z)>SPAWN_VIEW_DISTANCE&&!this.trams.some(t=>hypot(t.x-p.x,t.z-p.z)<70||t.path===f.path&&Math.abs(t.s-f.entry)<70);
    if(!clear){g.next=this.time+3;continue;}
    this.add(f.path,f.entry,{hotspot:h,exit:f.exit});g.index++;g.next=this.time+this.range(...h.headway);
   }
@@ -156,15 +157,15 @@ export class TramSimulation{
  // (never near the player, never in front of a player within view distance).
  guarantee(player,{min=3,radius=150,hotspot=this.nearestHotspot(player),clear=45}={}){
   if(!hotspot)return 0;
-  const near=()=>this.trams.filter(t=>Math.hypot(t.x-hotspot.x,t.z-hotspot.z)<radius);
+  const near=()=>this.trams.filter(t=>hypot(t.x-hotspot.x,t.z-hotspot.z)<radius);
   let count=near().length;if(count>=min)return count;
   for(const g of hotspot.groups){
    const f=g.feeders[g.index%g.feeders.length],stop=f.stop;
    g.next=Math.min(g.next,this.time);
    if(this.trams.length>=this.capacity)continue;
    if(stop){
-    const occupied=this.trams.some(t=>Math.hypot(t.x-stop.x,t.z-stop.z)<40||t.path===f.path&&t.s<stop.s&&stop.s-t.s<90);
-    if(!occupied&&Math.hypot(player.x-stop.x,player.z-stop.z)>=clear&&!this.inView(player,stop)){this.add(f.path,stop.s,{wait:this.range(8,16),lastStop:f.path.stops.indexOf(stop),hotspot,exit:f.exit,stop:stop.name});g.index++;count++;continue;}
+    const occupied=this.trams.some(t=>hypot(t.x-stop.x,t.z-stop.z)<40||t.path===f.path&&t.s<stop.s&&stop.s-t.s<90);
+    if(!occupied&&hypot(player.x-stop.x,player.z-stop.z)>=clear&&!this.inView(player,stop)){this.add(f.path,stop.s,{wait:this.range(8,16),lastStop:f.path.stops.indexOf(stop),hotspot,exit:f.exit,stop:stop.name});g.index++;count++;continue;}
    }
    // The platform is in view (or taken): stage one approaching tram per
    // direction instead, as close to the stretch as the view rule allows, so
@@ -172,7 +173,7 @@ export class TramSimulation{
    if(g.feeders.some(o=>this.trams.some(t=>t.path===o.path&&t.s>=o.entry-1&&t.s<o.s)))continue;
    for(let s=(stop?stop.s:f.s)-110;s>=f.entry;s-=25){
     const p=routePoint(f.path,s,0);
-    if(this.inView(player,p)||this.bodyNear(f.path,s,player,SPAWN_VIEW_DISTANCE/2)||this.trams.some(t=>Math.hypot(t.x-p.x,t.z-p.z)<70||t.path===f.path&&Math.abs(t.s-s)<70))continue;
+    if(this.inView(player,p)||this.bodyNear(f.path,s,player,SPAWN_VIEW_DISTANCE/2)||this.trams.some(t=>hypot(t.x-p.x,t.z-p.z)<70||t.path===f.path&&Math.abs(t.s-s)<70))continue;
     this.add(f.path,s,{hotspot,exit:f.exit});g.index++;count++;break;
    }
   }
@@ -217,8 +218,8 @@ export class TramSimulation{
    t.speed+=Math.max(-2.2*dt,Math.min(1.1*dt,desired-t.speed));
    const ns=Math.min(t.path.length,t.s+t.speed*dt),by=t.speed>0&&this.contact(t,ns,actors);
    if(by){t.speed=0;t.holdBy=by;}else{t.s=ns;Object.assign(t,routePoint(t.path,t.s,0));}
-   const far=Math.hypot(t.x-player.x,t.z-player.z)>450;
-   if(t.hotspot&&far&&(t.s>t.exit||Math.hypot(t.x-t.hotspot.x,t.z-t.hotspot.z)>t.hotspot.active)){t.retired=true;retire=true;continue;}
+   const far=hypot(t.x-player.x,t.z-player.z)>450;
+   if(t.hotspot&&far&&(t.s>t.exit||hypot(t.x-t.hotspot.x,t.z-t.hotspot.z)>t.hotspot.active)){t.retired=true;retire=true;continue;}
    if(t.s>=t.path.length-1){t.speed=0;if(t.hotspot){t.retired=true;retire=true;}else if(far){t.s=28;t.lastStop=-1;}}
   }
   if(retire)this.trams=this.trams.filter(t=>!t.retired);

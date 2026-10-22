@@ -1,6 +1,7 @@
 import {leavingBody,nudgeOut} from './contact-geometry.js';
 import {prepareGraph,routePoint} from './mobility.js';
 import {signalGreen,untilGreen,oncomingPasses} from './lane-model.js';
+const hypot=(x,z)=>Math.sqrt(x*x+z*z); // not Math.hypot: in optimised code it allocated ~80 bytes a call (its arguments boxed)
 
 export const BUS_DIMENSIONS=Object.freeze({city:{length:12,width:2.55,height:3.3,wheelbase:6},coach:{length:12,width:2.55,height:3.3,wheelbase:6},trunk:{length:15,width:2.55,height:3.3,wheelbase:7.6},tourist:{length:11.4,width:2.55,height:4.3,wheelbase:5.6}});
 const dims=a=>BUS_DIMENSIONS[a.kind]||{length:(a.halfLength??2.36)*2,width:(a.halfWidth??.98)*2};
@@ -21,9 +22,9 @@ export function busFitsRoad(p,world){
 // Separating axes of two boxes, without lists or closures (thousands of tests a step: probes ahead x vehicles near).
 const halfL=p=>{const d=BUS_DIMENSIONS[p.kind];return d?d.length/2:(p.halfLength??2.36);},halfW=p=>{const d=BUS_DIMENSIONS[p.kind];return d?d.width/2:(p.halfWidth??.98);};
 function apart(vx,vz,dx,dz,wa,la,ac,as,wb,lb,bc,bs){return Math.abs(dx*vx+dz*vz)>=wa*Math.abs(vx*ac-vz*as)+la*Math.abs(vx*as+vz*ac)+wb*Math.abs(vx*bc-vz*bs)+lb*Math.abs(vx*bs+vz*bc);}
-export function busOverlaps(a,b,margin=0){const la=halfL(a)+margin,wa=halfW(a)+margin,lb=halfL(b),wb=halfW(b),dx=b.x-a.x,dz=b.z-a.z;if(Math.hypot(dx,dz)>la+lb+3)return false;const ac=Math.cos(a.heading),as=Math.sin(a.heading),bc=Math.cos(b.heading),bs=Math.sin(b.heading);
+export function busOverlaps(a,b,margin=0){const la=halfL(a)+margin,wa=halfW(a)+margin,lb=halfL(b),wb=halfW(b),dx=b.x-a.x,dz=b.z-a.z;if(hypot(dx,dz)>la+lb+3)return false;const ac=Math.cos(a.heading),as=Math.sin(a.heading),bc=Math.cos(b.heading),bs=Math.sin(b.heading);
  return !(apart(ac,-as,dx,dz,wa,la,ac,as,wb,lb,bc,bs)||apart(as,ac,dx,dz,wa,la,ac,as,wb,lb,bc,bs)||apart(bc,-bs,dx,dz,wa,la,ac,as,wb,lb,bc,bs)||apart(bs,bc,dx,dz,wa,la,ac,as,wb,lb,bc,bs));}
-export function safeBusSweep(a,b,world){const distance=Math.hypot(b.x-a.x,b.z-a.z),angle=turn(a.heading,b.heading);if(distance>.02&&Math.abs(angle)/distance>1/8)return false;const n=Math.max(1,Math.ceil(distance/.35),Math.ceil(Math.abs(angle)*dims(a).length/.35));const q=SWEEP;q.kind=a.kind;q.halfLength=a.halfLength;q.halfWidth=a.halfWidth;for(let i=0;i<=n;i++){const t=i/n;q.x=a.x+(b.x-a.x)*t;q.z=a.z+(b.z-a.z)*t;q.heading=a.heading+angle*t;if(!busFitsRoad(q,world))return false;}return true;}
+export function safeBusSweep(a,b,world){const distance=hypot(b.x-a.x,b.z-a.z),angle=turn(a.heading,b.heading);if(distance>.02&&Math.abs(angle)/distance>1/8)return false;const n=Math.max(1,Math.ceil(distance/.35),Math.ceil(Math.abs(angle)*dims(a).length/.35));const q=SWEEP;q.kind=a.kind;q.halfLength=a.halfLength;q.halfWidth=a.halfWidth;for(let i=0;i<=n;i++){const t=i/n;q.x=a.x+(b.x-a.x)*t;q.z=a.z+(b.z-a.z)*t;q.heading=a.heading+angle*t;if(!busFitsRoad(q,world))return false;}return true;}
 const SWEEP={x:0,z:0,heading:0,kind:'city',halfLength:undefined,halfWidth:undefined}; // one pose reused along the sweep (a copy of the whole bus per 35 cm was the step's biggest garbage)
 // Lane assignment: a route line from GTFS or OpenStreetMap usually follows the middle of the street, so
 // both directions would share it head-on. `lanes` (from scripts/bus-lanes.mjs) holds a right-hand offset
@@ -44,7 +45,7 @@ export function assignBusStops(path,stops=[]){
  const own=path.stopIds&&new Set(path.stopIds),half=dims(path).length/2,out=[];let x0=Infinity,z0=Infinity,x1=-Infinity,z1=-Infinity;
  for(const [x,z] of path.points){x0=Math.min(x0,x);z0=Math.min(z0,z);x1=Math.max(x1,x);z1=Math.max(z1,z);}
  for(const stop of stops){if(own?!own.has(stop.id):stop.x<x0-BUS_STOP_REACH||stop.x>x1+BUS_STOP_REACH||stop.z<z0-BUS_STOP_REACH||stop.z>z1+BUS_STOP_REACH)continue;let best=own?25:BUS_STOP_REACH,at=null;
-  for(let i=1;i<path.points.length;i++){const a=path.points[i-1],b=path.points[i],dx=b[0]-a[0],dz=b[1]-a[1],l2=dx*dx+dz*dz||1,t=Math.max(0,Math.min(1,((stop.x-a[0])*dx+(stop.z-a[1])*dz)/l2)),ox=stop.x-a[0]-dx*t,oz=stop.z-a[1]-dz*t,d=Math.hypot(ox,oz);
+  for(let i=1;i<path.points.length;i++){const a=path.points[i-1],b=path.points[i],dx=b[0]-a[0],dz=b[1]-a[1],l2=dx*dx+dz*dz||1,t=Math.max(0,Math.min(1,((stop.x-a[0])*dx+(stop.z-a[1])*dz)/l2)),ox=stop.x-a[0]-dx*t,oz=stop.z-a[1]-dz*t,d=hypot(ox,oz);
    if(d<best&&(own||ox*-dz+oz*dx>0||d<1)){best=d;at=path.cumulative[i-1]+Math.sqrt(l2)*t;}}
   const s=at-half+1.5;if(at!==null&&s>path.start+BUS_PULL_IN&&s<path.end-BUS_PULL_OUT&&!out.some(o=>Math.abs(o.s-s)<30))out.push({id:stop.id,name:stop.name,s,x:stop.x,z:stop.z});}
  return out.sort((a,b)=>a.s-b.s);
@@ -66,8 +67,8 @@ export const busDwell=(bus,stopIndex)=>4+((bus.id*3+stopIndex*7)%5);
 // body pose on the departure shape. No pavement permission is introduced.
 export function stationBayPoses(data,world){const result=[];
  for(const line of ['78','611','600']){const stop=data.stationStops?.find(s=>s.lines?.includes(line));if(!stop)continue;
-  const source=data.paths.find(p=>p.line===line&&p.destination!=='Rautatientori'&&Math.hypot(p.points[0][0]-stop.x,p.points[0][1]-stop.z)<12);if(!source)continue;
-  const a=source.points[0],b=source.points[1],length=Math.hypot(b[0]-a[0],b[1]-a[1]),dx=(b[0]-a[0])/length,dz=(b[1]-a[1])/length,heading=Math.atan2(-dx,-dz);let found;
+  const source=data.paths.find(p=>p.line===line&&p.destination!=='Rautatientori'&&hypot(p.points[0][0]-stop.x,p.points[0][1]-stop.z)<12);if(!source)continue;
+  const a=source.points[0],b=source.points[1],length=hypot(b[0]-a[0],b[1]-a[1]),dx=(b[0]-a[0])/length,dz=(b[1]-a[1])/length,heading=Math.atan2(-dx,-dz);let found;
   for(const along of [-3,0,3])for(const offset of [0,1,-1,2,-2]){const p={kind:source.kind,x:a[0]+dx*along-dz*offset,z:a[1]+dz*along+dx*offset,heading};if(!found&&busFitsRoad(p,world)&&!result.some(q=>busOverlaps(p,q,1))){found={...p,stopId:stop.id,platform:stop.platform,line,destination:source.destination,reference:'HSL 2026-09-16 station stop and departure shape; approximate standing position, not photo-surveyed bus pose'};}}
   if(found)result.push(found);
  }return result;
@@ -123,20 +124,20 @@ export class BusSimulation{
  }
  // Fallback for paths no road graph has annotated (mobility.attachBuses gives signalStops): mapped signal
  // points near the route, found once per path when first needed.
- legacySignals(path){if(path.signals)return path.signals;path.signals=[];for(const [id,signal]of this.signalPoints.entries()){let best=12,at=null;for(let i=1;i<path.points.length;i++){const a=path.points[i-1],b=path.points[i],dx=b[0]-a[0],dz=b[1]-a[1],l=Math.hypot(dx,dz),t=Math.max(0,Math.min(1,((signal.p[0]-a[0])*dx+(signal.p[1]-a[1])*dz)/(l*l||1))),distance=Math.hypot(signal.p[0]-a[0]-dx*t,signal.p[1]-a[1]-dz*t);if(distance<best){best=distance;at=path.cumulative[i-1]+t*l;}}if(at!==null&&at>path.start&&at<path.end+10)path.signals.push({id,s:at});}return path.signals;}
+ legacySignals(path){if(path.signals)return path.signals;path.signals=[];for(const [id,signal]of this.signalPoints.entries()){let best=12,at=null;for(let i=1;i<path.points.length;i++){const a=path.points[i-1],b=path.points[i],dx=b[0]-a[0],dz=b[1]-a[1],l=hypot(dx,dz),t=Math.max(0,Math.min(1,((signal.p[0]-a[0])*dx+(signal.p[1]-a[1])*dz)/(l*l||1))),distance=hypot(signal.p[0]-a[0]-dx*t,signal.p[1]-a[1]-dz*t);if(distance<best){best=distance;at=path.cumulative[i-1]+t*l;}}if(at!==null&&at>path.start&&at<path.end+10)path.signals.push({id,s:at});}return path.signals;}
  cap(kind){return kind==='city'?this.cityCount:kind==='trunk'?this.trunkCount:kind==='coach'?this.coachCount:this.touristCount;}
- reset(player,traffic=[]){this.buses=[];const clear=p=>!traffic.some(o=>o.edge!==null&&busOverlaps(p,o,1));for(const bay of this.stationBays){if(!clear(bay)||Math.hypot(bay.x-player.x,bay.z-player.z)>(bay.radius||650)||!busFitsRoad(bay,this.world)||busOverlaps(bay,player,2)||this.buses.some(b=>busOverlaps(b,bay,1)))continue;const id='station-bay-'+(bay.stopId||bay.line)+(bay.radius?'-'+Math.round(bay.z):'');this.buses.push({...bay,id:this.buses.length,parked:true,speed:0,edge:true,path:{id,segmentId:id,line:bay.line,destination:bay.destination}});}const used=new Set();for(const kind of ['city','trunk','tourist','coach']){const count=this.cap(kind);const candidates=this.paths.filter(p=>p.kind===kind).map(path=>{const a=routeSamples(path);let best=Infinity,at=path.start;for(let i=0;i<a.length;i+=3){const d=Math.hypot(a[i+1]-player.x,a[i+2]-player.z);if(d<best){best=d;at=a[i];}}return {path,best,at};}).filter(p=>p.best<650).sort((a,b)=>a.best-b.best);let added=0;for(const {path,at}of candidates){if(added>=count)break;if(used.has(path.id))continue;let s=path.end-at<90?path.start+5:Math.min(path.end-25,Math.max(path.start,at+65+added*45)),p=busPose(path,s,kind);const distance=Math.hypot(p.x-player.x,p.z-player.z);if(!busFitsRoad(p,this.world)||!clear(p)||distance<30||distance>650||this.supplying&&distance<300&&this.visibilityTest?.(p)||/* no bus appearing in view */this.buses.some(b=>Math.hypot(b.x-p.x,b.z-p.z)<55))continue;this.buses.push({id:this.buses.length,path,s,speed:0,edge:true,...p});used.add(path.id);added++;}}this.refreshObstacles();}
+ reset(player,traffic=[]){this.buses=[];const clear=p=>!traffic.some(o=>o.edge!==null&&busOverlaps(p,o,1));for(const bay of this.stationBays){if(!clear(bay)||hypot(bay.x-player.x,bay.z-player.z)>(bay.radius||650)||!busFitsRoad(bay,this.world)||busOverlaps(bay,player,2)||this.buses.some(b=>busOverlaps(b,bay,1)))continue;const id='station-bay-'+(bay.stopId||bay.line)+(bay.radius?'-'+Math.round(bay.z):'');this.buses.push({...bay,id:this.buses.length,parked:true,speed:0,edge:true,path:{id,segmentId:id,line:bay.line,destination:bay.destination}});}const used=new Set();for(const kind of ['city','trunk','tourist','coach']){const count=this.cap(kind);const candidates=this.paths.filter(p=>p.kind===kind).map(path=>{const a=routeSamples(path);let best=Infinity,at=path.start;for(let i=0;i<a.length;i+=3){const d=hypot(a[i+1]-player.x,a[i+2]-player.z);if(d<best){best=d;at=a[i];}}return {path,best,at};}).filter(p=>p.best<650).sort((a,b)=>a.best-b.best);let added=0;for(const {path,at}of candidates){if(added>=count)break;if(used.has(path.id))continue;let s=path.end-at<90?path.start+5:Math.min(path.end-25,Math.max(path.start,at+65+added*45)),p=busPose(path,s,kind);const distance=hypot(p.x-player.x,p.z-player.z);if(!busFitsRoad(p,this.world)||!clear(p)||distance<30||distance>650||this.supplying&&distance<300&&this.visibilityTest?.(p)||/* no bus appearing in view */this.buses.some(b=>hypot(b.x-p.x,b.z-p.z)<55))continue;this.buses.push({id:this.buses.length,path,s,speed:0,edge:true,...p});used.add(path.id);added++;}}this.refreshObstacles();}
  // Every step: five sample boxes along each bus and one body per bus, written into objects kept on the bus (a fresh
  // {...bus} copy for each, five a bus a step, was a steady source of garbage).
  refreshObstacles(){const obs=this.obstacles=[],bodies=this.bodies=[];
   for(const b of this.buses){const d=dims(b),reach=d.length/2-2,sin=Math.sin(b.heading),cos=Math.cos(b.heading),cache=b._obstacles??=[{},{},{},{},{}];
    for(let i=0;i<5;i++){const o=cache[i],along=(i/2-1)*reach;for(const k in b)if(k!=='_obstacles'&&k!=='_body')o[k]=b[k];o.x=b.x+sin*along;o.z=b.z+cos*along;o.busId=b.id;o.bus=true;o.ref=b;obs.push(o);}
    const body=b._body??={};body.x=b.x;body.z=b.z;body.heading=b.heading;body.hl=d.length/2;body.hw=d.width/2;body.speed=b.speed;body.ref=b;bodies.push(body);}}
- step(dt,player,traffic=[]){this.time+=dt;if(this.time>this.supplyAt){this.supplyAt=this.time+4;const previous=this.buses.filter(b=>Math.hypot(b.x-player.x,b.z-player.z)<550);this.supplying=true;try{this.reset(player);}finally{this.supplying=false;}const candidates=this.buses;this.buses=previous;for(const c of candidates){
+ step(dt,player,traffic=[]){this.time+=dt;if(this.time>this.supplyAt){this.supplyAt=this.time+4;const previous=this.buses.filter(b=>hypot(b.x-player.x,b.z-player.z)<550);this.supplying=true;try{this.reset(player);}finally{this.supplying=false;}const candidates=this.buses;this.buses=previous;for(const c of candidates){
    // Fixed, mapped bay occupants have their own bounded slots. Moving buses
    // must not consume them before a continuous drive reaches the station.
    const count=this.buses.filter(b=>!b.parked&&b.kind===c.kind).length;
-   const blocked=this.buses.some(b=>b.path.id===c.path.id||(c.parked?busOverlaps(c,b,1):Math.hypot(b.x-c.x,b.z-c.z)<55));
+   const blocked=this.buses.some(b=>b.path.id===c.path.id||(c.parked?busOverlaps(c,b,1):hypot(b.x-c.x,b.z-c.z)<55));
    if((c.parked||count<this.cap(c.kind))&&!blocked&&!traffic.some(o=>o.edge!==null&&busOverlaps(c,o,1)))this.buses.push(c);
   }this.buses.forEach((b,i)=>b.id=i);}
   const all=this._all??=[];all.length=0;all.push(player);for(let i=0;i<traffic.length;i++)all.push(traffic[i]);for(let i=0;i<this.buses.length;i++)all.push(this.buses[i]); /* one list a step, not two fresh copies of all traffic per bus */
@@ -175,7 +176,7 @@ export class BusSimulation{
    // mapped run does not stand in a live lane for as long as the player stays nearby.
    // At the end of its mapped run a bus stands like a parked one: cars steer round it (mobility.js).
    b.standing=remaining<1;b.standFor=b.standing?(b.standFor||0)+dt:0;
-   const distance=Math.hypot(b.x-player.x,b.z-player.z),away=distance>150||distance>40&&this.visibilityTest&&!this.visibilityTest(b)||b.standFor>20&&distance>60;
+   const distance=hypot(b.x-player.x,b.z-player.z),away=distance>150||distance>40&&this.visibilityTest&&!this.visibilityTest(b)||b.standFor>20&&distance>60;
    // The route start must be clear: restarting on top of queued cars used to wedge them inside the bus.
    if((remaining<1||(b.held||0)>12)&&away){const start=busPose(b.path,b.path.start,b.kind);if(![player,...traffic,...this.buses].some(o=>o!==b&&o.edge!==null&&busOverlaps(start,o,1))){b.s=b.path.start;b.held=0;b.clearUntil=0;b.stop=b.pull=b.nextStop=null;Object.assign(b,start);}else b.done=true;}
   }

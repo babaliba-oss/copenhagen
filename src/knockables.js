@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import {groundAt} from './terrain.js';
+const hypot=(x,z)=>Math.sqrt(x*x+z*z); // not Math.hypot: in optimised code it allocated ~80 bytes a call (its arguments boxed)
 
 // Light street furniture (roadworks bollards) that the car knocks over instead of stopping against.
 // Each item is a small rigid body: it is kicked by the car, tumbles in the air, bounces, slides and
@@ -37,7 +38,7 @@ export function createKnockables(items,parts,{radius=.3,height=1.1,range=Infinit
     b.vx=(fx+sx*side)*speed*boost;b.vz=(fz+sz*side)*speed*boost;
     b.vy=Math.min(9,1.2+speed*.28*(.6+b.rand()*.6));
     // Tip over in the direction of travel: rotate about the horizontal axis perpendicular to the push.
-    const h=Math.hypot(b.vx,b.vz)||1;b.axis.set(b.vz/h,0,-b.vx/h);
+    const h=hypot(b.vx,b.vz)||1;b.axis.set(b.vz/h,0,-b.vx/h);
     b.tiltRate=3+speed*.35+b.rand()*2.5;b.spin=(b.rand()-.5)*speed*.9;
     b.knocked=true;b.resting=false;b.restTime=0;hits++;
   }
@@ -52,10 +53,10 @@ export function createKnockables(items,parts,{radius=.3,height=1.1,range=Infinit
       if(car&&b.y<.6&&Math.abs(car.speed)>.6&&Math.abs(b.x-car.x)<5&&Math.abs(b.z-car.z)<5){ // cheap reject first: sets run to 10k bodies
         let contact=carContact(car,b.x,b.z,radius);
         if(!contact&&long){const ex=Math.sin(b.yaw)*long,ez=Math.cos(b.yaw)*long;contact=carContact(car,b.x+ex,b.z+ez,radius)||carContact(car,b.x-ex,b.z-ez,radius);} // long items (rack bikes): their ends count, not only the centre
-        if(contact&&(b.resting||Math.hypot(b.vx,b.vz)<Math.abs(car.speed)*.8)){if(!b.knocked)slowdown+=.012;kick(b,car,contact);touched.add(b);}
+        if(contact&&(b.resting||hypot(b.vx,b.vz)<Math.abs(car.speed)*.8)){if(!b.knocked)slowdown+=.012;kick(b,car,contact);touched.add(b);}
       }
       if(b.resting){
-        if(b.knocked&&car&&(b.restTime+=dt)>RESPAWN_AFTER&&Math.hypot(car.x-b.home.x,car.z-b.home.z)>clear&&Math.hypot(car.x-b.x,car.z-b.z)>clear){reset(b);moving=true;}
+        if(b.knocked&&car&&(b.restTime+=dt)>RESPAWN_AFTER&&hypot(car.x-b.home.x,car.z-b.home.z)>clear&&hypot(car.x-b.x,car.z-b.z)>clear){reset(b);moving=true;}
         continue;
       }
       live=true;
@@ -75,7 +76,7 @@ export function createKnockables(items,parts,{radius=.3,height=1.1,range=Infinit
         const target=Math.round((b.tilt-Math.PI/2)/Math.PI)*Math.PI+Math.PI/2;
         b.tilt+=(target-b.tilt)*(1-Math.exp(-dt*9));b.tiltRate=0;
       }
-      if(!airborne&&b.vy===0&&Math.hypot(b.vx,b.vz)<.08&&Math.abs(Math.abs(b.tilt%Math.PI)-Math.PI/2)<.02){b.vx=b.vz=b.spin=0;b.resting=true;}
+      if(!airborne&&b.vy===0&&hypot(b.vx,b.vz)<.08&&Math.abs(Math.abs(b.tilt%Math.PI)-Math.PI/2)<.02){b.vx=b.vz=b.spin=0;b.resting=true;}
     }
     if(car&&slowdown)car.speed*=1-Math.min(.06,slowdown);
     if(live)moving=true;
@@ -90,12 +91,12 @@ export function createKnockables(items,parts,{radius=.3,height=1.1,range=Infinit
   let lastFocus=null,packedAt=null;
   function update(focus,force=focus===undefined){ // a bare update() (a ride taken or given back, a reset) always repacks
     focus=focus??lastFocus;if(focus)lastFocus={x:focus.x,z:focus.z};
-    if(!force&&!moving&&packedAt&&lastFocus&&Math.hypot(lastFocus.x-packedAt.x,lastFocus.z-packedAt.z)<25)return;
+    if(!force&&!moving&&packedAt&&lastFocus&&hypot(lastFocus.x-packedAt.x,lastFocus.z-packedAt.z)<25)return;
     packedAt=lastFocus&&{...lastFocus};moving=false;
     let n=0;
     for(const b of bodies){
       if(b.playerTaken||b.disabled){if(range===Infinity){matrix.makeScale(0,0,0);for(const m of meshes)m.setMatrixAt(n,matrix);n++;}continue;} // unpacked sets keep instance i = item i (per-item colours)
-      if(focus&&range<Infinity&&Math.abs(b.x-focus.x)+Math.abs(b.z-focus.z)>range*1.3&&Math.hypot(b.x-focus.x,b.z-focus.z)>range)continue;
+      if(focus&&range<Infinity&&Math.abs(b.x-focus.x)+Math.abs(b.z-focus.z)>range*1.3&&hypot(b.x-focus.x,b.z-focus.z)>range)continue;
       qYaw.setFromAxisAngle(up,b.yaw);qTilt.setFromAxisAngle(b.axis,b.tilt).multiply(qYaw);
       // Lying bollards rest on their side, lifted by half the board thickness so they do not sink into the road.
       pos.set(b.x,b.y+Math.abs(Math.sin(b.tilt))*.05+groundAt(b.x,b.z)+(b.home.drop&&Math.abs(b.x-b.home.x)+Math.abs(b.z-b.home.z)<1?b.home.drop:0),b.z); /* home.drop: an item off the paving stands on the bare ground drawn under the field (mapped-furniture.js) */matrix.compose(pos,qTilt,one);
