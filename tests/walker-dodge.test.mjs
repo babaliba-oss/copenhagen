@@ -24,3 +24,15 @@ test('walkers are not spawned on a stub of pavement they could not walk off',()=
  const placed=sim.people.filter(a=>a.edge);assert.ok(placed.length>=10,`${placed.length} placed`);
  assert.equal(placed.filter(a=>a.edge.from>=2).length,0,'none on the stub');
 });
+// A footway running on into the carriageway (no crossing) ends at the kerb: walkers turn there promptly and walk back,
+// rather than standing 3 s each while those behind queue into them.
+test('walkers reaching a kerb turn back and do not stand in one another there',()=>{
+ const n=[[-30,0],[10,10]],e=(a,b)=>({from:a,to:b,points:[n[a],n[b]],lane:0,signal:-1,crossing:false});
+ const pave=(x,z)=>x+z<0; /* a diagonal kerb across the path */
+ const sim=new Mobility({roads:{nodes:[],edges:[]},walks:{nodes:n,edges:[e(0,1),e(1,0)]},signals:[]},{roads:{at:(x,z)=>!pave(x,z)},pavement:{at:pave},buildings:{at:()=>false}},{cars:0,people:3});
+ sim.people.forEach((a,i)=>{Object.assign(a,{edge:sim.walks.edges[0],s:14-i*1.6,cruise:1.3,side:.25});Object.assign(a,sim.position(a),{speed:1.3});});
+ const player={x:-20,z:20,heading:0,speed:0,travelMode:'walk'};let close=0;
+ for(let i=0;i<60*20;i++){sim.step(1/60,player);const P=sim.people;for(let p=0;p<3;p++)for(let q=p+1;q<3;q++)if(Math.hypot(P[p].x-P[q].x,P[p].z-P[q].z)<.5)close+=1/60;}
+ for(const a of sim.people)assert.ok(a.x<-12,`walked back from the kerb (x ${a.x.toFixed(1)})`);
+ assert.ok(close<1.5,`${close.toFixed(1)} pair-seconds within 50 cm`);
+});

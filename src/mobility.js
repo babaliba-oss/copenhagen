@@ -170,10 +170,10 @@ export class Mobility {
   const rx=Math.cos(p.heading),rz=-Math.sin(p.heading);let side=a.yieldSide??(a.side||0)+(a.dodge||0); // dodge: a step aside for someone in the way (walkDodge); yieldSide: out of a coach's way (coachYield)
   while(Math.abs(side)>.08&&!this.walkable(p.x+rx*side,p.z+rz*side,a.edge))side*=.5;
   if(Math.abs(side)<=.08)side=0;
-  const tx=rx*side,tz=rz*side;
+  const tx=rx*side,tz=rz*side,ox0=a.ox,oz0=a.oz;
   if(a.ox===undefined||!(this.dt>0)){a.ox=tx;a.oz=tz;}
   else{const ex=tx-a.ox,ez=tz-a.oz,l=hypot(ex,ez),max=(a.yieldSide!==undefined?1.8:a.dodge?1.2:.7)*this.dt;if(l>max){a.ox+=ex/l*max;a.oz+=ez/l*max;}else{a.ox=tx;a.oz=tz;}}
-  if(!this.walkable(p.x+a.ox,p.z+a.oz,a.edge)){a.ox=tx;a.oz=tz;}
+  if(!this.walkable(p.x+a.ox,p.z+a.oz,a.edge)){if(ox0!==undefined&&this.walkable(p.x+ox0,p.z+oz0,a.edge)){a.ox=ox0;a.oz=oz0;}else{a.ox=tx;a.oz=tz;}} // where easing over cannot be walked (the line out on the carriageway at a kerb corner), it keeps its place across the path
   p.x+=a.ox;p.z+=a.oz;return p;
  }
  // How fast a walker may go so as to stay a step behind whoever walks ahead of it the same way (a queue at a
@@ -321,7 +321,10 @@ export class Mobility {
  retire(a,player,force=false){a.speed=0;
   // A walker at the end of its path or stuck there turns back (or stands) while you can see it: recycled on the spot it
   // vanished in front of you (two walkers met on a path, stood inside each other and were gone; the 1760 riding ground).
-  if(a.walking&&!force&&a.edge&&(a.hiddenFor||0)<1.5&&hypot(a.x-player.x,a.z-player.z)<120){const back=this.walks.outgoing[a.edge.to]?.find(e=>e.to===a.edge.from&&Math.abs(e.length-a.edge.length)<.8);if(back&&(a.turnedAt===undefined||this.time-a.turnedAt>2)){a.s=Math.max(0,back.length-a.s);a.edge=back;a.turnedAt=this.time;a.stuck=0;a.progressPoint=null;}return;}
+  if(a.walking&&!force&&a.edge&&(a.hiddenFor||0)<1.5&&hypot(a.x-player.x,a.z-player.z)<120){const back=this.walks.outgoing[a.edge.to]?.find(e=>e.to===a.edge.from&&Math.abs(e.length-a.edge.length)<.8);if(back&&(a.turnedAt===undefined||this.time-a.turnedAt>2)){a.s=Math.max(0,back.length-a.s);a.edge=back;a.turnedAt=this.time;a.stuck=0;a.progressPoint=null;
+    // Eased on from where it stands: a walker stopped at a kerb had its step aside zeroed (unpocket) though it still stood off the line;
+    // turned round, its first step went to the line out on the carriageway, was refused, and it stood there turning for good, a queue behind it.
+    if(a.ox!==undefined){const c=routePoint(back,a.s,0);a.ox=a.x-c.x;a.oz=a.z-c.z;a.unpocket=false;}}return;}
   if(force||a.walking||this.canRecycle(a,player))a.edge=null;}
  // Lanes a parked bus stands in (mapped bays on the carriageway) are avoided when routing allows; a car that
  // must pass one steers around it (position()).
@@ -596,6 +599,9 @@ export class Mobility {
     if(a.walking&&a.stuck>1.5&&(a.ox||a.oz)){a.ox=0;a.oz=0;a.unpocket=true;}
     // One whose way on runs under a coach standing for it (each waiting for the other) turns back after a second.
     if(a.walking&&a.stuck>1&&coachCells){const c=this.coachOver(p,a);if(c)this.scare(a,c,2);}
+    // A footway that runs on into the carriageway (not a crossing) ends at the kerb: the walker turns there as at a dead end
+    // rather than standing 3 s, those behind queued at the same spot and stood in one another as each turned through them.
+    if(a.walking&&a.stuck>.4&&!a.edge.crossing){const q=routePoint(a.edge,Math.min(a.edge.length,a.s+.5),0,undefined,undefined,REACH_P);if(!this.walkable(q.x,q.z,a.edge)){this.retire(a,player);continue;}}
     // A lane that runs off the mapped carriageway never clears; recycle it once it is not right beside the player.
     if(a.stuck>3)this.retire(a,player,!a.walking&&a.stuck>8&&hypot(a.x-player.x,a.z-player.z)>40);continue;}
    // Tiny successful steps between repeated failures are not real progress.
