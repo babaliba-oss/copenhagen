@@ -41,11 +41,12 @@ function makeGraph(g,undirected){
    if(f>d[u])continue;const into=radj[u];for(let k=0;k<into.length;k+=2){const v=into[k],e=into[k+1];if(avoid&&e.walled)continue;const nd=f+e.len;if(nd<d[v]){d[v]=nd;next[v]=e;push(nd,v);}}}
   const t={next,walls:wallsSeen};trees.set(key,t);if(trees.size>4)trees.delete(trees.keys().next().value);return t;
  }
- // blocked(x,z): what the player's car runs into. An edge whose line runs over 1 m through it (a passage the model draws
- // shut, a courtyard gate, a footway main.js drops as running through a house) is left out: the route found is checked
+ // blocked(x,z): what the player's car runs into. An edge whose line runs through it (over 0.3 m: the model's road walls
+ // are 0.6 m thick; a passage the model draws shut, a courtyard gate, a footway main.js drops as running through a house)
+ // is left out: the route found is checked
  // edge by edge (each judged once, then remembered) and found again without the walled ones, up to 6 times. The GPS line
  // and the races led straight into the wall (Christians Brygge under the Black Diamond).
- const walled=(P,blocked)=>{let run=0;for(let i=1;i<P.length;i++){const L=dist(P[i],P[i-1]),k=Math.ceil(L/.5);for(let j=0;j<k;j++){if(blocked(P[i-1][0]+(P[i][0]-P[i-1][0])*(j+.5)/k,P[i-1][1]+(P[i][1]-P[i-1][1])*(j+.5)/k)){run+=L/k;if(run>1)return true;}else run=0;}}return false;};
+ const walled=(P,blocked)=>{let run=0;for(let i=1;i<P.length;i++){const L=dist(P[i],P[i-1]),k=Math.ceil(L/.5);for(let j=0;j<k;j++){if(blocked(P[i-1][0]+(P[i][0]-P[i-1][0])*(j+.5)/k,P[i-1][1]+(P[i][1]-P[i-1][1])*(j+.5)/k)){run+=L/k;if(run>.3)return true;}else run=0;}}return false;};
  function route(a,b,blocked){
   if(a<0||b<0)return null;let edges=null;
   for(let t=0;t<6;t++){const {next}=tree(b,!!blocked);edges=[];for(let v=a,k=0;v!==b;k++){const e=next[v];if(!e||k>n){edges=null;break;}edges.push(e);v=e.to;}
@@ -57,9 +58,11 @@ function makeGraph(g,undirected){
  function nearestOpen(x,z,blocked){if(!blocked)return nearest(x,z);const gx=Math.floor(x/C),gz=Math.floor(z/C),c=[];
   for(let i=-3;i<=3;i++)for(let j=-3;j<=3;j++)for(const k of cell.get((gx+i)+','+(gz+j))||[])c.push([Math.hypot(g.nodes[k][0]-x,g.nodes[k][1]-z),k]);
   c.sort((a,b)=>a[0]-b[0]);
-  for(let q=0;q<c.length&&q<24;q++){const [d,k]=c[q],[nx,nz]=g.nodes[k],m=Math.ceil(d);let ok=true;for(let s=1;s<m&&ok;s++)if(blocked(nx+(x-nx)*s/m,nz+(z-nz)*s/m))ok=false;if(ok)return k;}
+  for(let q=0;q<c.length&&q<24;q++)if(clear(c[q][1],x,z,blocked))return c[q][1];
   return nearest(x,z);}
- return {nearest,nearestOpen,route,nodes:g.nodes};
+ // A straight run from node k to (x,z) with nothing solid on it (every 25 cm: the model's road walls are 0.6 m thick).
+ function clear(k,x,z,blocked){if(k<0)return false;const [nx,nz]=g.nodes[k],m=Math.ceil(Math.hypot(x-nx,z-nz)*4);for(let s=1;s<m;s++)if(blocked(nx+(x-nx)*s/m,nz+(z-nz)*s/m))return false;return true;}
+ return {nearest,nearestOpen,clear,route,nodes:g.nodes};
 }
 
 // ---------- the line on the street (eaten from behind as you ride it) ----------
@@ -307,7 +310,8 @@ export function createCopenhagenGame({scene,city,mobilityData,cityData,toast,sou
   return {p:state==='a'?job().A:job().B,kind:'job'};
  }
  function rebuild(){const t=target();routeFor=t.p;const G=mode==='car'?road:walk;const a=G.nearest(player.x,player.z);let b=G.nearestOpen(t.p[0],t.p[1],blocked),pts=G.route(a,b,blocked)||G.route(a,b);if(!pts){b=G.nearest(t.p[0],t.p[1]);pts=G.route(a,b,blocked)||G.route(a,b);} /* a one-way node that leads nowhere: the plain nearest; no way round a wall: through it, rather than no line */
-  if(pts&&G===road&&dist(road.nodes[b],t.p)>25){const wa=walk.nearestOpen(...road.nodes[b],blocked),wb=walk.nearestOpen(t.p[0],t.p[1],blocked),tail=walk.route(wa,wb,blocked)||walk.route(wa,wb);if(tail)pts=[...pts,...tail];} /* a target off the roads (Købmagergade, the squares, the quays): the last stretch along the footways the car can also take, not straight over the block */const on=pts&&trimStart(pts,player.x,player.z);line.set(on?[...(on.length&&dist(on[0],[player.x,player.z])>3?[[player.x,player.z]]:[]),...on,t.p]:null);}
+  if(pts&&G===road&&dist(road.nodes[b],t.p)>25){const wa=walk.nearestOpen(...road.nodes[b],blocked),wb=walk.nearestOpen(t.p[0],t.p[1],blocked),tail=walk.route(wa,wb,blocked)||walk.route(wa,wb);if(tail)pts=[...pts,...tail];} /* a target off the roads (Købmagergade, the squares, the quays): the last stretch along the footways the car can also take, not straight over the block */
+  if(pts&&G===walk&&blocked&&!walk.clear(b,t.p[0],t.p[1],blocked)){const rb=road.nearestOpen(t.p[0],t.p[1],blocked);if(road.clear(rb,t.p[0],t.p[1],blocked))for(let i=pts.length-1,s=25;i>=0;i--){if(i<pts.length-1&&(s+=dist(pts[i],pts[i+1]))<10)continue;s=0;const ra=road.nearest(pts[i][0],pts[i][1]);if(ra<0||dist(road.nodes[ra],pts[i])>40||!road.clear(ra,pts[i][0],pts[i][1],blocked))continue;const q=road.route(ra,rb,blocked);if(q){pts=[...pts.slice(0,i+1),...q];break;}}} /* on foot with no footway in clear sight of the target (Tivoli's gate, the Opera): the line went its last stretch through the houses; from the last point along it (every 10 m) with a street node in clear sight, along the streets instead */const on=pts&&trimStart(pts,player.x,player.z);line.set(on?[...(on.length&&dist(on[0],[player.x,player.z])>3?[[player.x,player.z]]:[]),...on,t.p]:null);}
  // The nearest graph node is often behind the car: the route then ran back to it and returned past the car
  // (a loop around the player). Start from the closest point of the route's first 60 m instead.
  function trimStart(pts,x,z){if(pts.length<2)return pts;let best=-1,bd=Infinity,bp=null,run=0;

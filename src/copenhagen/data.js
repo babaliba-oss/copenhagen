@@ -81,12 +81,12 @@ export const SAGAS = [
 
 // Characters who stand at fixed places and give sagas. `script` selects their dialogue in characters.js.
 export const CHARACTERS = [
-  { id: 'ghost', era: 'h', name: 'Christian IV', label: 'A king who died in 1648, Rundetårn', at: [55.68136, 12.57600], look: { coat: '#1c1c22' } },
+  { id: 'ghost', era: 'h', name: 'Christian IV', label: 'A king who died in 1648, Rundetårn', at: [55.68136, 12.57600], local: [-1, -146], look: { coat: '#1c1c22' } },
   { id: 'watchman', era: 'h', name: 'Vægteren', label: 'Night watchman, Gammeltorv', at: [55.67800, 12.57300], look: { coat: '#3a3226' } },
   { id: 'maren', era: 'h', name: 'Maren', label: 'Fishwife, Gammel Strand', at: [55.67760, 12.57900], look: { coat: '#6b2b2b' } },
   { id: 'thurah', era: 'h', name: 'Mester Thurah', label: 'Royal architect, Frederiksstaden', at: [55.68380, 12.59250], look: { coat: '#2d3d5a' } },
   { id: 'karen', name: 'Karen', label: 'Walking tour guide, Nyhavn', at: [55.67989, 12.58938], look: { coat: '#d8402e' } },
-  { id: 'aksel', name: 'Aksel', label: 'Regular at the Gefion Fountain', at: [55.68622, 12.59745], look: { coat: '#5a6b4a' } },
+  { id: 'aksel', name: 'Aksel', label: 'Regular at the Gefion Fountain', at: [55.68622, 12.59745], local: [1364, -712], look: { coat: '#5a6b4a' } },
   { id: 'nisse', name: 'Nissefar', era: 'b', label: 'House-nisse, Kongens Have', at: [55.68525, 12.57930], look: { coat: '#7a2a20', height: 1.1 } },
   { id: 'ole', name: 'Ole', era: 'b', label: 'Retired fisherman, Gammel Strand', at: [55.67750, 12.57856], look: { coat: '#2b3a55' } },
   { id: 'bent', name: 'Bent', label: 'Pølsevogn, Rådhuspladsen', at: [55.67610, 12.56880], look: { coat: '#f2f2ee' } },
