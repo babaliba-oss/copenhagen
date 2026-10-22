@@ -5,6 +5,10 @@ import {cornerSpeedLimit,edgeCruise,approachCruise,edgeTopSpeed,carLane} from '.
 import {sweptContact} from './contact-geometry.js';
 import {annotateJunctions,annotateCrossings,annotateTramRelations,annotateTramSignals,signalGreen as phaseGreen,tramThreat,boxesOverlap,carBox,oncomingPasses,CAR_HALF_LENGTH} from './lane-model.js';
 const hypot=(x,z)=>Math.sqrt(x*x+z*z); // not Math.hypot: in optimised code it allocated ~80 bytes a call (its arguments boxed), thousands of calls a step
+// Every car and walker is made with all the fields step() and spawn() give it, in one order: they were added as each
+// first came up, in different orders, so the agents had dozens of shapes and step() was thrown back out of its
+// optimised code ('wrong map') every few seconds, running at half speed and twice the garbage until optimised again.
+const newAgent=(id,walking,cruise,side,stationOnly,corridorOnly)=>({id,stationOnly,corridorOnly,walking,edge:null,s:0,speed:0,cruise,side,dodge:0,yieldSide:undefined,yieldHeld:0,unpocket:false,x:0,z:0,heading:0,playerTaken:undefined,conversation:undefined,knocked:undefined,damage:undefined,plan:[],prevDir:undefined,ox:undefined,oz:undefined,gapBy:null,gapHeld:0,offset:undefined,waiting:0,passing:null,unjam:null,unjamUntil:0,gridlock:0,hold:null,holdBy:null,atSignal:false,deadlocked:false,hiddenFor:0,panicUntil:0,turnAfter:0,turnedAt:undefined,holdUntil:0,retryAt:0,running:false,stuck:0,progressPoint:null,waitFrom:null,kerbUntil:0});
 const STANDING_PROBES=[3,6,10,15]; // metres ahead checked for a standing bus
 const NEXT_ONE=[null],NO_EDGES=[]; // the next planned edge, passed to cornerSpeedLimit without a fresh array per car
 // Walker grid cells (mobility step): a 1024-slot hash of 1.5 m cells; collisions only cost a distance test.
@@ -78,9 +82,9 @@ export class Mobility {
   // Main-road pool: extra cars that live only on a busy corridor (e.g. Olympia terminal → Kauppatori), both directions.
   this.corridor=corridor;this.corridorEdges=corridor?this.roads.edges.filter(e=>e.length>10&&corridor(...e.points[Math.floor(e.points.length/2)])):[];
   this.corridorIds=new Set(this.corridorEdges.map(e=>e.id));
-  this.cars=Array.from({length:cars+stationCars+(this.corridorEdges.length?corridorCars:0)},(_,id)=>({id,stationOnly:id>=cars&&id<cars+stationCars,corridorOnly:id>=cars+stationCars,walking:false,edge:null,s:0,speed:0,cruise:6+random()*5,x:0,z:0,heading:0}));
+  this.cars=Array.from({length:cars+stationCars+(this.corridorEdges.length?corridorCars:0)},(_,id)=>newAgent(id,false,6+random()*5,0,id>=cars&&id<cars+stationCars,id>=cars+stationCars));
   // side: each walker's own distance to the right of the path's line (0.2-0.9 m, spread by id so seeded runs keep their random sequence)
-  this.people=Array.from({length:people},(_,id)=>({id,walking:true,edge:null,s:0,speed:0,dodge:0,yieldSide:undefined,yieldHeld:0,unpocket:false,cruise:.85+random()*.65,side:.2+(id*.6180339887%1)*.7,x:0,z:0,heading:0}));
+  this.people=Array.from({length:people},(_,id)=>newAgent(id,true,.85+random()*.65,.2+(id*.6180339887%1)*.7,false,false));
  }
  // Trams share the street: tracks are related to lanes once, and their positions are read every step.
  attachTrams(trams){this.trams=trams;annotateTramRelations(this.roads.edges,trams.paths);annotateTramSignals(trams.paths,this.signals||[],this.signalControl);}
