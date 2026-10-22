@@ -10,7 +10,7 @@ export function installBootArt(doc=document){
  const list=SETS[era],root=doc.createElement('div');root.id='boot-art';root.dataset.era=era;root.setAttribute('aria-hidden','true');
  const layers=[0,1].map(()=>{const d=doc.createElement('div');d.className='boot-art-layer';root.append(d);return d;});
  doc.querySelector('#app')?.prepend(root);
- let i=Math.floor(Math.random()*list.length),front=0,first=true;const show=n=>{const id=list[n%list.length],img=new Image();img.onload=()=>{const back=layers[1-front];back.style.backgroundImage=`url(/art/${id}.webp)`;if(first){back.style.transition='none';first=false;requestAnimationFrame(()=>requestAnimationFrame(()=>back.style.transition=''));} /* the first picture is there at once (a busy start-up thread used to hold its fade) */back.classList.add('on');layers[front].classList.remove('on');front=1-front;};img.src=`/art/${id}.webp`;};
+ let i=Math.floor(Math.random()*list.length),front=0,first=true;const show=n=>{const id=list[n%list.length],img=new Image();img.onload=()=>{const back=layers[1-front];back.style.backgroundImage=`url(/art/${id}.webp)`;back.style.setProperty('--art',`url(/art/${id}.webp)`);if(first){back.style.transition='none';first=false;requestAnimationFrame(()=>requestAnimationFrame(()=>back.style.transition=''));} /* the first picture is there at once (a busy start-up thread used to hold its fade) */back.classList.add('on');layers[front].classList.remove('on');front=1-front;};img.src=`/art/${id}.webp`;};
  show(i);const timer=setInterval(()=>{if(!doc.body.classList.contains('booting')){clearInterval(timer);return;}if(list.length>1)show(++i);},6500);
  for(const id of ['start-prev','start-next'])doc.getElementById(id)?.addEventListener('click',()=>root.classList.add('aside'));
 }

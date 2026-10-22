@@ -199,6 +199,8 @@ scene.background=new THREE.Color('#b9cbd4');scene.fog=new THREE.Fog('#b9cbd4',33
 // centred on black, and the HUD is laid out relative to it, so a "record selected portion" over the
 // box gives a clean square/vertical clip. Without the parameter the frame is the whole window.
 const frameSpec=new URLSearchParams(location.search).get('frame');
+// The game's height follows the real visible height: 100dvh did not grow back when a phone went fullscreen (Daniel's Android: the controls hung off the bottom edge). Measured on every resize, fullscreen change and turn of the phone, again a moment later when the browser's bars have settled.
+{const fitApp=()=>{const h=Math.round(window.visualViewport?.height||innerHeight);if(h>0)document.documentElement.style.setProperty('--app-h',h+'px');};const later=()=>{fitApp();setTimeout(fitApp,250);setTimeout(fitApp,800);};fitApp();addEventListener('resize',fitApp);window.visualViewport?.addEventListener('resize',fitApp);document.addEventListener('fullscreenchange',later);addEventListener('orientationchange',later);}
 const captureFrame={x:0,y:0,w:innerWidth,h:innerHeight,fixed:!!frameSpec};
 function layoutFrame(){
  let w=innerWidth,h=innerHeight;
