@@ -576,8 +576,8 @@ export class Mobility {
     if(zone<desired){desired=zone;hold=this.zoneWhy;holdBy=this.zoneBy;}
     if(a.passing!=null&&!(this.cars[a.passing]?.edge&&trafficFootprintsOverlap(a,this.cars[a.passing])))a.passing=null;
     {const head=this._trafficHead,chain=this._trafficNext,gx=Math.floor(a.x/20),gz=Math.floor(a.z/20);for(let ix=-1;ix<=1;ix++)for(let iz=-1;iz<=1;iz++)for(let ti=head[trafficCell(gx+ix,gz+iz)];ti>=0;ti=chain[ti]){const b=traffic[ti];if(b===a||b.edge===null)continue;const x=b.x-a.x,z=b.z-a.z;if(x>20||x<-20||z>20||z<-20)continue;
-     if(b.ref?.parked||b.ref?.standing)continue; // standing buses: checked along the lane actually driven, below
-     const forward=x*dx+z*dz,street=b.walking&&!b.edge.crossing;if(forward<=(street?(a.halfLength??CAR_HALF_LENGTH)-.3:0)||forward>=20||Math.abs(x*dz-z*dx)>=(street?(a.halfWidth??1)+.45:2.1)||this.passes(a,b)||oncomingPasses(a,b))continue;
+     if(b.ref?.parked||b.ref?.standing)continue; // standing buses: checked along the lane actually driven, below. The player on foot (player-travel.js: walking, no edge) counts as someone in the street
+     const forward=x*dx+z*dz,street=b.walking&&!b.edge?.crossing;if(forward<=(street?(a.halfLength??CAR_HALF_LENGTH)-.3:0)||forward>=20||Math.abs(x*dz-z*dx)>=(street?(a.halfWidth??1)+.45:2.1)||this.passes(a,b)||oncomingPasses(a,b))continue;
      const v=Math.max(0,(forward-(a.halfLength??CAR_HALF_LENGTH)-(street?.5:b.halfLength??CAR_HALF_LENGTH)-1.3)*.85);if(v<desired){desired=v;hold='follow';holdBy=b.ref||b;} // stops ~1.3 m behind (6 m centres for two cars)
     }}
     if(this.standing?.length)for(const d of STANDING_PROBES){if(a.s+d>a.edge.length)break;const q=routePoint(a.edge,a.s+d,a.offset??a.edge.lane);if(this.standingAt(q)){const v=Math.max(0,(d-3.5)*.85);if(v<desired){desired=v;hold='follow';holdBy=null;}break;}}

@@ -19,3 +19,8 @@ test('a walker in the street steps aside for a coach coming up behind, and the c
  for(let i=0;i<60*12;i++){sim.step(1/60,player);const hx=-Math.sin(c.heading),hz=-Math.cos(c.heading),x=a.x-c.x,z=a.z-c.z;if(Math.abs(x*hx+z*hz)<c.halfLength&&Math.abs(-x*hz+z*hx)<c.halfWidth)inside++;}
  assert.equal(inside,0,'walker never inside the coach');assert.ok(c.x>a.x+5,`coach passed (coach ${c.x.toFixed(1)}, walker ${a.x.toFixed(1)})`);
 });
+test('the player on foot in the street ahead of a car: the step does not throw, and the car stops short (both eras)',()=>{
+ for(const sw of [false,true]){const [sim,a,c]=street(sw,{coach:true});Object.assign(a,{s:115});Object.assign(a,sim.position(a));
+  const me={x:0,z:0,heading:Math.PI/2,speed:0,travelMode:'walk',walking:true,halfWidth:.3,halfLength:.3}; // the on-foot actor (player-travel.js makeActor): walking, and no edge
+  for(let i=0;i<60*8;i++)sim.step(1/60,me);assert.ok(c.x<me.x-1,`car stopped behind the player (car at ${c.x.toFixed(1)})`);}
+});
