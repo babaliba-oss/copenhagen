@@ -28,11 +28,11 @@ export function prepareGraph(graph){
 const CORNER_BLEND=2.5;
 const edgeStartDirection=e=>{const a=e.points[0],b=e.points[1],l=e.cumulative[1]||1;return [(b[0]-a[0])/l,(b[1]-a[1])/l];};
 // A vehicle longer than a car (1760: coach and pair, COACH_HALF_LENGTH) carries its size to the footprints it is tested with.
-const sized=(p,a)=>{if(a.halfLength!==undefined){p.halfLength=a.halfLength;p.halfWidth=a.halfWidth;}return p;};
+const sized=(p,a)=>{p.halfLength=a.halfLength;p.halfWidth=a.halfWidth;return p;}; // always: position()'s points are reused from agent to agent
 const edgeEndDirection=e=>{const n=e.points.length,a=e.points[n-2],b=e.points[n-1],l=e.cumulative[n-1]-e.cumulative[n-2]||1;return [(b[0]-a[0])/l,(b[1]-a[1])/l];};
 // nextDir/prevDir: unit directions of the adjacent edges, so the blend also runs across junction nodes.
-export function routePoint(edge,distance,offset=edge.lane,nextDir,prevDir){
- // Hot path (thousands of calls per frame): no allocations beyond the returned point.
+export function routePoint(edge,distance,offset=edge.lane,nextDir,prevDir,out){
+ // Hot path (thousands of calls per frame): no allocations beyond the returned point (none with out: written into it).
  const s=Math.max(0,Math.min(distance,edge.length)),pts=edge.points,cum=edge.cumulative;let i=1;
  while(i<pts.length-1&&cum[i]<s)i++;
  const a=pts[i-1],b=pts[i],length=cum[i]-cum[i-1]||1,t=(s-cum[i-1])/length;
@@ -43,6 +43,7 @@ export function routePoint(edge,distance,offset=edge.lane,nextDir,prevDir){
  else if(nextDir&&i===pts.length-1&&toNext<CORNER_BLEND){const k=.5*(1-toNext/CORNER_BLEND);dx+=(nextDir[0]-dx)*k;dz+=(nextDir[1]-dz)*k;}
  else if(prevDir&&i===1&&fromPrev<CORNER_BLEND){const k=.5*(1-fromPrev/CORNER_BLEND);dx+=(prevDir[0]-dx)*k;dz+=(prevDir[1]-dz)*k;}
  const n=hypot(dx,dz)||1;dx/=n;dz/=n;
+ if(out){out.x=a[0]+(b[0]-a[0])*t-dz*offset;out.z=a[1]+(b[1]-a[1])*t+dx*offset;out.heading=Math.atan2(-dx,-dz);return out;}
  return {x:a[0]+(b[0]-a[0])*t-dz*offset,z:a[1]+(b[1]-a[1])*t+dx*offset,heading:Math.atan2(-dx,-dz)};
 }
 export function signalGreen(edge,time){
@@ -124,28 +125,31 @@ export class Mobility {
   if(!a.walking){const remaining=a.edge.length-a.s;
    if(remaining<CORNER_BLEND){const next=this.plan(a)[0];if(next)nextDir=edgeStartDirection(next);}
    if(a.s<CORNER_BLEND&&a.prevDir)prevDir=a.prevDir;}
-  let p=routePoint(a.edge,a.s,a.edge.lane,nextDir,prevDir);
+  // The candidate points are five scratch objects reused every call (a fresh point per candidate per agent per step was
+  // ~100 KB of garbage a step): the point returned is only read until the next position() call (step and spawn copy it).
+  const S=this._pointScratch||(this._pointScratch=[0,1,2,3,4].map(()=>({x:0,z:0,heading:0,halfLength:undefined,halfWidth:undefined})));
+  let p=routePoint(a.edge,a.s,a.edge.lane,nextDir,prevDir,S[0]);
   // Never fall back to the centre line when the right-hand lane is blocked.
   // Spawn/segment clearance rejects that route instead of using opposing space.
   // Move to the outer right-hand lane only when a mapped road surface exists
   // there. Shared narrow streets remain shared; crossing rails cause no detour.
   let target=a.edge.lane;
-  if(!a.walking&&a.edge.laneOffsets){const own=carLane(a.edge,a.id),q=routePoint(a.edge,a.s,own,nextDir,prevDir);if(vehicleFitsRoad(q,this.world)){target=own;p=q;}}
+  if(!a.walking&&a.edge.laneOffsets){const own=carLane(a.edge,a.id),q=routePoint(a.edge,a.s,own,nextDir,prevDir,S[1]);if(vehicleFitsRoad(q,this.world)){target=own;p=q;}}
   // A car is either clear of a parallel track (by a tram's half width plus its own) or on it, sharing the lane
   // with trams; straddling the edge of a tram's path would hold up both. Keep to the right where the road allows.
   const rails=this.world.railAvoidance;
   if(!a.walking&&!a.edge.separateCarriageway&&rails&&!rails.clear(p)){let chosen=false;
-   for(const offset of [a.edge.lane+.6,a.edge.lane+1.2,a.edge.lane+1.8,a.edge.lane+2.6,a.edge.lane+3.2]){const candidate=routePoint(a.edge,a.s,offset,nextDir,prevDir);if(vehicleFitsRoad(candidate,this.world)&&rails.clear(candidate)){target=offset;p=candidate;chosen=true;break;}}
-   const shift=chosen?null:rails.onTrack(p);if(shift!==null&&Math.abs(shift)>.3){const candidate=routePoint(a.edge,a.s,a.edge.lane+shift,nextDir,prevDir);if(vehicleFitsRoad(candidate,this.world)){target=a.edge.lane+shift;p=candidate;}}}
+   for(const offset of [a.edge.lane+.6,a.edge.lane+1.2,a.edge.lane+1.8,a.edge.lane+2.6,a.edge.lane+3.2]){const candidate=routePoint(a.edge,a.s,offset,nextDir,prevDir,S[2]);if(vehicleFitsRoad(candidate,this.world)&&rails.clear(candidate)){target=offset;p=candidate;chosen=true;break;}}
+   const shift=chosen?null:rails.onTrack(p);if(shift!==null&&Math.abs(shift)>.3){const candidate=routePoint(a.edge,a.s,a.edge.lane+shift,nextDir,prevDir,S[2]);if(vehicleFitsRoad(candidate,this.world)){target=a.edge.lane+shift;p=candidate;}}}
   // A standing bus (a mapped bay on the carriageway) is passed on whichever side the road allows, starting
   // a few metres before it; the lane offset eases across like any other shift.
   else if(!a.walking&&this.standing?.length){const lane=a.edge.lane,ahead=s=>routePoint(a.edge,Math.min(a.edge.length,a.s+s),lane);
    if(this.standingAt(p)||this.standingAt(ahead(5))||this.standingAt(ahead(10)))for(const offset of [lane-1.1,lane-1.7,lane-2.3,lane+.9,lane+1.6]){const candidate=routePoint(a.edge,a.s,offset,nextDir,prevDir),further=routePoint(a.edge,Math.min(a.edge.length,a.s+8),offset);
     if(vehicleFitsRoad(candidate,this.world)&&vehicleFitsRoad(further,this.world)&&!this.standingAt(candidate)&&!this.standingAt(further)){target=offset;p=candidate;break;}}}
-  if(a.walking)return this.walkerPlace(a,p);
+  if(a.walking)return this.walkerPlace(a,sized(p,a));
   // Slide to the new lateral offset at a walking pace rather than jumping 1.8 m sideways in one frame.
   if(a.offset===undefined||!(this.dt>0))a.offset=target;else{const max=1.4*this.dt;a.offset+=Math.max(-max,Math.min(max,target-a.offset));}
-  if(Math.abs(a.offset-target)>.01){const eased=routePoint(a.edge,a.s,a.offset,nextDir,prevDir);if(vehicleFitsRoad(eased,this.world))return sized(eased,a);a.offset=target;}
+  if(Math.abs(a.offset-target)>.01){const eased=routePoint(a.edge,a.s,a.offset,nextDir,prevDir,S[4]);if(vehicleFitsRoad(eased,this.world))return sized(eased,a);a.offset=target;}
   return sized(p,a);
  }
  // Back onto the lane from where a knock left the car: the nearest point of its own edge, if it is close and the car still
@@ -289,7 +293,7 @@ export class Mobility {
    if(distance<12||(this.visibilityTest?.(p)&&(a.walking?this.time>3&&!this.resetting&&distance<70:!(a.corridorOnly&&distance>300))))continue; // walkers too: people appeared on the pavement ahead
    if(!a.walking){const dx=p.x-player.x,dz=p.z-player.z,along=-dx*Math.sin(player.heading||0)-dz*Math.cos(player.heading||0),side=Math.abs(dx*Math.cos(player.heading||0)-dz*Math.sin(player.heading||0));if(along>-24&&along<(this.time<3?95:45)&&side<4.5)continue;} // a clear first 95 m when the drive starts
    if(!a.walking&&(this.cars.some(b=>b!==a&&b.edge&&hypot(p.x-b.x,p.z-b.z)<8)||this.externalObstacles.some(o=>o.edge!==null&&hypot(p.x-o.x,p.z-o.z)<8)))continue; // nor on a police unit, bus or tram (they blocked each other until one retired)
-   Object.assign(a,p);a.offset=undefined;a.prevDir=undefined;a.speed=edgeCruise(a.edge,a.cruise);a.waiting=0;a.passing=null;a.unjam=null;a.gridlock=0;a.hold=null;a.holdBy=null;a.deadlocked=false;a.hiddenFor=0;a.panicUntil=0;a.running=false;a.stuck=0;a.progressPoint={x:p.x,z:p.z};return;
+   a.x=p.x;a.z=p.z;a.heading=p.heading;a.offset=undefined;a.prevDir=undefined;a.speed=edgeCruise(a.edge,a.cruise);a.waiting=0;a.passing=null;a.unjam=null;a.gridlock=0;a.hold=null;a.holdBy=null;a.deadlocked=false;a.hiddenFor=0;a.panicUntil=0;a.running=false;a.stuck=0;a.progressPoint={x:p.x,z:p.z};return;
   }
   a.edge=null;a.speed=0;
  }
@@ -579,7 +583,7 @@ export class Mobility {
    if(!a.progressPoint||hypot(p.x-a.progressPoint.x,p.z-a.progressPoint.z)>.5){a.stuck=0;if(a.progressPoint){a.progressPoint.x=p.x;a.progressPoint.z=p.z;}else a.progressPoint={x:p.x,z:p.z};}
    // Time spent without real progress (2 m), red lights included: a queue that never clears is stalled.
    if(!a.walking){if(!a.waitFrom||hypot(p.x-a.waitFrom.x,p.z-a.waitFrom.z)>2){if(a.waitFrom){a.waitFrom.x=p.x;a.waitFrom.z=p.z;}else a.waitFrom={x:p.x,z:p.z};a.waiting=0;}else a.waiting=(a.waiting||0)+dt;}
-   a.unpocket=false;Object.assign(a,p);
+   a.unpocket=false;a.x=p.x;a.z=p.z;a.heading=p.heading; // p: position()'s point (its size fields are a's own)
   }
   // The impact pass owns contact resolution. Do not push the player sideways
   // into a second, differently sized envelope and lock them there. Existing
