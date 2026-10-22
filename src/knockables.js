@@ -13,7 +13,7 @@ function randomFor(seed){let s=seed*9301+49297;return()=>{s=(s*9301+49297)%23328
 export function carContact(car,x,z,radius){
   const s=Math.sin(car.heading),c=Math.cos(car.heading),dx=x-car.x,dz=z-car.z;
   const lateral=dx*c-dz*s,longitudinal=dx*s+dz*c;
-  return Math.abs(lateral)<CAR_HALF_WIDTH+radius&&Math.abs(longitudinal)<CAR_HALF_LENGTH+radius?{lateral,longitudinal}:null;
+  return Math.abs(lateral)<(car.halfWidth??CAR_HALF_WIDTH)+radius&&Math.abs(longitudinal)<(car.halfLength??CAR_HALF_LENGTH)+radius?{lateral,longitudinal}:null; // its own size where it has one (1760: the coach and pair, 6.8 m: the horses walked through the barrels)
 }
 
 // footprint [halfWidth, halfLength]: the upright item's box for walkers and riders (near()); range: drawn out to this.
