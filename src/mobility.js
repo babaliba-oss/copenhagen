@@ -220,10 +220,12 @@ export class Mobility {
   a.yieldSide=side;if(!wait)a.yieldHeld=0;
   return wait?0:desired;
  }
- // The first walker (from step's traffic list) inside coach a's box at pose p, 10 cm grown.
+ // The first walker (from step's traffic list) inside coach a's box at pose p, 10 cm grown, deeper than at its pose now:
+ // moving off someone is allowed, sliding its flank further over them is not. Every walker under it counts: only the first
+ // one found was compared, so a coach passing or turning by one walker at its side slid its flank over the next, 15-25 cm deep.
  walkerUnder(p,a,traffic){
   const hx=-Math.sin(p.heading),hz=-Math.cos(p.heading),hl=(a.halfLength??CAR_HALF_LENGTH)+.1,hw=(a.halfWidth??1)+.1;
-  for(let i=0;i<traffic.length;i++){const b=traffic[i];if(!b.walking)continue;const x=b.x-p.x,z=b.z-p.z;if(x>6||x<-6||z>6||z<-6)continue;const f=x*hx+z*hz,l=-x*hz+z*hx;if(f<hl&&f>-hl&&l<hw&&l>-hw)return b;}
+  for(let i=0;i<traffic.length;i++){const b=traffic[i];if(!b.walking)continue;const x=b.x-p.x,z=b.z-p.z;if(x>6||x<-6||z>6||z<-6)continue;const f=x*hx+z*hz,l=-x*hz+z*hx;if(f<hl&&f>-hl&&l<hw&&l>-hw&&underDepth(p,a,b)>underDepth(a,a,b)+1e-3)return b;}
   return null;
  }
  // The traffic coach walker a's step to p goes into, if any (one it is not already inside, by 5 cm or more: it may walk out;
@@ -590,7 +592,7 @@ export class Mobility {
    if(!a.walking){let by=sweptContact(a,p,player)?player:null;
     if(!by)for(let bi=0;bi<nCars;bi++){const b=this.cars[bi];if(b===a||!b.edge)continue;const x=b.x-p.x,z=b.z-p.z,r=(a.halfLength??CAR_HALF_LENGTH)+(b.halfLength??CAR_HALF_LENGTH)+.5;if(x>r||x<-r||z>r||z<-r||!trafficFootprintsOverlap(p,b)||!yieldsTo(a,b))continue;if(this.passes(a,b)){a.passing=b.id;continue;}by=b;break;}
     by||=this.bodyBlocking(a,p);
-    if(!by&&this.streetWalking){const b=this.walkerUnder(p,a,traffic);if(b&&(this.walkerUnder(a,a,traffic)!==b||underDepth(p,a,b)>underDepth(a,a,b)+1e-3))by=b;} // 1760: a coach stops rather than drive into someone in the street (moving off one is allowed; sliding its flank further over them, as it turns past someone waiting at its side, is not)
+    if(!by&&this.streetWalking)by=this.walkerUnder(p,a,traffic); // 1760: a coach stops rather than drive into someone in the street (moving off one is allowed; sliding its flank further over them, as it turns past someone waiting at its side, is not)
     if(by){undo(a,oldS,oldEdge,oldPrev,by);if(a.stuck>4)this.retire(a,player);continue;}}
    // The last half-step out of a crossing is still part of that crossing. Testing
    // it as an ordinary footway strands pedestrians on the road and blocks cars.
