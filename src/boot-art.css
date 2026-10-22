@@ -6,5 +6,14 @@ body:not(.booting) #boot-art,#boot-art.aside{opacity:0;visibility:hidden}
 @keyframes boot-art-drift{from{transform:scale(1.04) translate(0,0)}to{transform:scale(1.08) translate(-1.5%,0)}}
 @media (prefers-reduced-motion:reduce){#boot-art .boot-art-layer{animation:none}}
 body:not(.booting) #boot-art .boot-art-layer{animation:none} /* hidden in play: no drift animation left running */
-/* Upright phones: the 16:9 pictures were cut to a sliver by cover (an arm and a wheel). The whole picture spans the width at the top, over a dimmed, enlarged copy of itself that fills the rest of the screen */
-@media (orientation:portrait){#boot-art .boot-art-layer{background-image:var(--art),linear-gradient(#0d1420c7,#0d1420c7),var(--art)!important;background-size:100% auto,cover,cover;background-position:center max(24px,env(safe-area-inset-top)),center,center;background-repeat:no-repeat;transform-origin:50% 0;animation:none;transform:none}#boot-art::after{background:linear-gradient(180deg,#0000 0,#0000 40%,#0006 100%)}}
+/* Upright phones. A picture drawn for them (<name>-portrait.webp, data-fit=portrait) simply fills the screen. A 16:9 one
+   was cut to a sliver by cover (an arm and a wheel): it spans the width from the top and fades out at its foot, over a
+   blurred, dimmed copy of itself that fills the rest of the screen. */
+@media (orientation:portrait){
+ #boot-art .boot-art-layer{animation:none;transform:none}
+ #boot-art .boot-art-layer[data-fit=wide]{background-image:none!important}
+ #boot-art .boot-art-layer[data-fit=wide]::before,#boot-art .boot-art-layer[data-fit=wide]::after{content:'';position:absolute;inset:0;background-image:var(--art);background-repeat:no-repeat}
+ #boot-art .boot-art-layer[data-fit=wide]::before{background-size:cover;background-position:center;filter:blur(22px) brightness(.55) saturate(1.1);inset:-40px}
+ #boot-art .boot-art-layer[data-fit=wide]::after{background-size:100% auto;background-position:center top;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 calc(100vw * .5625 - 90px),#0000 calc(100vw * .5625));mask-image:linear-gradient(180deg,#000 0,#000 calc(100vw * .5625 - 90px),#0000 calc(100vw * .5625))}
+ #boot-art::after{background:linear-gradient(180deg,#0000 0,#0000 40%,#0006 100%)}
+}
