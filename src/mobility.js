@@ -27,6 +27,8 @@ export function prepareGraph(graph){
 // corners (CORNER_BLEND metres each side) so a car does not jump sideways and snap its heading at every vertex.
 const CORNER_BLEND=2.5;
 const edgeStartDirection=e=>{const a=e.points[0],b=e.points[1],l=e.cumulative[1]||1;return [(b[0]-a[0])/l,(b[1]-a[1])/l];};
+// How far walker b stands inside coach a's box (10 cm grown, as walkerUnder) at pose p: the smaller of the two margins.
+const underDepth=(p,a,b)=>{const hx=-Math.sin(p.heading),hz=-Math.cos(p.heading),x=b.x-p.x,z=b.z-p.z;return Math.min((a.halfLength??CAR_HALF_LENGTH)+.1-Math.abs(x*hx+z*hz),(a.halfWidth??1)+.1-Math.abs(-x*hz+z*hx));};
 // A vehicle longer than a car (1760: coach and pair, COACH_HALF_LENGTH) carries its size to the footprints it is tested with.
 const sized=(p,a)=>{p.halfLength=a.halfLength;p.halfWidth=a.halfWidth;return p;}; // always: position()'s points are reused from agent to agent
 const edgeEndDirection=e=>{const n=e.points.length,a=e.points[n-2],b=e.points[n-1],l=e.cumulative[n-1]-e.cumulative[n-2]||1;return [(b[0]-a[0])/l,(b[1]-a[1])/l];};
@@ -224,12 +226,13 @@ export class Mobility {
   for(let i=0;i<traffic.length;i++){const b=traffic[i];if(!b.walking)continue;const x=b.x-p.x,z=b.z-p.z;if(x>6||x<-6||z>6||z<-6)continue;const f=x*hx+z*hz,l=-x*hz+z*hx;if(f<hl&&f>-hl&&l<hw&&l>-hw)return b;}
   return null;
  }
- // Whether walker a's step to p goes into a traffic coach (one it is not already inside: it may walk out).
+ // The traffic coach walker a's step to p goes into, if any (one it is not already inside, by 5 cm or more: it may walk out;
+ // one waiting right against a coach's side counted as inside by a hair, and its next step aside went half a metre in).
  coachOver(p,a){
   for(let i=0;i<this.cars.length;i++){const c=this.cars[i];if(!c.edge)continue;const x=p.x-c.x,z=p.z-c.z;if(x>6||x<-6||z>6||z<-6)continue;
    const hx=-Math.sin(c.heading),hz=-Math.cos(c.heading),hl=c.halfLength??CAR_HALF_LENGTH,hw=c.halfWidth??1,f=x*hx+z*hz,l=-x*hz+z*hx;if(f>=hl||f<=-hl||l>=hw||l<=-hw)continue;
-   const ax=a.x-c.x,az=a.z-c.z,g=ax*hx+az*hz,m=-ax*hz+az*hx;if(g>=hl||g<=-hl||m>=hw||m<=-hw)return true;}
-  return false;
+   const ax=a.x-c.x,az=a.z-c.z,g=ax*hx+az*hz,m=-ax*hz+az*hx;if(Math.min(hl-Math.abs(g),hw-Math.abs(m))<.05)return c;}
+  return null;
  }
  // What lies under a point (0 building, 1 road, 2 pavement, 3 neither), memoised on a 25 cm grid: walkers ask
  // this for every 25 cm of every step, and three polygon lookups each was the biggest cost in a frame. The memo is a
@@ -566,7 +569,7 @@ export class Mobility {
    if(!a.walking){let by=sweptContact(a,p,player)?player:null;
     if(!by)for(let bi=0;bi<nCars;bi++){const b=this.cars[bi];if(b===a||!b.edge)continue;const x=b.x-p.x,z=b.z-p.z,r=(a.halfLength??CAR_HALF_LENGTH)+(b.halfLength??CAR_HALF_LENGTH)+.5;if(x>r||x<-r||z>r||z<-r||!trafficFootprintsOverlap(p,b)||!yieldsTo(a,b))continue;if(this.passes(a,b)){a.passing=b.id;continue;}by=b;break;}
     by||=this.bodyBlocking(a,p);
-    if(!by&&this.streetWalking){const b=this.walkerUnder(p,a,traffic);if(b&&this.walkerUnder(a,a,traffic)!==b)by=b;} // 1760: a coach stops rather than drive into someone in the street (moving off one is allowed)
+    if(!by&&this.streetWalking){const b=this.walkerUnder(p,a,traffic);if(b&&(this.walkerUnder(a,a,traffic)!==b||underDepth(p,a,b)>underDepth(a,a,b)+1e-3))by=b;} // 1760: a coach stops rather than drive into someone in the street (moving off one is allowed; sliding its flank further over them, as it turns past someone waiting at its side, is not)
     if(by){undo(a,oldS,oldEdge,oldPrev,by);if(a.stuck>4)this.retire(a,player);continue;}}
    // The last half-step out of a crossing is still part of that crossing. Testing
    // it as an ordinary footway strands pedestrians on the road and blocks cars.
@@ -576,6 +579,8 @@ export class Mobility {
     // neither on nor back: it turned round every 3 s for good at the door end of a path. After a second and a half it steps
     // back onto the path's line.
     if(a.walking&&a.stuck>1.5&&(a.ox||a.oz)){a.ox=0;a.oz=0;a.unpocket=true;}
+    // One whose way on runs under a coach standing for it (each waiting for the other) turns back after a second.
+    if(a.walking&&a.stuck>1&&coachCells){const c=this.coachOver(p,a);if(c)this.scare(a,c,2);}
     // A lane that runs off the mapped carriageway never clears; recycle it once it is not right beside the player.
     if(a.stuck>3)this.retire(a,player,!a.walking&&a.stuck>8&&hypot(a.x-player.x,a.z-player.z)>40);continue;}
    // Tiny successful steps between repeated failures are not real progress.
