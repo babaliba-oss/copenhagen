@@ -22,15 +22,19 @@ const RING_BANDS=new WeakMap(),BAND=4;
 function ringBands(ring){
   let t=RING_BANDS.get(ring);if(t)return t;
   let z0=Infinity,z1=-Infinity;for(const p of ring){if(p[1]<z0)z0=p[1];if(p[1]>z1)z1=p[1];}
-  const base=Math.floor(z0/BAND),lists=Array.from({length:Math.floor(z1/BAND)-base+1},()=>[]);
-  for(let i=0,j=ring.length-1;i<ring.length;j=i++){const a=ring[i],b=ring[j];if(a[1]===b[1])continue; // level edges never cross
-    for(let k=Math.floor(Math.min(a[1],b[1])/BAND)-base,e=Math.floor(Math.max(a[1],b[1])/BAND)-base;k<=e;k++)lists[k].push(a[0],a[1],b[0],b[1]);}
-  t={base,lists};RING_BANDS.set(ring,t);return t;
+  // Each band holds the indices of its edges (edge i runs from ring[i] to the point before it), packed in one typed array:
+  // an array of four coordinates per band per edge took ~20 MB on a phone (an edge 400 m tall copied into 100 bands).
+  const base=Math.floor(z0/BAND),n=Math.floor(z1/BAND)-base+1,start=new Uint32Array(n+1),span=(i,f)=>{const a=ring[i],b=ring[i?i-1:ring.length-1];if(a[1]===b[1])return; // level edges never cross
+    for(let k=Math.floor(Math.min(a[1],b[1])/BAND)-base,e=Math.floor(Math.max(a[1],b[1])/BAND)-base;k<=e;k++)f(k);};
+  for(let i=0;i<ring.length;i++)span(i,k=>start[k+1]++);
+  for(let k=0;k<n;k++)start[k+1]+=start[k];
+  const edges=new Uint32Array(start[n]),fill=start.slice(0,n);for(let i=0;i<ring.length;i++)span(i,k=>{edges[fill[k]++]=i;});
+  t={base,n,start,edges};RING_BANDS.set(ring,t);return t;
 }
 function pointInLongRing(x,z,ring){
   if(ring.length<48)return pointInRing(x,z,ring);
-  const t=ringBands(ring),e=t.lists[Math.floor(z/BAND)-t.base];if(!e)return false;let inside=false;
-  for(let i=0;i<e.length;i+=4){const az=e[i+1],bz=e[i+3];if((az>z)!==(bz>z)&&x<(e[i+2]-e[i])*(z-az)/(bz-az)+e[i])inside=!inside;}
+  const t=ringBands(ring),k=Math.floor(z/BAND)-t.base;if(!(k>=0&&k<t.n))return false;let inside=false;
+  for(let m=t.start[k],e=t.start[k+1];m<e;m++){const i=t.edges[m],a=ring[i],b=ring[i?i-1:ring.length-1],az=a[1],bz=b[1];if((az>z)!==(bz>z)&&x<(b[0]-a[0])*(z-az)/(bz-az)+a[0])inside=!inside;}
   return inside;
 }
 function pointInIndexedPolygon(x,z,rings){
