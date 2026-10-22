@@ -111,7 +111,7 @@ body.era-1760 #app .speedometer .gear{color:#cdb68a}
 .cph-race-time{font:700 34px/1.1 'Spectral',Georgia,serif !important;font-variant-numeric:tabular-nums;margin:2px 0 !important;color:#7b2fbe}
 
 /* Postcards */
-.cph-card-hint{justify-self:start;padding:5px 10px;border-radius:8px;background:rgba(20,22,24,.72);color:#f6f1e4;font:600 12px Manrope,sans-serif}
+.cph-card-hint{justify-self:start;max-width:100%;padding:5px 10px;border-radius:8px;background:rgba(20,22,24,.72);color:#f6f1e4;font:600 12px Manrope,sans-serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis} /* one line: wrapped to two, it pushed the job card down onto the minimap in a short window */
 .cph-card-hint kbd{font:700 10px Manrope,sans-serif;padding:1px 5px;border-radius:4px;background:#f6f1e4;color:#222}
 #cph-flash{position:fixed;inset:0;background:#fff;opacity:0;pointer-events:none;z-index:75}
 #cph-flash.on{animation:cph-flash .5s ease-out}
@@ -154,7 +154,7 @@ body.clean-capture.driving #wanted:not([hidden])+#radio-now{top:82px}
 .era-1760 #radio-btn,.era-1760 #radio-now{display:none!important}
 body.busted #radio-now,body.arrest-cinematic #radio-now{visibility:hidden}
 /* A short desktop window (under ~600 px): the compass and zoom (.right-tools, anchored above the instruments) climb up to the card and it covered the compass; it now keeps left of that column. */
-@media(max-height:600px) and (min-width:701px){#radio-now{right:96px;width:min(320px,calc(100% - 134px))}}
+@media(max-height:600px) and (min-width:701px){#radio-now{right:96px;width:min(320px,calc(100% - 134px))}body.clean-capture.driving:not(.touch) #cph-hud{top:24px}} /* the cards from the top: from 96 px the job card (race card with its countdown, ~110 px) ran 15-70 px into the minimap under ~600 px; with the extra HUD off nothing else is up there at the left */
 @media(max-width:700px){#radio-now{top:116px;right:12px;width:min(300px,calc(100% - 24px))}#wanted:not([hidden])+#radio-now{top:174px}#radio-btn #radio-label{display:none}}
 /* Touch screens hide the top bar (and its radio button), so the card is how you tune: placed like the stars (mobile-controls.css). */
 @media(pointer:coarse){
