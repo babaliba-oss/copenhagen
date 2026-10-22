@@ -834,7 +834,7 @@ async function runTilePass(){
  const near=roofIndex.tiles.filter(t=>priority(t)<range).sort((a,b)=>priority(a)-priority(b));
  // One tile that fails (a dropped fetch on 4G, a decode error) used to reject the pass before the unload/LOD loop
  // below, freezing both for as long as it stayed near; it is now skipped for 20 s and retried.
- const now=performance.now();await pool(near.filter(t=>!(now-(tileFailedAt.get(t.file)??-1e9)<20000)),4,t=>loadRoof(t).catch(e=>{tileFailedAt.set(t.file,performance.now());handleTileError(e);}));
+ const now=performance.now();await pool(near.filter(t=>!(now-(tileFailedAt.get(t.file)??-1e9)<20000)),4,t=>loadRoof(t).catch(e=>{if(aborted(e))return;tileFailedAt.set(t.file,performance.now());handleTileError(e);}) /* a cancelled tile is not held back 20 s */);
  for(const t of roofIndex.tiles){const m=loadedTiles.get(t.file);if(!m)continue;
   const d=tileDistance(t);
   if(d>1000){dropTile(t,m);continue;}
@@ -997,7 +997,8 @@ function showEraCard(era,hold=false){
 // An era arrival is named after the nearest place: the URL (?start=) and "Back on the road at …" need a real start, not "1760".
 const nearestPlaceName=(list=[],p)=>list.reduce((best,l)=>!best||Math.hypot(l.x-p.x,l.z-p.z)<Math.hypot(best.x-p.x,best.z-p.z)?l:best,null)?.name;
 function setStart(l){mobileControls?.release();if(started)cph?.teleported?.();peopleInteraction?.reset(world);marketShop?.reset();gullEncounter.reset();birds?.clearEncounter();cameraTransition=null;impacts.reset();crowd?.reset();finale.reset();startPoint=l;car=makeCar(l.x,l.z,l.heading??(l.name==='Senate Square'?0:-Math.PI/2+.17));if(city?.era===1760){car.front=3.3;car.back=3;} /* the coach and horses are 6.3 m: the horses' heads went into walls */car.distance=distance;if(travel)travel.reset(car,world);else travel=new PlayerTravel(car,world,{cars:()=>[...staticCars,...trafficCars],rides:()=>[...(knockables?.rideSources||[]),...(cyclists?.rideSources||[]),...(npcScooters?.rideSources||[])],obstacles:travelObstacles});peopleInteraction??=new PeopleInteraction(world,{context:()=>({cityName:city.name,era:city.era,landmarks:data?.landmarks||[]}),voiceEnabled:sound});playerCars.sync(travel);focus.set(car.x,0,car.z);cameraHeading=car.heading;tramSim?.reset(car);buses?.reset(car,tramSim?.obstacles);if(mobility){mobility.externalBodies=transitBodies();mobility.reset(car);}npcScooters?.reset(car);roadblock?.reset();police?.reset();marketLife?.reset();universityLife?.reset();terminalLife?.reset();$('district-label').textContent=(l.district||city.name||'').toUpperCase();carGroup.position.set(car.x,.1+groundAt(car.x,car.z),car.z);carGroup.rotation.y=car.heading;if(ready)updateTiles().catch(handleTileError);drawMinimap();}
-function handleTileError(e){console.error(e);if(!document.body.classList.contains('booting'))toast('Some scenery could not load. Nearby streets will retry.');} // not over the welcome card
+const aborted=e=>e?.name==='AbortError'||/abort/i.test(e?.message||''); // a download cancelled on purpose (the player jumped away), not a failure
+function handleTileError(e){if(aborted(e))return;console.error(e);if(!document.body.classList.contains('booting'))toast('Some scenery could not load. Nearby streets will retry.');} // not over the welcome card
 const touchScreen=matchMedia('(pointer:coarse)').matches; // phones and tablets: no keyboard, so the HUD and touch buttons stay on
 if(touchScreen){document.body.classList.remove('clean-capture');document.body.classList.add('touch');}
 keys.gentle=touchScreen; // touch driving pulls softer, tops out at 90 km/h and steers in slower (physics.js driveStep)
