@@ -113,7 +113,7 @@ export function createSeasonalDecor(season,{buildings=[],world,places=[],cafes=[
  // doorstep pumpkin at the field's height floated unless strip paving happens to be drawn there: those spots are skipped
  // (within 2.5 km of the centre, pumpkins floating over 20 cm 315 -> 0 of ~2,900).
  const deep=(x,z)=>!!bare&&!world.pavement?.at(x,z)&&groundAt(x,z)-(bare(x,z)??groundAt(x,z))>DEEP_BARE;
- const doorsteps=season==='halloween'?pumpkinDoorsteps(buildings,world,places,r,{open:(x,z)=>open(x,z)&&!deep(x,z)}):[];
+ const doorsteps=season==='halloween'?pumpkinDoorsteps(buildings,world,places,r,{open:(x,z)=>open(x,z)&&!deep(x,z)&&!inWaterPolygons(world.water,x,z)}):[]; /* houseboats (Nyhavn's, Bådteatret) and quay-edge houses had doorsteps in the canal: 20 pumpkins floating */
  // Instanced in 200 m chunks, each hidden beyond `range` (small things far away are sub-pixel and cost the same).
  const chunks=[];
  const instanced=(geometry,material,list,name,{scale=()=>1,y=0,range=260}={})=>{if(!list.length)return null;const by=new Map();list.forEach((p,i)=>{const k=Math.floor(p[0]/200)+','+Math.floor(p[1]/200);if(!by.has(k))by.set(k,[]);by.get(k).push([p,i]);});
