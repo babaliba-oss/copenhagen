@@ -252,7 +252,7 @@ export function createCopenhagenGame({scene,city,mobilityData,cityData,toast,sou
  const flashEl=document.createElement('div');flashEl.id='cph-flash';document.body.append(flashEl);
  function flash(){flashEl.classList.remove('on');void flashEl.offsetWidth;flashEl.classList.add('on');}
 
- let race=null,hopped=false; // race: {r, k (next checkpoint), t, countdown}; hopped: the job's delivery leg crossed a map jump or reset (no speed bonus)
+ let race=null,hopped=false,chainHold=0; // race: {r, k (next checkpoint), t, countdown}; hopped: the job's delivery leg crossed a map jump or reset (no speed bonus)
  const H=ERA==='h',mkStart=races.map(()=>beam(scene,H?0xb5462e:0x9b5de5,60)),mkCp=beam(scene,H?0xe0a040:0xff4fd8,90),mkCp2=beam(scene,H?0xe0a040:0xff4fd8,40); // 1760: sealing-wax red and lantern gold, not neon
  const fmtT=t=>`${Math.floor(t/60)}:${String(Math.floor(t%60)).padStart(2,'0')}.${Math.floor(t%1*10)}`;
  function startRace(r){if(blocked&&!r.walls){r.walls=true;const q=planRace(r,blocked);if(q)Object.assign(r,{cps:q.cps,len:q.len,par:q.par,pay:q.pay});}race={r,k:0,t:0,countdown:3.4};routeFor=null;banner(r.title,`${r.cps.length} checkpoints · ${(r.len/1000).toFixed(1)} km · gold ${fmtT(r.par[0])}`,'pick');}
@@ -327,11 +327,11 @@ export function createCopenhagenGame({scene,city,mobilityData,cityData,toast,sou
   if(pts&&G===road&&dist(road.nodes[b],t.p)>25){const wa=walk.nearestOpen(...road.nodes[b],blocked),wb=walk.nearestOpen(t.p[0],t.p[1],blocked),tail=walk.route(wa,wb,blocked)||walk.route(wa,wb);if(tail)pts=[...pts,...tail];} /* a target off the roads (Købmagergade, the squares, the quays): the last stretch along the footways the car can also take, not straight over the block */
   if(pts&&G===walk&&blocked&&!walk.clear(b,t.p[0],t.p[1],blocked)){const rb=road.nearestOpen(t.p[0],t.p[1],blocked);if(road.clear(rb,t.p[0],t.p[1],blocked))for(let i=pts.length-1,s=25;i>=0;i--){if(i<pts.length-1&&(s+=dist(pts[i],pts[i+1]))<10)continue;s=0;const ra=road.nearest(pts[i][0],pts[i][1]);if(ra<0||dist(road.nodes[ra],pts[i])>40||!road.clear(ra,pts[i][0],pts[i][1],blocked))continue;const q=road.route(ra,rb,blocked);if(q){pts=[...pts.slice(0,i+1),...q];break;}}} /* on foot with no footway in clear sight of the target (Tivoli's gate, the Opera): the line went its last stretch through the houses; from the last point along it (every 10 m) with a street node in clear sight, along the streets instead */const on=pts&&trimStart(pts,player.x,player.z);line.set(on?[...(on.length&&dist(on[0],[player.x,player.z])>3?[[player.x,player.z]]:[]),...on,t.p]:null);}
  // The first route to a new target grew its whole tree in one frame (10-40 ms: a hitch at every pick-up and delivery).
- // The current and the next target's trees (both graphs, and the plain walk tree the pick-up times the delivery by) grow
+ // The current and the next target's trees (both graphs; the pick-up times the delivery by the walk one) grow
  // in idle time instead, a slice at a time.
  let warmFor=[],warmJobs=[],warmQueued=false;
  function warmNext(p){if(!blocked||typeof requestIdleCallback!=='function')return;const next=race?race.r.cps[race.k+1]:state==='a'?job().B:save.active?null:jobs[(save.job+1)%jobs.length].A;
-  if(p!==warmFor[0]||next!==warmFor[1]||mode!==warmFor[2]){warmFor=[p,next,mode];const G=mode==='car'?road:walk,H=G===road?walk:road;warmJobs=[];for(const q of [p,next])if(q)warmJobs.push({G,q,b:null},{G:H,q,b:null});if(state==='a'&&!race)warmJobs.push({G:walk,q:job().B,b:null,plain:true});}
+  if(p!==warmFor[0]||next!==warmFor[1]||mode!==warmFor[2]){warmFor=[p,next,mode];const G=mode==='car'?road:walk,H=G===road?walk:road;warmJobs=[];for(const q of [p,next])if(q)warmJobs.push({G,q,b:null},{G:H,q,b:null});}
   if(warmJobs.length&&!warmQueued){warmQueued=true;requestIdleCallback(runWarm);}}
  function runWarm(dl){warmQueued=false;while(warmJobs.length&&dl.timeRemaining()>2){const j=warmJobs[0];if(j.b===null){j.b=j.plain?j.G.nearest(j.q[0],j.q[1]):j.G.nearestOpen(j.q[0],j.q[1],blocked);continue;}if(j.G.warm(j.b,dl.timeRemaining()-1.5,!j.plain))warmJobs.shift();}}
  // The nearest graph node is often behind the car: the route then ran back to it and returned past the car
@@ -407,12 +407,13 @@ export function createCopenhagenGame({scene,city,mobilityData,cityData,toast,sou
   const j=job();
   if(race){mkA.visible=mkB.visible=false;}
   else{
+  if(running)chainHold-=dt;
   if(state==='b'&&running){timer-=dt;if(timer<=0){banner('Job failed',`Too slow: ${esc(j.t)}. Streak lost.`,'fail');save.streak=0;save.job++;state='a';persist();routeFor=null;}}
   const t=state==='a'?j.A:j.B;
-  if(running&&dist(here,t)<9){
-   if(state==='a'){state='b';wayTo=null;hopped=false;const len=(walk.route(walk.nearest(...j.A),walk.nearest(...j.B))||[]).reduce((s,p,i,a)=>i?s+dist(p,a[i-1]):0,0)||dist(j.A,j.B)*1.4;timer=Math.round(len/6+35);banner('Picked up',`Deliver to <b>${esc(j.bName)}</b> in ${timer} s`,'pick');routeFor=null;}
+  if(running&&dist(here,t)<9&&!(state==='a'&&chainHold>0)){ /* a job picked up where the last one was delivered (Den Sorte Diamant) waits a moment: its banner replaced "Delivered!" the next frame */
+   if(state==='a'){state='b';wayTo=null;hopped=false;const wa=walk.nearest(...j.A),wb=walk.nearestOpen(...j.B,blocked),len=(walk.route(wa,wb,blocked)||walk.route(wa,walk.nearest(...j.B))||[]).reduce((s,p,i,a)=>i?s+dist(p,a[i-1]):0,0)||dist(j.A,j.B)*1.4; /* timed along the way round the houses, as the GPS line goes: the plain shortest walk cut through the Black Diamond and gave Ice lollies 248 s for a 1.9 km ride (7.7 m/s; a bike does 7) */timer=Math.round(len/6+35);banner('Picked up',`Deliver to <b>${esc(j.bName)}</b> in ${timer} s`,'pick');routeFor=null;}
    else{const before=rankOf(save.delivered||0);save.delivered=(save.delivered||0)+1;save.streak=(save.streak||0)+1;
-    const base=j.pay+(hopped?0:timer*4),streakBonus=save.streak>=3?Math.round(base*.25):0,pay=Math.round(base*payBonus())+streakBonus;save.money+=pay;save.job++;state='a';persist();routeFor=null;
+    const base=j.pay+(hopped?0:timer*4),streakBonus=save.streak>=3?Math.round(base*.25):0,pay=Math.round(base*payBonus())+streakBonus;save.money+=pay;save.job++;state='a';chainHold=2.5;persist();routeFor=null;
     const after=rankOf(save.delivered);
     if(after>before)banner(`Promoted: ${RANKS[after][0]}`,`+${fmtKr(pay)} ${UNIT} · jobs now pay +${after*10}%${RANKS[after+1]?` · next: ${esc(RANKS[after+1][0])} at ${RANKS[after+1][1]} deliveries`:''}`,'rank');
     else banner('Delivered!',`+${fmtKr(pay)} ${UNIT}${streakBonus?` · streak ×${save.streak} bonus +${fmtKr(streakBonus)}`:''}${timer>20&&!hopped?' · fast':''}`,'pass');}
