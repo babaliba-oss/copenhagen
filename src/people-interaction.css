@@ -20,8 +20,12 @@
 }
 @media(pointer:coarse) and (max-height:500px){
  body.mobile-controls-ready #people-interaction{left:auto;right:var(--mobile-right,16px);bottom:calc(var(--mobile-bottom,10px) + 160px);transform:none}
- body.mobile-controls-ready #people-interaction:has(#people-chat:not([hidden])){bottom:calc(var(--mobile-bottom,10px) + 108px);width:min(280px,calc(100% - 350px));max-width:280px}
- body.mobile-controls-ready #people-chat{max-height:calc(var(--app-h,100dvh) - var(--mobile-bottom,10px) - 176px);padding:12px}
+ /* the chat sits at the top left (touch-docks.js), clear of the controls and the right-hand column: wide, so the replies
+    take two rows, and as tall as the band above the controls. 280 px wide and 174 px tall at 740x360 showed one of five
+    replies; the rest needed a scroll inside the panel that nothing hinted at */
+ body.mobile-controls-ready #people-interaction:has(#people-chat:not([hidden])){bottom:calc(var(--mobile-bottom,10px) + 108px);width:min(520px,calc(100% - 220px));max-width:520px}
+ body.mobile-controls-ready #people-chat{max-height:calc(var(--app-h,100dvh) - var(--mobile-bottom,10px) - 118px);padding:12px}
+ body.mobile-controls-ready .people-chat-options button{min-height:40px;padding:7px 11px}
  body.mobile-controls-ready #people-chat-response{font-size:13px;margin:6px 0 9px}
 }
 @media (hover:hover) and (pointer:fine){#people-interaction{left:auto;right:76px;top:96px}} /* desktop: the job and saga cards sit where it was (top left) */
