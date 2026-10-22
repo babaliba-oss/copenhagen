@@ -64,3 +64,16 @@ test('the chosen station is remembered (0 = off); nothing stored means station 1
  const blocked={getItem(){throw new Error('SecurityError');},setItem(){throw new Error('QuotaExceededError');}};
  assert.equal(storedStation(blocked),1);assert.doesNotThrow(()=>storeStation(2,blocked));
 });
+
+test('a short buffer mid-song does not skip the track; a host with no data for 20 s does',()=>{
+ let t=0;const audio=fakeAudio(),shown=[];
+ const radio=createRadio({stations,audio,clock:()=>t,random:()=>0,initial:1,banner:(a,b)=>shown.push([a,b])});
+ radio.update(.1,{on:true});audio.fire('playing');const src=audio.src;
+ for(let i=0;i<20;i++){t+=1;radio.update(1,{on:true});} // 20 s of a sounding song
+ audio.readyState=2;for(let i=0;i<15;i++){t+=1;radio.update(1,{on:true});} // a 15 s buffer
+ assert.equal(audio.src,src,'the track is kept');assert.ok(radio.playing,'the game music does not cut in');
+ audio.readyState=4;radio.update(.1,{on:true});
+ const dead=fakeAudio();dead.readyState=0;const r2=createRadio({stations,audio:dead,clock:()=>t,random:()=>0,initial:1,banner:()=>{}});
+ r2.update(.1,{on:true});const s0=dead.src;for(let i=0;i<22;i++){t+=1;r2.update(1,{on:true});}
+ assert.ok(!r2.playing);
+});

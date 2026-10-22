@@ -32,12 +32,12 @@ export function createRadio({stations=[],banner=null,initial=RADIO_OFF,clock=()=
  const list=stations.filter(s=>s.tracks?.length).map(s=>({...s,offset:random()*3600}));
  const player=audio||(typeof Audio!=='undefined'?new Audio():null);
  if(player){player.preload='auto';player.volume=0;}
- let loadAt=0,station=Math.max(0,Math.min(list.length,initial|0)),active=false,track=null,failures=0,silentUntil=0,volume=0,target=0,pendingSeek=0,tuned=null;
+ let loadAt=0,sounded=false,station=Math.max(0,Math.min(list.length,initial|0)),active=false,track=null,failures=0,silentUntil=0,volume=0,target=0,pendingSeek=0,tuned=null;
  const current=()=>station>0?list[station-1]:null;
  function show(text,sub=''){banner?.(text,sub);}
  function load(index,offset){
   const s=current();if(!s||!player)return;
-  track={station:s,index};pendingSeek=offset>3?offset:0;tuned=s;loadAt=clock();
+  track={station:s,index};pendingSeek=offset>3?offset:0;tuned=s;loadAt=clock();sounded=false;
   player.src=s.tracks[index].url;player.load?.();
   const p=player.play?.();if(p?.catch)p.catch(()=>{}); // a refused play (no gesture yet) retries on the next update
  }
@@ -49,7 +49,7 @@ export function createRadio({stations=[],banner=null,initial=RADIO_OFF,clock=()=
  function nextTrack(){if(!track)return;const s=track.station,i=(track.index+1)%s.tracks.length;load(i,0);if(active)show(s.name,credit(s.tracks[i]));}
  if(player){
   player.addEventListener?.('loadedmetadata',()=>{if(pendingSeek&&Number.isFinite(player.duration)&&pendingSeek<player.duration-8){try{player.currentTime=pendingSeek;}catch{}}pendingSeek=0;});
-  player.addEventListener?.('playing',()=>{failures=0;});
+  player.addEventListener?.('playing',()=>{failures=0;sounded=true;});
   player.addEventListener?.('ended',()=>nextTrack());
   player.addEventListener?.('error',()=>fail());
  }
@@ -63,7 +63,7 @@ export function createRadio({stations=[],banner=null,initial=RADIO_OFF,clock=()=
  return {
   get station(){return station;},
   get stations(){return list;},
-  get playing(){return !!(active&&track&&player&&!player.paused&&player.readyState>=3);}, // actually sounding: while a station can't be reached the game's own music plays instead
+  get playing(){return !!(active&&track&&player&&(sounded||!player.paused&&player.readyState>=3));}, // the track has sounded: until a station answers the game's own music plays instead (a buffering pause mid-song does not swap it back)
   // the track now on air (for the now-playing card and the credits line)
   nowPlaying(){return track?track.station.tracks[track.index]:null;},
   next(step=1){if(!list.length){show('No stations');return;}station=((station+step)%(list.length+1)+list.length+1)%(list.length+1);if(active)tune();announce();return station;},
@@ -76,7 +76,8 @@ export function createRadio({stations=[],banner=null,initial=RADIO_OFF,clock=()=
    target=active&&track?level:0;volume+=(target-volume)*Math.min(1,dt*3);
    if(player){player.volume=Math.max(0,Math.min(1,volume));if(!active&&volume<.01&&!player.paused)player.pause?.();
     if(active&&track&&player.paused&&player.readyState>=2){const p=player.play?.();if(p?.catch)p.catch(()=>{});}
-    if(active&&track&&player.readyState<3&&clock()-loadAt>12){loadAt=clock();fail();}} // a host that never answers (archive.org hung for 20 s+ on Daniel's network) counts as a failure, not silence
+    if(active&&track&&player.readyState>=3)loadAt=clock(); /* loadAt: the last moment the track had data */
+    if(active&&track&&player.readyState<3&&clock()-loadAt>(sounded?30:20)){loadAt=clock();fail();}} // a host that never answers counts as a failure, not silence; it counts from the last data, not the load (a short buffer 12 s into a song skipped it, and three skips meant 45 s of 'No signal')
   },
   dispose(){player?.pause?.();if(player)player.src='';}
  };
