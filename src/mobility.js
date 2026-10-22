@@ -78,7 +78,7 @@ export class Mobility {
   this.corridorIds=new Set(this.corridorEdges.map(e=>e.id));
   this.cars=Array.from({length:cars+stationCars+(this.corridorEdges.length?corridorCars:0)},(_,id)=>({id,stationOnly:id>=cars&&id<cars+stationCars,corridorOnly:id>=cars+stationCars,walking:false,edge:null,s:0,speed:0,cruise:6+random()*5,x:0,z:0,heading:0}));
   // side: each walker's own distance to the right of the path's line (0.2-0.9 m, spread by id so seeded runs keep their random sequence)
-  this.people=Array.from({length:people},(_,id)=>({id,walking:true,edge:null,s:0,speed:0,dodge:0,cruise:.85+random()*.65,side:.2+(id*.6180339887%1)*.7,x:0,z:0,heading:0}));
+  this.people=Array.from({length:people},(_,id)=>({id,walking:true,edge:null,s:0,speed:0,dodge:0,unpocket:false,cruise:.85+random()*.65,side:.2+(id*.6180339887%1)*.7,x:0,z:0,heading:0}));
  }
  // Trams share the street: tracks are related to lanes once, and their positions are read every step.
  attachTrams(trams){this.trams=trams;annotateTramRelations(this.roads.edges,trams.paths);annotateTramSignals(trams.paths,this.signals||[],this.signalControl);}
@@ -513,7 +513,11 @@ export class Mobility {
    // The last half-step out of a crossing is still part of that crossing. Testing
    // it as an ordinary footway strands pedestrians on the road and blocks cars.
    const segmentEdge=a.walking&&oldEdge.crossing?oldEdge:a.edge;
-   if(this.world.buildings.at(p.x,p.z)||(a.walking?(!this.walkable(p.x,p.z,a.edge)||!this.safeWalkSegment(a,p,segmentEdge)):!safeVehicleSegment(a,p,this.world)&&!this.kerbCorner(a,p,oldEdge))){undo(a,oldS,oldEdge,oldPrev,null);
+   if(this.world.buildings.at(p.x,p.z)||(a.walking?(!this.walkable(p.x,p.z,a.edge)||!a.unpocket&&!this.safeWalkSegment(a,p,segmentEdge)):!safeVehicleSegment(a,p,this.world)&&!this.kerbCorner(a,p,oldEdge))){undo(a,oldS,oldEdge,oldPrev,null);
+    // A walker whose step aside put it in a pocket of pavement between house corners (the 25 cm ground grid) could step
+    // neither on nor back: it turned round every 3 s for good at the door end of a path. After a second and a half it steps
+    // back onto the path's line.
+    if(a.walking&&a.stuck>1.5&&(a.ox||a.oz)){a.ox=0;a.oz=0;a.unpocket=true;}
     // A lane that runs off the mapped carriageway never clears; recycle it once it is not right beside the player.
     if(a.stuck>3)this.retire(a,player,!a.walking&&a.stuck>8&&Math.hypot(a.x-player.x,a.z-player.z)>40);continue;}
    // Tiny successful steps between repeated failures are not real progress.
@@ -521,7 +525,7 @@ export class Mobility {
    if(!a.progressPoint||Math.hypot(p.x-a.progressPoint.x,p.z-a.progressPoint.z)>.5){a.stuck=0;if(a.progressPoint){a.progressPoint.x=p.x;a.progressPoint.z=p.z;}else a.progressPoint={x:p.x,z:p.z};}
    // Time spent without real progress (2 m), red lights included: a queue that never clears is stalled.
    if(!a.walking){if(!a.waitFrom||Math.hypot(p.x-a.waitFrom.x,p.z-a.waitFrom.z)>2){if(a.waitFrom){a.waitFrom.x=p.x;a.waitFrom.z=p.z;}else a.waitFrom={x:p.x,z:p.z};a.waiting=0;}else a.waiting=(a.waiting||0)+dt;}
-   Object.assign(a,p);
+   a.unpocket=false;Object.assign(a,p);
   }
   // The impact pass owns contact resolution. Do not push the player sideways
   // into a second, differently sized envelope and lock them there. Existing
