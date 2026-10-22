@@ -90,10 +90,14 @@ export function starterRides(car,world){
   // only a start with no pavement near falls back to the nearest clear spot.
   for(const strict of [true,false]){
    for(let radius=3;radius<=(strict?30:22)&&!(best&&radius-3.5>best.score);radius+=1.5){const steps=radius>10?48:24;for(let i=0;i<steps;i++){
-    const a=i*2*Math.PI/steps,q={x:car.x+Math.cos(a)*radius,z:car.z+Math.sin(a)*radius,heading:car.heading};
-    const pavement=world.pavement?.at(q.x,q.z),cycle=/pyör|Pyör|cycle/.test(pavement?.kind||''),onWalk=!!pavement&&!cycle&&!world.roads.at(q.x,q.z);
+    const a=i*2*Math.PI/steps,x=car.x+Math.cos(a)*radius,z=car.z+Math.sin(a)*radius;
+    // parked along the car's heading, or across it, whichever keeps both ends (the Copenhagen ladcykel's box reaches ~1.3 m
+    // ahead) off the carriageway: at a corner the car's heading pointed the bike out into the road (6 of 40 starts)
+    const reach=mode==='bike'?1.3:.7,clearEnds=h=>[-reach,reach].every(t=>!world.roads.at(x+Math.sin(h)*t,z+Math.cos(h)*t));
+    const q={x,z,heading:[car.heading,car.heading+Math.PI/2].find(clearEnds)??car.heading};
+    const pavement=world.pavement?.at(q.x,q.z),cycle=/pyör|Pyör|cycle/.test(pavement?.kind||''),onWalk=!!pavement&&!cycle&&!world.roads.at(q.x,q.z)&&clearEnds(q.heading);
     // a quay or square mapped as neither road nor pavement (Nyhavn's quayside) is fine too, kept a metre clear of the carriageway
-    const offStreet=!onWalk&&!cycle&&!pavement&&[[0,0],[1.2,0],[-1.2,0],[0,1.2],[0,-1.2]].every(([dx,dz])=>!world.roads.at(q.x+dx,q.z+dz))&&![[0,0],[1.2,0],[-1.2,0],[0,1.2],[0,-1.2]].some(([dx,dz])=>inWaterPolygons(world.water,q.x+dx,q.z+dz));
+    const offStreet=!onWalk&&!cycle&&!pavement&&clearEnds(q.heading)&&[[0,0],[1.2,0],[-1.2,0],[0,1.2],[0,-1.2]].every(([dx,dz])=>!world.roads.at(q.x+dx,q.z+dz))&&![[0,0],[1.2,0],[-1.2,0],[0,1.2],[0,-1.2]].some(([dx,dz])=>inWaterPolygons(world.water,q.x+dx,q.z+dz));
     if(strict&&!onWalk&&!offStreet)continue;
     // on the pavement only the spot itself must be clear (parked cars or racks along the kerb may stand between)
     if(travelCollision(q,mode,world,[car,...rides])||(strict?!reachable(origin,q,world):!clearTravelPath(origin,q,world,[car,...rides]))||rides.some(r=>gap(r,q)<2.3))continue;
