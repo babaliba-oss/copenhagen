@@ -114,7 +114,7 @@
  body.touch #cph-hud .cph-card{padding:9px 12px}body.touch #cph-hud .cph-card h3{font-size:17px}
  body.touch #cph-hud .cph-card p:not(.cph-go):not(.cph-kick):not(.cph-timer):not(.cph-race-time){display:none}body.touch #cph-hud .cph-saga li:not(.c){display:none} /* timers and the current saga step stay */
  body.touch #cph-hud .cph-card-hint{pointer-events:auto;cursor:pointer;padding:9px 12px;line-height:1.35}
- body.touch #people-interaction{left:var(--mobile-left,12px)}
+ body.touch #people-interaction{left:var(--mobile-left,12px);transform:none} /* people-interaction.css centred it with left:50% and translateX(-50%); with the left edge moved here, the shift hung it half off screen */
  body.touch .edge-invite{max-width:min(320px,calc(100% - 24px));padding:12px 40px 12px 14px}
  body.touch .edge-invite strong{font-size:14px}
 }
