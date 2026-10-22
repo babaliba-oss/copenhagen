@@ -119,8 +119,9 @@ function beam(scene,color,h=80){
 export function createCopenhagenGame({scene,city,mobilityData,cityData,toast,soundOn=()=>true,blocked=null}){ // blocked(x,z): a solid house there (the GPS line's last stretch)
  const proj=proj4('EPSG:4326',city.projection);
  const ll=([lat,lon])=>{const [x,y]=proj.forward([lon,lat]);return [x,-y];};
- const walk=makeGraph(mobilityData.walks,true),road=makeGraph(mobilityData.roads,false);
- const ERA=city.era===1760?'h':'m';UNIT=ERA==='h'?'sk.':'kr';const inEra=e=>(e||'m')===ERA||e==='b',cast=CHARACTERS.filter(c=>inEra(c.era));
+ const ERA=city.era===1760?'h':'m';
+ const walk=makeGraph(mobilityData.walks,true),road=makeGraph(mobilityData.roads,ERA==='h'); // 1760: the coach's line and the races ignore one-way streets (the 1760 roads keep today's oneway tags: the line took the coach 1.9 km round Kongens Nytorv's one-way system for 1.1 km of street)
+ UNIT=ERA==='h'?'sk.':'kr';const inEra=e=>(e||'m')===ERA||e==='b',cast=CHARACTERS.filter(c=>inEra(c.era));
  const jobs=(ERA==='h'?JOBS_1760:JOBS).map(j=>({...j,A:ll(j.a),B:ll(j.b),aName:j.a[2],bName:j.b[2]}));
  // Sagas told in both eras: in 1760 nothing from later (GPS, Andersen's 1845 tale, the war).
  const period=t=>ERA!=='h'||typeof t!=='string'?t:t.replace('No beams, no GPS. Just the map.','No signposts. Just the map.').replace(' Andersen wrote a tale about him in 1845.','').replace(' In the Second World War a resistance group took his name.','');

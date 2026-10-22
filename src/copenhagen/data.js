@@ -50,7 +50,7 @@ export const SAGAS = [
       { at: [55.67497, 12.57853], name: 'Tøjhuset', card: ['Tøjhuset · 1604', 'My arsenal. Ships row straight in through the harbour gate to load cannon. In 1644 those cannon go to sea. A poet called Ewald will turn that day into a song in 1779: "Kong Christian stod ved højen mast." It becomes the royal anthem. I\'m told it is very good.'] },
       { at: [55.68590, 12.57640], name: 'Rosenborg', card: ['Rosenborg · 1606', 'My summer house, out among the gardens. The story goes that the splinters from my eye were set into earrings for Vibeke Kruse. I died here in February 1648. Comfortable house. Would die there again.'] },
       { at: [55.68126, 12.57580], name: 'Rundetårn', card: ['Rundetårn · 1642', 'Look up at the rebus on the front. Gold letters and pictures: God, guide learning and justice into the heart of the crowned King Christian IV. I had it put there so nobody would forget who built the thing. It worked.'] }] },
-  { id: 'fire', era: 'h', title: 'Fire Watch', giver: 'watchman', pay: 400, limit: 210, night: true,
+  { id: 'fire', era: 'h', title: 'Fire Watch', giver: 'watchman', pay: 400, limit: 330, night: true,
     intro: 'Five lanterns are out in my district, and a dark street is a burning street waiting to happen. Light them all, any order, before the next hour is called. Go!',
     go: 'Gammeltorv, Vor Frue, Højbro, Nikolaj, Kongens Nytorv. Run!',
     steps: [
