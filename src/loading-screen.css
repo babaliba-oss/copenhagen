@@ -31,7 +31,7 @@ body.booting :is(.topbar,.location-tag,.dashboard,.right-tools,.landmark-label,#
 /* UI: DM Sans */
 #intro.boot-screen .boot-place-label{display:flex;align-items:baseline;justify-content:space-between;gap:var(--s-12);margin:0 0 var(--s-8);font:600 var(--t-12)/16px var(--ui);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
 #intro:not(.ready) .boot-place-label{display:none}
-#intro .start-count{font:500 var(--t-12)/16px var(--ui);letter-spacing:0;font-variant-numeric:tabular-nums;text-transform:none}
+#intro .start-count{flex:none;white-space:nowrap;font:500 var(--t-12)/16px var(--ui);letter-spacing:0;font-variant-numeric:tabular-nums;text-transform:none}
 
 /* ‹ Place name ›: a control the same width and radius as the button below it. */
 #intro .start-picker{display:flex;align-items:center}
