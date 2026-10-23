@@ -57,3 +57,9 @@ test('a batch frees its CPU arrays after the upload that follows its last buildi
  up();assert.equal(g.attributes.position.array,null);assert.equal(g.attributes.aBid.array,null);
  assert.ok(g.boundingSphere.radius>0,'culling bounds survive');
 });
+
+test('batch bounds follow the ground a part stands on (terrain cities), so culling never drops a sunken or raised building',()=>{
+ const low={...part(0),base:-9},high={...part(1),base:60},buildings=[low,high].map((p,i)=>({part:p,windows:0,meshes:[mesh(i,{})]}));
+ const box=createBuildingBatches(buildings,new Map(),x=>buildings.indexOf(x)).meshes[0].geometry.boundingBox;
+ assert.ok(box.min.y<=-9,'the sunken part\'s foot is inside');assert.ok(box.max.y>=60+12,'the raised part\'s roof is inside');
+});

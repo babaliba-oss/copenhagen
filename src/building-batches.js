@@ -51,7 +51,7 @@ export function createBuildingBatches(buildings,textures,partOf){
   const bid=new Float32Array(g.count).fill(300);for(const [b,s] of g.list){const i=partOf(b),[,first]=placed.get(s);if(i>=0&&i<256)bid.fill(i,first,first+vertexCount(s));}
   geometry.setAttribute('aBid',new THREE.BufferAttribute(bid,1));
   // Bounds from the parts (the vertices arrive later): culling must not see an empty batch at the origin.
-  box.makeEmpty();for(const [b] of g.list){const p=b.part;box.expandByPoint(corner.set(p.bbox[0],-5,p.bbox[1]));box.expandByPoint(corner.set(p.bbox[2],(p.height||20)+40,p.bbox[3]));}
+  box.makeEmpty();for(const [b] of g.list){const p=b.part,y=p.base||0;box.expandByPoint(corner.set(p.bbox[0],Math.min(y,0)-5,p.bbox[1]));box.expandByPoint(corner.set(p.bbox[2],Math.max(y,0)+(p.height||20)+40,p.bbox[3]));} // base: the ground the part stands on (terrain cities, liftBuildings)
   geometry.boundingBox=box.clone();geometry.boundingSphere=box.getBoundingSphere(new THREE.Sphere());
   for(const a of Object.values(geometry.attributes))a.setUsage(THREE.StaticDrawUsage);
   const mesh=new THREE.Mesh(geometry,batchMaterial(g.part,g.source,textures,uniforms));mesh.name='Detailed buildings';mesh.castShadow=false;mesh.receiveShadow=true;mesh.userData.batch=true;
