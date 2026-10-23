@@ -1092,8 +1092,9 @@ window.addEventListener('keydown',e=>{
  // A HUD button keeps focus after a click (or Tab): game keys go back to the world instead of being swallowed.
  if(e.code!=='Escape'&&e.target.closest?.('button,a,summary,input,select,textarea,[contenteditable="true"]')){
   const hud=started&&!paused&&!mapOpen&&!police?.busted&&!cph?.blocking?.()&&!e.target.closest('dialog,input,select,textarea,[contenteditable="true"]');
-  if(!(hud&&/^(Key[A-Z]|Arrow|Space|Shift)/.test(e.code)))return;
-  e.target.blur?.();focusWorldControls();}
+  const pauseKey=paused&&started&&e.target.id==='resume-btn'&&/^Key[PHV]$/.test(e.code); // the pause card focuses its button: its own keys (FPS, HUD, capture) still work, and the button keeps the focus
+  if(!pauseKey){if(!(hud&&/^(Key[A-Z]|Arrow|Space|Shift)/.test(e.code)))return;
+  e.target.blur?.();focusWorldControls();}}
  if(e.code==='Tab'&&started&&!paused&&!mapOpen&&!police?.busted&&!cph?.blocking?.()&&!peopleInteraction?.session){e.preventDefault();return;} // Tab moved focus onto the top bar and the keys stopped steering
  if(e.metaKey||e.ctrlKey){if(e.code.startsWith('Meta'))keys.clear();return;} // browser shortcuts (Cmd+A, Ctrl+R): macOS sends no keyup for keys let go under Cmd
  if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space'].includes(e.code)&&!mapOpen)e.preventDefault();
