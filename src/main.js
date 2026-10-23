@@ -1138,7 +1138,7 @@ window.addEventListener('keydown',e=>{
 window.addEventListener('keyup',e=>{keys.delete(e.code);if(e.code.startsWith('Meta'))keys.clear();});window.addEventListener('blur',()=>{keys.clear();if(!perfOverlay&&!CINEMATIC)setPaused(true);}); // ?perf: no pause on blur, so a screenshot tool can be opened mid-stall
 document.addEventListener('visibilitychange',()=>{if(document.hidden){keys.clear();setPaused(true);}}); // perf mode keeps the blur off, not this
 // Hidden tab or locked phone: frames stop, so the engine hum, city bed and radio would play on at their last level.
-document.addEventListener('visibilitychange',()=>{if(document.hidden){audioContext?.suspend?.().catch?.(()=>{});radio?.update(10,{on:false});}else if(sound)audioContext?.resume?.().catch?.(()=>{});});
+document.addEventListener('visibilitychange',()=>{if(document.hidden){audioContext?.suspend?.().catch?.(()=>{});radio?.update(10,{on:false});}else if(sound&&!(started&&paused))audioContext?.resume?.().catch?.(()=>{});}); /* back to a paused game: the context stays asleep until the key or tap that resumes play (below), so the engine and music frozen at their driving level do not blare under the pause card while they fade */
 // iOS suspends audio when the app is backgrounded or a call comes in ('interrupted'), and a context created outside a
 // tap starts suspended: the next touch or key brings it back (the sound button only toggles).
 for(const type of ['pointerdown','keydown'])window.addEventListener(type,()=>{if(sound&&audioContext&&audioContext.state!=='running')audioContext.resume().catch(()=>{});},{capture:true,passive:true});
