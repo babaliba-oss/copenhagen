@@ -1,5 +1,5 @@
 // Copenhagen soundscape (Web Audio, no files): an engine with gears, tyre roll, a low city bed, the odd
-// bicycle bell, a horn (B) and generative Danish folk tunes for background music (U toggles it; the car radio, L,
+// bicycle bell, a car horn (B) and generative Danish folk tunes for background music (U toggles it; the car radio, L,
 // takes over while it plays). In 1760 the engine becomes hooves on cobbles and the bells stay.
 export function createSoundscape(ac,{era=null}={}){
  const out=ac.createGain();out.gain.value=0;out.connect(ac.destination);
@@ -19,9 +19,10 @@ export function createSoundscape(ac,{era=null}={}){
  const ping=(f,t0,dur,vol,type='sine')=>{t0=when(t0);const o=ac.createOscillator(),g=ac.createGain();o.type=type;o.frequency.value=f;g.gain.setValueAtTime(0,t0);g.gain.linearRampToValueAtTime(vol,t0+.005);g.gain.exponentialRampToValueAtTime(.0001,t0+dur);o.connect(g);g.connect(out);o.start(t0);o.stop(t0+dur+.05);};
  const bell=()=>{const t=ac.currentTime,f=2400+Math.random()*500;ping(f,t,.9,.05);ping(f*2.76,t,.5,.02);ping(f,t+.16,.9,.045);ping(f*2.76,t+.16,.5,.018);};
  const hoof=(v)=>{const t=ac.currentTime,s=ac.createBufferSource(),bp=ac.createBiquadFilter(),g=ac.createGain();s.buffer=noiseBuf;bp.type='bandpass';bp.frequency.value=900+Math.random()*500;bp.Q.value=3;g.gain.setValueAtTime(v,t);g.gain.exponentialRampToValueAtTime(.0001,t+.09);s.connect(bp);bp.connect(g);g.connect(out);s.start(t,Math.random());s.stop(t+.12);};
- let hornG=null;
- function horn(on){if(on&&!hornG){const t=ac.currentTime;hornG=ac.createGain();hornG.gain.setValueAtTime(0,t);hornG.gain.linearRampToValueAtTime(.035,t+.02);const lp=ac.createBiquadFilter();lp.type='lowpass';lp.frequency.value=1800;
-   for(const f of era===1760?[330]:[392,494]){const o=ac.createOscillator();o.type=era===1760?'triangle':'square';o.frequency.value=f;o.connect(lp);o.start();hornG._o=[...(hornG._o||[]),o];}lp.connect(hornG);hornG.connect(out);}
+ // The horn is the car's: none on a coach (1760: the help lists none), on foot, a bike or a scooter, and getting out lets it go.
+ let hornG=null,mode='car';
+ function horn(on){if(on&&!hornG){if(mode!=='car'||era===1760)return;const t=ac.currentTime;hornG=ac.createGain();hornG.gain.setValueAtTime(0,t);hornG.gain.linearRampToValueAtTime(.035,t+.02);const lp=ac.createBiquadFilter();lp.type='lowpass';lp.frequency.value=1800;
+   for(const f of [392,494]){const o=ac.createOscillator();o.type='square';o.frequency.value=f;o.connect(lp);o.start();hornG._o=[...(hornG._o||[]),o];}lp.connect(hornG);hornG.connect(out);}
   else if(!on&&hornG){const g=hornG;hornG=null;g.gain.setTargetAtTime(0,ac.currentTime,.03);setTimeout(()=>{for(const o of g._o||[])o.stop();g.disconnect();},300);}}
  // Background music (generative, no files): slow jazzy pad chords with a soft plucked melody through a tape-like
  // echo. Today: Fmaj7, Am7, Dm9, Bbmaj7 at a walking pace; 1760: a gentle D-major minuet on a harpsichord-ish pluck.
@@ -81,8 +82,8 @@ export function createSoundscape(ac,{era=null}={}){
  }
  let gear=1,bellT=8+Math.random()*15,stepT=0,lastSpeed=0;
  const GEARS=[0,9,17,25,34,99]; // m/s top of each gear
- function update(dt,{enabled,speed=0,mode='car',throttle=0,musicOff=false}){ // musicOff: the car radio is playing
-  const t=ac.currentTime,v=Math.abs(speed);out.gain.setTargetAtTime(enabled?.65:0,t,.15);if(!enabled)return;
+ function update(dt,{enabled,speed=0,mode:m='car',throttle=0,musicOff=false}){ // musicOff: the car radio is playing
+  mode=m;if(hornG&&mode!=='car')horn(false);const t=ac.currentTime,v=Math.abs(speed);out.gain.setTargetAtTime(enabled?.65:0,t,.15);if(!enabled)return;
   const car=mode==='car'&&era!==1760,coach=mode==='car'&&era===1760;
   if(car){while(gear<5&&v>GEARS[gear])gear++;while(gear>1&&v<GEARS[gear-1]-2)gear--;
    const lo=GEARS[gear-1],hi=GEARS[gear],rpm=.25+.75*Math.min(1,(v-lo)/Math.max(1,hi-lo)),f=38+rpm*70;

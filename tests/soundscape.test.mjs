@@ -29,3 +29,13 @@ for(const era of [null,1760])test(`music and bells never schedule before now whi
   assert.ok(ac.scheduled>50,'notes were scheduled');
  }finally{Math.random=random;}
 });
+
+test('the horn (B) is the car\'s: none on a coach in 1760, on foot or on a bike, and getting out lets it go',()=>{
+ const horns=(era,mode)=>{const ac=fakeContext(),sound=createSoundscape(ac,{era});sound.update(1/60,{enabled:true,mode}); // the music's notes are scheduled here, before counting
+  let made=0;const make=ac.createOscillator;ac.createOscillator=()=>{made++;return make();};sound.horn(true);sound.horn(false);return made;};
+ assert.equal(horns(null,'car'),2);
+ for(const [era,mode] of [[1760,'car'],[null,'walk'],[null,'bike'],[null,'scooter']])assert.equal(horns(era,mode),0,`${era||'today'} ${mode}`);
+ const ac=fakeContext(),sound=createSoundscape(ac,{era:null});let released=0;const make=ac.createGain;
+ sound.update(1/60,{enabled:true,mode:'car'});ac.createGain=()=>{const g=make();g.gain.setTargetAtTime=()=>{released++;};return g;};sound.horn(true);ac.createGain=make;
+ sound.update(1/60,{enabled:true,mode:'walk'});assert.equal(released,1,'stepping out with B held fades the horn');
+});
