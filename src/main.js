@@ -533,7 +533,7 @@ function partOnRay(tile,w,ray,far){
  return false;
 }
 // Footprints the fallback pass never draws (when no model covers them): kept out of collision, they were invisible walls.
-const SKYWAY_CLEAR=5; // metres of headroom under a skyway lifted off the street
+const SKYWAY_CLEAR=5,skywayUndersides=new WeakMap(); // metres of headroom under a skyway lifted off the street; the underside drawn once per part, kept off the part (parts go to the building worker: a mesh on one could not be cloned, and the tile failed and reloaded every 20 s)
 // The underside of a lifted skyway (the model draws none: from the street you looked up into the box): its mapped outline at the clearance.
 function skywayUnderside(p,y){const b=data.buildings.find(b=>b.id===p.id.replace(/^kk-/,''));const ring=b?.rings?.[0];if(!ring||ring.length<3)return null;const pts=ring.map(([x,z])=>new THREE.Vector2(x,z)),tris=THREE.ShapeUtils.triangulateShape(pts,[]),pos=[];for(const t of tris)for(const k of t)pos.push(pts[k].x,y,pts[k].y);const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));g.computeVertexNormals();const m=new THREE.Mesh(g,new THREE.MeshStandardMaterial({color:new THREE.Color(...(p.color||[.7,.7,.7])),roughness:.9,side:THREE.DoubleSide}));m.name='Skyway underside';m.receiveShadow=true;return m;}
 function addSolids(list){if(world.objects)world.objects.add(list);else(world.pendingSolids||=[]).push(...list);} // a prop that loads before world.objects exists queues its collision (the 1760 cannons threw 'reading add' and were never drawn)
@@ -638,7 +638,7 @@ async function buildRoof(t,at){
    for(let i=p.start;i<p.start+p.count;i++){a[i*5]=cx+(a[i*5]-cx)*sx;a[i*5+2]=cz+(a[i*5+2]-cz)*sz;}}
   if(city.era===1760)for(const p of t.parts)if(!p.embankment&&/^volden$|bastion|skanse/i.test(p.name||''))slopeRampart(a,p); // older terrace data; built earthworks (p.embankment) already slope // earthworks slope (period-roofs.js)
   applyFacadeHeights(a,t.parts);liftBuildings(a,t.parts); // terrain cities: each part stands on its lowest ground
-  for(const p of t.parts)if(p.skyway){const [x0,z0,x1,z1]=p.bbox,y=groundAt((x0+x1)/2,(z0+z1)/2)+SKYWAY_CLEAR;for(let i=p.start;i<p.start+p.count;i++)if(a[i*5+1]<y)a[i*5+1]=y;if(!p.underside){p.underside=skywayUnderside(p,y);if(p.underside)cityModel.add(p.underside);}} // skyways: the model's block from the ground up becomes the span over the street (index: p.skyway)
+  for(const p of t.parts)if(p.skyway){const [x0,z0,x1,z1]=p.bbox,y=groundAt((x0+x1)/2,(z0+z1)/2)+SKYWAY_CLEAR;for(let i=p.start;i<p.start+p.count;i++)if(a[i*5+1]<y)a[i*5+1]=y;if(!skywayUndersides.has(p)){const u=skywayUnderside(p,y);skywayUndersides.set(p,u);if(u)cityModel.add(u);}} // skyways: the model's block from the ground up becomes the span over the street (index: p.skyway)
   if(city.era===1760&&hasTerrain())for(const p of t.parts)if(p.embankment&&isRampart(p))drapeRampart(a,p); // the earthworks lie on the field raised under them (ramparts.js)
   // Flat model roofs lying within a metre of the street are plinths and paved decks the city model folds into
   // a block (the Knippelsbro approach): drawn, they sat on the street as a dark slab with a kerb. Collapsed away.
