@@ -84,3 +84,11 @@ test('converted sign modules register breakable posts and keep their footprints 
  assert.equal(breakableSigns.snapshot().count,before+5,'both sets join the combined knockables entry');
  for(const mesh of [...kit.children,...group.children].filter(m=>m.isMesh&&m.geometry.attributes.signIndex))assert.ok(mesh.customDepthMaterial,'broken signs cast correct shadows');
 });
+
+test('sign posts dissolve right in front of the camera, only in lit materials', async () => {
+ const {nearFade}=await import('../src/near-fade.js');const {SIGN_NEAR}=await import('../src/breakable-signs.js');
+ const lit=nearFade({fragmentShader:THREE.ShaderLib.physical.fragmentShader},SIGN_NEAR.from,SIGN_NEAR.to).fragmentShader;
+ assert.match(lit,/length\(vViewPosition\)/);assert.match(lit,/discard/);
+ const basic=THREE.ShaderLib.basic.fragmentShader;assert.equal(nearFade({fragmentShader:basic},1,2).fragmentShader,basic,'no vViewPosition there: left alone');
+ assert.ok(SIGN_NEAR.to<4,'the car, 8 m ahead of the lens, never dissolves the signs beside it');
+});

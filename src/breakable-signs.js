@@ -1,6 +1,10 @@
 import * as THREE from 'three';
 import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';
 import {carContact} from './knockables.js';
+import {nearFade} from './near-fade.js';
+// A post or sign plate within 2.5 m of the drive camera dissolves (near-fade.js): parked at the kerb, the lens sat
+// behind a signal pole or a round sign that filled a third of the screen.
+export const SIGN_NEAR={from:1,to:2.5};
 
 // Free-standing sign posts the car can hit. A light post bends over at its base when struck at
 // moderate speed, is pushed over slowly by a crawling car, and snaps off at speed: the sign part
@@ -65,7 +69,7 @@ export function createBreakableSigns(name='Breakable signs',{register=true}={}){
  }
  // Patched clone of a material for sign geometry (cached; shared by all meshes of this set).
  function material(base){
-  if(!materials.has(base)){const m=base.clone();m.onBeforeCompile=s=>{ensureTexture();patchShader(s,texture,uniforms);};m.customProgramCacheKey=()=>'breakable-sign';materials.set(base,m);}
+  if(!materials.has(base)){const m=base.clone();m.onBeforeCompile=s=>{ensureTexture();patchShader(s,texture,uniforms);nearFade(s,SIGN_NEAR.from,SIGN_NEAR.to);};m.customProgramCacheKey=()=>'breakable-sign';materials.set(base,m);}
   return materials.get(base);
  }
  // A merged sign mesh: patched material plus a matching shadow depth material.

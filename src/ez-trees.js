@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {template} from './route-trees.js';
+import {nearFade} from './near-fade.js';
 // Detailed crowns for the trees nearest the player in cities other than Helsinki, picked by species family. Broadleaf
 // trees get Daniel's tree models where they load (public/models/trees/, scripts/models/tree_build.py): 'linden', a dense
 // rounded tree, for limes, maples, ash, chestnuts and the smaller street trees; 'oak', an old spreading tree, for oaks,
@@ -50,8 +51,7 @@ function modelParts(gltf,root=0){
 export const LEAF_NEAR={from:2,to:4.5};
 export function fadeLeavesNearCamera(material){
  if(material.userData.nearFade)return material;material.userData.nearFade=true;
- material.onBeforeCompile=shader=>{shader.fragmentShader=shader.fragmentShader.replace('#include <clipping_planes_fragment>',`#include <clipping_planes_fragment>
-  {float camD=length(vViewPosition);if(camD<${LEAF_NEAR.to.toFixed(2)}){float t=(camD-${LEAF_NEAR.from.toFixed(2)})/${(LEAF_NEAR.to-LEAF_NEAR.from).toFixed(2)};if(t<fract(52.9829189*fract(dot(gl_FragCoord.xy,vec2(.06711056,.00583715)))))discard;}}`);};
+ material.onBeforeCompile=shader=>{nearFade(shader,LEAF_NEAR.from,LEAF_NEAR.to);};
  material.customProgramCacheKey=()=>'leaf-near-fade';return material;
 }
 export function createEzTrees(items,models=null){ // items: [{x,z,y,kind,width,height,yaw,tint}]
