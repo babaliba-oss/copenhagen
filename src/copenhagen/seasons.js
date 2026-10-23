@@ -75,14 +75,16 @@ function treeGeometry(){
 // come from the map's footprints, and the model's walls stand up to 2 m off them, so a quarter of the pumpkins stood in
 // or against a shopfront. A pumpkin within PUMPKIN_CLEAR of a drawn wall is left out, on placement or when the tile
 // arrives later. Segments are kept in 8 m cells: [x0,z0,x1,z1,...].
-export const PUMPKIN_CLEAR=.5,DEEP_BARE=.15;const WALL_CELL=8,drawnWalls=new Map(),wallListeners=new Set(),notedTiles=new Set();
+// Only the cells round a doorstep pumpkin are kept once the decor has placed them (wantDrawnWalls): every street wall of
+// every tile was kept for the whole visit, 3.9 MB of the JS heap at the start and 21 MB after seven map jumps.
+export const PUMPKIN_CLEAR=.5,DEEP_BARE=.15;const WALL_CELL=8,drawnWalls=new Map(),wallListeners=new Set(),notedTiles=new Set();let wantCells=null; /* null: no decor yet, keep all */
 export function noteDrawnWalls(array,parts,key=null){ /* key: the tile, noted once (tiles stream out and back in) */
  if(key!=null){if(notedTiles.has(key))return 0;notedTiles.add(key);}
  let added=0;
  for(const p of parts)for(let v=p.start;v+2<p.start+p.count;v+=3){const o=v*5,ax=array[o],az=array[o+2],bx=array[o+5],bz=array[o+7],cx=array[o+10],cz=array[o+12];
   if(Math.abs((bx-ax)*(cz-az)-(bz-az)*(cx-ax))>.05||Math.min(array[o+1],array[o+6],array[o+11])>groundAt(ax,az)+1.5)continue; // walls only (upright: no area seen from above), reaching the street
   let s=[ax,az,bx,bz],l=Math.hypot(bx-ax,bz-az);for(const q of [[bx,bz,cx,cz],[cx,cz,ax,az]]){const m=Math.hypot(q[2]-q[0],q[3]-q[1]);if(m>l){l=m;s=q;}}if(l<.3)continue;
-  for(let gx=Math.floor(Math.min(s[0],s[2])/WALL_CELL);gx<=Math.floor(Math.max(s[0],s[2])/WALL_CELL);gx++)for(let gz=Math.floor(Math.min(s[1],s[3])/WALL_CELL);gz<=Math.floor(Math.max(s[1],s[3])/WALL_CELL);gz++){const k=gx+','+gz;if(!drawnWalls.has(k))drawnWalls.set(k,[]);drawnWalls.get(k).push(...s);}
+  for(let gx=Math.floor(Math.min(s[0],s[2])/WALL_CELL);gx<=Math.floor(Math.max(s[0],s[2])/WALL_CELL);gx++)for(let gz=Math.floor(Math.min(s[1],s[3])/WALL_CELL);gz<=Math.floor(Math.max(s[1],s[3])/WALL_CELL);gz++){const k=gx+','+gz;if(wantCells&&!wantCells.has(k))continue;if(!drawnWalls.has(k))drawnWalls.set(k,[]);drawnWalls.get(k).push(...s);}
   added++;}
  if(added)for(const f of wallListeners)f();
  return added;
@@ -92,7 +94,11 @@ export function nearDrawnWall(x,z,r=PUMPKIN_CLEAR){
   for(let i=0;i<w.length;i+=4){const ax=w[i],az=w[i+1],dx=w[i+2]-ax,dz=w[i+3]-az,l=dx*dx+dz*dz,t=l?Math.max(0,Math.min(1,((x-ax)*dx+(z-az)*dz)/l)):0;if(Math.hypot(x-ax-dx*t,z-az-dz*t)<r)return true;}}
  return false;
 }
-export function clearDrawnWalls(){drawnWalls.clear();notedTiles.clear();}
+export function clearDrawnWalls(){drawnWalls.clear();notedTiles.clear();wantCells=null;}
+export function wantDrawnWalls(points,r=PUMPKIN_CLEAR){ /* points: [x, z]; null or []: none wanted (no Halloween) */
+ wantCells=new Set();for(const [x,z] of points||[])for(let gx=Math.floor((x-r)/WALL_CELL);gx<=Math.floor((x+r)/WALL_CELL);gx++)for(let gz=Math.floor((z-r)/WALL_CELL);gz<=Math.floor((z+r)/WALL_CELL);gz++)wantCells.add(gx+','+gz);
+ for(const k of [...drawnWalls.keys()])if(!wantCells.has(k))drawnWalls.delete(k);
+}
 // Doorsteps: points just outside long building walls that face a pavement → [x, z, facing].
 export function pumpkinDoorsteps(buildings,world,places,r,{open=(x,z)=>!world.roads.at(x,z)&&!world.buildings.at(x,z),out=.8}={}){
  const doorsteps=[],nearPlace=(x,z)=>places.some(q=>Math.abs(q.x-x)<260&&Math.abs(q.z-z)<260);
@@ -135,7 +141,7 @@ export function createSeasonalDecor(season,{buildings=[],world,places=[],cafes=[
    instanced(pumpkinGeometry(),new THREE.MeshStandardMaterial({vertexColors:true,roughness:.7,emissive:'#6a2a08',emissiveIntensity:.9}),spots,'Halloween pumpkins',{scale:sc});
    instanced(faceGeometry(),glow('#ffb238'),spots,'Pumpkin faces',{scale:sc});
    for(const c of chunks)if(c.items&&/Pumpkin|pumpkins/.test(c.im.name))c.items.forEach(([,i],j)=>(slots[i]??=[]).push(c.im,j));}
-  hideWalled();wallListeners.add(hideWalled);dispose=()=>wallListeners.delete(hideWalled);
+  hideWalled();wantDrawnWalls(spots.filter((p,i)=>!hidden[i]&&p[3]===undefined));wallListeners.add(hideWalled);dispose=()=>wallListeners.delete(hideWalled);
   // orange string lights over Nyhavn and the café streets: bulbs along a catenary between pavement points
   const bulbs=[];
   // strings span a street from facade to facade: both ends open ground with a wall just beyond, no house in between

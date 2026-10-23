@@ -45,5 +45,13 @@ test('no pumpkin within half a metre of a drawn wall, whether the tile came befo
  const before=shown();assert.ok(before>0,'pumpkins along the house');
  noteDrawnWalls(wall(20,-.6,40.6,-.6),one);noteDrawnWalls(wall(40.6,-.6,40.6,10.6),one);noteDrawnWalls(wall(40.6,10.6,-.6,10.6),one);noteDrawnWalls(wall(-.6,10.6,-.6,-.6),one);
  assert.ok(shown()<before,'a tile arriving later hides the pumpkins its walls stand on');assert.equal(shown(),0);
+ noteDrawnWalls(wall(500,0,520,0),one);assert.ok(!nearDrawnWall(510,-.3),'walls far from any pumpkin are not kept (the grid grew with every tile visited)');
  decor.dispose();clearDrawnWalls();
+});
+test('without Halloween no street walls are kept', async () => {
+ const {noteDrawnWalls,clearDrawnWalls,nearDrawnWall,wantDrawnWalls}=await import('../src/copenhagen/seasons.js');
+ const wall=(x0,z0,x1,z1)=>new Float32Array([x0,0,z0,0,0, x1,0,z1,0,0, x1,5,z1,0,0, x0,0,z0,0,0, x1,5,z1,0,0, x0,5,z0,0,0]),one=[{start:0,count:6}];
+ clearDrawnWalls();noteDrawnWalls(wall(0,0,20,0),one);assert.ok(nearDrawnWall(10,-.3));
+ wantDrawnWalls(null);assert.ok(!nearDrawnWall(10,-.3));noteDrawnWalls(wall(0,5,20,5),one);assert.ok(!nearDrawnWall(10,4.7));
+ clearDrawnWalls();
 });
