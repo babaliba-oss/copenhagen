@@ -192,7 +192,7 @@ export function createModelledBuilding(array,part,pixels,texture=null,includeHer
  function shell(p,c,roughness,metalness,map=texture){if(!p.length)return;const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(p,3));g.setAttribute('color',new THREE.Float32BufferAttribute(c,3));g.setAttribute('uv',new THREE.Float32BufferAttribute(p===walls?wallUV:roofUV,2));creasedShellNormals(g);g.computeBoundingSphere();mesh(g,new THREE.MeshStandardMaterial({map,vertexColors:!map,roughness,metalness,side:THREE.DoubleSide}));meshes.at(-1).userData.shell=true;}
  if(part.ratu===324||clean||corridor||described)texture=null; // clean granite/copper on the measured whole station; no baked trees/shadows
  if(!texture&&walls.length&&roofs.length){ // untextured: walls and roofs in one shell mesh
-  walls.push(...roofs);wallColours.push(...roofColours);wallUV.push(...roofUV);roofs.length=0;roofColours.length=0;roofUV.length=0;
+  for(const [to,from] of [[walls,roofs],[wallColours,roofColours],[wallUV,roofUV]])for(let i=0;i<from.length;i++)to.push(from[i]); /* not push(...roofs): a large part (48,903 vertices, Sydhavn) overflowed the call stack and failed its whole tile's details */roofs.length=0;roofColours.length=0;roofUV.length=0;
   shell(walls,wallColours,.78,.06);meshes.at(-1).userData.role='facade';if(provisional)meshes.at(-1).userData.provisional=true;
  }else{
  shell(walls,wallColours,.86,.02);if(walls.length)meshes.at(-1).userData.role='facade';
