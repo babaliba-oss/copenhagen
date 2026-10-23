@@ -116,7 +116,7 @@ function beam(scene,color,h=80){
  g.add(col,ring);g.visible=false;scene.add(g);return g;
 }
 
-export function createCopenhagenGame({scene,city,mobilityData,cityData,toast,soundOn=()=>true,blocked=null}){ // blocked(x,z): a solid house there (the GPS line's last stretch)
+export function createCopenhagenGame({scene,city,mobilityData,cityData,toast,soundOn=()=>true,audio=null,blocked=null}){ // blocked(x,z): a solid house there (the GPS line's last stretch)
  const proj=proj4('EPSG:4326',city.projection);
  const ll=([lat,lon])=>{const [x,y]=proj.forward([lon,lat]);return [x,-y];};
  const ERA=city.era===1760?'h':'m';
@@ -160,12 +160,12 @@ export function createCopenhagenGame({scene,city,mobilityData,cityData,toast,sou
  const PANT_HOTSPOTS=[[55.68003,12.58930],[55.67998,12.59130],[55.67955,12.59010],[55.68628,12.56400],[55.66505,12.57600],[55.68100,12.59600],[55.68545,12.57960]];
  function setFurniture(items,{clear,geometry}={}){if(ERA==='h'||pant||!items?.length)return;
   pant=createPant({items:[...items,...PANT_HOTSPOTS.map(p=>{const [x,z]=ll(p);return {k:'hotspot',x,z};})],clear,geometry});scene.add(pant.group);}
- function clink(){if(!soundOn())return;try{ac??=new (window.AudioContext||window.webkitAudioContext)();const t0=ac.currentTime; // an aluminium can: a short bright clink
+ function clink(){if(!soundOn())return;try{const ac=audioContext();const t0=ac.currentTime; // an aluminium can: a short bright clink
   for(const [f,v] of [[2350,.05],[3520,.03],[5180,.018]]){const o=ac.createOscillator(),g=ac.createGain();o.type='sine';o.frequency.value=f;g.gain.setValueAtTime(v,t0);g.gain.exponentialRampToValueAtTime(.0001,t0+.2);o.connect(g).connect(ac.destination);o.start(t0);o.stop(t0+.22);}}catch{}}
  // ---- big moments: GTA-style banner with a short chime ----
  const ban=document.createElement('div');ban.id='cph-banner';ban.hidden=true;document.body.append(ban);let banT=0;
- let ac=null;
- function chime(kind){if(!soundOn())return;try{ac??=new (window.AudioContext||window.webkitAudioContext)();const t0=ac.currentTime,notes=kind==='fail'?[392,330,262]:kind==='rank'?[523,659,784,1047]:[523,659,784];
+ let ownContext=null;const audioContext=()=>audio?.()||(ownContext??=new (window.AudioContext||window.webkitAudioContext)()); /* the game's own context (main.js): a second one made without a tap (the era switch starts by itself) stayed suspended, and nothing resumed it */
+ function chime(kind){if(!soundOn())return;try{const ac=audioContext();const t0=ac.currentTime,notes=kind==='fail'?[392,330,262]:kind==='rank'?[523,659,784,1047]:[523,659,784];
   notes.forEach((f,i)=>{const o=ac.createOscillator(),g=ac.createGain();o.type='triangle';o.frequency.value=f;g.gain.setValueAtTime(0,t0+i*.11);g.gain.linearRampToValueAtTime(.09,t0+i*.11+.02);g.gain.exponentialRampToValueAtTime(.001,t0+i*.11+.5);o.connect(g).connect(ac.destination);o.start(t0+i*.11);o.stop(t0+i*.11+.55);});}catch{}}
  function banner(title,sub='',kind='pass'){ban.className='cph-banner-'+kind;ban.innerHTML=`<h2>${esc(title)}</h2>${sub?`<p>${sub}</p>`:''}`;ban.hidden=false;ban.style.animation='none';void ban.offsetWidth;ban.style.animation='';clearTimeout(banT);banT=setTimeout(()=>{ban.hidden=true;},kind==='rank'?4600:3400);chime(kind);}
  // ---- courier ranks: deliveries move you up; every rank pays 10% more ----
