@@ -49,3 +49,13 @@ test('the tree models stand with their root flare below the ground', async () =>
  assert.ok(Math.abs(parts[0].geometry.boundingBox.max.y-.84)<1e-6);assert.ok(Math.abs(parts[1].geometry.boundingBox.max.y-.84)<1e-6,'the crown comes down with the trunk');
  assert.ok(ROOT.oak>ROOT.linden&&ROOT.linden>0,'the oak has the bigger roots');
 });
+
+test('detailed crowns dissolve near the camera', async () => {
+ const THREE=await import('three');const {createEzTrees,LEAF_NEAR}=await import('../src/ez-trees.js');
+ const {group}=createEzTrees([{x:0,z:0,y:0,kind:3,width:6,height:10,yaw:0,tint:1}]);
+ const leaves=group.children.find(m=>/\/1$/.test(m.name)),bark=group.children.find(m=>/\/0$/.test(m.name));
+ assert.ok(leaves.material.userData.nearFade&&bark.material.userData.nearFade);
+ const shader={fragmentShader:THREE.ShaderLib.physical.fragmentShader,uniforms:{}};
+ leaves.material.onBeforeCompile(shader);assert.match(shader.fragmentShader,/length\(vViewPosition\)/);assert.match(shader.fragmentShader,/discard/);
+ assert.ok(LEAF_NEAR.to<8,'the car, 8 m ahead of the lens, keeps the crowns over it');
+});

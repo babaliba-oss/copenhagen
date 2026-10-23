@@ -44,6 +44,16 @@ function modelParts(gltf,root=0){
   material.forceSinglePass=true;return {geometry,material,model:true};
  });
 }
+// Crowns close to the lens dissolve (dithered, 2 m to 4.5 m from the camera): on tree-lined streets the drive camera's
+// boom, 3.3 m up and 8 m back, runs through the crowns over the pavement, and a wall of leaf cards filled the screen.
+// Only the drawn colour: the shadow pass has its own depth material, so the crown's shadow stays whole.
+export const LEAF_NEAR={from:2,to:4.5};
+export function fadeLeavesNearCamera(material){
+ if(material.userData.nearFade)return material;material.userData.nearFade=true;
+ material.onBeforeCompile=shader=>{shader.fragmentShader=shader.fragmentShader.replace('#include <clipping_planes_fragment>',`#include <clipping_planes_fragment>
+  {float camD=length(vViewPosition);if(camD<${LEAF_NEAR.to.toFixed(2)}){float t=(camD-${LEAF_NEAR.from.toFixed(2)})/${(LEAF_NEAR.to-LEAF_NEAR.from).toFixed(2)};if(t<fract(52.9829189*fract(dot(gl_FragCoord.xy,vec2(.06711056,.00583715)))))discard;}}`);};
+ material.customProgramCacheKey=()=>'leaf-near-fade';return material;
+}
 export function createEzTrees(items,models=null){ // items: [{x,z,y,kind,width,height,yaw,tint}]
  const group=new THREE.Group();group.name='Detailed trees (near)';
  const byKind=new Map();items.forEach((it,i)=>{if(it.kind==null)return;if(!byKind.has(it.kind))byKind.set(it.kind,[]);byKind.get(it.kind).push(i);});
@@ -51,6 +61,7 @@ export function createEzTrees(items,models=null){ // items: [{x,z,y,kind,width,h
  for(const [kind,list] of byKind){
   const parts=models?.[kind]||template(kind,SEED[kind],false),meshes=[]; // the full EZ crowns: the reduced 'far' cards read as bare, wintry trees up close
   for(const [pi,{geometry,material,model}] of parts.entries()){
+   fadeLeavesNearCamera(material); // bark too: with the leaves gone, the limbs through the lens were left as dark beams
    const bm=new THREE.BatchedMesh(list.length,geometry.attributes.position.count,geometry.index?.count||0,material);
    const gid=bm.addGeometry(geometry);bm.name=`Detailed trees ${kind}/${pi}`;bm.perObjectFrustumCulled=true;bm.castShadow=true;bm.receiveShadow=true;bm.userData.shadowLod=true;
    for(const i of list){const it=items[i],id=bm.addInstance(gid);m.position.set(it.x,it.y,it.z);m.rotation.set(0,it.yaw,0);m.scale.set(it.width,it.height,it.width);m.updateMatrix();bm.setMatrixAt(id,m.matrix);
