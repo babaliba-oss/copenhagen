@@ -115,7 +115,7 @@ export function applyMeshLod(mesh,level,focus,bands=LOD){
  // A landed building (part index and tile mask set by main.js) beyond bands.building is drawn by the merged shell:
  // its own meshes hide and its part is unmasked. The decision lives on the building's shared occlusion state.
  const o=u.occlusion;let detailed=true;
- if(u.mask&&u.part!==undefined&&o){const want=level==='near'&&d<bands.building+(o.detailed===false?0:20);if(o.detailed!==want){o.detailed=want;if(mesh.parent)u.mask.set(u.part,want?0:1);}detailed=want;}
+ if(u.mask&&u.part!==undefined&&o){const want=level==='near'&&d<bands.building+(o.detailed===false?0:20);if(o.detailed!==want&&mesh.parent){o.detailed=want;u.mask.set(u.part,want?0:1);}detailed=want;} /* not before it joins the tile: the state recorded with the mask unwritten left the merged shell drawn under the landed building (applyPartLod saw nothing to change) */
  const hero=!!u.shell&&u.role==='detail';
  mesh.visible=level==='near'?detailed&&!!(u.shell||u.provisional||d<bands.detail):hero;
  mesh.castShadow=!!u.shell&&!u.castByTile&&level==='near'&&mesh.visible&&d<bands.shadow;

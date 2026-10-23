@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
-import {LOD,tileLevel,mergedShellRanges,createMergedShells,applyTileLod,applyTreeLod,treeLeafDetail,createStaticShadowCuller,freezeTileGroup,createShellMask} from '../src/tile-lod.js';
+import {LOD,tileLevel,mergedShellRanges,createMergedShells,applyTileLod,applyMeshLod,applyPartLod,applyTreeLod,treeLeafDetail,createStaticShadowCuller,freezeTileGroup,createShellMask} from '../src/tile-lod.js';
 import {createSourceShell,materialiseBuilding} from '../src/building-loader.js';
 import {tilePriority,aheadPoint,createFrameQueue,createDetailScheduler} from '../src/tile-streaming.js';
 
@@ -150,4 +150,20 @@ test('landed buildings beyond LOD.building hand back to the merged shell, with h
  applyTileLod(group,'near',at(LOD.building+30));assert.equal(meshes[0].visible,false);assert.equal(mask.get(0),1);assert.ok(lod.visible,'the merged shell draws it now');
  applyTileLod(group,'near',at(LOD.building+10));assert.equal(meshes[0].visible,false,'and does not flick back inside the band');
  applyTileLod(group,'near',at(LOD.building-10));assert.ok(meshes[0].visible);assert.equal(mask.get(0),0);assert.equal(lod.visible,false);
+});
+
+test('a building whose own meshes are judged before they join the tile still hands its part over from the merged shell',()=>{
+ /* main.js detailTile: the shop signs / hero front (not batched) get applyMeshLod while still parentless, then land() runs applyPartLod.
+    The first call used to record the detailed state without writing the mask, so the second saw nothing to change and the merged
+    shell kept drawing the part under its detailed building. */
+ const textures=new Map([['a.jpg',new THREE.Texture()]]),parts=[part(0,6,'a.jpg','p0'),part(6,6,'a.jpg','p1')],mask=createShellMask(parts.length),group=new THREE.Group();
+ group.add(...createMergedShells(array,parts,textures,mask));
+ const building={part:parts[0],windows:0,meshes:[{attributes:{position:{array:new Float32Array(9),itemSize:3,normalized:false}},shell:true,role:'detail',material:{color:0xffffff,roughness:.8,metalness:0,side:2,vertexColors:false,textured:false}}]};
+ const occlusion={opacity:1,clearTime:1},partState={i:0,box:new THREE.Box3(new THREE.Vector3(-.5,-.5,-.5),new THREE.Vector3(10.5,12.5,10.5)),occlusion},shown=new Map(),batches={set:(i,v)=>shown.set(i,v)};
+ const meshes=materialiseBuilding(building,textures),focus=new THREE.Vector3(12,0,5);
+ for(const m of meshes){m.userData.part=0;m.userData.mask=mask;m.userData.occlusion=occlusion;applyMeshLod(m,'near',focus);} // before it joins the tile
+ assert.equal(mask.get(0),1,'not hidden before its building is in the tile');
+ applyPartLod(batches,partState,'near',focus,mask);group.add(...meshes);
+ assert.equal(mask.get(0),0,'the merged shell stops drawing the part');assert.equal(shown.get(0),1,'the batches draw it');
+ applyTileLod(group,'near',focus);assert.equal(mask.get(0),0);assert.equal(group.children.find(m=>m.userData.lod).visible,true,'p1 still waits on the merged shell');
 });
