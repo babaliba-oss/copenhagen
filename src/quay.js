@@ -206,7 +206,7 @@ export function buildBridgeRailings(water,land={},{height=1.05,ground=()=>0}={})
     if(!inWater(ox,oz)||otherPaving(ox,oz,deck))return false;
     return BRIDGE.test(`${deck.kind||''} ${deck.name||''}`)||inWater(x-nx*s*1.5,z-nz*s*1.5);};
    const shadow=[];for(let k=0;k<=steps;k++){const ok=k<steps&&wet((k+.5)/steps);
-    if(ok){const mx=a[0]+dx*(k+.5)/steps,mz=a[1]+dz*(k+.5)/steps;shadow[k]=railedNear(mx,mz,deck);if(!shadow[k]){const c=cellOf(mx,mz);if(!placed.has(c))placed.set(c,[]);placed.get(c).push([a[0]+dx*k/steps,a[1]+dz*k/steps,a[0]+dx*(k+1)/steps,a[1]+dz*(k+1)/steps,deck]);}} /* shadowed: the deck still counts as railed (its plate and height), the railing is not drawn twice */
+    if(ok){const mx=a[0]+dx*(k+.5)/steps,mz=a[1]+dz*(k+.5)/steps,s=inRing(mx+nx*.6,mz+nz*.6)?-1:1;shadow[k]=railedNear(mx,mz,deck)||otherPaving(mx+nx*s*.3,mz+nz*s*.3,deck); /* or paving right outside the edge: the edge lies on the next deck (a carriageway's rounded end cap inside the next span at Langebro), and its railing stood across the road */if(!shadow[k]){const c=cellOf(mx,mz);if(!placed.has(c))placed.set(c,[]);placed.get(c).push([a[0]+dx*k/steps,a[1]+dz*k/steps,a[0]+dx*(k+1)/steps,a[1]+dz*(k+1)/steps,deck]);}} /* shadowed: the deck still counts as railed (its plate and height), the railing is not drawn twice */
     if(ok&&start<0)start=k;
     else if(!ok&&start>=0){const t0=start/steps,t1=k/steps,x0=a[0]+dx*t0,z0=a[1]+dz*t0,x1=a[0]+dx*t1,z1=a[1]+dz*t1,len=Math.hypot(x1-x0,z1-z0),yaw=Math.atan2(ux,uz);
      // set in 25 cm from the deck edge

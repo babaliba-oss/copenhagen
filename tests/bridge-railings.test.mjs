@@ -44,3 +44,10 @@ test('an untagged deck along a bridge adds no second railing beside the bridge\'
  assert.equal(extractQuayEdges(water,{roads:[street,deck]}).filter(inBridge).length,0,'no wall round the street end inside the bridge');
  const pier={kind:'Ajorata',rings:[[[-25,-40],[0,-40],[0,-30],[-25,-30]]]};assert.ok(extractQuayEdges(water,{roads:[pier,deck]}).some(e=>e.a[1]<-29&&e.a[0]>-20),'a pier away from bridges keeps its walls');
 });
+test('a span\'s rounded end lying on the next span gets no railing across the road',()=>{
+ // Langebro: each carriageway span is mapped with round end caps; where the line bends at the joint, the cap pokes from
+ // inside the next span to within a metre of its side, the water beyond, and a railing stood across the carriageway.
+ const a={id:'a',kind:'Ajorata (Silta)',rings:[[[-30,-5],[0,-5],[2,-4],[3,0],[2,4.2],[0,5],[-30,5]]]},b={id:'b',kind:'Ajorata (Silta)',rings:[[[-1,-5],[30,-5],[30,5],[-1,5]]]};
+ const g=buildBridgeRailings(water,{roads:[a,b]}),onB=([x0,z0,x1,z1])=>{const x=(x0+x1)/2,z=(z0+z1)/2;return x>-.5&&x<30&&Math.abs(z)<4.7;};
+ assert.equal(g.userData.rails.filter(onB).length,0,JSON.stringify(g.userData.rails));assert.equal(g.userData.bridges.length,2,'both keep their plates');
+});
