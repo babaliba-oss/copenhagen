@@ -15,7 +15,7 @@ export const CAMERA_CLEARANCE={r:1};const CLEAR_RING=[0,1,2,3,4,5,6,7].map(k=>[M
 // past it: the boom then keeps its lens off the drawn wall, not just off the mapped footprint. Camera only, never collision.
 export function cameraWallStrips(segs,half=.5){const out=[];for(let i=0;i+3<segs.length;i+=4){const ax=segs[i],az=segs[i+1],bx=segs[i+2],bz=segs[i+3],L=Math.hypot(bx-ax,bz-az)||1,px=-(bz-az)/L*half,pz=(bx-ax)/L*half;
  out.push({rings:[[[ax+px,az+pz],[bx+px,bz+pz],[bx-px,bz-pz],[ax-px,az-pz]]],bbox:[Math.min(ax,bx)-half,Math.min(az,bz)-half,Math.max(ax,bx)+half,Math.max(az,bz)+half]});}return out;}
-export function drivingCameraPose(car,heading,zoom=240,look=0,buildings=null){
+export function drivingCameraPose(car,heading,zoom=240,look=0,buildings=null,aspect=0){
  // Close and low, more behind the car than above it, so the street ahead reads
  // on a phone screen (arcade-style: ~8.3 m back, 3.3 m up at the default zoom 150). Zoom (36–240) still pulls it back.
  let distance=4.5+Math.max(36,Math.min(240,zoom))/40;
@@ -40,7 +40,10 @@ export function drivingCameraPose(car,heading,zoom=240,look=0,buildings=null){
  // A wall right behind: the short boom rises instead, looking down over the vehicle (at 0.5 m back and 2.5 m up
  // the lens sat inside the 1760 coach's body).
  const short=Math.max(0,3.6-distance),lift=short*1.05,far=ahead+short*2.2; // and aims further ahead, so it never looks straight down on the roof
- return {position:[px,Math.max(y+2.4+distance*.11+lift,groundAt(px,pz)+1.4),pz],target:[car.x-Math.sin(aim+look)*far,y+1.15,car.z-Math.cos(aim+look)*far]};
+ // A swung boom on a narrow (portrait phone) screen: straight ahead put the car 12 degrees off a 15 degree half-view, half
+ // off the edge. The aim turns toward the boom's line just far enough that the car's centre stays within 35% of the half-view.
+ let to=aim;if(swing&&aspect){const half=Math.atan(Math.tan(DRIVE_FOV.min*Math.PI/360)*aspect)*.35;for(let t=0;t<=1.001;t+=.1){to=aim+swing*t;const a=Math.atan2(car.x-px,car.z-pz)-Math.atan2(-Math.sin(to)*far-px+car.x,-Math.cos(to)*far-pz+car.z);if(Math.abs(Math.atan2(Math.sin(a),Math.cos(a)))<=half)break;}}
+ return {position:[px,Math.max(y+2.4+distance*.11+lift,groundAt(px,pz)+1.4),pz],target:[car.x-Math.sin(to+look)*far,y+1.15,car.z-Math.cos(to+look)*far]};
 }
 
 // ---- Drive-camera feel: speed FOV, heading lag/settle, roll, look, shake ----

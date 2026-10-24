@@ -34,6 +34,13 @@ test('driving camera keeps off drawn walls that stand clear of the footprints (c
  for(let i=0;i<40;i++)p=drivingCameraPose({x:113.5,z:103.7},0,150,0,new SpatialIndex(cameraWallStrips(near)));
  assert.ok(segDist(p.position[0],p.position[2],near)>=.9,`lens ${segDist(p.position[0],p.position[2],near).toFixed(2)} m from a drawn wall`);
 });
+test('a swung boom keeps the car near the middle of a portrait phone view',()=>{
+ const wall={at:(x,z)=>z>=3&&x>-1}; /* wall right behind, open to the left: the boom swings */
+ const off=p=>{const a=Math.atan2(-p.position[0],-p.position[2])-Math.atan2(p.target[0]-p.position[0],p.target[2]-p.position[2]);return Math.abs(Math.atan2(Math.sin(a),Math.cos(a)));};
+ let wide,narrow;for(let i=0;i<40;i++)wide=drivingCameraPose({x:0,z:0},0,150,0,wall);for(let i=0;i<40;i++)narrow=drivingCameraPose({x:0,z:0},0,150,0,wall,.49);
+ assert.ok(Math.abs(wide.position[0])>1,'boom swung');assert.ok(off(narrow)<=Math.atan(Math.tan(29*Math.PI/180)*.49)*.36,`car ${(off(narrow)*180/Math.PI).toFixed(1)} deg off the view axis`);
+ assert.ok(Math.hypot(narrow.position[0]-wide.position[0],narrow.position[2]-wide.position[2])<.05,'the lens stays where it was; only the aim turns');
+});
 test('suspended signs reproduce left/right/right; supports stay off the road',()=>{
  const signs=createHarbourSigns(),roads=new SpatialIndex(city.roads),pavement=new SpatialIndex(city.pavement);
  assert.deepEqual(signs.userData.turns,['left','right','right']);assert.equal(signs.children.length,4);
