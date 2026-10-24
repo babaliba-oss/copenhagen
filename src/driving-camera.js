@@ -10,6 +10,11 @@ export function overviewCameraPose(car,heading,zoom=240,high=false){
 }
 let swing=0;
 export const CAMERA_CLEARANCE={r:1};const CLEAR_RING=[0,1,2,3,4,5,6,7].map(k=>[Math.cos(k*Math.PI/4),Math.sin(k*Math.PI/4)]);
+// camera-walls.json (scripts/road-walls.mjs): the drawn walls at lens height that stand clear of the footprints, as flat
+// [x0,z0,x1,z1,...] segments. Each becomes a strip `half` either side, wide enough (1 m) that the ring above cannot slip
+// past it: the boom then keeps its lens off the drawn wall, not just off the mapped footprint. Camera only, never collision.
+export function cameraWallStrips(segs,half=.5){const out=[];for(let i=0;i+3<segs.length;i+=4){const ax=segs[i],az=segs[i+1],bx=segs[i+2],bz=segs[i+3],L=Math.hypot(bx-ax,bz-az)||1,px=-(bz-az)/L*half,pz=(bx-ax)/L*half;
+ out.push({rings:[[[ax+px,az+pz],[bx+px,bz+pz],[bx-px,bz-pz],[ax-px,az-pz]]],bbox:[Math.min(ax,bx)-half,Math.min(az,bz)-half,Math.max(ax,bx)+half,Math.max(az,bz)+half]});}return out;}
 export function drivingCameraPose(car,heading,zoom=240,look=0,buildings=null){
  // Close and low, more behind the car than above it, so the street ahead reads
  // on a phone screen (arcade-style: ~8.3 m back, 3.3 m up at the default zoom 150). Zoom (36–240) still pulls it back.

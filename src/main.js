@@ -52,7 +52,7 @@ import {createLandcover} from './landcover.js';
 import {TramSimulation} from './tram-simulation.js';
 import {createTramRenderer} from './trams.js';
 import {createHarbour} from './harbour.js';
-import {drivingCameraPose,overviewCameraPose,createDriveCameraState,stepDriveCamera,DRIVE_FOV} from './driving-camera.js';
+import {drivingCameraPose,cameraWallStrips,overviewCameraPose,createDriveCameraState,stepDriveCamera,DRIVE_FOV} from './driving-camera.js';
 import {surfaceDetailAt,rumbleFor,createRumbleState} from './road-surface.js';
 import {createSkyEnvironment} from './environment.js';
 import {correctHarbourLanes,olympiaTramOnlySurfaces,harbourCorridor,HARBOUR_CORRIDOR_CARS} from './road-safety.js';
@@ -1292,7 +1292,7 @@ function frame(now){
  viewSpan+=(desiredSpan-viewSpan)*(1-Math.exp(-dt*7));resizeCamera();
  const heading=started?cameraHeading:0,height=viewSpan*(highCamera?.85:.64),behind=viewSpan*(highCamera?.40:.70);
  if(chaseCamera&&started){
-  const pose=(travel.mode==='car'?drivingCameraPose:travelCameraPose)(travel.viewActor(),cameraHeading,viewSpan,cameraLook,travel.mode==='car'?world.cameraBuildings:world.travelCameraBuildings);
+  const pose=(travel.mode==='car'?drivingCameraPose:travelCameraPose)(travel.viewActor(),cameraHeading,viewSpan,cameraLook,travel.mode==='car'?world.driveCameraBuildings||world.cameraBuildings:world.travelCameraBuildings);
   if(cameraTransition){cameraTransition.elapsed+=paused||mapOpen?0:dt;const t=Math.min(1,cameraTransition.elapsed/.5),blend=t*t*(3-2*t);pose.position=pose.position.map((v,i)=>cameraTransition.position.getComponent(i)+(v-cameraTransition.position.getComponent(i))*blend);pose.target=pose.target.map((v,i)=>cameraTransition.target.getComponent(i)+(v-cameraTransition.target.getComponent(i))*blend);if(t===1)cameraTransition=null;}
   camera.position.set(pose.position[0]+cameraShake[0]+cameraRumble[0],pose.position[1]+cameraShake[1]+cameraRumble[1],pose.position[2]+cameraShake[2]+cameraRumble[2]);camera.lookAt(...pose.target);camera.rotateZ(cameraRoll);
  }else if(started&&car){const pose=overviewCameraPose(car,heading,viewSpan,highCamera);camera.position.set(...pose.position);camera.lookAt(...pose.target);
@@ -1660,6 +1660,7 @@ async function boot(){
    const marketCameraObstacles=new SpatialIndex((market.stalls||[]).map(s=>solidBox({x:s.x,z:s.z,width:s.w+.5,depth:s.d+.5,yaw:s.facing||0})));
    world.travelCameraBuildings={at:(x,z)=>world.cameraBuildings.at(x,z)||marketCameraObstacles.at(x,z)}; // walking cameras must stay outside canopy roofs and counters
    world.collisionBuildings=world.cameraBuildings;
+   {const walls=new SpatialIndex([]),here=city;world.driveCameraBuildings={at:(x,z)=>world.cameraBuildings.at(x,z)||walls.at(x,z)};if(city.id.startsWith('copenhagen'))json(dataUrl('camera-walls.json')).then(s=>{if(city===here&&s?.length)walls.add(cameraWallStrips(s));}).catch(()=>{});} // the drive camera's boom also keeps off the drawn walls that stand clear of the footprints (scripts/road-walls.mjs): camera only, not collision
    if(city.id==='copenhagen'){const here=city;json(dataUrl('kk-footprints.json')).then(list=>{if(city===here&&list?.length)world.cameraBuildings.add(list);}).catch(()=>{});json(dataUrl('collision-trim.json')).then(trim=>{if(city!==here||!trim)return;const seen=new Map();for(const b of data.buildings){const k=seen.get(b.id)||0;seen.set(b.id,k+1);const r=trim[k?`${b.id}#${k}`:b.id];if(r===undefined)continue; /* a few ids repeat: id#1, id#2 in city.pack order */if(r){b.rings=r;b.bbox=bounds([r.flat()]);}else b.disabled=true;}}).catch(()=>{});} // the city model's own houses with no mapped footprint (scripts/kk-collision.py): the car drove into them. collision-trim (scripts/collision-trim.py): mapped footprints cut back to the drawn house where they ran into the street, invisible walls (a smaller box stays inside the indexed cells)
    world.objects=new WorldObjects([...streetObstacles,...ads.obstacles,...breakableSigns.bodies]);if(world.pendingSolids){world.objects.add(world.pendingSolids);world.pendingSolids=null;} // solids that loaded first (the 1760 cannons)
    cityModel.traverse(object=>{if(object.worldObjects)world.objects.add(object.worldObjects);});

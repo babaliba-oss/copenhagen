@@ -10,7 +10,7 @@ import {createTramRenderer} from '../src/trams.js';
 import {createWaterfrontFront,isWaterfrontFront} from '../src/kauppatori-buildings.js';
 import {createStationStatues,LANTERN_PAIRS} from '../src/station-statues.js';
 import {stopAdPlacements} from '../src/bind-ads.js';
-import {drivingCameraPose} from '../src/driving-camera.js';
+import {drivingCameraPose,cameraWallStrips} from '../src/driving-camera.js';
 const city=JSON.parse(gunzipSync(readFileSync('public/data/city.pack')));
 test('driving camera retracts before entering a roadside building',()=>{
  const pose=drivingCameraPose({x:0,z:0},0,240,0,{at:(x,z)=>z>=8});
@@ -20,6 +20,19 @@ test('driving camera retracts before entering a roadside building',()=>{
  // a house corner 0.6 m beside the boom: the drawn facade stands up to a metre outside its footprint, so the lens stops short of it
  let corner;for(let i=0;i<40;i++)corner=drivingCameraPose({x:0,z:0},0,240,0,{at:(x,z)=>x>=.6&&z>=6}); /* the boom may swing away (eased) */
  const [cx,,cz]=corner.position;assert.ok(Math.hypot(Math.max(0,.6-cx),Math.max(0,6-cz))>=.75,`lens at ${cx.toFixed(2)},${cz.toFixed(2)}`);
+});
+test('driving camera keeps off drawn walls that stand clear of the footprints (camera-walls.json)',()=>{
+ const segDist=(x,z,s)=>{let best=Infinity;for(let i=0;i+3<s.length;i+=4){const [ax,az,bx,bz]=s.slice(i,i+4),dx=bx-ax,dz=bz-az,t=Math.max(0,Math.min(1,((x-ax)*dx+(z-az)*dz)/(dx*dx+dz*dz||1)));best=Math.min(best,Math.hypot(x-ax-t*dx,z-az-t*dz));}return best;};
+ // a wall across the boom 6 m behind the car, no footprint under it: the 1 m strip stops the ring short of it
+ const wall=[-5,6,5,6];let p;for(let i=0;i<40;i++)p=drivingCameraPose({x:0,z:0},0,240,0,new SpatialIndex(cameraWallStrips(wall)));
+ assert.ok(segDist(p.position[0],p.position[2],wall)>=.9,`lens ${segDist(p.position[0],p.position[2],wall).toFixed(2)} m from the wall`);
+ // Amagertorv's side street (113.5,103.7 heading 0): kk-osm-way-28719500's front stands ~0.9 m past its footprint, and the
+ // lens stood 0.27 m from it (a dark wedge). The data has that front; the boom keeps the lens off it.
+ const segs=JSON.parse(readFileSync('public/cities/copenhagen/camera-walls.json')),near=[];
+ for(let i=0;i+3<segs.length;i+=4)if(Math.abs(segs[i]-113)<30&&Math.abs(segs[i+1]-108)<30)near.push(...segs.slice(i,i+4));
+ assert.ok(segDist(113.26,111.57,near)<.4,'the front at lens height is a camera wall');
+ for(let i=0;i<40;i++)p=drivingCameraPose({x:113.5,z:103.7},0,150,0,new SpatialIndex(cameraWallStrips(near)));
+ assert.ok(segDist(p.position[0],p.position[2],near)>=.9,`lens ${segDist(p.position[0],p.position[2],near).toFixed(2)} m from a drawn wall`);
 });
 test('suspended signs reproduce left/right/right; supports stay off the road',()=>{
  const signs=createHarbourSigns(),roads=new SpatialIndex(city.roads),pavement=new SpatialIndex(city.pavement);
