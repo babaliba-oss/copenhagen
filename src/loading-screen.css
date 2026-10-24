@@ -1,5 +1,5 @@
 /* One welcome panel, with the live city left in view. */
-body.booting :is(.topbar,.location-tag,.dashboard,.right-tools,.landmark-label,#wanted,#location-readout,#touch-controls,#touch-aux,.vignette){visibility:hidden;pointer-events:none}
+body.booting :is(.topbar,.location-tag,.dashboard,.right-tools,.bottomline,.landmark-label,#wanted,#location-readout,#touch-controls,#touch-aux,.vignette){visibility:hidden;pointer-events:none}
 
 /* Type system for the card. Two faces, one scale, one spacing rhythm:
    display  Spectral  — wordmark, tagline (second line 20), place name (28 / 28 / 20)
