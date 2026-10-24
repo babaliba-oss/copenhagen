@@ -45,3 +45,12 @@ test('surveyed parts meet the ground: a buried part comes up, a wall foot over t
   a=wall(3);settleSurveyed(a,{start:0,count:6,height:6});assert.ok(Math.abs(a[1]-3)<1e-6,'a wall rising from a roof 3 m up: untouched');
  }finally{setTerrain(null);}
 });
+
+test('1760 earthworks get no roof seams: the dark ridge strips ran along the banks\' crests (Vesterport, Volden)',async()=>{
+ const {readFileSync}=await import('node:fs'),{gunzipSync}=await import('node:zlib'),{createModelledBuilding}=await import('../src/building-detail.js');
+ const idx=JSON.parse(readFileSync('public/cities/copenhagen-1760/buildings3d-index.json')),t=idx.tiles.find(t=>t.parts.some(p=>p.id==='osm-way--520300')),part=t.parts.find(p=>p.id==='osm-way--520300');
+ let b=readFileSync(`public/cities/copenhagen-1760/${t.file}`);if(b[0]===0x1f)b=gunzipSync(b);const a=new Float32Array(b.buffer.slice(b.byteOffset,b.byteOffset+b.byteLength));
+ const d=createModelledBuilding(a,part,undefined,null,true);
+ assert.ok(d.meshes.some(m=>m.userData.role==='roof'),'the bank is still drawn');
+ assert.equal(d.meshes.filter(m=>!m.userData.role).length,0,'no seam/trim mesh on an earthwork');
+});

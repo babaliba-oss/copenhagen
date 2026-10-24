@@ -152,10 +152,10 @@ export function createModelledBuilding(array,part,pixels,texture=null,includeHer
  // Mesh-space roof seams accent the genuine pitches and ridgelines.
  const edgeMap=new Map();
  for(const t of analysis.roof)for(let i=0;i<3;i++){const a=t.v[i].slice(0,3),b=t.v[(i+1)%3].slice(0,3),key=[a.map(v=>v.toFixed(2)).join(','),b.map(v=>v.toFixed(2)).join(',')].sort().join('|');const prev=edgeMap.get(key);if(prev){if(Math.abs(prev.normal.dot(t.n))<.92)prev.ridge=true;}else edgeMap.set(key,{a,b,normal:t.n,ridge:false});}
- for(const e of edgeMap.values())if(e.ridge){const a=new THREE.Vector3(...e.a),b=new THREE.Vector3(...e.b),length=a.distanceTo(b);if(length<1||length>100)continue;const g=new THREE.CylinderGeometry(.055,.055,length,5);g.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,1,0),b.clone().sub(a).normalize()));g.translate(...a.add(b).multiplyScalar(.5).toArray());ridges.push(g);}
+ const earthwork=!!part.embankment||/^volden$|bastion|skanse/i.test(part.name||''); // ramparts: no ridge seams (dark lines along the banks' crests and slope breaks), chimneys or dormers
+ for(const e of edgeMap.values())if(e.ridge&&!earthwork){const a=new THREE.Vector3(...e.a),b=new THREE.Vector3(...e.b),length=a.distanceTo(b);if(length<1||length>100)continue;const g=new THREE.CylinderGeometry(.055,.055,length,5);g.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,1,0),b.clone().sub(a).normalize()));g.translate(...a.add(b).multiplyScalar(.5).toArray());ridges.push(g);}
  // Chimney stacks on the ridges of the city model's pitched roofs (houses up to ~30 m): two or three per house.
  const chimneys=[];
- const earthwork=/^volden$|bastion|skanse/i.test(part.name||''); // ramparts: no chimneys or dormers
  if(part.roofColor&&part.height<30&&part.height>6&&!earthwork){
   const ridgesFlat=[...edgeMap.values()].filter(e=>e.ridge&&Math.abs(e.a[1]-e.b[1])<.3).map(e=>({e,l:Math.hypot(e.a[0]-e.b[0],e.a[2]-e.b[2])})).filter(r=>r.l>4).sort((a,b)=>b.l-a.l).slice(0,2);
   let k=0;for(const {e,l} of ridgesFlat)for(const f of l>14?[.22,.78]:[.5]){if(k++>=3)break;const x=e.a[0]+(e.b[0]-e.a[0])*f,y=e.a[1]+(e.b[1]-e.a[1])*f,z=e.a[2]+(e.b[2]-e.a[2])*f,yaw=Math.atan2(e.b[0]-e.a[0],e.b[2]-e.a[2]);
