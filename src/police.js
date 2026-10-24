@@ -31,6 +31,11 @@ export function recklessDriving(from,player,dt,world){
 }
 // Seconds out of every unit's sight before the search is called off.
 export const escapeTime=level=>level?10+level*5:0;
+// The escape clock only runs once the units have had a fair chance: a unit has seen the player during this pursuit, or the
+// first unit has had time to drive to where the player was reported (its route at half cruise speed, plus `slack`, at most
+// `max` s), or `fallback` s have passed without any unit being dispatched. Units spawn 65–150 m out, so a player who simply
+// stopped used to be cleared before anyone arrived (Copenhagen halves escape times: 7.5 s at one star).
+export const CONTACT={pace:.5,slack:4,max:25,fallback:30};
 export const heatForLevel=level=>[0,3,6,10,16,24][Math.max(0,Math.min(5,Math.round(level)))];
 // Four- and five-star incidents call a stronger response in every city.
 // Units arrive closer, prefer spots the player cannot see, and arrest sooner.
@@ -84,7 +89,10 @@ export class PoliceSimulation{
   for(const e of this.graph.edges)this.incoming[e.to].push(e);
   this.costs=[];this.target=null;this.intercept=null;this.predicted=null;this.repath=0;
  }
- reset(){this.time=0;this.heat=0;this.units=[];this.contacts=new Map();this.recentIncidents=[];this.recklessSeconds=0;this.recklessAt=-Infinity;this.blocked=new Map();this.escape=0;this.bust=0;this.contact=0;this.stopped=0;this.backupAt=-Infinity;this.grace=0;this.repath=0;this.dispatch=0;this.costs=[];this.target=null;this.message=null;this.serial=0;this.busted=false;this.lastSeen=null;this.seen=false;this.intercept=null;this.predicted=null;this.pressure=false;this.surgeUntil=-Infinity;this.minUnits=0;this.units=[...(this.parked||[])];}
+ reset(){this.time=0;this.heat=0;this.units=[];this.contacts=new Map();this.recentIncidents=[];this.recklessSeconds=0;this.recklessAt=-Infinity;this.blocked=new Map();this.escape=0;this.bust=0;this.contact=0;this.stopped=0;this.backupAt=-Infinity;this.grace=0;this.repath=0;this.dispatch=0;this.costs=[];this.target=null;this.message=null;this.serial=0;this.busted=false;this.lastSeen=null;this.seen=false;this.intercept=null;this.predicted=null;this.pressure=false;this.surgeUntil=-Infinity;this.minUnits=0;this.sighted=false;this.contactBy=0;this.contactPlanned=false;this.units=[...(this.parked||[])];}
+ // A pursuit starting from no stars: nobody has seen the player yet and no unit is on its way (see CONTACT).
+ startContact(){this.sighted=false;this.contactBy=this.time+CONTACT.fallback;this.contactPlanned=false;}
+ get contactMade(){return this.sighted||this.time>=this.contactBy;}
  get level(){return wantedLevel(this.heat);}
  get obstacles(){return this.units;}
  // Location never starts or ends the stronger response.
@@ -102,6 +110,7 @@ export class PoliceSimulation{
  // Explicit escalation for scripted incidents; ordinary driving uses report().
  escalate({level=4,message='Police alerted — units converging.'}={}){
   if(this.busted)return false;
+  if(!this.level)this.startContact();
   this.heat=Math.max(this.heat,heatForLevel(level));this.grace=0;
   this.escape=0;this.standoff=0;this.lastSeen=null;this.repath=0;this.dispatch=this.time;this.surgeUntil=this.time+SURGE.duration;
   this.message=message;return true;
@@ -114,7 +123,7 @@ export class PoliceSimulation{
   if(this.relaxed)add=Math.max(3,add-3);
   const key=`${kind}:${id}`,last=this.contacts.get(key)??-Infinity;this.contacts.set(key,this.time);
   if(this.time-last<CONTACT_COOLDOWN)return false;
-  const before=this.level;
+  const before=this.level;if(!before)this.startContact();
   this.recentIncidents=this.recentIncidents.filter(t=>this.time-t<=INCIDENT_WINDOW);
   this.heat=Math.min(30,this.heat+add+Math.min(3,this.recentIncidents.length));
   this.recentIncidents.push(this.time);
@@ -204,6 +213,7 @@ export class PoliceSimulation{
   // sight ahead loses to any hidden one among the few best.
   {const few=candidates.slice(0,8);for(const c of few)if(c.ahead>0&&this.clearSight(c,player))c.score+=surge?40:200;few.sort((a,b)=>a.score-b.score);candidates[0]=few[0];}
   this.units.push(this.newUnit(candidates[0],role,false));
+  if(!this.contactPlanned&&!this.sighted){this.contactPlanned=true;this.contactBy=this.time+Math.min(CONTACT.max,candidates[0].route/((24+this.level*2.6)*CONTACT.pace)+CONTACT.slack);} // the first unit's fair chance to arrive
  }
  // Every unit with the same fields in the same order (the spawn and backup candidates were spread in, with braking and
  // progressPoint added later): step() saw several unit shapes and kept being thrown out of its optimised code ('wrong map').
@@ -305,12 +315,12 @@ export class PoliceSimulation{
   }
   // Never teleport a visible stuck car. Retire units only well away from player.
   this.units=this.units.filter(u=>u.parked||distance(u,player)<450&&!(u.stuck>8&&distance(u,player)>85));
-  this.seen=this.units.some(u=>this.canSee(u,player));
+  this.seen=this.units.some(u=>this.canSee(u,player));if(this.seen)this.sighted=true;
   const canArrest=this.units.some(u=>distance(u,player)<(surge?SURGE.arrestRange:10)&&this.clearSight(u,player));
   // Stand-off: the player is off any road the units can drive (a plaza, Strøget) and they can only watch from the kerb.
   // After 10 s of that the escape clock runs as if unseen (the wanted level used to stay frozen for good).
   this.standoff=this.seen&&!canArrest&&!this.world.roads?.at?.(player.x,player.z)&&this.units.every(u=>Math.abs(u.speed||0)<.5)?(this.standoff||0)+dt:0;
-  this.escape=!this.seen||this.standoff>10?this.escape+dt:0;
+  this.escape=(!this.seen||this.standoff>10)&&this.contactMade?this.escape+dt:0; // no escape before the units have had a fair chance (CONTACT)
   this.bust=canArrest&&Math.abs(player.speed)<1?this.bust+dt:0;
   // Hands-on arrest: a unit at the car (any side, no line of sight needed) and a stopped or crawling player.
   const atCar=this.units.some(u=>distance(u,player)<CONTACT_BUST.range);

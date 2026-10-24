@@ -293,7 +293,7 @@ test('police: the surge expires on its own and arrests a stopped car within rang
  assert.deepEqual(SURGE.spawn,[60,110]);for(const u of p.units){const d=Math.hypot(u.x-car.x,u.z-car.z);assert.ok(d>=60&&d<=110,`surge unit spawned ${d.toFixed(0)} m away`);}
  let busted=0;for(let i=1;i<60*30&&!p.busted;i++){p.step(1/30,car);busted=i/30;}
  assert.equal(p.busted,true);assert.ok(busted<30,`arrested in ${busted}s`);assert.equal(p.snapshot().status,'BUSTED');
- const q=new PoliceSimulation(graph(),world);q.setPressure(true);q.escalate({level:4});q.dispatch=1e9;q.backupAt=Infinity; // no units at all: does the surge itself keep the level up?
+ const q=new PoliceSimulation(graph(),world);q.setPressure(true);q.escalate({level:4});q.dispatch=1e9;q.backupAt=Infinity;q.sighted=true; // no units at all: does the surge itself keep the level up?
  for(let i=0;i<(SURGE.duration-1)*30;i++)q.step(1/30,car);assert.equal(q.surging,true);assert.equal(q.level,4,'under the surge the unseen player is not let go after the ordinary 30 s');
  for(let i=0;i<2*30;i++)q.step(1/30,car);assert.equal(q.surging,false,'surge rules lapse after SURGE.duration');
  assert.equal(q.level,0,'then the ordinary escape rule applies and clears the level');assert.match(q.message,/Escaped/);

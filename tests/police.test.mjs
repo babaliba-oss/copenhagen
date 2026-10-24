@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {gunzipSync} from 'node:zlib';
-import {PoliceSimulation,sweptContact,wantedLevel,incidentHeat,escapeTime,closingSpeed,CRASH_MIN_SPEED,RECKLESS,INCIDENT_WINDOW,recklessDriving} from '../src/police.js';
+import {PoliceSimulation,sweptContact,wantedLevel,incidentHeat,escapeTime,CONTACT,closingSpeed,CRASH_MIN_SPEED,RECKLESS,INCIDENT_WINDOW,recklessDriving} from '../src/police.js';
 import {prepareGraph} from '../src/mobility.js';
 import {correctHarbourLanes,vehicleFitsRoad} from '../src/road-safety.js';
 import {SpatialIndex} from '../src/geo.js';
@@ -35,7 +35,7 @@ test('closing speed counts head-on crashes more than rear-end nudges',()=>{
 test('one-star patrol gives up sooner than a pedestrian pursuit; unseen wanted level decays to zero',()=>{
  assert.ok(escapeTime(1)<escapeTime(2)&&escapeTime(2)<escapeTime(5));
  const minor=new PoliceSimulation(graph(),world),serious=new PoliceSimulation(graph(),world),car=player();
- minor.report('reckless','driving');serious.report('pedestrian',1);minor.dispatch=serious.dispatch=1e9;
+ minor.report('reckless','driving');serious.report('pedestrian',1);minor.dispatch=serious.dispatch=1e9;minor.sighted=serious.sighted=true; // units had seen the player
  let minorCleared=0,seriousCleared=0;
  for(let i=1;i<40*30;i++){minor.step(1/30,car);serious.step(1/30,car);if(!minorCleared&&!minor.level)minorCleared=i/30;if(!seriousCleared&&!serious.level)seriousCleared=i/30;}
  assert.ok(minorCleared>0&&seriousCleared>minorCleared,`${minorCleared} < ${seriousCleared}`);
@@ -57,7 +57,7 @@ test('search remembers the last visible location and cannot see through building
  const p=new PoliceSimulation(graph(),{...world,buildings:{at:(x,z)=>z>0&&z<10}}),car=player();
  const unit={id:'unit',edge:p.graph.edges[0],s:70,x:0,z:30,heading:0,speed:0,stuck:0};
  assert.equal(p.canSee(unit,car),false);
- p.report('pedestrian','one');p.units=[unit];p.dispatch=100;
+ p.report('pedestrian','one');p.units=[unit];p.dispatch=100;p.sighted=true;
  p.step(1/30,car);const seen={...p.lastSeen};car.x=70;
  for(let i=0;i<90;i++)p.step(1/30,car);
  assert.deepEqual(p.lastSeen,seen);assert.equal(p.snapshot().status,'SEARCHING');
@@ -92,9 +92,18 @@ test('stopping beside police ends pursuit; reset clears all state',()=>{
  assert.equal(p.recentIncidents.length,0);assert.equal(p.recklessSeconds,0);
 });
 test('escape clears heat only after being separated from pursuers',()=>{
- const p=new PoliceSimulation(graph(),world),car=player();p.report('pedestrian',1);p.dispatch=100;
+ const p=new PoliceSimulation(graph(),world),car=player();p.report('pedestrian',1);p.dispatch=100;p.sighted=true;
  for(let i=0;i<19*30;i++)p.step(1/30,car);assert.equal(p.level,2);
  for(let i=0;i<10*30;i++)p.step(1/30,car);assert.equal(p.level,0);assert.match(p.message,/Escaped/);
+});
+test('standing still is no escape: the clock waits until the units have had a fair chance',()=>{
+ const idle=new PoliceSimulation(graph(),world),car=player();idle.relaxed=true;idle.escalate({level:1});idle.dispatch=1e9; // no unit is ever dispatched
+ for(let i=0;i<(CONTACT.fallback-1)*30;i++)idle.step(1/30,car);assert.equal(idle.level,1,'not cleared before anyone could come');assert.equal(idle.escape,0);
+ for(let i=0;i<10*30;i++)idle.step(1/30,car);assert.equal(idle.level,0,'nobody ever came: cleared after the fallback');
+ const p=new PoliceSimulation(graph(),world);p.relaxed=true;p.escalate({level:1});p.step(1/30,car);
+ assert.equal(p.units.length,1);assert.ok(p.contactBy>p.time+2&&p.contactBy<=p.time+CONTACT.max,'the first unit sets how long the clock waits');
+ let cleared=false;for(let i=0;i<40*30&&!p.busted;i++){p.step(1/30,car);cleared||=!p.level&&!p.busted;}
+ assert.equal(cleared,false);assert.equal(p.busted,true,'a stopped player is arrested');
 });
 test('player cannot pass through a police car',()=>{
  const p=new PoliceSimulation(graph(),world);p.units=[{id:'police',x:0,z:0,heading:0}];
@@ -152,7 +161,7 @@ test('the repeat bonus expires and a fresh pursuit starts without old incident h
  quick.report('vehicle','a',9);quick.time=2;quick.report('vehicle','b',9);
  spaced.report('vehicle','a',9);spaced.time=INCIDENT_WINDOW+1;spaced.report('vehicle','b',9);
  assert.ok(quick.heat>spaced.heat);assert.equal(spaced.heat,12);
- const escaped=new PoliceSimulation(graph(),world);escaped.report('vehicle','a',9);escaped.dispatch=1e9;
+ const escaped=new PoliceSimulation(graph(),world);escaped.report('vehicle','a',9);escaped.dispatch=1e9;escaped.sighted=true;
  for(let i=0;i<21*30;i++)escaped.step(1/30,player());assert.equal(escaped.level,0);
  escaped.report('vehicle','a',9);assert.equal(escaped.heat,6,'escape clears the combo and contact history');
  escaped.reset();escaped.report('vehicle','a',9);assert.equal(escaped.heat,6,'restart also clears it');
