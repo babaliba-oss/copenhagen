@@ -23,3 +23,11 @@ test('today\'s main block is cut out of the model part, the riding ground wings 
  assert.equal(b.length,CUT_1760[id].footprint.length+1);assert.ok(b.every(f=>f.id!=='osm-way-25992657'||f.rings[0].every(([X,Z])=>{const u=(X-x)*c-(Z-z)*s,v=(X-x)*s+(Z-z)*c;return Math.abs(u)>hx-.5||Math.abs(v)>hz-.5;})));
  const w=cutRoadWalls1760([{id,rings:[[world(0,40),world(1,40),world(1,41)]]},{id,rings:[[[60,500],[61,500],[61,501]]]}]);assert.equal(w.length,1);
 });
+test('1760 job and saga spots stand outside the hand-built landmarks you cannot enter', async () => {
+ /* Herring for the Palace kitchens delivered to a spot inside the first Christiansborg's closed block (and court): 49 m short at best, by coach or on foot */
+ const {default:proj4}=await import('proj4'),fs=await import('node:fs'),{JOBS_1760,SAGAS}=await import('../src/copenhagen/data.js');
+ const city=JSON.parse(fs.readFileSync('public/cities/index.json','utf8')).cities.find(q=>q.id==='copenhagen-1760'),pr=proj4('EPSG:4326',city.projection),ll=([lat,lon])=>{const [X,Y]=pr.forward([lon,lat]);return [X,-Y];};
+ const obs=createLandmarks({era:1760,anchors:{},mills:[]}).obstacles,inside=([X,Z])=>obs.some(o=>{const r=o.rings[0];let q=false;for(let i=0,j=r.length-1;i<r.length;j=i++){const a=r[i],b=r[j];if((a[1]>Z)!==(b[1]>Z)&&X<(b[0]-a[0])*(Z-a[1])/(b[1]-a[1])+a[0])q=!q;}return q;});
+ const spots=[...JOBS_1760.flatMap(j=>[[j.t+' pick-up',j.a],[j.t+' delivery',j.b]]),...SAGAS.filter(q=>q.era==='h'||q.era==='b').flatMap(q=>q.steps.map(st=>[q.id+' '+st.name,st.at]))];
+ for(const [name,at] of spots)assert.ok(!inside(ll(at)),`${name} stands inside a landmark`);
+});

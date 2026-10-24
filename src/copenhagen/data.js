@@ -17,7 +17,7 @@ export const JOBS = [
 // Copenhagen 1760 (the copenhagen-1760 city): errands inside the walls, on foot or by cart.
 export const JOBS_1760 = [
   { t: 'A letter for the Exchange', d: 'A merchant in Nyhavn needs this sealed letter at Børsen before the bell. Ships wait for no one.', a: [55.67990, 12.58955, 'Nyhavn'], b: [55.67568, 12.58380, 'Børsen'], pay: 192 },
-  { t: 'Herring for the Palace kitchens', d: 'Two baskets from the fishwives on Gammel Strand. The cook at Christiansborg is not a patient man.', a: [55.67750, 12.57856, 'Gammel Strand'], b: [55.67620, 12.58010, 'Christiansborg'], pay: 144 },
+  { t: 'Herring for the Palace kitchens', d: 'Two baskets from the fishwives on Gammel Strand. The cook at Christiansborg is not a patient man.', a: [55.67750, 12.57856, 'Gammel Strand'], b: [55.67570, 12.57894, 'Christiansborg'], pay: 144 },
   { t: 'Ink for the University', d: 'A crate of ink and quills from Købmagergade to the professors by Vor Frue.', a: [55.68092, 12.57712, 'Købmagergade'], b: [55.67933, 12.57377, 'University'], pay: 144 },
   { t: 'Beer across the harbour', d: 'A small keg from Christianshavn for the inn on Kongens Nytorv. Over Knippelsbro, mind the toll man.', a: [55.67330, 12.59180, 'Christianshavn'], b: [55.67980, 12.58530, 'Kongens Nytorv'], pay: 192 },
   { t: 'Plans for Amalienborg', d: 'Rolled drawings from the architect Eigtved\'s office for the new palaces. Keep them dry.', a: [55.67762, 12.58641, 'Holmens Kanal'], b: [55.68400, 12.59300, 'Amalienborg'], pay: 288 },
