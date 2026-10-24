@@ -17,6 +17,9 @@ test('driving camera retracts before entering a roadside building',()=>{
  assert.ok(pose.position[2]<8);assert.ok(pose.position[2]>5);
  const buildings=new SpatialIndex(city.buildings),forum=drivingCameraPose({x:-724,z:43},1.95,240,0,buildings);
  assert.ok(!buildings.at(forum.position[0],forum.position[2]));
+ // a house corner 0.6 m beside the boom: the drawn facade stands up to a metre outside its footprint, so the lens stops short of it
+ let corner;for(let i=0;i<40;i++)corner=drivingCameraPose({x:0,z:0},0,240,0,{at:(x,z)=>x>=.6&&z>=6}); /* the boom may swing away (eased) */
+ const [cx,,cz]=corner.position;assert.ok(Math.hypot(Math.max(0,.6-cx),Math.max(0,6-cz))>=.75,`lens at ${cx.toFixed(2)},${cz.toFixed(2)}`);
 });
 test('suspended signs reproduce left/right/right; supports stay off the road',()=>{
  const signs=createHarbourSigns(),roads=new SpatialIndex(city.roads),pavement=new SpatialIndex(city.pavement);

@@ -9,14 +9,17 @@ export function overviewCameraPose(car,heading,zoom=240,high=false){
  return {position:[px,Math.max(y+height,groundAt(px,pz)+1.5),pz],target:[car.x-Math.sin(heading)*ahead,y+1.15,car.z-Math.cos(heading)*ahead]};
 }
 let swing=0;
+export const CAMERA_CLEARANCE={r:1};const CLEAR_RING=[0,1,2,3,4,5,6,7].map(k=>[Math.cos(k*Math.PI/4),Math.sin(k*Math.PI/4)]);
 export function drivingCameraPose(car,heading,zoom=240,look=0,buildings=null){
  // Close and low, more behind the car than above it, so the street ahead reads
  // on a phone screen (arcade-style: ~8.3 m back, 3.3 m up at the default zoom 150). Zoom (36–240) still pulls it back.
  let distance=4.5+Math.max(36,Math.min(240,zoom))/40;
  // A turn near Forum can put a fixed-length camera boom inside the building
  // across the road. Shorten it before the wall, retaining the driving target.
+ // The lens keeps CAMERA_CLEARANCE from the footprints all round: the city model's facades stand up to a metre
+ // outside them (cornices, bays, a footprint mapped short), and a lens 0.25 m off the footprint sat inside the drawn wall.
  const clear=(h,max)=>{for(let d=1;d<=max;d+=.25){const x=car.x+Math.sin(h)*d,z=car.z+Math.cos(h)*d;
-  if([[0,0],[.25,0],[-.25,0],[0,.25],[0,-.25]].some(([dx,dz])=>buildings.at(x+dx,z+dz)))return Math.max(.5,d-.5);}return max;};
+  if(buildings.at(x,z)||CLEAR_RING.some(([dx,dz])=>buildings.at(x+dx*CAMERA_CLEARANCE.r,z+dz*CAMERA_CLEARANCE.r)))return Math.max(.5,d-.5);}return max;};
  const aim=heading; // the target stays straight ahead of the car even when the boom swings
  if(buildings){const full=distance;distance=clear(heading,full);
   // Backed up against a wall: swing the boom up to 40 degrees to whichever side is open, rather than a lens
