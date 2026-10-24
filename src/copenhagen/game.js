@@ -225,7 +225,7 @@ export function createCopenhagenGame({scene,city,mobilityData,cityData,toast,sou
    ['borsen','Børsen',55.6758,12.5833,'The exchange and its dragon spire, a century old already.'],['christiansborg','Christiansborg',55.6761,12.5800,'The new palace, finished only fifteen years ago.'],
    ['rundetaarn','Rundetårn',55.6813,12.5757,'Christian IV’s round tower: a coach can drive up its ramp.'],['vorfrelsers','Vor Frelsers Kirke',55.6727,12.5940,'The spiral spire, finished in 1752.'],
    ['amalienborg','Amalienborg',55.6840,12.5930,'Four noble palaces, still smelling of fresh mortar.'],['vorfrue','Vor Frue Kirke',55.6796,12.5729,'The cathedral and its tall copper spire.'],
-   ['nikolaj','Sankt Nikolaj',55.6785,12.5810,'The spire sailors steer by.'],['frederiks','Frederik’s Church',55.6849,12.5893,'A marble church that may never be finished.'],
+   ['nikolaj','Sankt Nikolaj',55.6785,12.5810,'The spire sailors steer by.'],['frederiks','Frederiks Kirke',55.6849,12.5893,'A marble church that may never be finished.'],
    ['christian5','Christian V',55.6797,12.5856,'The gilded king on Kongens Nytorv.'],['holmens','Holmens Kirke',55.6762,12.5823,'The navy’s church by the canal.']]
   :[['nyhavn','Nyhavn',55.6799,12.5911,'The painted houses on the canal.'],['mermaid','The Little Mermaid',55.6929,12.5993,'Smaller than you expected. Everyone says so.'],
    ['rundetaarn','Rundetårn',55.6813,12.5757,'The round tower with a ramp instead of stairs.'],['amalienborg','Amalienborg',55.6840,12.5930,'The royal square; the guard changes at noon.'],
