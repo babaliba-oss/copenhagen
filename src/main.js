@@ -46,7 +46,7 @@ import {createSurfaceStreamer} from './surface-streaming.js';
 import {createCathedral,createSenateSquare,loadSenateMaterials} from './cathedral.js';
 import {USPENSKI,createUspenskiCathedral} from './uspenski-cathedral.js';
 import {createKauppatori} from './kauppatori.js';
-import {advanceOcclusion,stableShadowTarget,shadowFrame} from './render-stability.js';
+import {advanceOcclusion,stableShadowTarget,shadowFrame,compileWhenReady} from './render-stability.js';
 import {HARBOUR_START} from './demo-route.js';
 import {createLandcover} from './landcover.js';
 import {TramSimulation} from './tram-simulation.js';
@@ -715,12 +715,13 @@ async function detailTile(group){
   compileBoth(tmp).then(()=>{tmp.remove(...meshes);land();},()=>{tmp.remove(...meshes);land();});
  },()=>dist(b),()=>loadedTiles.get(t.file)===group); // nearest building first, across every tile in the queue
 }
+const compileSafe=(obj,cam,target=null)=>compileWhenReady(renderer,obj,cam,target); // renderer.compileAsync, but a tile dropped while its shaders compile no longer stops the game (render-stability.js)
 // Detail batches compile before they join the tile: the opaque variant and the dithering one the chase-camera fade
 // switches to (building-batches.js), so neither stalls a frame later.
 async function compileBatches(obj,meshes){
- await renderer.compileAsync(obj,camera,lightScene()).catch(()=>{});
+ await compileSafe(obj,camera,lightScene()).catch(()=>{});
  for(const m of meshes){m.material.userData.dither=true;m.material.needsUpdate=true;}
- try{await renderer.compileAsync(obj,camera,lightScene());}catch{}finally{for(const m of meshes){m.material.userData.dither=false;m.material.needsUpdate=true;}}
+ try{await compileSafe(obj,camera,lightScene());}catch{}finally{for(const m of meshes){m.material.userData.dither=false;m.material.needsUpdate=true;}}
 }
 // Draw calls are what costs on Windows (each one goes through ANGLE/D3D11): a busy Nyhavn frame issued
 // 1,600 of them, a third for the shadow map. Moving things (traffic, buses, people, cyclists, boats) and
@@ -742,9 +743,9 @@ function trimDraws(now){
 // Both versions are compiled when a building arrives, so the first fade no longer stalls a frame.
 async function compileBoth(obj){
  const mats=new Set();obj.traverse(o=>{if(o.material&&!o.material.transparent&&o.userData.occlusion)mats.add(o.material);});
- await renderer.compileAsync(obj,camera,lightScene()).catch(()=>{});
+ await compileSafe(obj,camera,lightScene()).catch(()=>{});
  if(!mats.size)return;for(const m of mats){m.transparent=true;m.needsUpdate=true;}
- try{await renderer.compileAsync(obj,camera,lightScene());}catch{}finally{for(const m of mats){m.transparent=false;m.needsUpdate=true;}}
+ try{await compileSafe(obj,camera,lightScene());}catch{}finally{for(const m of mats){m.transparent=false;m.needsUpdate=true;}}
 }
 let lightProxy=null,lightsAt=0;
 function lightScene(){const now=performance.now();if(!lightProxy||now-lightsAt>5000){const lights=[];scene.traverse(o=>{if(o.isLight)lights.push(o);});lightProxy??=Object.create(scene);const shown=o=>{for(let q=o;q;q=q.parent)if(!q.visible)return false;return true;};lightProxy.traverseVisible=cb=>{for(const l of lights)if(shown(l))cb(l);};lightsAt=now;}return lightProxy;}
@@ -1696,7 +1697,7 @@ async function boot(){
    transitQueue.splice(0).forEach(addTransit);mobility.attachTrams(tramSim);mobility.attachBuses(buses.simulation);buses.reset(car,tramSim.obstacles);mobility.externalBodies=transitBodies();mobility.reset(car);
    // Shader programs compile now, behind the loading screen (in parallel where the GPU offers it), instead of
    // stalling frames the first time each material comes into view while driving. Capped so a slow GPU still starts.
-   progress(98,'Warming up shaders');{const shown=[];scene.traverse(o=>{if(!o.visible){o.visible=true;shown.push(o);}}); /* hidden things too (night lamps, rain, far versions): compiled now, not mid-drive */await Promise.race([renderer.compileAsync(scene,camera).catch(()=>{}),new Promise(r=>setTimeout(r,6000))]);for(const o of shown)o.visible=false;}
+   progress(98,'Warming up shaders');{const shown=[];scene.traverse(o=>{if(!o.visible){o.visible=true;shown.push(o);}}); /* hidden things too (night lamps, rain, far versions): compiled now, not mid-drive */await Promise.race([compileSafe(scene,camera).catch(()=>{}),new Promise(r=>setTimeout(r,6000))]);for(const o of shown)o.visible=false;}
    progress(100,'Ready');
    {const head=el=>()=>(el.querySelector('h3')?.textContent||'')+'|'+(el.querySelector('.cph-go')?.textContent.split('·')[0]||'');for(const id of ['cph-job','cph-saga']){const el=$(id);if(el)touchTucks.add(el,'left',head(el),()=>id==='cph-saga'?'SAGA':/race/i.test(el.querySelector('.cph-kick')?.textContent||'')?'RACE':'JOB',()=>!!el.querySelector('.cph-timer,.cph-race-time,.cph-low')||/Deliver to/.test(el.textContent));} /* a running clock keeps its card out */touchTucks.add($('radio-now'),'right',()=>$('radio-station').textContent,()=>'RADIO');}
    ready=true;carGroup.visible=true;marker.visible=true;loadingScreen.ready(startPoint.name);

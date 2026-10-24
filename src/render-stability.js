@@ -40,3 +40,12 @@ export function shadowFrame(offset,{halfWidth=200,casterHeight=45,minHalfHeight=
  const halfHeight=Math.min(halfWidth,Math.max(minHalfHeight,halfWidth*sinE+casterHeight*cosE));
  return {elevation,halfWidth,halfHeight,normalBias:.25+.5*(1-sinE),groundTexel:{across:halfWidth*2/2048,along:halfHeight*2/2048/Math.max(sinE,.05)}};
 }
+
+// renderer.compileAsync, except that a material disposed while its shader compiles (a building tile dropped as the player
+// moves on or jumps) is let go. three's own check reads the program from a timer, and a disposed material has none: an
+// uncaught TypeError ('reading isReady') that stopped the game, and the compile never finished.
+export async function compileWhenReady(renderer,obj,camera,target=null){
+ const mats=renderer.compile(obj,camera,target);
+ await new Promise(resolve=>{const check=()=>{for(const m of mats){const p=renderer.properties.get(m).currentProgram;if(!p||p.isReady())mats.delete(m);}if(mats.size)setTimeout(check,10);else resolve();};if(renderer.extensions.get('KHR_parallel_shader_compile'))check();else setTimeout(check,10);});
+ return obj;
+}
