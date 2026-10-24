@@ -1037,8 +1037,8 @@ function reset(){if(!ready)return;setBusted(false);setStart(startPoint);toast('B
 let laneSurfaces=null,laneSurfaceCount=-1;
 // The nearest clear spot in a traffic lane (no house, water, object or vehicle on it), or null: R's recovery, and the arrest scene.
 function clearLaneSpot(){
- const count=data.roads.length+data.pavement.length;if(count!==laneSurfaceCount){laneSurfaces=startSurfaces(data.roads,data.pavement);laneSurfaceCount=count;} // map extensions add streets as they stream in
- const solid=(x,z)=>laneSurfaces.blocked.at(x,z)||world.buildings.at(x,z)||!world.roads.at(x,z)&&inWaterPolygons(world.water,x,z);
+ const count=data.roads.length+data.pavement.length;if(count!==laneSurfaceCount){laneSurfaces=startSurfaces(data.roads,city.era===1760?data.pavement.filter(p=>p.kind!=='Jalankulkualue'):data.pavement);laneSurfaceCount=count;} // map extensions add streets as they stream in. 1760: the cobbled town areas (Jalankulkualue, one of 2.2 km2) lie under every street and the coach drives on them: as kerbs they left R a lane spot at 52 of 150 places (147 without)
+ const solid=(x,z)=>laneSurfaces.blocked.at(x,z)||world.buildings.at(x,z)||world.collisionBuildings?.at(x,z)||!world.roads.at(x,z)&&inWaterPolygons(world.water,x,z); /* collisionBuildings: 1760's landmarks are solid only there */
  const bodies=[...travelObstacles(),...travel.parkedBodies(),...(parkedCars?.near(car.x,car.z,70)||[])].map(v=>({x:v.x,z:v.z,heading:v.heading||0,hl:v.hl??v.halfLength??2.36,hw:v.hw??v.halfWidth??.98}));
  const p=laneStart({x:car.x,z:car.z,heading:car.heading},mobility.roads.edges,{drive:laneSurfaces.drive,blocked:{at:solid}},{reach:60,step:2,tries:400,accept:q=>!world.objects?.overlap(q)&&!bodies.some(b=>boxesOverlap(carBox(q,.6),b))}); // a few ms; capped so a dense block never stalls a frame
  return p;
