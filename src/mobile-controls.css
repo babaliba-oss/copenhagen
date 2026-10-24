@@ -42,6 +42,10 @@
  body.mobile-controls-ready #touch-controls button:is(:active,.pressed){background:#30312ef2;color:#fff8ed;border-color:#30312e}
  body.mobile-controls-ready #app .dashboard{position:absolute;left:50%;right:auto;bottom:calc(var(--mobile-bottom) + 4px);width:62px;height:52px;transform:translateX(-50%);display:block;pointer-events:none;z-index:24}
  body.mobile-controls-ready #app .dashboard :is(.minimap-card,.journey,.controls-hint){display:none}
+ body.mobile-controls-ready #app>.minimap-card{display:block;position:absolute;top:calc(var(--mobile-top) + 56px);right:calc(var(--mobile-right) + 26px);width:112px;height:84px;flex:none;border-width:3px;z-index:23}
+ body.mobile-controls-ready #app>.minimap-card .minimap-caption{display:none}
+ body.mobile-controls-ready:is(.booting,.busted) #app>.minimap-card{display:none}
+ @media (max-height:500px){body.mobile-controls-ready #app>.minimap-card{top:auto;right:auto;left:var(--mobile-left);bottom:calc(var(--mobile-bottom) + 92px)}}
  body.mobile-controls-ready #app .dashboard .speedometer{width:62px;min-width:0;height:52px;margin:0!important;padding:3px 0;background:#f8f5eede;color:#30312e;border:1px solid #fff7;border-radius:8px;box-shadow:none;display:block;transform:none;pointer-events:none}
  body.mobile-controls-ready #app .speedometer .speed-dial{width:100%;height:100%;aspect-ratio:auto}
  body.mobile-controls-ready #app .speedometer :is(svg,#drive-gear,.gear){display:none}

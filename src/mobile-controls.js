@@ -16,6 +16,8 @@ export function createMobileControls({keys,canPlay=()=>true,onMenuChange=()=>{},
  const menu=doc.createElement('dialog');menu.id='mobile-menu';menu.setAttribute('aria-labelledby','mobile-menu-title');
  menu.innerHTML=`<div class="mobile-menu-head"><h2 id="mobile-menu-title">Menu</h2><button class="mobile-menu-close" type="button" aria-label="Resume game">×</button></div><p id="mobile-menu-status" class="mobile-menu-status"></p><div class="mobile-menu-actions"><button type="button" data-action="map"><span>City map</span><small>Find a place</small></button><button type="button" data-action="camera"><span>Camera</span><small id="mobile-camera-value">Drive</small></button><button type="button" data-action="weather"><span>Time &amp; weather</span><small id="mobile-weather-value">Midday</small></button><button type="button" data-action="sound"><span>Sound</span><small id="mobile-sound-value">Off</small></button><button type="button" data-action="era" hidden><span>Travel in time</span><small id="mobile-era-value">1760</small></button><button type="button" data-action="journal"><span>Journal</span><small>Your sagas</small></button><button type="button" data-action="quitRace" hidden><span>Quit race</span><small>Back to jobs</small></button></div><fieldset class="mobile-steering-options"><legend>Steering</legend><div><button type="button" data-steering="thumb" aria-pressed="false">Thumb</button><button type="button" data-steering="buttons" aria-pressed="true">Buttons</button><button type="button" data-steering="tilt" aria-pressed="false">Tilt</button></div></fieldset><p id="mobile-steering-note" role="status">Slide left or right for gentle turns. Release to straighten.</p><div class="mobile-menu-secondary"><button type="button" data-action="help">How to play</button><button type="button" data-action="reset">Reset position</button><button type="button" data-action="sources">About this city</button></div><button class="mobile-menu-resume" type="button">Back to the city <span aria-hidden="true">→</span></button>`;
  doc.getElementById('app').append(menu);
+ // the minimap leaves the dashboard (a small centred speed box on phones) for its own corner
+ const minimap=doc.getElementById('minimap-btn'),minimapHome=minimap?.parentNode,minimapNext=minimap?.nextSibling;if(minimap)doc.getElementById('app').append(minimap);
  doc.body.classList.add('mobile-controls-ready');
  const note=doc.getElementById('mobile-steering-note');
  function paintSteering(value=keys.tilt||0){
@@ -126,6 +128,6 @@ export function createMobileControls({keys,canPlay=()=>true,onMenuChange=()=>{},
   // wedged against something (main.js, stuck.js): a button beside Menu puts the car back on the road right here
   setStuck(on){const b=doc.getElementById('touch-unstuck');if(b&&b.hidden===!!on)b.hidden=!on;},
   snapshot(){return {steering,contacts:input.size,turn:keys.tilt||0,menuOpen:menu.open};},
-  dispose(){disposed=true;release();win.clearTimeout(motionTimer);if(menu.open)menu.close();listeners.abort();menu.remove();doc.body.classList.remove('mobile-controls-ready');},
+  dispose(){disposed=true;release();win.clearTimeout(motionTimer);if(menu.open)menu.close();listeners.abort();menu.remove();if(minimap&&minimapHome)minimapHome.insertBefore(minimap,minimapNext);doc.body.classList.remove('mobile-controls-ready');},
  };
 }
