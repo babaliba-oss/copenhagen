@@ -1036,11 +1036,11 @@ function reset(){if(!ready)return;setBusted(false);setStart(startPoint);toast('B
 // and repaired. With no such spot in reach it is the old reset to the starting point, which R still is on foot or a ride.
 let laneSurfaces=null,laneSurfaceCount=-1;
 // The nearest clear spot in a traffic lane (no house, water, object or vehicle on it), or null: R's recovery, and the arrest scene.
-function clearLaneSpot(){
+function clearLaneSpot(from=car,edges=mobility.roads.edges){ /* from, edges: the era arrival asks before the car and traffic exist */
  const count=data.roads.length+data.pavement.length;if(count!==laneSurfaceCount){laneSurfaces=startSurfaces(data.roads,city.era===1760?data.pavement.filter(p=>p.kind!=='Jalankulkualue'):data.pavement);laneSurfaceCount=count;} // map extensions add streets as they stream in. 1760: the cobbled town areas (Jalankulkualue, one of 2.2 km2) lie under every street and the coach drives on them: as kerbs they left R a lane spot at 52 of 150 places (147 without)
  const solid=(x,z)=>laneSurfaces.blocked.at(x,z)||world.buildings.at(x,z)||world.collisionBuildings?.at(x,z)||!world.roads.at(x,z)&&inWaterPolygons(world.water,x,z); /* collisionBuildings: 1760's landmarks are solid only there */
- const bodies=[...travelObstacles(),...travel.parkedBodies(),...(parkedCars?.near(car.x,car.z,70)||[])].map(v=>({x:v.x,z:v.z,heading:v.heading||0,hl:v.hl??v.halfLength??2.36,hw:v.hw??v.halfWidth??.98}));
- const p=laneStart({x:car.x,z:car.z,heading:car.heading},mobility.roads.edges,{drive:laneSurfaces.drive,blocked:{at:solid}},{reach:60,step:2,tries:400,accept:q=>!world.objects?.overlap(q)&&!bodies.some(b=>boxesOverlap(carBox(q,.6),b))}); // a few ms; capped so a dense block never stalls a frame
+ const bodies=[...travelObstacles(),...(travel?.parkedBodies()||[]),...(parkedCars?.near(from.x,from.z,70)||[])].map(v=>({x:v.x,z:v.z,heading:v.heading||0,hl:v.hl??v.halfLength??2.36,hw:v.hw??v.halfWidth??.98}));
+ const p=laneStart({x:from.x,z:from.z,heading:from.heading},edges,{drive:laneSurfaces.drive,blocked:{at:solid}},{reach:60,step:2,tries:400,accept:q=>!world.objects?.overlap(q)&&!bodies.some(b=>boxesOverlap(carBox(q,.6),b))}); // a few ms; capped so a dense block never stalls a frame
  return p;
 }
 function recoverCar(){
@@ -1667,7 +1667,10 @@ async function boot(){
    // ?start=<name> picks any start on the city map (fuzzy, accent-insensitive).
    // Y keeps your spot in the other century, but a quay of today can be harbour in 1760 (and a street can be a house):
    // land at the nearest named place instead, so the car (and R, which returns to the start) isn't stuck in the water.
-   let arrival=firstStart;if(eraArrival?.to===city.id){const {x,z}=firstStart;if(world.buildings.at(x,z)||!world.roads.at(x,z)&&inWaterPolygons(world.water||[],x,z)){const d=l=>Math.hypot(l.x-x,l.z-z);arrival=[...data.landmarks].sort((a,b)=>d(a)-d(b))[0]||firstStart;afterStart(1500,()=>toast(`That spot was ${city.era===1760?'harbour or houses in 1760':'built over by now'}: you arrive at ${arrival.name}.`));}}
+   let arrival=firstStart;if(eraArrival?.to===city.id){const {x,z}=firstStart,probe={x,z,heading:firstStart.heading??0,...(city.era===1760?{front:3.3,back:3}:{})},wet=(a,b)=>!world.roads.at(a,b)&&inWaterPolygons(world.water||[],a,b),open=!world.buildings.at(x,z)&&!wet(x,z),wedged=carSamples(probe).some(([a,b])=>world.collisionBuildings.at(a,b)||wet(a,b))||!!world.objects.overlap(probe);
+    /* the street is open but the car's body is not (a corner in a house of the other century, or the coach's longer nose): the nearest clear lane spot within 60 m (12 of 1,500 spots driven today wedged the 1760 coach) */
+    if(open&&wedged){const p=clearLaneSpot(probe,mobilityData.roads.edges);if(p)arrival={...firstStart,x:p.x,z:p.z,heading:p.heading};}
+    if(arrival===firstStart&&(!open||wedged)){const d=l=>Math.hypot(l.x-x,l.z-z);arrival=[...data.landmarks].sort((a,b)=>d(a)-d(b))[0]||firstStart;afterStart(1500,()=>toast(`That spot was ${city.era===1760?'harbour or houses in 1760':'built over by now'}: you arrive at ${arrival.name}.`));}}
    setStart(arrival);history.replaceState(null,'',startUrl(location,city,arrival));
    progress(58,'Preparing the driving map');await new Promise(r=>setTimeout(r,30));drawMapBase();
    progress(68,'Loading buildings and textures');focus.set(car.x,0,car.z);await Promise.all([ensureCityModel(),updateTiles()]);
