@@ -75,7 +75,7 @@ export const isAuthored=person=>!!(person?.script&&SCRIPTS[person.script]);
 export function authoredCharacter(person){
  const c=CHARACTERS.find(c=>c.id===person.script)||{name:'Someone',label:''};
  let n=0;for(const ch of c.id||'')n=(n*31+ch.charCodeAt(0))>>>0;
- return {name:c.name,profile:{id:'authored'},label:c.name,description:c.label,voiceSeed:n};
+ return {name:c.name,profile:{id:'authored'},label:c.name,description:y1760()&&c.label1760||c.label,voiceSeed:n}; // Ole still fishes in 1760
 }
 export function authoredBegin(person,memory){memory.visits=(memory.visits||0)+1;memory.topics??=[];return SCRIPTS[person.script].hello(memory);}
 export function authoredNext(id,person,memory){

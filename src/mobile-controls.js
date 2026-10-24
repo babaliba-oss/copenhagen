@@ -55,7 +55,7 @@ export function createMobileControls({keys,canPlay=()=>true,onMenuChange=()=>{},
 
  function refreshMenu(){
   {const q=menu.querySelector('[data-action="quitRace"]');if(q)q.hidden=!actions.racing?.();const j=menu.querySelector('[data-action="journal"]');if(j)j.hidden=!actions.hasJournal?.();} // phones have no X key
-  doc.getElementById('mobile-menu-status').textContent=state.mode==='car'?'Exploring by car':state.mode==='walk'?'Exploring on foot':state.mode==='bike'?'Exploring by bike':'Exploring by scooter';
+  doc.getElementById('mobile-menu-status').textContent=state.mode==='car'?(doc.body.classList.contains('era-1760')?'Exploring by coach':'Exploring by car'):state.mode==='walk'?'Exploring on foot':state.mode==='bike'?'Exploring by bike':'Exploring by scooter';
   doc.getElementById('mobile-camera-value').textContent=doc.getElementById('view-label')?.textContent||'Drive';
   doc.getElementById('mobile-weather-value').textContent=doc.getElementById('look-label')?.textContent||'Midday';
   doc.getElementById('mobile-sound-value').textContent=doc.getElementById('sound-btn')?.getAttribute('aria-label')==='Mute sound'?'On':'Off';

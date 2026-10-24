@@ -8,6 +8,13 @@ import {MarketShop,STALL_KINDS} from '../src/market-shop.js';
 import {createMarketShopRenderer} from '../src/market-shop-renderer.js';
 import {SpatialIndex} from '../src/geo.js';
 import {createCrowdReaction} from '../src/crowd-reaction.js';
+import {connectCharacters} from '../src/copenhagen/characters.js';
+
+test('Copenhagen characters: Ole is a retired fisherman today and still fishing in 1760',()=>{
+ connectCharacters({era:'m'});assert.equal(characterFor({script:'ole'}).description,'Retired fisherman, Gammel Strand');
+ connectCharacters({era:'h'});assert.equal(characterFor({script:'ole'}).description,'Fisherman, Gammel Strand');assert.equal(characterFor({script:'karen'}).description,'Walking tour guide, Nyhavn');
+ connectCharacters(null);
+});
 
 const world=()=>({buildings:new SpatialIndex([]),water:[],roads:new SpatialIndex([]),pavement:new SpatialIndex([])});
 const walker=()=>({x:0,z:0,heading:0,speed:0,travelMode:'walk'});

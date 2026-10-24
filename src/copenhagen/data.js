@@ -20,7 +20,7 @@ export const JOBS_1760 = [
   { t: 'Herring for the Palace kitchens', d: 'Two baskets from the fishwives on Gammel Strand. The cook at Christiansborg is not a patient man.', a: [55.67750, 12.57856, 'Gammel Strand'], b: [55.67620, 12.58010, 'Christiansborg'], pay: 144 },
   { t: 'Ink for the University', d: 'A crate of ink and quills from Købmagergade to the professors by Vor Frue.', a: [55.68092, 12.57712, 'Købmagergade'], b: [55.67933, 12.57377, 'University'], pay: 144 },
   { t: 'Beer across the harbour', d: 'A small keg from Christianshavn for the inn on Kongens Nytorv. Over Knippelsbro, mind the toll man.', a: [55.67330, 12.59180, 'Christianshavn'], b: [55.67980, 12.58530, 'Kongens Nytorv'], pay: 192 },
-  { t: 'Plans for Amalienborg', d: 'Rolled drawings from the architect Eigtved\'s office for the new palaces. Keep them dry.', a: [55.67762, 12.58641, 'Holmen'], b: [55.68400, 12.59300, 'Amalienborg'], pay: 288 },
+  { t: 'Plans for Amalienborg', d: 'Rolled drawings from the architect Eigtved\'s office for the new palaces. Keep them dry.', a: [55.67762, 12.58641, 'Holmens Kanal'], b: [55.68400, 12.59300, 'Amalienborg'], pay: 288 },
   { t: 'Bread for the Watch', d: 'Rye loaves for the guard at Nørreport before the gate closes.', a: [55.67820, 12.57338, 'Gammeltorv'], b: [55.68320, 12.57160, 'Nørreport'], pay: 96 },
   { t: 'Tobacco to the Kastel', d: 'A twist of tobacco for an officer at Kastellet. He says the last boy was slow.', a: [55.68005, 12.58033, 'Østergade'], b: [55.69130, 12.59350, 'Kastellet'], pay: 144 },
 ];
@@ -79,7 +79,7 @@ export const SAGAS = [
       { at: [55.69340, 12.59440], name: 'The last X', clue: 1, r: 18, card: ['Norgesporten, Kastellet', 'The north gate. Look north: 45 km up the coast is Kronborg, and in its cellars Holger Danske sleeps, his beard grown into the stone table. He wakes when Denmark is in danger. In the Second World War a resistance group took his name. The treasure? The map was the treasure. Also, 700.'] }] },
 ];
 
-// Characters who stand at fixed places and give sagas. `script` selects their dialogue in characters.js.
+// Characters who stand at fixed places and give sagas. `script` selects their dialogue in characters.js; `label1760` replaces the label in 1760.
 export const CHARACTERS = [
   { id: 'ghost', era: 'h', name: 'Christian IV', label: 'A king who died in 1648, Rundetårn', at: [55.68136, 12.57600], local: [-1, -146], look: { coat: '#1c1c22' } },
   { id: 'watchman', era: 'h', name: 'Vægteren', label: 'Night watchman, Gammeltorv', at: [55.67800, 12.57300], look: { coat: '#3a3226' } },
@@ -88,9 +88,9 @@ export const CHARACTERS = [
   { id: 'karen', name: 'Karen', label: 'Walking tour guide, Nyhavn', at: [55.67989, 12.58938], look: { coat: '#d8402e' } },
   { id: 'aksel', name: 'Aksel', label: 'Regular at the Gefion Fountain', at: [55.68622, 12.59745], local: [1364, -712], look: { coat: '#5a6b4a' } },
   { id: 'nisse', name: 'Nissefar', era: 'b', label: 'House-nisse, Kongens Have', at: [55.68525, 12.57930], look: { coat: '#7a2a20', height: 1.1 } },
-  { id: 'ole', name: 'Ole', era: 'b', label: 'Retired fisherman, Gammel Strand', at: [55.67750, 12.57856], look: { coat: '#2b3a55' } },
+  { id: 'ole', name: 'Ole', era: 'b', label: 'Retired fisherman, Gammel Strand', label1760: 'Fisherman, Gammel Strand', at: [55.67750, 12.57856], look: { coat: '#2b3a55' } },
   { id: 'bent', name: 'Bent', label: 'Pølsevogn, Rådhuspladsen', at: [55.67610, 12.56880], look: { coat: '#f2f2ee' } },
   { id: 'astrid', name: 'Astrid', label: 'Telescope keeper, Rundetårn', at: [55.68152, 12.57560], look: { coat: '#4a3b6b' } },
-  { id: 'hca', name: 'H.C. Andersen', label: 'Writer of fairy tales, Nyhavn 20 (an easter egg)', at: [55.67970, 12.59000], local: [892.8, 38.5], look: { coat: '#1d1f2b', height: 1.85 } },
+  { id: 'hca', name: 'H.C. Andersen', label: 'Writer of fairy tales, Nyhavn', at: [55.67970, 12.59000], local: [892.8, 38.5], look: { coat: '#1d1f2b', height: 1.85 } },
   { id: 'mette', name: 'Mette', label: 'Lives in Christiania', at: [55.67380, 12.59870], look: { coat: '#3c6b3a' } },
 ];
