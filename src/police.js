@@ -55,6 +55,11 @@ export const BUST_TIME=4;
 // or crawling below `speed` (world m/s; 8 km/h) makes the arrest after `time`
 // seconds, instead of waiting out the ordinary or surge bust timers.
 export const CONTACT_BUST={range:7,speed:8/3.6,time:1};
+// On foot: a unit within `range` of a stopped player, in sight, that has got no closer (by 1 m) for `after` seconds stops
+// and an officer walks over at `speed` m/s; the arrest range is then measured from the officer. Units could sit for good
+// 20-70 m from a stopped player: wedged where the next step is too narrow for a car, boxed in by another unit, with no
+// route onward, or circling a tiny loop near the target; they are only retired when stuck more than 85 m out.
+export const ON_FOOT={range:80,after:5,speed:3.5};
 // Closing speed between the player and another road user.
 export function closingSpeed(a,b){
  const as=a.speed||0,bs=b.speed||0;
@@ -217,7 +222,7 @@ export class PoliceSimulation{
  }
  // Every unit with the same fields in the same order (the spawn and backup candidates were spread in, with braking and
  // progressPoint added later): step() saw several unit shapes and kept being thrown out of its optimised code ('wrong map').
- newUnit(c,role,backup){return {edge:c.edge,s:c.s,x:c.x,z:c.z,heading:c.heading,ahead:c.ahead??0,route:c.route??0,score:c.score,id:`police-${this.serial++}`,role,speed:0,stuck:0,braking:false,progressPoint:null,backup};}
+ newUnit(c,role,backup){return {edge:c.edge,s:c.s,x:c.x,z:c.z,heading:c.heading,ahead:c.ahead??0,route:c.route??0,score:c.score,id:`police-${this.serial++}`,role,speed:0,stuck:0,braking:false,progressPoint:null,backup,closest:Infinity,idle:0,foot:0};}
  // Surge backup: one unit pulls up close to a stopped player, out of their
  // view, when the first wave has not reached arrest range (boxed in by traffic).
  backup(player,traffic){
@@ -290,7 +295,7 @@ export class PoliceSimulation{
    near.length=0;{const ux=unit.x,uz=unit.z;for(let i=0;i<n;i++){const dx=OX[i]-ux,dz=OZ[i]-uz;if(dx*dx+dz*dz<OR[i]&&obstacles[i]!==unit)near.push(i);}}
    const field=this.fieldFor(unit);
    let desired=cornerSpeedLimit(unit.edge,unit.s,cruise,[this.next(unit.edge,field)]);
-   const gap=distance(unit,player);if(gap<18)desired=Math.min(desired,Math.max(0,(gap-5)*1.6));
+   const gap=distance(unit,player);if(gap<18)desired=Math.min(desired,Math.max(0,(gap-5)*1.6));if(unit.foot>0)desired=0; // the officer is out on foot: the car waits
    // Surge: a unit that has a stopped player within arrest range creeps up to the car and makes the arrest, instead of driving on to the lane target and looping the block.
    if(surge&&gap<SURGE.arrestRange&&Math.abs(player.speed)<1&&this.clearSight(unit,player))desired=Math.min(desired,unit.backup?0:Math.max(0,(gap-10)*.6)); // a backup unit has pulled up: it holds there
    const sh=Math.sin(unit.heading),ch=Math.cos(unit.heading);
@@ -316,7 +321,12 @@ export class PoliceSimulation{
   // Never teleport a visible stuck car. Retire units only well away from player.
   this.units=this.units.filter(u=>u.parked||distance(u,player)<450&&!(u.stuck>8&&distance(u,player)>85));
   this.seen=this.units.some(u=>this.canSee(u,player));if(this.seen)this.sighted=true;
-  const canArrest=this.units.some(u=>distance(u,player)<(surge?SURGE.arrestRange:10)&&this.clearSight(u,player));
+  const halted=Math.abs(player.speed)<1,arrestRange=surge?SURGE.arrestRange:10;
+  for(const u of this.units){if(u.parked)continue;const d=distance(u,player); /* ON_FOOT: a unit that cannot get any closer to a stopped player sends an officer on foot */
+   if(!halted||d>ON_FOOT.range){u.closest=Infinity;u.idle=u.foot=0;continue;}
+   if(d<u.closest-1){u.closest=d;u.idle=0;}else if((u.idle+=dt)>ON_FOOT.after&&d-u.foot>=arrestRange&&this.clearSight(u,player)){if(!u.foot)this.message='An officer gets out and walks over.';u.foot=Math.min(d,u.foot+ON_FOOT.speed*dt);}
+  }
+  const canArrest=this.units.some(u=>distance(u,player)-(u.foot||0)<arrestRange&&this.clearSight(u,player));
   // Stand-off: the player is off any road the units can drive (a plaza, Strøget) and they can only watch from the kerb.
   // After 10 s of that the escape clock runs as if unseen (the wanted level used to stay frozen for good).
   this.standoff=this.seen&&!canArrest&&!this.world.roads?.at?.(player.x,player.z)&&this.units.every(u=>Math.abs(u.speed||0)<.5)?(this.standoff||0)+dt:0;

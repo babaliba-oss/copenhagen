@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {gunzipSync} from 'node:zlib';
-import {PoliceSimulation,sweptContact,wantedLevel,incidentHeat,escapeTime,CONTACT,closingSpeed,CRASH_MIN_SPEED,RECKLESS,INCIDENT_WINDOW,recklessDriving} from '../src/police.js';
+import {PoliceSimulation,sweptContact,wantedLevel,incidentHeat,escapeTime,CONTACT,ON_FOOT,closingSpeed,CRASH_MIN_SPEED,RECKLESS,INCIDENT_WINDOW,recklessDriving} from '../src/police.js';
 import {prepareGraph} from '../src/mobility.js';
 import {correctHarbourLanes,vehicleFitsRoad} from '../src/road-safety.js';
 import {SpatialIndex} from '../src/geo.js';
@@ -104,6 +104,16 @@ test('standing still is no escape: the clock waits until the units have had a fa
  assert.equal(p.units.length,1);assert.ok(p.contactBy>p.time+2&&p.contactBy<=p.time+CONTACT.max,'the first unit sets how long the clock waits');
  let cleared=false;for(let i=0;i<40*30&&!p.busted;i++){p.step(1/30,car);cleared||=!p.level&&!p.busted;}
  assert.equal(cleared,false);assert.equal(p.busted,true,'a stopped player is arrested');
+});
+test('a unit that cannot get closer to a stopped player sends an officer on foot to make the arrest',()=>{
+ const gapWorld={roads:{at:(x,z)=>z>=20||z<-15},buildings:{at:()=>false}}; // the road between is too narrow for a car
+ const p=new PoliceSimulation(graph(),gapWorld),car=player();p.report('pedestrian',1);p.dispatch=1e9;
+ p.units=[p.newUnit({edge:p.graph.edges[0],s:40,x:0,z:60,heading:0},'chase',false)];
+ let t=0;for(;t<60&&!p.busted;t+=1/30){p.step(1/30,car);assert.ok(p.units[0].z>=20,'the car itself never crosses the gap');}
+ assert.equal(p.busted,true);assert.ok(t>ON_FOOT.after&&t<30,`arrested on foot after ${t.toFixed(1)} s`);
+ const moving=new PoliceSimulation(graph(),gapWorld),fleeing={...player(),speed:5};moving.report('pedestrian',1);moving.dispatch=1e9;
+ moving.units=[moving.newUnit({edge:moving.graph.edges[0],s:40,x:0,z:60,heading:0},'chase',false)];
+ for(let i=0;i<30*30;i++)moving.step(1/30,fleeing);assert.equal(moving.units[0].foot,0,'nobody gets out while the player is moving');assert.equal(moving.busted,false);
 });
 test('player cannot pass through a police car',()=>{
  const p=new PoliceSimulation(graph(),world);p.units=[{id:'police',x:0,z:0,heading:0}];
