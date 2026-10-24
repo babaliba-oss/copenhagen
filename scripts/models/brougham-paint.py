@@ -16,7 +16,7 @@ lab, n = ndimage.label(panel); size = ndimage.sum(panel, lab, range(1, n + 1))
 panel = np.isin(lab, 1 + np.nonzero(size > 4000)[0])         # broad painted panels only, not rods, straps or wheel grain
 inner = ndimage.binary_erosion(panel, iterations=5)
 trim = panel & ~inner                                          # a band just inside each panel's edge
-a = a * (1 + .4 * w) + w * np.array([34, 46, 40], np.float32)  # dark bottle-green, keeping the texture's grain
+a = a * (1 + .4 * w) + w * np.array([46, 62, 54], np.float32)  # dark bottle-green, keeping the texture's grain
 a[trim] = np.array([176, 138, 62], np.float32)                 # brass
 Image.fromarray(np.clip(a, 0, 255).astype(np.uint8)).save(out, quality=86)
 print('trim px', int(trim.sum()))
