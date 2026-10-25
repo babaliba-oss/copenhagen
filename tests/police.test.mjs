@@ -115,6 +115,13 @@ test('a unit that cannot get closer to a stopped player sends an officer on foot
  moving.units=[moving.newUnit({edge:moving.graph.edges[0],s:40,x:0,z:60,heading:0},'chase',false)];
  for(let i=0;i<30*30;i++)moving.step(1/30,fleeing);assert.equal(moving.units[0].foot,0,'nobody gets out while the player is moving');assert.equal(moving.busted,false);
 });
+test('no officer walks over the water: a unit stuck across a canal from a stopped player stays in its car',()=>{
+ const canal={rings:[[[-50,-14],[50,-14],[50,15],[-50,15]]]},wetWorld={roads:{at:(x,z)=>z>=20||z<-15},buildings:{at:()=>false},water:[canal]}; // the unit's road ends at the quay; the player stands on the far one
+ const p=new PoliceSimulation(graph(),wetWorld),car=player();p.report('pedestrian',1);p.dispatch=1e9;
+ p.units=[p.newUnit({edge:p.graph.edges[0],s:40,x:0,z:60,heading:0},'chase',false)];
+ for(let i=0;i<40*30&&!p.busted;i++)p.step(1/30,car);
+ assert.equal(p.units[0].foot,0,'nobody got out to walk across the canal');assert.equal(p.busted,false);
+});
 test('player cannot pass through a police car',()=>{
  const p=new PoliceSimulation(graph(),world);p.units=[{id:'police',x:0,z:0,heading:0}];
  const car={x:0,z:-6,heading:0,speed:30};p.observe({x:0,z:6,heading:0},car,[],[]);assert.equal(car.z,6);assert.equal(car.speed,0);

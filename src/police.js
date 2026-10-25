@@ -1,6 +1,7 @@
 import {routePoint} from './mobility.js';
 import {safeVehicleSegment,vehicleFitsRoad,trafficFootprintsOverlap} from './road-safety.js';
 import {cornerSpeedLimit} from './traffic-driving.js';
+import {inWaterPolygons} from './geo.js';
 
 export const wantedLevel=heat=>heat>=24?5:heat>=16?4:heat>=10?3:heat>=6?2:heat>=3?1:0;
 const distance=(a,b)=>Math.hypot(a.x-b.x,a.z-b.z);
@@ -257,6 +258,9 @@ export class PoliceSimulation{
   const index=this.surging&&this.world.sightBuildings||this.world.buildings;
   const d=distance(a,b),n=Math.ceil(d/4);for(let i=1;i<n;i++)if(index.at(a.x+(b.x-a.x)*i/n,a.z+(b.z-a.z)*i/n))return false;return true;
  }
+ // The officer's straight walk from the car to the player keeps to dry land (roads and paving mapped over the water are
+ // bridges): a unit stuck across a canal from a stopped player sent one walking over the water to make the arrest.
+ dryWalk(a,b){const w=this.world.water;if(!w?.length)return true;const n=Math.ceil(distance(a,b));for(let i=1;i<n;i++){const x=a.x+(b.x-a.x)*i/n,z=a.z+(b.z-a.z)*i/n;if(inWaterPolygons(w,x,z)&&!this.world.roads?.at?.(x,z)&&!this.world.pavement?.at?.(x,z))return false;}return true;}
  canSee(unit,player){
   const d=distance(unit,player);if(d>(this.surging?SURGE.sight:145))return false;
   const forward=-(player.x-unit.x)*Math.sin(unit.heading)-(player.z-unit.z)*Math.cos(unit.heading);
@@ -324,7 +328,7 @@ export class PoliceSimulation{
   const halted=Math.abs(player.speed)<1,arrestRange=surge?SURGE.arrestRange:10;
   for(const u of this.units){if(u.parked)continue;const d=distance(u,player); /* ON_FOOT: a unit that cannot get any closer to a stopped player sends an officer on foot */
    if(!halted||d>ON_FOOT.range){u.closest=Infinity;u.idle=u.foot=0;continue;}
-   if(d<u.closest-1){u.closest=d;u.idle=0;}else if((u.idle+=dt)>ON_FOOT.after&&d-u.foot>=arrestRange&&this.clearSight(u,player)){if(!u.foot)this.message='An officer gets out and walks over.';u.foot=Math.min(d,u.foot+ON_FOOT.speed*dt);}
+   if(d<u.closest-1){u.closest=d;u.idle=0;}else if((u.idle+=dt)>ON_FOOT.after&&d-u.foot>=arrestRange&&this.clearSight(u,player)&&(u.foot||this.dryWalk(u,player))){if(!u.foot)this.message='An officer gets out and walks over.';u.foot=Math.min(d,u.foot+ON_FOOT.speed*dt);}
   }
   const canArrest=this.units.some(u=>distance(u,player)-(u.foot||0)<arrestRange&&this.clearSight(u,player));
   // Stand-off: the player is off any road the units can drive (a plaza, Strøget) and they can only watch from the kerb.
