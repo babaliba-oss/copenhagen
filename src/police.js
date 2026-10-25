@@ -332,8 +332,8 @@ export class PoliceSimulation{
   }
   const canArrest=this.units.some(u=>distance(u,player)-(u.foot||0)<arrestRange&&this.clearSight(u,player));
   // Stand-off: the player is off any road the units can drive (a plaza, Strøget) and they can only watch from the kerb.
-  // After 10 s of that the escape clock runs as if unseen (the wanted level used to stay frozen for good).
-  this.standoff=this.seen&&!canArrest&&!this.world.roads?.at?.(player.x,player.z)&&this.units.every(u=>Math.abs(u.speed||0)<.5)?(this.standoff||0)+dt:0;
+  // After 10 s of that the escape clock runs as if unseen (the wanted level used to stay frozen for good). An officer walking over is not a stand-off.
+  this.standoff=this.seen&&!canArrest&&!this.world.roads?.at?.(player.x,player.z)&&this.units.every(u=>Math.abs(u.speed||0)<.5&&!(u.foot>0))?(this.standoff||0)+dt:0;
   this.escape=(!this.seen||this.standoff>10)&&this.contactMade?this.escape+dt:0; // no escape before the units have had a fair chance (CONTACT)
   this.bust=canArrest&&Math.abs(player.speed)<1?this.bust+dt:0;
   // Hands-on arrest: a unit at the car (any side, no line of sight needed) and a stopped or crawling player.
