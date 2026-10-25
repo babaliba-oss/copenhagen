@@ -50,11 +50,11 @@ export function horseGeometry(src,pivots,{x=0,z=0,coat=1,offset=0}={}){
 // x: the wheel's plane) turns about that axle. Everything else stands still.
 export function wheelGeometry(g,wheels){
  const p=g.attributes.position,n=p.count,anim=new Float32Array(n*4),piv=new Float32Array(n*4),marked=g.attributes._wheel;
- if(marked){for(let i=0;i<n;i++){const w=wheels[Math.round(marked.getX(i))];if(w){anim.set([2,1/w.r,0,0],i*4);piv.set([w.y,w.z,0,0],i*4);}} // the model marks its wheels (brougham.py)
+ if(marked){for(let i=0;i<n;i++){const w=wheels[Math.round(marked.getX(i))];if(w){anim.set([2,1/rollRadius(w.r),0,0],i*4);piv.set([w.y,w.z,0,0],i*4);}} // the model marks its wheels (brougham.py)
   g.deleteAttribute('_wheel');g.setAttribute('anim',new THREE.BufferAttribute(anim,4));g.setAttribute('pivot',new THREE.BufferAttribute(piv,4));return g;}
  for(let t=0;t<n;t+=3){let cx=0,cy=0,cz=0;for(let k=0;k<3;k++){cx+=p.getX(t+k)/3;cy+=p.getY(t+k)/3;cz+=p.getZ(t+k)/3;}
   const w=wheels.find(w=>Math.abs(cx-w.x)<(w.dx??.065)&&Math.hypot(cy-w.y,cz-w.z)<w.r+.06);if(!w)continue;
-  for(let k=0;k<3;k++){anim.set([2,1/w.r,0,0],(t+k)*4);piv.set([w.y,w.z,0,0],(t+k)*4);}}
+  for(let k=0;k<3;k++){anim.set([2,1/rollRadius(w.r),0,0],(t+k)*4);piv.set([w.y,w.z,0,0],(t+k)*4);}}
  g.setAttribute('anim',new THREE.BufferAttribute(anim,4));g.setAttribute('pivot',new THREE.BufferAttribute(piv,4));return g;
 }
 // Per-instance motion: phase advances with speed (a walk when slow, a brisk trot at 7 m/s), the swing grows with speed
@@ -64,6 +64,9 @@ export function wheelGeometry(g,wheels){
 // Capped, they turn visibly forwards at any speed (under a third of a spoke a frame at 60 fps). Wrapped so the angles keep
 // float precision, at a whole number of turns of the brougham's wheels (0.7 and 0.4875 m: 171.5 m).
 export const ROLL_WRAP=2*Math.PI*.7*.4875*80,ROLL_SPEED=3;
+// The radius a wheel turns at: the nearest with a whole number of turns in ROLL_WRAP (the brougham's exactly its own; the
+// backup coach's 0.62 and 0.44 m wheels jumped 12 and 16 degrees every 171.5 m at the wrap), under 0.1% off.
+export const rollRadius=r=>ROLL_WRAP/(2*Math.PI*Math.max(1,Math.round(ROLL_WRAP/(2*Math.PI*r))));
 export function stepMotion(m,speed,dt){const v=Math.min(Math.abs(speed),14);m.phase=(m.phase+dt*v*1.45)%(Math.PI*2000);m.amp+=(Math.min(.38,v*.065)-m.amp)*Math.min(1,dt*4);m.roll=(m.roll+Math.max(-ROLL_SPEED,Math.min(ROLL_SPEED,speed))*dt)%ROLL_WRAP;return m;}
 
 // One-mesh models made by scripts/models/*.py: the geometry and the mesh's extras. Stored gzipped (Cloudflare serves .glb

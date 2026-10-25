@@ -73,3 +73,9 @@ test('the backup coach (no models loaded) turns its wheels with speed, capped li
  for(let i=0;i<30;i++)t.update(()=>0,1/30);const m=t.group.getObjectByName('Coaches').geometry.attributes.motion;
  assert.ok(m.getZ(0)>1.9&&m.getZ(0)<2.1,`a moving coach's wheels roll: ${m.getZ(0)}`);assert.ok(Math.abs(m.getZ(1)-3.3)<1e-6,'a standing one\'s stay put');
 });
+test('the backup coach\'s wheels (0.62 and 0.44 m) wrap at a whole number of turns too: no jump every 171.5 m',async()=>{
+ const {createCarriage}=await import('../src/copenhagen/carriage.js');
+ const a=createCarriage().getObjectByName('Coach body').geometry.attributes.anim,jumps=new Set();
+ for(let i=0;i<a.count;i++)if(a.getX(i)===2){const turns=ROLL_WRAP*a.getY(i)/(2*Math.PI);jumps.add(Math.round(Math.abs(turns-Math.round(turns))*360*10)/10);}
+ assert.deepEqual([...jumps],[0],`degrees a wheel jumps at the wrap: ${[...jumps]}`);
+});
