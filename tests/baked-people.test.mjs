@@ -97,6 +97,10 @@ test('the instanced crowds draw their people as the characters once the models a
  const drawn=[];crowd.group.traverse(o=>{if(o.isInstancedMesh&&/^Baked /.test(o.name)&&o.count)drawn.push(`${o.name} ${o.count}`);});
  assert.equal(drawn.reduce((s,d)=>s+ +d.split(' ').pop(),0),3,`three near people as models (${drawn}), the far one procedural`);
  assert.ok(drawn.some(d=>/ sit \d/.test(d)),'the seated guest on its chair');
+ const baked=()=>{const l=[];crowd.group.traverse(o=>{if(o.isInstancedMesh&&/^Baked /.test(o.name))l.push(o);});return l;},kept=baked();
+ crowd.update(.1,{x:700,z:0});assert.equal(baked().length,kept.length,'just out of sight (650 m): the models stay');
+ crowd.update(.1,{x:900,z:0});assert.equal(baked().length,0,'far away: the models go (a long drive passed dozens of crowds, each kept ~30 meshes)');assert.ok(kept.every(o=>o.morphTexture===null),'their GPU data freed');
+ crowd.update(.1,{x:0,z:0});await new Promise(r=>setTimeout(r,100));crowd.update(.1,{x:0,z:0});assert.equal(baked().length,kept.length,'back again: rebuilt from the shared bakes');
  setBakedPeople(null);crowd.update(.1,{x:0,z:0});
  const left=[];crowd.group.traverse(o=>{if(o.isInstancedMesh&&/^Baked /.test(o.name))left.push(o.name);});assert.equal(left.length,0,'models dropped when unset');
 });

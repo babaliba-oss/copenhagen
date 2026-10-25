@@ -149,7 +149,7 @@ export function createBakedPeople(lib,{set='walk',capacity=32,range=140,pick=a=>
    const row=im.morphTexture.image.data,o=idx*len;row.fill(0,o,o+len);row[o+1+f0]+=w0;if(w1)row[o+1+f1]+=w1;
    return true;},
   end(){for(const k of kinds)if(k)for(const im of k.ims){im.visible=im.count>0;if(im.count){im.instanceMatrix.needsUpdate=true;im.morphTexture.needsUpdate=true;}}},
-  dispose(){disposed=true;for(const k of kinds)if(k)for(const im of k.ims){group.remove(im);im.dispose();}}};
+  dispose(){disposed=true;for(const k of kinds)if(k)for(const im of k.ims){group.remove(im);im.dispose();}material.dispose();}};
 }
 // The baked crowd of walkers (street-life.js): everyone beyond the rigged few out to `range`, walking (two Walk frames
 // either side of each walker's own phase) or standing (Idle). Anyone posed, fallen, talking, running or pushing a pram

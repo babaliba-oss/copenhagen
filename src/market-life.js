@@ -78,9 +78,10 @@ export function createInstancedPeople(records,options={}){
  // The character models (setBakedPeople): one renderer for walking and standing, one for sitting, made on first use.
  const hash=v=>{let h=2166136261;for(const c of String(v))h=Math.imul(h^c.charCodeAt(0),16777619);return h>>>0;};
  const phases=new Map(),FR=WALK_FRAMES;
+ function releaseModels(){if(!models)return;for(const r of models.r){group.remove(r.group);r.dispose();}models=null;}
  function modelsNow(){
-  if(!bakedPeople||options.models===false){if(models){for(const r of models.r)group.remove(r.group),r.dispose();models=null;}return null;}
-  if(models?.version===bakedPeople.version)return models;if(models)for(const r of models.r)group.remove(r.group),r.dispose();
+  if(!bakedPeople||options.models===false){releaseModels();return null;}
+  if(models?.version===bakedPeople.version)return models;releaseModels();
   const {lib,range}=bakedPeople,cap=Math.max(4,Math.min(48,Math.ceil(people.length/lib.models.length*1.6)+2)),pick=p=>hash(p.id??'');
   const walk=createBakedPeople(lib,{set:'walk',capacity:cap,range,pick,name:`${options.name||'Crowd'} (models)`}),sit=people.some(p=>p.seated)?createBakedPeople(lib,{set:'sit',capacity:cap,range,pick,name:`${options.name||'Crowd'} (models, seated)`}):null;
   models={version:bakedPeople.version,walk,sit,r:[walk,sit].filter(Boolean)};for(const r of models.r)group.add(r.group);return models;
@@ -101,8 +102,8 @@ export function createInstancedPeople(records,options={}){
  const clear=(x,z,p)=>safe(x,z)&&!people.some(q=>q!==p&&Math.hypot(q.x-x,q.z-z)<.69)&&!scooters.some(q=>Math.hypot(q.x-x,q.z-z)<1.2);
  function update(dt,player){
   const step=clamp(dt||0,0,.08);time+=step;viewer=player||null;
-  group.visible=!player||Math.hypot(player.x-center.x,player.z-center.z)<(options.range??650);
-  if(!group.visible)return;
+  const away=player?Math.hypot(player.x-center.x,player.z-center.z):0,shown=options.range??650;group.visible=away<shown;
+  if(!group.visible){if(models&&away>shown+150)releaseModels();return;} // far away: the character models go (rebuilt from the shared bakes on return); kept, every crowd passed added ~30 idle instanced meshes for good
   for(const p of options.externalMotion?[]:people){
    if(p.knockdown){p.speed=0;continue;}
    if(p.seated){p.speed=0;continue;} // café guests stay in their chairs
