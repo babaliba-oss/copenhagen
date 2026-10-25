@@ -51,3 +51,13 @@ test('a span\'s rounded end lying on the next span gets no railing across the ro
  const g=buildBridgeRailings(water,{roads:[a,b]}),onB=([x0,z0,x1,z1])=>{const x=(x0+x1)/2,z=(z0+z1)/2;return x>-.5&&x<30&&Math.abs(z)<4.7;};
  assert.equal(g.userData.rails.filter(onB).length,0,JSON.stringify(g.userData.rails));assert.equal(g.userData.bridges.length,2,'both keep their plates');
 });
+// A footway and a cycle track mapped side by side across the canal, 1.5 m apart, their quay ends on ground 0.8 m apart
+// (the Papirøen bridge): one height for both, not a kerb-high step along the bridge. Spans end to end keep their own.
+test('decks alongside each other share the higher one\'s height',()=>{
+ const walk={kind:'Jalkakäytävä (Silta)',rings:[[[-30,1],[30,1],[30,4],[-30,4]]]},cycle={kind:'Erotettu pyörätie (Silta)',rings:[[[-30,-3.5],[30,-3.5],[30,-.5],[-30,-.5]]]};
+ const g=buildBridgeRailings(water,{pavement:[walk,cycle]},{ground:(x,z)=>z>0?0:-.8}),y=r=>g.userData.bridges.find(b=>b.rings===r.rings).y;
+ assert.ok(Math.abs(y(walk)-y(cycle))<1e-6,`${y(walk)} vs ${y(cycle)}`);assert.ok(y(walk)>-.1);
+ const west={kind:'Jalkakäytävä (Silta)',rings:[[[-30,-2],[0,-2],[0,2],[-30,2]]]},east={kind:'Jalkakäytävä (Silta)',rings:[[[0,-2],[30,-2],[30,2],[0,2]]]};
+ const s=buildBridgeRailings(water,{pavement:[west,east]},{ground:x=>x<0?0:-.6}),ys=s.userData.bridges.filter(b=>b.rings===west.rings||b.rings===east.rings).map(b=>b.y);
+ assert.ok(Math.abs(ys[0]-ys[1])>.5,'spans in a row keep their own heights: '+ys);
+});
