@@ -1,8 +1,9 @@
 import * as THREE from 'three';
 import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';
 // Door, tailgate and light-bar lettering: POLIISI in Finland, POLITI in Denmark (setPoliceLettering, set per city).
+import {POLICE_UNIFORM} from './person-model.js';
 let POLICE_TEXT='POLIISI';
-export function setPoliceLettering(t){POLICE_TEXT=t;}
+export function setPoliceLettering(t){POLICE_TEXT=t;POLICE_UNIFORM.text=t;POLICE_UNIFORM.stripe=t==='POLITI'?POLICE_UNIFORM.vest:null;} // officers' uniforms follow: POLITI on the back, Danish hi-vis chest band
 
 // Finnish Poliisi patrol vehicles, modelled from reference photography
 // (no photo pixels are embedded):

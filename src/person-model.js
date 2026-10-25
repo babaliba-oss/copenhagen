@@ -416,7 +416,8 @@ export function uniformTorsoGeometry(){
 }
 // Finnish police: dark navy patrol jacket with reflective POLIISI across the
 // back, or a fluorescent yellow vest with silver bands and POLIISI on a navy panel.
-export const POLICE_UNIFORM={navy:'#1b2436',vest:'#d4e03c',reflective:'#c8ccd0',text:'POLIISI'};
+// Danish politi (`stripe`, set with the POLITI lettering in police-model.js): the navy jacket gets a hi-vis yellow chest band edged in reflective silver.
+export const POLICE_UNIFORM={navy:'#1b2436',vest:'#d4e03c',reflective:'#c8ccd0',text:'POLIISI',stripe:null};
 function uniformTexture(kind){
  if(typeof document==='undefined')return null;
  const canvas=document.createElement('canvas');canvas.width=512;canvas.height=256;const ctx=canvas.getContext('2d'),U=POLICE_UNIFORM;
@@ -428,7 +429,7 @@ function uniformTexture(kind){
   band(.55,.8,U.navy,.36,.64);text(U.text,.5,.675,.2,.25,U.reflective);
   band(.62,.7,U.navy,.84,.96);text(U.text,.9,.66,.07,.1,U.vest);
  }else{
-  band(0,1,U.navy);band(.06,.1,'#11161f');text(U.text,.5,.66,.17,.24,U.reflective);
+  band(0,1,U.navy);band(.06,.1,'#11161f');if(U.stripe){band(.4,.56,U.stripe);band(.4,.43,U.reflective);band(.53,.56,U.reflective);}text(U.text,.5,.66,.17,.24,U.reflective);
   band(.64,.69,U.reflective,.86,.94);band(.6,.7,'#2a3550',.06,.12);
  }
  const t=new THREE.CanvasTexture(canvas);t.colorSpace=THREE.SRGBColorSpace;t.anisotropy=4;return t;

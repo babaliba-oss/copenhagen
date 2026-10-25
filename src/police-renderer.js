@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import {animateVehicle} from './vehicles.js';
 import {createSiren,SURGE_SIREN} from './police-siren.js';
 import {groundPose} from './terrain.js';
+import {createFootOfficers} from './foot-officers.js';
 const slope={y:0,pitch:0,roll:0};
 import {createPoliceBody,unitNumber,unitNumberTexture,unitVariant,POLICE_BLUE,POLICE_YELLOW} from './police-model.js';
 
@@ -32,7 +33,7 @@ function createKit(){
 const unitIndex=id=>Number(String(id).replace(/\D/g,''))||0;
 
 export function createPoliceRenderer(scene,simulation){
- const models=new Map(),kit=createKit(),siren=createSiren();
+ const models=new Map(),kit=createKit(),siren=createSiren(),onFoot=createFootOfficers(simulation,scene); // the officer a stuck unit sends on foot (police.js ON_FOOT)
  // No real lights: a PointLight costs every lit fragment in the city even when
  // no police exist (measured ~2–4 FPS). The nearest two cars instead get an
  // additive blue light pool on the road that flashes with the active side.
@@ -92,9 +93,11 @@ export function createPoliceRenderer(scene,simulation){
     const a=strobe(t,0,m.userData.phase),b=strobe(t,1,m.userData.phase),pool=m.userData.policePool;
     pool.visible=!!(a||b);pool.position.x=a?-1.1:1.1;
    }
+   onFoot.update(dt);
   },
   // WebAudio siren; call every frame. `enabled` must reflect the sound toggle.
   // `enabled` must reflect the sound toggle; the arrest cinematic keeps the siren going after heat drops to zero.
+  onFoot,
   audio(context,enabled){siren.update(context,enabled&&(simulation.level>0||!!simulation.busted),simulation.units,simulation.player,simulation.time+arrestClock,simulation.surging||simulation.busted?SURGE_SIREN:1);},
  };
 }
