@@ -16,7 +16,19 @@ test('an untagged deck reaching into the water keeps its plate at the local quay
  const g=buildBridgeRailings(water,{roads:[{kind:'Ajorata',rings:[[[-10,-5],[60,-5],[60,5],[-10,5]]]}]},{ground:x=>x*.02});assert.ok(g?.userData.deck);
  const p=g.userData.deck.attributes.position.array;for(let i=0;i<p.length;i+=3)if(p[i]<0)assert.ok(p[i+1]<.5,`plate at x=${p[i]} is ${p[i+1]}`);
  const b=g.userData.bridges[0];assert.ok(b.heightAt(-10,0)<.5&&b.y>1.2,'the ground under it is raised to the local height, not the flat one');
- const t=buildBridgeRailings(water,{roads:[deck]},{ground:x=>x*.02});assert.equal(t.userData.bridges[0].heightAt,undefined,'tagged bridges stay flat');
+ const t=buildBridgeRailings(water,{roads:[deck]},{ground:()=>0});assert.equal(t.userData.bridges[0].heightAt,undefined,'a tagged bridge between ends at one height stays flat');
+});
+// The Papirøen footbridge: its east end lands on ground 1.5 m below the west quay. The plate stood level with the west end
+// to the last metre over the water and dropped to the east ground in one triangle (and the ground raised under it with it).
+test('a tagged bridge ramps down to a lower end instead of dropping off it',()=>{
+ const g=buildBridgeRailings(water,{roads:[deck]},{ground:x=>x<0?0:-1.5}),b=g.userData.bridges[0];assert.ok(b.heightAt,'the plate follows its ends');
+ assert.ok(Math.abs(b.heightAt(-10,0)-b.y)<1e-6&&Math.abs(b.heightAt(-20,0)-b.y)<1e-6,'flat from the higher end');
+ assert.ok(Math.abs(b.heightAt(20,0)-(-1.5+.035))<.15&&Math.abs(b.heightAt(30,0)-(-1.5+.035))<.01,'meets the lower end\'s ground at the shore, mid-deck too: '+b.heightAt(20,0));
+ const p=g.userData.deck.attributes.position.array;let steep=0;
+ for(let t=0;t<p.length;t+=9)for(let k=0;k<3;k++){const i=t+k*3,j=t+(k+1)%3*3,h=Math.hypot(p[i]-p[j],p[i+2]-p[j+2]),dy=Math.abs(p[i+1]-p[j+1]);if(p[i]>-20&&p[j]>-20&&dy>.09*Math.max(h,.1))steep++;}
+ assert.equal(steep,0,'no plate edge steeper than the 8% ramp');
+ const short={kind:'Jalkakäytävä (Silta)',rings:[[[-25,-2],[25,-2],[25,2],[-25,2]]]},s=buildBridgeRailings([{rings:[[[-3,-100],[3,-100],[3,100],[-3,100]]]}],{pavement:[short]},{ground:x=>x<0?0:-1.5}).userData.bridges[0];
+ assert.ok(Math.abs(s.heightAt(-3,0)-.035)<.2&&Math.abs(s.heightAt(3,0)-(-1.465))<.2,'a short span still meets the ground at both ends: '+s.heightAt(-3,0)+' '+s.heightAt(3,0));
 });
 test('a tagged deck with paving along both sides (no railing of its own) still gets its plate over the water',()=>{
  const road={kind:'Ajorata (Silta)',rings:[[[-30,-3],[30,-3],[30,3],[-30,3]]]},walks=[-1,1].map(s=>({kind:'Jalkakäytävä (Silta)',rings:[[[-30,3*s],[30,3*s],[30,6*s],[-30,6*s]]]}));

@@ -256,10 +256,30 @@ export function buildBridgeRailings(water,land={},{height=1.05,ground=()=>0}={})
   const dry=[];for(const ring of d.rings)for(let i=0;i<ring.length;i++){const a=ring[i],b=ring[(i+1)%ring.length],n=Math.max(1,Math.ceil(Math.hypot(b[0]-a[0],b[1]-a[1])/2));
    for(let k=0;k<n;k++){const x=a[0]+(b[0]-a[0])*k/n,z=a[1]+(b[1]-a[1])*k/n;if(inWater(x,z))continue;const g=ground(x,z);if(Number.isFinite(g))dry.push(x,z,g);}}
   if(dry.length)plateHeight.set(d,(x,z)=>{let best=Infinity,h=top;for(let i=0;i<dry.length;i+=3){const q=(dry[i]-x)**2+(dry[i+1]-z)**2;if(q<best){best=q;h=dry[i+2]+.035;}}return Math.min(top,h);});}
- const deck=[];for(const d of railed){const r=d.rings[0];
-  const flat=r.flat(),ids=earcut(flat),y=deckY.get(d)+.035,at=plateHeight.get(d);for(const i of ids)deck.push(r[i][0],at?at(r[i][0],r[i][1]):y,r[i][1]);}
+ // A tagged deck's ends: the plate stood level with its highest end all the way, so where the far end's ground is lower
+ // (the Papirøen footbridge's east end, 1.6 m) the plate met it in one triangle off the last metres over the water, and the
+ // ground raised under it (raiseBridgeDecks) made the same drop a cliff to drive off. The plate now ramps down to every dry
+ // point of its outline: at most its height plus RAMP per metre from there (steeper where its own dry ends need it, so a
+ // short span still meets the ground at both ends), never above the flat height. Over the water it stays flat.
+ const RAMP=.08;for(const d of railed){if(!BRIDGE.test(`${d.kind||''} ${d.name||''}`))continue;const top=deckY.get(d)+.035,dry=[];
+  for(const ring of d.rings)for(let i=0;i<ring.length;i++){const a=ring[i],b=ring[(i+1)%ring.length],n=Math.max(1,Math.ceil(Math.hypot(b[0]-a[0],b[1]-a[1])));
+   for(let k=0;k<n;k++){const x=a[0]+(b[0]-a[0])*k/n,z=a[1]+(b[1]-a[1])*k/n;if(inWater(x,z))continue;const g=ground(x,z)+.035;if(Number.isFinite(g)&&g<top-.02)dry.push(x,z,g);else if(Number.isFinite(g))dry.push(x,z,top);}}
+  const edge=dry.length;{const [x0,z0,x1,z1]=d.bbox||[Math.min(...d.rings[0].map(p=>p[0])),Math.min(...d.rings[0].map(p=>p[1])),Math.max(...d.rings[0].map(p=>p[0])),Math.max(...d.rings[0].map(p=>p[1]))],S=1.5,nx=Math.ceil((x1-x0)/S)+1,nz=Math.ceil((z1-z0)/S)+1; // and the dry ground inside it along the shore: a wide deck's middle is metres from its outline where it leaves the water
+   if(nx*nz<4e4){const cell=new Int8Array(nx*nz);for(let i=0;i<nx;i++)for(let j=0;j<nz;j++){const x=x0+i*S,z=z0+j*S;cell[i*nz+j]=!pointInPolygon(x,z,d.rings)?0:inWater(x,z)?2:1;}
+    for(let i=0;i<nx;i++)for(let j=0;j<nz;j++){if(cell[i*nz+j]!==1)continue;let shore=false;for(let a=-2;a<=2&&!shore;a++)for(let b=-2;b<=2;b++){const u=i+a,v=j+b;if(u>=0&&v>=0&&u<nx&&v<nz&&cell[u*nz+v]===2){shore=true;break;}}
+     if(!shore)continue;const x=x0+i*S,z=z0+j*S,g=ground(x,z)+.035;if(Number.isFinite(g))dry.push(x,z,Math.min(g,top));}}}
+  if(!dry.some((v,i)=>i%3===2&&v<top-.02))continue;let k=RAMP;for(let i=0;i<edge;i+=3)for(let j=0;j<edge;j+=3){const dh=dry[j+2]-dry[i+2];if(dh>0){const l=Math.hypot(dry[j]-dry[i],dry[j+1]-dry[i+1]);if(l>.5)k=Math.max(k,dh/l);}} // dry ends at their own height: the steepest climb between two points of its outline
+  const low=[];for(let i=0;i<dry.length;i+=3)if(dry[i+2]<top-.02)low.push([dry[i],dry[i+1],dry[i+2]]);const memo=new Map(),runs=[]; // in outline order, 16 to a run with its box and lowest point: a run that cannot come under the height so far is skipped
+  for(let i=0;i<low.length;i+=16){const pts=low.slice(i,i+16);runs.push({pts,g:Math.min(...pts.map(p=>p[2])),b:[Math.min(...pts.map(p=>p[0])),Math.min(...pts.map(p=>p[1])),Math.max(...pts.map(p=>p[0])),Math.max(...pts.map(p=>p[1]))]});}
+  plateHeight.set(d,(x,z)=>{const key=x+','+z;let h=memo.get(key);if(h!==undefined)return h;h=top;for(const {pts,g,b} of runs){if(g+k*Math.hypot(Math.max(b[0]-x,0,x-b[2]),Math.max(b[1]-z,0,z-b[3]))>=h)continue;for(const [px,pz,q] of pts)h=Math.min(h,q+k*Math.hypot(px-x,pz-z));}memo.set(key,h);return h;});}
+ // plate triangles; a ramped tagged plate is cut to 2 m so it follows its slope (the drape in sea.js interpolates the heights)
+ const deck=[],tri=(at,a,b,c)=>{const l=[[a,b],[b,c],[c,a]].map(([p,q])=>Math.hypot(p[0]-q[0],p[1]-q[1])),m=l.indexOf(Math.max(...l));
+  const ys=[a,b,c].map(v=>at(v[0],v[1])),bent=()=>[[a,b,0,1],[b,c,1,2],[c,a,2,0],[a,b,0,1,c,2]].some(([p,q,i,j,o,k])=>{const x=o?(p[0]+q[0]+o[0])/3:(p[0]+q[0])/2,z=o?(p[1]+q[1]+o[1])/3:(p[1]+q[1])/2;return Math.abs(at(x,z)-(o?(ys[i]+ys[j]+ys[k])/3:(ys[i]+ys[j])/2))>.03;}); // flat over the water: left whole
+  if(l[m]>2&&(l[m]>40||bent())){const [p,q,o]=[[a,b,c],[b,c,a],[c,a,b]][m],h=[(p[0]+q[0])/2,(p[1]+q[1])/2];tri(at,p,h,o);tri(at,h,q,o);return;}for(let i=0;i<3;i++)deck.push([a,b,c][i][0],ys[i],[a,b,c][i][1]);};
+ for(const d of railed){const r=d.rings[0];
+  const flat=r.flat(),ids=earcut(flat),y=deckY.get(d)+.035,at=plateHeight.get(d);if(at&&BRIDGE.test(`${d.kind||''} ${d.name||''}`)){for(let i=0;i<ids.length;i+=3)tri(at,r[ids[i]],r[ids[i+1]],r[ids[i+2]]);continue;}for(const i of ids)deck.push(r[i][0],at?at(r[i][0],r[i][1]):y,r[i][1]);}
  // the slots' plates, level with their deck's (or its highest ground where it has none)
- const slotPlates=fillers.map(({deck:d,ring})=>{let y=deckY.get(d);if(y===undefined){y=-Infinity;for(const p of d.rings[0]){const g=ground(p[0],p[1]);if(Number.isFinite(g))y=Math.max(y,g);}if(!Number.isFinite(y))y=0;}y+=.035;for(const i of [0,1,2,0,2,3])deck.push(ring[i][0],y,ring[i][1]);return {rings:[ring],y,name:d.name||'',kind:d.kind||''};});
+ const slotPlates=fillers.map(({deck:d,ring})=>{let y=deckY.get(d);if(y===undefined){y=-Infinity;for(const p of d.rings[0]){const g=ground(p[0],p[1]);if(Number.isFinite(g))y=Math.max(y,g);}if(!Number.isFinite(y))y=0;}y+=.035;const at=plateHeight.get(d);if(at){tri(at,ring[0],ring[1],ring[2]);tri(at,ring[0],ring[2],ring[3]);}else for(const i of [0,1,2,0,2,3])deck.push(ring[i][0],y,ring[i][1]);return {rings:[ring],y,...(at?{heightAt:at}:{}),name:d.name||'',kind:d.kind||''};});
  const pos=[];for(const g of parts){pos.push(...g.attributes.position.array);g.dispose();}
  const geometry=new THREE.BufferGeometry();geometry.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));geometry.computeVertexNormals();geometry.userData.runs=runs;geometry.userData.rails=runList; // [x0,z0,x1,z1,deck id] per run
  geometry.userData.bridges=[...[...railed].map(d=>({rings:d.rings,y:deckY.get(d)+.035,...(plateHeight.has(d)?{heightAt:plateHeight.get(d)}:{}),name:d.name||'',kind:d.kind||''})),...slotPlates]; // the plates as drawn: what the ground under them must carry (raiseBridgeDecks); heightAt: a plate that follows its quay
