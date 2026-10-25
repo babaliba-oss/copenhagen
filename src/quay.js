@@ -238,10 +238,11 @@ export function buildBridgeRailings(water,land={},{height=1.05,ground=()=>0}={})
   // over between them) each stood at its own highest corner: up to 0.8 m apart (the Papirøen bridge, Bryggebroen, Knippelsbro),
   // a kerb-high wall along the bridge with dark ramps where the lower plate met the slot plate. A deck alongside a higher one
   // (within SLOT metres along at least 40% of the shorter one's length) takes its height too.
+  // Only up to 1 m: a deck much higher alongside is a different bridge (Cykelslangen over the Havneholmen footway).
   const half=d=>{const r=d.rings[0];let l=0;for(let i=0;i<r.length;i++){const a=r[i],b=r[(i+1)%r.length];l+=Math.hypot(b[0]-a[0],b[1]-a[1]);}return l/2;},halves=new Map(list.map(d=>[d,half(d)]));
   const contact=(d,e)=>{const r=d.rings[0],s=e.rings[0];let l=0;for(let i=0;i<r.length;i++){const a=r[i],b=r[(i+1)%r.length],len=Math.hypot(b[0]-a[0],b[1]-a[1]),k=Math.max(1,Math.ceil(len));for(let j=0;j<k;j++){const x=a[0]+(b[0]-a[0])*(j+.5)/k,z=a[1]+(b[1]-a[1])*(j+.5)/k;for(let m=0,n=s.length;m<n;m++){const [ax,az]=s[m],[bx,bz]=s[(m+1)%n],dx=bx-ax,dz=bz-az,q=dx*dx+dz*dz,t=q?Math.max(0,Math.min(1,((x-ax)*dx+(z-az)*dz)/q)):0;if(Math.hypot(x-ax-dx*t,z-az-dz*t)<SLOT+.1){l+=len/k;break;}}}}return l;};
   const beside=new Map(),alongside=(d,e)=>{const p=boxes.get(d),q=boxes.get(e),g=SLOT+.1;if(p[2]<q[0]-g||q[2]<p[0]-g||p[3]<q[1]-g||q[3]<p[1]-g)return false;let row=beside.get(d);if(!row)beside.set(d,row=new Map());if(!row.has(e)){const m=Math.min(halves.get(d),halves.get(e));row.set(e,contact(d,e)>=.4*m||contact(e,d)>=.4*m);}return row.get(e);};
-  for(let pass=0;pass<4;pass++){let moved=false;for(const d of list){let up=-Infinity;for(const e of list)if(e!==d&&(touch(d,e)&&deckY.get(e)>deckY.get(d)+1||deckY.get(e)>deckY.get(d)+.05&&alongside(d,e)))up=Math.max(up,deckY.get(e));if(up>deckY.get(d)){deckY.set(d,up);lifted.add(d);moved=true;}}if(!moved)break;}}
+  for(let pass=0;pass<4;pass++){let moved=false;for(const d of list){let up=-Infinity;for(const e of list)if(e!==d&&(touch(d,e)&&deckY.get(e)>deckY.get(d)+1||deckY.get(e)>deckY.get(d)+.05&&deckY.get(e)<=deckY.get(d)+1&&alongside(d,e)))up=Math.max(up,deckY.get(e));if(up>deckY.get(d)){deckY.set(d,up);lifted.add(d);moved=true;}}if(!moved)break;}}
  for(const {deck,cx,cz,len,yaw,y:y0,posts} of rails){const y=lifted.has(deck)?deckY.get(deck):y0;
   box(.07,.07,len,cx,y+height,cz,yaw);box(.05,.05,len,cx,y+height*.5,cz,yaw);
   for(let p=0;p<posts.length;p+=2)box(.07,height,.07,posts[p],y+height/2,posts[p+1],0);}
