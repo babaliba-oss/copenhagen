@@ -56,7 +56,7 @@ export const SAGAS = [
     steps: [
       { at: [55.67820, 12.57338], name: 'Gammeltorv', any: 1, lantern: 1, toast: ['Lantern lit', 'Gammeltorv'] },
       { at: [55.67933, 12.57377], name: 'Vor Frue', any: 1, lantern: 1, toast: ['Lantern lit', 'Vor Frue. Rebuilt after 1728.'] },
-      { at: [55.67830, 12.57957], name: 'Højbro Plads', any: 1, lantern: 1, toast: ['Lantern lit', 'Højbro Plads'] },
+      { at: [55.67830, 12.57957], name: 'Højbro', any: 1, lantern: 1, toast: ['Lantern lit', 'Højbro'] },
       { at: [55.67885, 12.58210], name: 'Nikolaj', any: 1, lantern: 1, toast: ['Lantern lit', 'Sankt Nikolaj'] },
       { at: [55.67995, 12.58560], name: 'Kongens Nytorv', any: 1, lantern: 1, toast: ['Lantern lit', 'Kongens Nytorv'] },
       { at: [55.67799, 12.57298], name: 'Back to the Watchman', card: ['Copenhagen burns · 1728 and 1795', 'The fire of October 1728 burned for days and took a large part of the medieval city, the university and Vor Frue with it. The Watchman is right: it happens again in 1795, and this time Nikolaj burns. Afterwards a rule: corner houses get their corners cut off, so the fire engines can turn. Ride around Copenhagen in 2026 and look at the corners. They\'re still cut.'] }] },

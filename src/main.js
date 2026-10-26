@@ -1469,7 +1469,7 @@ async function boot(){
    if(helsinki)data.landmarks.push({...HARBOUR_START});
    for(const e of extensions)data.landmarks.push(...(e.starts||[]));
    areaLabel=areaCaption(helsinki?[...HELSINKI_AREAS,...extensions.flatMap(e=>e.starts||[])]:data.landmarks,city.name);
-   if(city.era===1760)renameStarts(data.landmarks,{'Little Mermaid':'Langelinie'}); // the statue is from 1913: in 1760 the start is the promenade (?start=little-mermaid still finds it)
+   if(city.era===1760)renameStarts(data.landmarks,{'Little Mermaid':'Langelinie','Højbro Plads':'Højbro','Bispetorvet':'Bispegården','Frue Plads':'Vor Frue Kirkegård'}); // names of 1760 (?start= keys unchanged): the statue is from 1913, Højbro Plads from after the 1795 fire, Bispetorvet and Frue Plads from after 1807 (the bishop's house and Vor Frue's churchyard then)
    let eraArrival=null;try{eraArrival=JSON.parse(sessionStorage.getItem('era-jump')||'null');sessionStorage.removeItem('era-jump');}catch{} // Y in Copenhagen: same spot, other century
    const requestedStart=new URLSearchParams(location.search).get('start'),firstStart=(eraArrival?.to===city.id&&Number.isFinite(eraArrival.x)?{name:nearestPlaceName(data.landmarks,eraArrival)||'Copenhagen',district:city.name,x:eraArrival.x,z:eraArrival.z,heading:eraArrival.heading}:null)||pickStart(data.landmarks,requestedStart)||pickStart(data.landmarks,city.defaultStart)||(helsinki?HARBOUR_START:data.landmarks[0]);
    treeTrunks=createTreeTrunks({lanes:mobilityData.roads.edges});

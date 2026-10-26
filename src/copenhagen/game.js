@@ -203,7 +203,7 @@ export function createCopenhagenGame({scene,city,mobilityData,cityData,toast,sou
 
  // ---- checkpoint races: routes follow the road graph between named places; medals by time ----
  const RACE_DEFS=ERA==='h'?[
-   {id:'coach-dash',title:'The Coachman’s Dash',via:['Kongens Nytorv','Højbro Plads','Gammeltorv','Vesterport']},
+   {id:'coach-dash',title:'The Coachman’s Dash',via:['Kongens Nytorv','Højbro','Gammeltorv','Vesterport']},
    {id:'harbour-run',title:'Harbour Run',via:['Nyhavn','Amalienborg','Kongens Nytorv']},
    {id:'rampart-ride',title:'Rampart Ride',via:['Nørreport','Kultorvet','Rundetårn','Christiansborg']}]
   :[{id:'harbour-sprint',title:'Harbour Sprint',via:['Kongens Nytorv','Christiansborg','Christianshavn']},
@@ -370,7 +370,7 @@ export function createCopenhagenGame({scene,city,mobilityData,cityData,toast,sou
    items:[['The new palaces at Amalienborg near completion','Four noble houses around one octagonal square. Builders on the marble church next door ask coachmen to mind the scaffolding.'],
     ['Errand boys wanted','Merchants at Nyhavn and the Exchange pay in good skilling for quick feet and a closed mouth.'],
     ['Fire watch doubled','After the great fire of 1728 the watchmen sing every hour. Householders are reminded: no open candles in the hayloft.'],
-    ['A ship from the East India Company lies at Christianshavn','Tea, silk and porcelain from Canton. The auction will be announced at the Exchange.']]}};
+    ['A ship of the Asiatic Company lies at Christianshavn','Tea, silk and porcelain from Canton. The auction will be announced at the Exchange.']]}};
  let paperShown=false;
  function showPaper(){
   paperShown=true;try{if(sessionStorage.getItem('cph-paper-'+ERA))return;sessionStorage.setItem('cph-paper-'+ERA,'1');}catch{}
