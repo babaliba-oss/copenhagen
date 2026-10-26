@@ -1115,7 +1115,7 @@ window.addEventListener('keydown',e=>{
  if(e.code==='KeyE'&&!paused&&canTalk()&&(marketShop?.intent()||gullEncounter.snapshot().phase==='chase'&&marketShop?.hand?.item.encounter==='gulls')){e.preventDefault();marketAction();return;} // otherwise E keeps looking right
  if(marketShop?.open&&/^(Digit|Numpad)[1-9]$/.test(e.code)){e.preventDefault();const item=marketShop.menu()[Number(e.code.at(-1))-1];if(item)buyAtStall(item.id);return;}
  if(e.code==='KeyB'){soundscape?.horn(true);return;}
- if(e.code==='KeyU'&&city?.id?.startsWith('copenhagen')){let on=true;if(soundscape)on=soundscape.music();else try{on=localStorage.getItem('cph-music')==='0';}catch{} /* sound off from the start: no soundscape yet, U still flips the choice it starts with */try{localStorage.setItem('cph-music',on?'1':'0');}catch{}toast((on?'Music on (U)':'Music off (U)')+(on&&!sound?' · the sound is off':''));return;}
+ if(e.code==='KeyU'&&city?.id?.startsWith('copenhagen')){const on=setMusic();toast((on?'Music on (U)':'Music off (U)')+(on&&!sound?' · the sound is off':''));return;}
  if(e.code==='KeyN'&&cph?.photo){e.preventDefault();const d=camera.getWorldDirection(new THREE.Vector3());cph.photo({dir:[d.x,d.z],snap:snapPhoto});return;}
  if(e.code==='KeyM'){showDialog('map-dialog');return;}
  if(e.code==='KeyR'){recoverCar();return;}
@@ -1144,9 +1144,14 @@ document.addEventListener('visibilitychange',()=>{if(document.hidden){audioConte
 // tap starts suspended: the next touch or key brings it back (the sound button only toggles).
 for(const type of ['pointerdown','keydown'])window.addEventListener(type,()=>{if(sound&&audioContext&&audioContext.state!=='running')audioContext.resume().catch(()=>{});},{capture:true,passive:true});
 $('world').addEventListener('wheel',e=>{e.preventDefault();zoom(Math.sign(e.deltaY)*22);},{passive:false});
-$('sound-btn').addEventListener('click',async()=>{sound=!sound;peopleInteraction?.setVoiceEnabled(sound);if(sound&&!audioContext){audioContext=new AudioContext();oscillator=audioContext.createOscillator();gain=audioContext.createGain();oscillator.type='triangle';gain.gain.value=0;oscillator.connect(gain);gain.connect(audioContext.destination);oscillator.start();}if(sound&&!soundscape&&city?.id?.startsWith('copenhagen'))soundscape=createSoundscape(audioContext,{era:city.era});try{localStorage.setItem('cph-sound',sound?'1':'0');}catch{}if(!sound)audioContext?.suspend().catch(()=>{}); /* muted: the oscillators and noise loops stop working too */if(sound)await audioContext.resume().catch(()=>{}); /* a refused resume only means silence, never a stopped game */$('sound-btn').setAttribute('aria-label',sound?'Mute sound':'Enable sound');$('sound-btn').title=sound?'Mute sound':'Enable sound';$('sound-btn').querySelector('.mute-slash').hidden=sound;});
+$('sound-btn').addEventListener('click',async()=>{sound=!sound;peopleInteraction?.setVoiceEnabled(sound);if(sound&&!audioContext){audioContext=new AudioContext();oscillator=audioContext.createOscillator();gain=audioContext.createGain();oscillator.type='triangle';gain.gain.value=0;oscillator.connect(gain);gain.connect(audioContext.destination);oscillator.start();}if(sound&&!soundscape&&city?.id?.startsWith('copenhagen')){soundscape=createSoundscape(audioContext,{era:city.era});soundscape.music(musicChoice);}try{localStorage.setItem('cph-sound',sound?'1':'0');}catch{}if(!sound)audioContext?.suspend().catch(()=>{}); /* muted: the oscillators and noise loops stop working too */if(sound)await audioContext.resume().catch(()=>{}); /* a refused resume only means silence, never a stopped game */$('sound-btn').setAttribute('aria-label',sound?'Mute sound':'Enable sound');$('sound-btn').title=sound?'Mute sound':'Enable sound';$('sound-btn').querySelector('.mute-slash').hidden=sound;});
 // After a HUD action, the next movement/interaction key belongs to the game.
 for(const id of ['view-btn','look-btn','sound-btn','zoom-in','zoom-out'])$(id).addEventListener('click',focusWorldControls);
+// Music on/off: U and the phone Menu. Off silences the game's own music and switches the radio off; on brings back
+// the station you had. Works with the sound off too (a soundscape made later starts with the choice).
+let musicChoice=(()=>{try{return localStorage.getItem('cph-music')!=='0';}catch{return true;}})(),stationBeforeMute=0;
+const musicOn=()=>musicChoice||!!radio?.station;
+function setMusic(on=!musicOn()){musicChoice=on;soundscape?.music(on);try{localStorage.setItem('cph-music',on?'1':'0');}catch{}if(radio){if(!on&&radio.station){stationBeforeMute=radio.station;radio.set(0);storeStation(0);}else if(on&&!radio.station&&stationBeforeMute){radio.set(stationBeforeMute);storeStation(stationBeforeMute);}}return on;}
 // Car radio: L (Shift+L back), the top-bar button, or a click or tap on the now-playing card (on touch screens the only way).
 // Every change, Radio off included, is remembered for the next drive.
 function tuneRadio(step=1){if(!radio)return;radio.next(step);storeStation(radio.station);if(!sound)toast('Turn the sound on to hear the radio');}
@@ -1159,7 +1164,7 @@ mobileControls=createMobileControls({
  onMenuChange:()=>{mapOpen=!!document.querySelector('dialog[open]');if(mapOpen)peopleInteraction?.close();keys.clear();keys.tilt=0;},
  actions:{
   map:()=>showDialog('map-dialog'),camera:cycleCamera,
-  weather:()=>{look.cycle();toast(look.label);},sound:()=>$('sound-btn').click(),
+  weather:()=>{look.cycle();toast(look.label);},sound:()=>$('sound-btn').click(),music:()=>setMusic(),musicOn,hasMusic:()=>!!city?.id?.startsWith('copenhagen'),
   help:()=>showDialog('help-dialog'),reset:recoverCar,journal:()=>cph?.key('KeyJ'),hasJournal:()=>!!cph,quitRace:()=>cph?.key('KeyX'),racing:()=>!!cph?.debug?.()?.race, /* phones have no J or X key */sources:()=>showDialog('sources-dialog'),era:()=>$('era-btn').click(), // phones have no top bar: the Menu carries the time travel
  },
  notify:toast,
