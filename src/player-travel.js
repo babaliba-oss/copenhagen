@@ -2,7 +2,7 @@
 import {insidePlayable,pointInPolygon,inWaterPolygons} from './geo.js';
 import {makeCar} from './physics.js';
 import {sweptContact} from './contact-geometry.js';
-import {slopeAt,lakeAt} from './terrain.js';
+import {slopeAt,lakeAt,raisedDeckAt,rideDeck,deckBlocks} from './terrain.js';
 
 export const TRAVEL_MODES=Object.freeze({
  walk:{label:'On foot',speed:2,run:4.8,acceleration:8,braking:12,halfWidth:.28,halfLength:.28},
@@ -24,7 +24,7 @@ export function slopeFactor(mode,grade){
  return 1;
 }
 const slope=[0,0];
-export function gradeAhead(p,direction=1){slopeAt(p.x,p.z,slope);return -(slope[0]*Math.sin(p.heading)+slope[1]*Math.cos(p.heading))*direction;}
+export function gradeAhead(p,direction=1){if(p.deckY!=null){const s=Math.sin(p.heading),c=Math.cos(p.heading),a=raisedDeckAt(p.x-s*.5,p.z-c*.5),b=raisedDeckAt(p.x+s*.5,p.z+c*.5);if(a!==null&&b!==null)return (a-b)*direction;} /* on a raised deck: its own grade */slopeAt(p.x,p.z,slope);return -(slope[0]*Math.sin(p.heading)+slope[1]*Math.cos(p.heading))*direction;}
 const gap=(a,b)=>Math.hypot(a.x-b.x,a.z-b.z);
 const offset=(p,x,z)=>({x:p.x+x*Math.cos(p.heading)+z*Math.sin(p.heading),z:p.z-x*Math.sin(p.heading)+z*Math.cos(p.heading),heading:p.heading});
 const bodySize=a=>({hw:a.halfWidth??a.hw??.98,hl:a.halfLength??a.hl??2.36});
@@ -34,14 +34,16 @@ function bodyContains(body,x,z,margin=.3){
 }
 export function travelCollision(p,mode,world,obstacles=[],ignore=[],from=null){
  const spec=TRAVEL_MODES[mode],w=spec.halfWidth,l=spec.halfLength;
- const buildings=world.collisionBuildings||world.buildings;
+ const buildings=world.collisionBuildings||world.buildings,level=from||p; // level: the body before the step, on a raised deck or not (terrain.js)
+ if(deckBlocks(level,p,mode==='walk'?'walk':'bike'))return 'building'; // a raised deck's railing, or its ramp in the way below
  for(const [sx,sz] of [[0,0],[-w,-l],[w,-l],[-w,l],[w,l],[0,-l],[0,l]]){
   const q=offset(p,sx,sz);
   if(!insidePlayable(q.x,q.z,.2))return 'boundary';
   const building=ignore.length&&buildings.near?buildings.near(q.x,q.z).find(b=>!b.disabled&&!ignore.includes(b)&&pointInPolygon(q.x,q.z,b.rings)):buildings.at(q.x,q.z);
   if(building&&!ignore.includes(building))return 'building';
-  if(!world.roads.at(q.x,q.z)&&!world.pavement?.at(q.x,q.z)&&(inWaterPolygons(world.water,q.x,q.z)||lakeAt(q.x,q.z)!==null))return 'water'; // lakes from the elevation model too, as for the car
+  if(level.deckY==null&&!world.roads.at(q.x,q.z)&&!world.pavement?.at(q.x,q.z)&&(inWaterPolygons(world.water,q.x,q.z)||lakeAt(q.x,q.z)!==null))return 'water'; // lakes from the elevation model too, as for the car; on a raised deck the water is below
  }
+ if(level.deckY!=null)return null; // up on a raised deck: the street furniture, parked cars and traffic are below
  const dimensions={halfWidth:w,halfLength:l,ignore};
  if(from&&world.objects?.blocksStep?world.objects.blocksStep(from,p,dimensions):world.objects?.overlap(p,dimensions))return 'building';
  if(obstacles.some(b=>b!==p&&!b.disabled&&!b.playerTaken&&b.edge!==null&&!ignore.includes(b)&&bodyContains(b,p.x,p.z,spec.halfWidth)))return 'vehicle';
@@ -66,7 +68,7 @@ export function mountPosition(ride,mode,world,obstacles=[],ignore=[]){
 export function exitPosition(p,mode,world,obstacles=[]){
  const car=mode==='car',side=car?1.7:.9,end=car?3:1.5;
  for(const [x,z] of [[-side,0],[side,0],[-side,1],[side,1],[0,end],[0,-end]]){
-  const q=offset(p,x,z);
+  const q={...offset(p,x,z),deckY:p.deckY};rideDeck(q); // off a ride on a raised deck: onto the deck beside it
   if(!travelCollision(q,'walk',world,[p,...obstacles])&&clearTravelPath(p,q,world,obstacles.filter(b=>b!==p)))return q;
  }
  return null;
@@ -170,7 +172,7 @@ export class PlayerTravel{
   const spot=exitPosition(this.actor,this.mode,this.world,[...this.parked(),...obstacles]);
   if(!spot){this.actor.speed=0;ride.speed=0;return false;} // no room to land beside it: the rider stays on (landing on the fallen ride trapped the walker)
   Object.assign(ride,{speed:0,steer:0,parked:true,fallen:{side:Math.random()<.5?-1:1,elapsed:0}});
-  this.actor=makeActor({x:spot.x,z:spot.z,heading:from.heading},'walk',from.distance);this.mode='walk';this.riding=null;this.sprint=false;this.transition=null;
+  this.actor=makeActor({x:spot.x,z:spot.z,heading:from.heading,deckY:spot.deckY},'walk',from.distance);this.mode='walk';this.riding=null;this.sprint=false;this.transition=null;
   this.actor.knockdown={elapsed:.001,duration:clamp(1.8+speed*.3,2,4.5),prone:speed>4.5,side:ride.fallen.side};
  }
  // The player's body against pedestrians over one step (from: the body before it). A ride hits them by
@@ -178,7 +180,7 @@ export class PlayerTravel{
  // grumble. Returns {kind,severity,actor,bumped|fell} for the first person hit, or null.
  hitPeople(from,people,impacts,{police=null,obstacles=[]}={}){
   const p=this.actor,kind=HIT_KIND[this.mode],speed=Math.abs(from.speed||0);
-  if(!kind||p.knockdown||this.transition||speed<HIT_SPEED[kind])return null;
+  if(!kind||p.knockdown||this.transition||speed<HIT_SPEED[kind]||p.deckY!=null)return null; // on a raised deck: the people are below
   const walk=kind==='walker',body={...from,halfWidth:p.halfWidth,halfLength:p.halfLength};
   for(const a of people){
    if(a.edge===null||a.knockdown||!Number.isFinite(a.x)||!sweptContact(body,p,a,true))continue;
@@ -224,10 +226,10 @@ export class PlayerTravel{
     const back=Math.sign(step)*.025,at=(a,k)=>({...p,heading,x:p.x-Math.sin(heading+a)*step*Math.cos(a)*k+Math.sin(heading)*back*k,z:p.z-Math.cos(heading+a)*step*Math.cos(a)*k+Math.cos(heading)*back*k,f:Math.cos(a)});
     const free=a=>!blocked(at(a,.5))&&!blocked(at(a,1));
     let alt=null;for(const [i,a] of (walk?[.25,.5,.75,1,1.2]:Math.abs(p.speed)<CRASH_SPEED?[.3,.6]:[.3]).entries()){const l=free(a),r=free(-a);if(l!==r){alt=at(l?a:-a,1);break;}if(l&&r){if(i===0&&(walk||Math.abs(p.speed)<CRASH_SPEED))alt=at(p.steer<-.05?-a:a,1);break;}} /* both sides open at once: something narrow (a post), go round it on the steered side */ // a rider at crash speed slides off only a glancing scrape; anything squarer is a crash
-    if(alt){const {f,...c}=alt;p.distance+=gap(p,c);Object.assign(p,{x:c.x,z:c.z,heading:c.heading});p.speed*=Math.max(.4,f);collision=null;continue;}
+    if(alt){const {f,...c}=alt;p.distance+=gap(p,c);Object.assign(p,{x:c.x,z:c.z,heading:c.heading});rideDeck(p);p.speed*=Math.max(.4,f);collision=null;continue;}
     if(turn&&!travelCollision(turned,this.mode,this.world,[...this.parked(),...obstacles],[],p))p.heading=heading;
     p.speed=0;break;}
-   p.distance+=gap(p,q);Object.assign(p,{x:q.x,z:q.z,heading:q.heading});
+   p.distance+=gap(p,q);Object.assign(p,{x:q.x,z:q.z,heading:q.heading});rideDeck(p); // on or off a raised deck (terrain.js)
   }
   if(this.riding)Object.assign(this.riding,p);
   if(collision&&!walk&&Math.abs(before.speed)>=CRASH_SPEED){const v=Math.abs(before.speed);if(this.crash(v,obstacles)===false)return {collision,moved:gap(before,p)};return {collision,moved:gap(before,p),crashed:v};}

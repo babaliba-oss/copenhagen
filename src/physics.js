@@ -1,5 +1,5 @@
 import { insidePlayable, pointInPolygon, segmentDistance, inWaterPolygons } from './geo.js';
-import {groundPose,lakeAt} from './terrain.js';
+import {groundPose,lakeAt,deckBlocks} from './terrain.js';
 const hypot=(x,z)=>Math.sqrt(x*x+z*z); // not Math.hypot: in optimised code it allocated ~80 bytes a call (its arguments boxed)
 export const GRAVITY=9.81;
 export const PLAYER_MAX_SPEED=140/3.6,GENTLE_MAX_SPEED=90/3.6;
@@ -104,6 +104,7 @@ export function driveStep(car,keys,dt,world) {
    const hit=next=>{const samples=carSamples(next,next.x,next.z,STEP_SAMPLES);item=world.objects?.blocksStep(from,next)||null;
     let inside=false;for(const p of samples)if(collisionBuildings.at(p[0],p[1])){inside=true;break;}
     if(item||inside&&!canExitBuildings(from,next,collisionBuildings))return 'building';
+    if(deckBlocks(from,next,'car'))return 'building'; // a raised cycle deck (terrain.js): its ramps are no road, the car passes only under its high part
     for(const p of samples){const x=p[0],z=p[1];if(!world.roads.at(x,z)&&!world.pavement.at(x,z)&&(inWaterPolygons(world.water,x,z)||lakeAt(x,z)!==null))return 'water';}
     return null;};
    const next={...car,x:nx,z:nz};collision=hit(next);

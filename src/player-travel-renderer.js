@@ -51,7 +51,7 @@ export function createPlayerTravelRenderer(scene){
   for(const {root,ring,motion,ride,lift} of models.values()){
    root.visible=Math.hypot(ride.x-p.x,ride.z-p.z)<220;if(!root.visible)continue;
    const q=travel.riding===ride?p:ride;
-   root.position.set(q.x,lift+groundAt(q.x,q.z),q.z);root.rotation.y=q.heading;
+   root.position.set(q.x,lift+(q.deckY??groundAt(q.x,q.z)),q.z);root.rotation.y=q.heading; // deckY: on a raised deck (terrain.js rideDeck)
    const f=ride.fallen;if(f)f.elapsed=Math.min(1,(f.elapsed||0)+dt*3);root.rotation.z=f?f.side*(Math.PI/2-.12)*f.elapsed*f.elapsed:0; // tipped onto its side after a crash
    motion?.update(ride.distance||0);
    ring.visible=actorVisible&&travel.mode==='walk'&&travel.riding!==ride&&Math.hypot(ride.x-p.x,ride.z-p.z)<3.2;
@@ -60,7 +60,7 @@ export function createPlayerTravelRenderer(scene){
   if(actorVisible&&travel.mode!=='car'){
    const pose=travel.mode==='walk'?'walk':travel.mode==='bike'?'cycle':'scooter';
    const model=models.get(travel.riding?.id),bike=model?.anchors||PLAYER_BIKE,lift=model?.lift??.12;
-   const actor={...p,speed:Math.abs(p.speed),pose,gaitDirection:pose==='walk'&&p.speed<0?-1:1,groundY:pose==='scooter'?PLAYER_SCOOTER.groundY+lift-.12:pose==='cycle'?lift:.12,running:Math.abs(p.speed)>2.5,grip:true,
+   const actor={...p,speed:Math.abs(p.speed),pose,gaitDirection:pose==='walk'&&p.speed<0?-1:1,groundY:(pose==='scooter'?PLAYER_SCOOTER.groundY+lift-.12:pose==='cycle'?lift:.12)+(p.deckY!=null?p.deckY-groundAt(p.x,p.z):0) /* riding a raised deck: its height over the ground beneath */,running:Math.abs(p.speed)>2.5,grip:true,
     bike:{...bike,crank:p.distance*bike.crankPerMetre},scooter:PLAYER_SCOOTER};
    if(pose==='walk'&&hold!==null&&!p.knockdown)actor.hold=hold;
    const rigged=rig&&pose==='walk'&&!p.knockdown&&hold===null,riding=rig?.bones&&pose!=='walk'&&!p.knockdown&&hold===null;if(rig)rig.root.visible=!!(rigged||riding);
@@ -80,6 +80,6 @@ export function createPlayerTravelRenderer(scene){
 export function travelCameraPose(actor,heading,zoom=150,look=0,buildings=null){
  let distance=2.7+Math.max(36,Math.min(240,zoom))/90;
  for(let d=.4;buildings&&d<=distance;d+=.2){if(buildings.at(actor.x+Math.sin(heading)*d,actor.z+Math.cos(heading)*d)){distance=Math.max(.35,d-.3);break;}}
- const y=groundAt(actor.x,actor.z),px=actor.x+Math.sin(heading)*distance,pz=actor.z+Math.cos(heading)*distance;
+ const y=actor.deckY??groundAt(actor.x,actor.z),px=actor.x+Math.sin(heading)*distance,pz=actor.z+Math.cos(heading)*distance;
  return {position:[px,Math.max(y,groundAt(px,pz))+2.5,pz],target:[actor.x-Math.sin(heading+look)*2,y+1.2,actor.z-Math.cos(heading+look)*2]};
 }
