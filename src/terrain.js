@@ -7,6 +7,7 @@
 // differences mod 65536, which gzip squeezes well. Ground: min+v*scale. Water (mapped water bodies) and lake
 // (open water found in the elevation model only): 0 = none, else min+(v-1)*scale.
 
+import {pointInPolygon} from './geo.js';
 const MAGIC='TERR';
 export function encodeTerrain({size,cell,extent,base=0,scale=.01,ground,water=null,lake=null,source=''}){
  const layers=[['ground',ground,false],['water',water,true],['lake',lake,true]].filter(l=>l[1]),meta=[];
@@ -240,6 +241,27 @@ export function raiseBridgeDecks(decks,isWet,f=field){
    if(!c&&segDist(x,z,r)>cell*.9)continue;const top=d.heightAt?d.heightAt(x,z)-.12:flat;if(g[k]>=top-1e-3)continue;g[k]=top;raised++;}} // heightAt: a plate that follows its quay (quay.js), never above the flat one
  return raised;
 }
+// Raised decks (quay.js findRaisedDecks: Cykelslangen, a cycle deck on piers over the quay and the water): a second
+// level over the ground. groundAt stays the ground beneath (the footway under the deck, the harbour under its piers); a
+// body that comes onto the deck where it meets the ground (its ends) rides it: body.deckY holds the deck's height
+// under it until it leaves the outline (at an end; the railings stop it at the sides). Nothing else goes up there.
+let raisedList=[];const raisedSet=new WeakSet();
+export function setRaisedDecks(list){raisedList=(list||[]).filter(d=>d.rings?.[0]?.length>2&&d.heightAt);for(const d of raisedList){d.bbox??=d.rings[0].reduce((b,[x,z])=>[Math.min(b[0],x),Math.min(b[1],z),Math.max(b[2],x),Math.max(b[3],z)],[Infinity,Infinity,-Infinity,-Infinity]);if(d.deck)raisedSet.add(d.deck);}return raisedList.length;}
+export const raisedDecks=()=>raisedList;
+export const isRaisedDeck=p=>!!p&&raisedSet.has(p); // the map polygon (data.pavement) of a raised deck
+export function raisedDeckAt(x,z){for(const d of raisedList){const b=d.bbox;if(x<b[0]||x>b[2]||z<b[1]||z>b[3])continue;if(pointInPolygon(x,z,d.rings))return d.heightAt(x,z);}return null;}
+const MOUNT=.45,HEADROOM={car:2.3,bike:2.4,walk:2.4};
+// After a move: the deck height under a body that is (or just came) on a raised deck, else null; kept as body.deckY.
+export function rideDeck(body){if(!raisedList.length){if(body.deckY!=null)body.deckY=null;return null;}const h=raisedDeckAt(body.x,body.z);
+ body.deckY=h!==null&&(body.deckY!=null&&Math.abs(h-body.deckY)<1.2||h-groundAt(body.x,body.z)<MOUNT)?h:null;return body.deckY;}
+// Height a body stands at: the deck it rides, else the ground.
+export const surfaceAt=body=>body.deckY??groundAt(body.x,body.z);
+// Whether a step from `from` to `to` is stopped by a raised deck: riding it, by its railing where the step leaves the
+// outline above the ground; under it, by the deck itself where it is lower than headroom (its ramps). Cars never ride
+// one (cycle decks): a car meets it as a kerb even at its foot. mode: 'car' | 'bike' | 'walk'.
+export function deckBlocks(from,to,mode='car'){if(!raisedList.length)return false;const h=raisedDeckAt(to.x,to.z);
+ if(from.deckY!=null)return h===null&&from.deckY-groundAt(to.x,to.z)>MOUNT;
+ if(h===null)return false;const c=h-groundAt(to.x,to.z);return mode==='car'?c<(HEADROOM.car):c>=MOUNT&&c<(HEADROOM[mode]??2.4);}
 export function flattenWaterBodies(f=field){
  if(!f?.water)return 0;const w=f.water,n=f.size,label=new Int32Array(n*n).fill(-1),stack=[];let regions=0;
  for(let s=0;s<n*n;s++){if(Number.isNaN(w[s])||label[s]>=0)continue;

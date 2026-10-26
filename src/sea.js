@@ -1,9 +1,9 @@
 import * as THREE from 'three';
 import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';
-import {buildBridgeRailings,waterLocator,WATER_LEVEL,QUAY_FOOT,extractQuayEdges,buildQuayGeometry,createGroundGeometry,groundSizeForExtent} from './quay.js';
+import {buildBridgeRailings,waterLocator,WATER_LEVEL,QUAY_FOOT,extractQuayEdges,buildQuayGeometry,createGroundGeometry,groundSizeForExtent,findRaisedDecks,buildRaisedDecks} from './quay.js';
 import {ALLAS} from './waterfront-landmarks.js';
 import {drapeGeometry,createLakeGeometry,removeLegacyWater} from './terrain-mesh.js';
-import {hasTerrain,seaLevel,terrain,groundAt} from './terrain.js';
+import {hasTerrain,seaLevel,terrain,groundAt,setRaisedDecks,isRaisedDeck} from './terrain.js';
 
 export {WATER_LEVEL,removeLegacyWater};
 
@@ -173,6 +173,9 @@ export function createSea(water,land={},{helsinkiHarbour=true,groundExtent=0,dec
  // Lakes found only in the elevation model (src/terrain.js), at their own levels.
  const lakeGeometry=createLakeGeometry();
  if(lakeGeometry){const lakes=new THREE.Mesh(lakeGeometry,material);lakes.name='Lake surfaces';lakes.onBeforeRender=followSky;group.add(lakes);}
+ // Raised decks (quay.js findRaisedDecks: Cykelslangen) stand clear of the quay and the water: the quay walls, railings and plates
+ // below are for the ground level, without them.
+ const raised=findRaisedDecks(water,land,{ground:hasTerrain()?groundAt:()=>0});setRaisedDecks(raised);if(raised.length)land={...land,roads:(land.roads||[]).filter(p=>!isRaisedDeck(p)),pavement:(land.pavement||[]).filter(p=>!isRaisedDeck(p))};
  const edges=extractQuayEdges(water,land);
  const {geometry,skirt}=buildQuayGeometry(edges,helsinkiHarbour?{skipBollards:kauppatoriBollards,pontoons:[{x:ALLAS.x,z:ALLAS.z,w:81.9,d:42.9,yaw:ALLAS.yaw,top:-.2}]}:{});
  if(geometry.attributes.position.count){
@@ -192,6 +195,7 @@ export function createSea(water,land={},{helsinkiHarbour=true,groundExtent=0,dec
    /* the deck follows the street where there is street under it, and keeps its quay-end height over the water; 5 cm under the street's own paving, which now stays on bridges (surface-tiles.js): level with it, the two asphalts met in a saw-tooth seam. Over open water the ground is raised to 12 cm under the drawn height (raiseBridgeDecks), so the plate sits just under the paving there too */const p=deckGeo.attributes.position,b=deckGeo.attributes.deckBase,wet=waterLocator(water);for(let i=0;i<p.count;i++){const g=p.getY(i),base=b?b.getX(i):lvl+2.6;p.setY(i,wet(p.getX(i),p.getZ(i))?Math.max(base-.17,g-.05):g-.05);}
    /* only the part over the water: on land the street's own surface is already there (two asphalts and a seam) */{const keep=[],q=deckGeo.index?deckGeo.toNonIndexed():deckGeo,qp=q.attributes.position,uvA=q.attributes.uv;for(let t=0;t<qp.count;t+=3){const cx=(qp.getX(t)+qp.getX(t+1)+qp.getX(t+2))/3,cz=(qp.getZ(t)+qp.getZ(t+1)+qp.getZ(t+2))/3;if(wet(cx,cz)||[t,t+1,t+2].some(j=>wet(qp.getX(j),qp.getZ(j))))keep.push(t,t+1,t+2);}const g2=new THREE.BufferGeometry(),P=new Float32Array(keep.length*3),U=new Float32Array(keep.length*2);keep.forEach((j,k)=>{P.set([qp.getX(j),qp.getY(j),qp.getZ(j)],k*3);if(uvA)U.set([uvA.getX(j),uvA.getY(j)],k*2);});g2.setAttribute('position',new THREE.BufferAttribute(P,3));g2.setAttribute('uv',new THREE.BufferAttribute(U,2));deckGeo=g2;}p.needsUpdate=true;deckGeo.computeVertexNormals();}
   const d=new THREE.Mesh(deckGeo,(()=>{const m=new THREE.MeshStandardMaterial({color:deckColor,roughness:.9,side:THREE.DoubleSide});if(deckTexture&&typeof document!=='undefined'){const t=new THREE.TextureLoader().load(`/materials/${deckTexture}-color.jpg`);t.wrapS=t.wrapT=THREE.RepeatWrapping;t.colorSpace=THREE.SRGBColorSpace;m.map=t;m.color.set('#ffffff').lerp(new THREE.Color(deckColor),.25);}return m;})() /* deck in the street's own surface: scanned asphalt today, setts in 1760 */);d.name='Bridge decks';d.receiveShadow=true;group.add(d);}console.info('Bridge railings',rails.userData.runs);}}
+ if(raised.length){const g=buildRaisedDecks(raised,{ground:hasTerrain()?groundAt:()=>0});if(g){const m=new THREE.Mesh(g,new THREE.MeshStandardMaterial({vertexColors:true,roughness:.8,side:THREE.DoubleSide}));m.name='Raised decks';m.castShadow=true;m.receiveShadow=true;group.add(m);}}
  const groundGeometry=createGroundGeometry(water,groundSizeForExtent(groundExtent));
  const kinds={};for(const e of edges)kinds[e.kind]=(kinds[e.kind]||0)+1;
  // The railings and the wall shade were one city-wide mesh each (84k and 57k triangles), never frustum-culled: cut into 500 m cells.
@@ -199,7 +203,7 @@ export function createSea(water,land={},{helsinkiHarbour=true,groundExtent=0,dec
   const parts=splitByCell(m.geometry,500);if(parts.length<2){parts.forEach(g=>g.dispose());continue;}
   for(const g of parts){const c=new THREE.Mesh(g,m.material);c.name=m.name;c.castShadow=m.castShadow;c.receiveShadow=m.receiveShadow;c.renderOrder=m.renderOrder;group.add(c);}
   group.remove(m);m.geometry.dispose();}
- group.userData={polygons:geometries.length,surfaceHeight:WATER_LEVEL,animated:true,quayEdges:edges.length,quayKinds:kinds,drawCalls:group.children.length,bridges}; // bridges: the deck plates drawn over the water (main.js raises the ground under them)
+ group.userData={polygons:geometries.length,surfaceHeight:WATER_LEVEL,animated:true,quayEdges:edges.length,quayKinds:kinds,drawCalls:group.children.length,bridges,raised}; // bridges: the deck plates drawn over the water (main.js raises the ground under them)
  return {group,groundGeometry,edges,material,
   update(seconds){if(Number.isFinite(seconds))time.value=seconds;},
   setSky(horizon,zenith){manualSky=true;u.uSkyHorizon.value.set(horizon);if(zenith)u.uSkyZenith.value.set(zenith);else skyZenith(u.uSkyHorizon.value,u.uSkyZenith.value);skyMid(u.uSkyHorizon.value,u.uSkyZenith.value,u.uSkyMid.value);}};

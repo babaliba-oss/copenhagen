@@ -288,3 +288,59 @@ export function buildBridgeRailings(water,land={},{height=1.05,ground=()=>0}={})
  if(deck.length){const g=new THREE.BufferGeometry(),uv=new Float32Array(deck.length/3*2);for(let i=0,j=0;i<deck.length;i+=3,j+=2){uv[j]=deck[i]/2.6;uv[j+1]=deck[i+2]/2.6;}g.setAttribute('position',new THREE.Float32BufferAttribute(deck,3));g.setAttribute('uv',new THREE.BufferAttribute(uv,2));const base=new Float32Array(deck.length/3);for(let i=0;i<base.length;i++)base[i]=deck[i*3+1];g.setAttribute('deckBase',new THREE.BufferAttribute(base,1));g.computeVertexNormals();geometry.userData.deck=g;}
  return geometry;
 }
+
+// Raised decks: a cycle or foot bridge (tagged, not a carriageway) that runs a long way over the land as well as the water,
+// standing clear of both: Cykelslangen, the orange cycle deck snaking on piers over the Havneholmen quay and the harbour edge
+// between Dybbølsbro and Bryggebroen. The plates above are decks at their quay's height (the ground raised under them over
+// the water, the street's own paving on land): over the land this one lay on the ground with steps up to 2.1 m where it came
+// off the water, and the ground raised under its water part pulled the footway beneath it about. A raised deck stands up to
+// CLEAR metres over the quay (the highest dry ground under it), ramping down at RAMP per metre to the ground at its two ends
+// (the farthest-apart points of its outline), with railings and slim piers (buildRaisedDecks), and is a level of its own for
+// what rides it (terrain.js rideDeck). Not one running alongside another bridge deck (a footway or cycle track beside a
+// carriageway: Langebro, Dybbølsbro), which stays with that bridge.
+export const RAISED={CLEAR:5.8,RAMP:.085,LENGTH:150,DRY:.3,WET:.1,CAP:6};
+export function findRaisedDecks(water,land={},{ground=()=>0}={}){
+ const inWater=waterLocator(water),tagged=[...(land.roads||[]),...(land.pavement||[])].filter(p=>p.rings?.[0]?.length>3&&BRIDGE.test(`${p.kind||''} ${p.name||''}`)),out=[];
+ const seg=(x,z,r)=>{let best=Infinity;for(let i=0,m=r.length;i<m;i++){const [ax,az]=r[i],[bx,bz]=r[(i+1)%m],dx=bx-ax,dz=bz-az,l=dx*dx+dz*dz,t=l?Math.max(0,Math.min(1,((x-ax)*dx+(z-az)*dz)/l)):0;best=Math.min(best,Math.hypot(x-ax-dx*t,z-az-dz*t));}return best;};
+ for(const d of tagged){if(/Ajorata/.test(d.kind||''))continue;const r=openRing(d.rings[0]);let A=0,B=0,far=0;
+  for(let i=0;i<r.length;i++)for(let j=i+1;j<r.length;j++){const q=(r[i][0]-r[j][0])**2+(r[i][1]-r[j][1])**2;if(q>far){far=q;A=i;B=j;}}
+  if(Math.sqrt(far)<RAISED.LENGTH)continue;
+  const [x0,z0,x1,z1]=d.bbox||r.reduce((b,[x,z])=>[Math.min(b[0],x),Math.min(b[1],z),Math.max(b[2],x),Math.max(b[3],z)],[Infinity,Infinity,-Infinity,-Infinity]);
+  const dry=[];let n=0;for(let x=x0+1;x<x1;x+=2)for(let z=z0+1;z<z1;z+=2)if(pointInPolygon(x,z,d.rings)){n++;if(!inWater(x,z)){const g=ground(x,z);if(Number.isFinite(g))dry.push(g);}}
+  if(!n||dry.length<RAISED.DRY*n||dry.length>(1-RAISED.WET)*n)continue; // over the land and the water both: a deck only over dry ground (a footbridge over a railway cutting) is left as it was
+  let half=0;for(let i=0;i<r.length;i++){const a=r[i],b=r[(i+1)%r.length];half+=Math.hypot(b[0]-a[0],b[1]-a[1])/2;}
+  const beside=tagged.some(e=>{if(e===d||!e.rings?.[0])return false;const q=e.bbox;if(q&&(q[0]>x1+5||q[2]<x0-5||q[1]>z1+5||q[3]<z0-5))return false;const s=openRing(e.rings[0]);let l=0;
+   for(let i=0;i<r.length;i++){const a=r[i],b=r[(i+1)%r.length],len=Math.hypot(b[0]-a[0],b[1]-a[1]),k=Math.max(1,Math.ceil(len/2));for(let j=0;j<k;j++)if(seg(a[0]+(b[0]-a[0])*(j+.5)/k,a[1]+(b[1]-a[1])*(j+.5)/k,s)<4.1)l+=len/k;}
+   return l>=.4*half;});
+  if(beside)continue;
+  dry.sort((a,b)=>a-b);const caps=[],fine=subdivide(r,1);for(const e of [A,B])for(const p of fine)if(Math.hypot(p[0]-r[e][0],p[1]-r[e][1])<=RAISED.CAP){const g=ground(p[0],p[1]);caps.push([p[0],p[1],Number.isFinite(g)?g:0,e===A?0:1]);}
+  const top=Math.max(dry[Math.floor(dry.length*.9)]+RAISED.CLEAR,...caps.map(c=>c[2])),memo=new Map();
+  const heightAt=(x,z)=>{const key=x+','+z;let h=memo.get(key);if(h!==undefined)return h;h=top;for(const [px,pz,g] of caps)h=Math.min(h,g+RAISED.RAMP*Math.hypot(px-x,pz-z));const g=ground(x,z);h=Math.max(h,(Number.isFinite(g)?g:-Infinity)+.035)+0;if(memo.size>2e5)memo.clear();memo.set(key,h);return h;};
+  // centreline: the two sides of the outline from end to end, each resampled by length, averaged
+  const chain=(i,j)=>{const c=[];for(let k=i;;k=(k+1)%r.length){c.push(r[k]);if(k===j)break;}return c;},s1=chain(A,B),s2=chain(B,A).reverse(),len=c=>{let l=0;for(let i=1;i<c.length;i++)l+=Math.hypot(c[i][0]-c[i-1][0],c[i][1]-c[i-1][1]);return l;};
+  const at=(c,f)=>{let t=f*len(c);for(let i=1;i<c.length;i++){const l=Math.hypot(c[i][0]-c[i-1][0],c[i][1]-c[i-1][1]);if(t<=l||i===c.length-1){const u=l?Math.min(1,t/l):0;return [c[i-1][0]+(c[i][0]-c[i-1][0])*u,c[i-1][1]+(c[i][1]-c[i-1][1])*u];}t-=l;}return c[0];};
+  const m=Math.max(2,Math.ceil(Math.max(len(s1),len(s2))/2)),centre=[];for(let k=0;k<=m;k++){const a=at(s1,k/m),b=at(s2,k/m);centre.push([(a[0]+b[0])/2,(a[1]+b[1])/2]);}
+  out.push({deck:d,rings:d.rings,bbox:[x0,z0,x1,z1],heightAt,top,caps,centre,name:d.name||'',kind:d.kind||''});}
+ return out;
+}
+// The raised decks drawn: an orange-red riding surface on a pale slab half a metre deep, steel railings along both sides
+// where the deck stands clear of the ground, and slim piers every PIER metres along its centreline down to the ground (the
+// harbour bed over the water). Absolute heights: nothing is draped.
+export function buildRaisedDecks(list,{ground=()=>0,color='#c9522c',slab='#cfcac0',steel='#8e969b',depth=.5,pier=14}={}){
+ const pos=[],col=[],push=(c,...v)=>{for(const p of v){pos.push(p[0],p[1],p[2]);col.push(...c);}},top=linear(color),under=linear(slab),side=shade(linear(slab),.85),rail=linear(steel),UP=new THREE.Vector3(0,1,0);
+ const solid=(g,c)=>{const p=g.toNonIndexed().attributes.position;for(let i=0;i<p.count;i++){pos.push(p.getX(i),p.getY(i),p.getZ(i));col.push(...c);}g.dispose();};
+ const beam=(a,b,w,h,c)=>{const A=new THREE.Vector3(...a),B=new THREE.Vector3(...b),l=A.distanceTo(B);if(l<.01)return;const g=new THREE.BoxGeometry(w,h,l),m=new THREE.Matrix4().lookAt(B,A,Math.abs(B.x-A.x)+Math.abs(B.z-A.z)<1e-3?new THREE.Vector3(1,0,0):UP);m.setPosition(A.add(B).multiplyScalar(.5));g.applyMatrix4(m);solid(g,c);};
+ for(const d of list){const h=(x,z)=>d.heightAt(x,z);const r=openRing(d.rings[0]),flat=r.flat(),ids=earcut(flat);
+  const tri=(a,b,c)=>{const l=[[a,b],[b,c],[c,a]].map(([p,q])=>Math.hypot(p[0]-q[0],p[1]-q[1])),k=l.indexOf(Math.max(...l));
+   if(l[k]>2.5){const [p,q,o]=[[a,b,c],[b,c,a],[c,a,b]][k],m=[(p[0]+q[0])/2,(p[1]+q[1])/2];tri(p,m,o);tri(m,q,o);return;}
+   push(top,...[a,b,c].map(v=>[v[0],h(v[0],v[1]),v[1]]));push(under,...[a,c,b].map(v=>[v[0],h(v[0],v[1])-depth,v[1]]));};
+  for(let i=0;i<ids.length;i+=3)tri(r[ids[i]],r[ids[i+1]],r[ids[i+2]]);
+  for(let i=0;i<r.length;i++){const a=r[i],b=r[(i+1)%r.length],l=Math.hypot(b[0]-a[0],b[1]-a[1]),n=Math.max(1,Math.ceil(l/1.8));
+   for(let k=0;k<n;k++){const p=[a[0]+(b[0]-a[0])*k/n,a[1]+(b[1]-a[1])*k/n],q=[a[0]+(b[0]-a[0])*(k+1)/n,a[1]+(b[1]-a[1])*(k+1)/n],hp=h(...p),hq=h(...q);
+    push(side,[p[0],hp,p[1]],[q[0],hq,q[1]],[q[0],hq-depth,q[1]],[p[0],hp,p[1]],[q[0],hq-depth,q[1]],[p[0],hp-depth,p[1]]); // the slab's edge
+    if(hp-ground(...p)<.6||hq-ground(...q)<.6)continue; // its ends, where it comes down to the ground: open
+    beam([p[0],hp+1.1,p[1]],[q[0],hq+1.1,q[1]],.06,.06,rail);beam([p[0],hp+.55,p[1]],[q[0],hq+.55,q[1]],.04,.04,rail);beam([p[0],hp,p[1]],[p[0],hp+1.1,p[1]],.05,.05,rail);}}
+  let run=pier/2;for(let i=1;i<d.centre.length;i++){const a=d.centre[i-1],b=d.centre[i];run+=Math.hypot(b[0]-a[0],b[1]-a[1]);if(run<pier)continue;const hh=h(...b)-depth,g=ground(...b);if(hh-g<1.6)continue;run=0;
+   const p=new THREE.BoxGeometry(.6,hh-g+.3,.6);p.translate(b[0],(hh+g-.3)/2,b[1]);solid(p,side);}}
+ if(!pos.length)return null;const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));g.setAttribute('color',new THREE.Float32BufferAttribute(col,3));g.computeVertexNormals();return g;
+}
