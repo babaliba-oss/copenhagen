@@ -9,11 +9,12 @@ globalThis.Image=class{set src(v){asked.push(v);const ok=fs.existsSync('public'+
 globalThis.setInterval=f=>{tick=f;return 1;};globalThis.requestAnimationFrame=()=>{};
 const {installBootArt}=await import('../src/boot-art.js');
 
-test('a phone turned on its side while loading asks only for pictures that exist',async()=>{
+test('the slideshow leaves out the title logo and asks only for pictures that exist, upright or turned',async()=>{
  globalThis.innerWidth=400;globalThis.innerHeight=860;const random=Math.random;Math.random=()=>0;
  try{installBootArt();}finally{Math.random=random;}
- globalThis.innerWidth=860;globalThis.innerHeight=400; // turned: the upright-only title picture has no 16:9 file
- for(let i=0;i<12;i++){tick();await new Promise(r=>setTimeout(r,0));}
+ for(let i=0;i<12;i++){if(i===6){globalThis.innerWidth=860;globalThis.innerHeight=400;} /* turned on its side halfway */tick();await new Promise(r=>setTimeout(r,0));}
+ assert.ok(asked.length>=12);
+ assert.deepEqual(asked.filter(v=>/title-logo/.test(v)),[],'the welcome card already shows the logo');
  const missing=[...new Set(asked.filter(v=>!fs.existsSync('public'+v)&&!/-portrait/.test(v)))];
  assert.deepEqual(missing,[],'every wide picture asked for is in public/art');
 });
