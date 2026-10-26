@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import path from 'node:path';
-import {selectCity,pickStart,slug,startUrl,dataUrl,useCity,CITIES} from '../src/cities.js';
+import {selectCity,pickStart,renameStarts,slug,startUrl,dataUrl,useCity,CITIES} from '../src/cities.js';
 
 const starts=[{name:'Olympia Terminal'},{name:'Töölö (National Opera)'},{name:'Seurasaari bridge'},{name:'Senate Square'}];
 test('start names become accent-free URL slugs',()=>{
@@ -30,4 +30,9 @@ test('every shipped city includes a JSON extension catalog even when it has no r
   const catalog=JSON.parse(readFileSync(file,'utf8'));
   assert.ok(Array.isArray(catalog.extensions),`${city.id} needs an extension catalog; missing files can return the host's HTML fallback`);
  }
+});
+test('a start renamed for another era keeps its ?start= key',()=>{
+ const starts=renameStarts([{name:'Nyhavn'},{name:'Little Mermaid'}],{'Little Mermaid':'Langelinie'});
+ assert.equal(starts[1].name,'Langelinie');assert.equal(pickStart(starts,'little-mermaid'),starts[1]);assert.equal(startUrl({href:'https://x.dk/?city=copenhagen-1760'},{id:'copenhagen-1760'},starts[1]),'/?city=copenhagen-1760&start=little-mermaid');
+ assert.equal(starts[0].id,undefined,'other starts untouched');
 });

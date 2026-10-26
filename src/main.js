@@ -18,7 +18,7 @@ import {SpatialIndex,RADIUS,pointInPolygon,insidePlayable,setPlayableRadius} fro
 import {loadExtensionIndex,loadExtension,applyExtensions,mapViewFor,activateExtension,createExtensionStreamer} from './extensions.js';
 import {setTramLivery} from './tram-model.js';
 import {setBusLivery,setBusBodies} from './bus-renderer.js';
-import {selectCity,useCity,pickStart,startUrl,dataUrl,registerCities,CITIES} from './cities.js';
+import {selectCity,useCity,pickStart,renameStarts,startUrl,dataUrl,registerCities,CITIES} from './cities.js';
 import {createStartPicker,pickerStep} from './start-picker.js';
 import {createAdaptiveResolution} from './adaptive-quality.js';
 import {createQualityGovernor} from './quality-governor.js';
@@ -1469,7 +1469,7 @@ async function boot(){
    if(helsinki)data.landmarks.push({...HARBOUR_START});
    for(const e of extensions)data.landmarks.push(...(e.starts||[]));
    areaLabel=areaCaption(helsinki?[...HELSINKI_AREAS,...extensions.flatMap(e=>e.starts||[])]:data.landmarks,city.name);
-   if(city.era===1760)for(const l of data.landmarks||[])if(l.name==='Little Mermaid')l.name='Langelinie'; // the statue is from 1913: in 1760 the start is the promenade
+   if(city.era===1760)renameStarts(data.landmarks,{'Little Mermaid':'Langelinie'}); // the statue is from 1913: in 1760 the start is the promenade (?start=little-mermaid still finds it)
    let eraArrival=null;try{eraArrival=JSON.parse(sessionStorage.getItem('era-jump')||'null');sessionStorage.removeItem('era-jump');}catch{} // Y in Copenhagen: same spot, other century
    const requestedStart=new URLSearchParams(location.search).get('start'),firstStart=(eraArrival?.to===city.id&&Number.isFinite(eraArrival.x)?{name:nearestPlaceName(data.landmarks,eraArrival)||'Copenhagen',district:city.name,x:eraArrival.x,z:eraArrival.z,heading:eraArrival.heading}:null)||pickStart(data.landmarks,requestedStart)||pickStart(data.landmarks,city.defaultStart)||(helsinki?HARBOUR_START:data.landmarks[0]);
    treeTrunks=createTreeTrunks({lanes:mobilityData.roads.edges});

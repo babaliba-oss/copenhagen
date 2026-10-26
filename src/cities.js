@@ -40,6 +40,9 @@ export function pickStart(starts,request){
  return (named.find(n=>n.id===want)||named.find(n=>n.id.startsWith(want))||named.find(n=>n.id.includes(want)))?.s||null;
 }
 
+// A start shown under another name (1760: no Little Mermaid yet) keeps its old name as its key, so ?start= links still work.
+export function renameStarts(starts,names){for(const s of starts||[]){const to=names[s.name];if(to){s.id??=slug(s.name);s.name=to;}}return starts;}
+
 // Keep the address bar shareable: it always names the current city and start.
 export function startUrl(location,city,start){
  const url=new URL(location.href);url.searchParams.set('city',city.id);url.searchParams.set('start',slug(start.id||start.name));
