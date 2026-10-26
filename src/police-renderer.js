@@ -33,7 +33,7 @@ function createKit(){
 const unitIndex=id=>Number(String(id).replace(/\D/g,''))||0;
 
 export function createPoliceRenderer(scene,simulation){
- const models=new Map(),kit=createKit(),siren=createSiren(),onFoot=createFootOfficers(simulation,scene); // the officer a stuck unit sends on foot (police.js ON_FOOT)
+ const models=new Map(),kit=createKit(),siren=createSiren(),onFoot=createFootOfficers(simulation,scene); // the officers units send on foot (police.js ON_FOOT, FOOT_CHASE)
  // No real lights: a PointLight costs every lit fragment in the city even when
  // no police exist (measured ~2–4 FPS). The nearest two cars instead get an
  // additive blue light pool on the road that flashes with the active side.

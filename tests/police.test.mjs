@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {gunzipSync} from 'node:zlib';
-import {PoliceSimulation,sweptContact,wantedLevel,incidentHeat,escapeTime,CONTACT,ON_FOOT,closingSpeed,CRASH_MIN_SPEED,RECKLESS,INCIDENT_WINDOW,recklessDriving} from '../src/police.js';
+import {PoliceSimulation,sweptContact,wantedLevel,incidentHeat,escapeTime,CONTACT,ON_FOOT,FOOT_CHASE,closingSpeed,CRASH_MIN_SPEED,RECKLESS,INCIDENT_WINDOW,recklessDriving} from '../src/police.js';
 import {prepareGraph} from '../src/mobility.js';
 import {correctHarbourLanes,vehicleFitsRoad} from '../src/road-safety.js';
 import {SpatialIndex} from '../src/geo.js';
@@ -113,14 +113,45 @@ test('a unit that cannot get closer to a stopped player sends an officer on foot
  assert.equal(p.busted,true);assert.ok(t>ON_FOOT.after&&t<30,`arrested on foot after ${t.toFixed(1)} s`);
  const moving=new PoliceSimulation(graph(),gapWorld),fleeing={...player(),speed:5};moving.report('pedestrian',1);moving.dispatch=1e9;
  moving.units=[moving.newUnit({edge:moving.graph.edges[0],s:40,x:0,z:60,heading:0},'chase',false)];
- for(let i=0;i<30*30;i++)moving.step(1/30,fleeing);assert.equal(moving.units[0].foot,0,'nobody gets out while the player is moving');assert.equal(moving.busted,false);
+ for(let i=0;i<30*30;i++)moving.step(1/30,fleeing);assert.equal(moving.units[0].officer,null,'nobody gets out while the player is moving');assert.equal(moving.busted,false);
 });
 test('no officer walks over the water: a unit stuck across a canal from a stopped player stays in its car',()=>{
  const canal={rings:[[[-50,-14],[50,-14],[50,15],[-50,15]]]},wetWorld={roads:{at:(x,z)=>z>=20||z<-15},buildings:{at:()=>false},water:[canal]}; // the unit's road ends at the quay; the player stands on the far one
  const p=new PoliceSimulation(graph(),wetWorld),car=player();p.report('pedestrian',1);p.dispatch=1e9;
  p.units=[p.newUnit({edge:p.graph.edges[0],s:40,x:0,z:60,heading:0},'chase',false)];
  for(let i=0;i<40*30&&!p.busted;i++)p.step(1/30,car);
- assert.equal(p.units[0].foot,0,'nobody got out to walk across the canal');assert.equal(p.busted,false);
+ assert.equal(p.units[0].officer,null,'nobody got out to walk across the canal');assert.equal(p.busted,false);
+});
+// Strøget in miniature: a road along z=0, a house between it and a pedestrian street at z=50 that runs east, footways
+// (both ways) from the kerb round the house's west end and along the street. The car can get no nearer than the road.
+const footStreet=()=>{
+ const roads=prepareGraph({nodes:[[-200,0],[200,0]],edges:[{from:0,to:1,lane:0,points:[[-200,0],[200,0]]}]}),house=(x,z)=>x>-10&&x<10&&z>8&&z<40;
+ const walk=[[-20,5],[-20,50],[20,50],[400,50]],edges=[];for(let i=1;i<walk.length;i++)edges.push({from:i-1,to:i,points:[walk[i-1],walk[i]]},{from:i,to:i-1,points:[walk[i],walk[i-1]]});
+ const p=new PoliceSimulation(roads,{roads:{at:(x,z)=>Math.abs(z)<4},buildings:{at:house}});p.setWalks({nodes:walk,edges});p.relaxed=true;p.escalate({level:2});p.dispatch=1e9;
+ p.units=[0,25,-60].map(x=>p.newUnit({edge:roads.edges[0],s:200+x,x,z:0,heading:-Math.PI/2},'chase',false));return {p,house};
+};
+test('foot chase: off the roads an officer parks, gets out and follows the player along the footways, round the houses',()=>{
+ const {p,house}=footStreet(),me={x:0,z:50,heading:0,speed:0,walking:true,travelMode:'walk'};let t=0,round=false,most=0;
+ for(;t<40&&!p.busted;t+=1/30){p.step(1/30,me);const out=p.units.filter(u=>u.officer);most=Math.max(most,out.length);
+  for(const u of out){assert.ok(!house(u.officer.x,u.officer.z),'never through the house');round||=u.officer.x<-15&&u.officer.z>20;}
+  for(const u of p.units)if(!u.officer)assert.ok(Math.abs(u.z)<4,'the cars stay on the road');}
+ assert.equal(p.busted,true,'a player standing in the pedestrian street is arrested');assert.ok(round,'the officer went round the house on the footway (the straight line goes through it)');
+ assert.ok(most>=1&&most<=FOOT_CHASE.max,`at most ${FOOT_CHASE.max} officers out (${most})`);assert.ok(t<30,`arrested after ${t.toFixed(1)} s`);
+});
+test('foot chase: running gets away from the officer, walking does not; driving off on a road calls them back',()=>{
+ const {p,house}=footStreet(),me={x:0,z:50,heading:-Math.PI/2,speed:0,walking:true,travelMode:'walk'};
+ let t=0;for(;t<8;t+=1/30)p.step(1/30,me);assert.ok(p.units.some(u=>u.officer&&!u.officer.back),'an officer is out');
+ const gap=()=>Math.min(...p.units.filter(u=>u.officer&&!u.officer.back).map(u=>me.x-u.officer.x));let far=0,first=null;
+ for(let i=0;i<40*30;i++){me.speed=4.8;me.x+=4.8/30;p.step(1/30,me);for(const u of p.units)if(u.officer){assert.ok(!house(u.officer.x,u.officer.z));if(!u.officer.back){far=Math.max(far,u.officer.x);assert.ok(u.officer.x<me.x-1,'never catches up');}}if(i===15*30)first=gap();}
+ assert.equal(p.busted,false,'running at 4.8 m/s, nobody catches up');assert.ok(far>100,`the officer ran after the player along the street (to x=${far.toFixed(0)})`);
+ assert.ok(gap()>first+5,`and falls behind (${first.toFixed(1)} -> ${gap().toFixed(1)} m): out of sight round a corner, the escape clock runs`);
+ const w=footStreet().p,walker={x:0,z:50,heading:-Math.PI/2,speed:0,walking:true,travelMode:'walk'};for(let i=0;i<8*30;i++)w.step(1/30,walker);
+ for(let i=0;i<40*30&&!w.busted;i++){walker.speed=2;walker.x+=2/30;w.step(1/30,walker);}
+ assert.equal(w.busted,true,'walking (2 m/s), the officer catches up and takes hold');
+ const q=footStreet().p,car={x:0,z:50,heading:0,speed:0,walking:true,travelMode:'walk'};for(let i=0;i<8*30;i++)q.step(1/30,car);
+ const sent=q.units.filter(u=>u.officer);assert.ok(sent.length>=1);
+ Object.assign(car,{x:150,z:0,speed:12,walking:false,travelMode:'car'});q.step(1/30,car);assert.ok(sent.every(u=>!u.officer||u.officer.back),'back to the car once the player drives off on the road');
+ for(let i=0;i<20*30;i++){car.x+=12/30;q.step(1/30,car);}assert.ok(sent.every(u=>!u.officer),'and gone (back in, or out of view)');
 });
 test('player cannot pass through a police car',()=>{
  const p=new PoliceSimulation(graph(),world);p.units=[{id:'police',x:0,z:0,heading:0}];
