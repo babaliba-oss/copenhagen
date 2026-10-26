@@ -367,7 +367,7 @@ export function createCopenhagenGame({scene,city,mobilityData,cityData,toast,sou
     ['Old map found in a herring barrel','A retired fisherman at Gammel Strand says it shows the way to Holger Danske. Nobody believes him. Everybody wants to see it.'],
     ['Night watch on Rundetårn','The tower stays open after dark this week. The view over the lamps on their wires is worth the ramp.']]},
   h:{name:'Kiøbenhavns Adresse-Contoirs Efterretninger',date:()=>'Anno 1760',
-   items:[['The new palaces at Amalienborg near completion','Four noble houses around one octagonal square. The royal architect asks coachmen to mind the scaffolding.'],
+   items:[['The new palaces at Amalienborg near completion','Four noble houses around one octagonal square. Builders on the marble church next door ask coachmen to mind the scaffolding.'],
     ['Errand boys wanted','Merchants at Nyhavn and the Exchange pay in good skilling for quick feet and a closed mouth.'],
     ['Fire watch doubled','After the great fire of 1728 the watchmen sing every hour. Householders are reminded: no open candles in the hayloft.'],
     ['A ship from the East India Company lies at Christianshavn','Tea, silk and porcelain from Canton. The auction will be announced at the Exchange.']]}};

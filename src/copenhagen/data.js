@@ -20,7 +20,7 @@ export const JOBS_1760 = [
   { t: 'Herring for the Palace kitchens', d: 'Two baskets from the fishwives on Gammel Strand. The cook at Christiansborg is not a patient man.', a: [55.67750, 12.57856, 'Gammel Strand'], b: [55.67570, 12.57894, 'Christiansborg'], pay: 144 },
   { t: 'Ink for the University', d: 'A crate of ink and quills from Købmagergade to the professors by Vor Frue.', a: [55.68092, 12.57712, 'Købmagergade'], b: [55.67933, 12.57377, 'University'], pay: 144 },
   { t: 'Beer across the harbour', d: 'A small keg from Christianshavn for the inn on Kongens Nytorv. Over Knippelsbro, mind the toll man.', a: [55.67330, 12.59180, 'Christianshavn'], b: [55.67980, 12.58530, 'Kongens Nytorv'], pay: 192 },
-  { t: 'Plans for Amalienborg', d: 'Rolled drawings from the architect Eigtved\'s office for the new palaces. Keep them dry.', a: [55.67762, 12.58641, 'Holmens Kanal'], b: [55.68400, 12.59300, 'Amalienborg'], pay: 288 },
+  { t: 'Drawings for the marble church', d: 'Rolled drawings from Monsieur Jardin for the builders at Frederiks Kirke, by the new palaces. Keep them dry.', a: [55.67762, 12.58641, 'Holmens Kanal'], b: [55.68400, 12.59300, 'Amalienborg'], pay: 288 },
   { t: 'Bread for the Watch', d: 'Rye loaves for the guard at Nørreport before the gate closes.', a: [55.67820, 12.57338, 'Gammeltorv'], b: [55.68320, 12.57160, 'Nørreport'], pay: 96 },
   { t: 'Tobacco to the Kastel', d: 'A twist of tobacco for an officer at Kastellet. He says the last boy was slow.', a: [55.68005, 12.58033, 'Østergade'], b: [55.69130, 12.59350, 'Kastellet'], pay: 144 },
 ];
@@ -84,7 +84,7 @@ export const CHARACTERS = [
   { id: 'ghost', era: 'h', name: 'Christian IV', label: 'A king who died in 1648, Rundetårn', at: [55.68136, 12.57600], local: [-1, -146], look: { coat: '#1c1c22' } },
   { id: 'watchman', era: 'h', name: 'Vægteren', label: 'Night watchman, Gammeltorv', at: [55.67800, 12.57300], look: { coat: '#3a3226' } },
   { id: 'maren', era: 'h', name: 'Maren', label: 'Fishwife, Gammel Strand', at: [55.67760, 12.57900], look: { coat: '#6b2b2b' } },
-  { id: 'thurah', era: 'h', name: 'Mester Thurah', label: 'Royal architect, Frederiksstaden', at: [55.68380, 12.59250], look: { coat: '#2d3d5a' } },
+  { id: 'thurah', era: 'h', name: 'Monsieur Jardin', label: 'Architect, Frederiks Kirke', /* id kept for saves: Nicolas-Henri Jardin (Thurah died 1759) */ at: [55.68380, 12.59250], look: { coat: '#2d3d5a' } },
   { id: 'karen', name: 'Karen', label: 'Walking tour guide, Nyhavn', at: [55.67989, 12.58938], look: { coat: '#d8402e' } },
   { id: 'aksel', name: 'Aksel', label: 'Regular at the Gefion Fountain', at: [55.68622, 12.59745], local: [1364, -712], look: { coat: '#5a6b4a' } },
   { id: 'nisse', name: 'Nissefar', era: 'b', label: 'House-nisse, Kongens Have', at: [55.68525, 12.57930], look: { coat: '#7a2a20', height: 1.1 } },

@@ -16,6 +16,14 @@ test('Copenhagen characters: Ole is a retired fisherman today and still fishing 
  connectCharacters(null);
 });
 
+test('Copenhagen 1760: the architect at Frederiksstaden is Jardin, not Thurah (dead in 1759); his id stays for saves',async()=>{
+ const {CHARACTERS}=await import('../src/copenhagen/data.js'),{authoredBegin,authoredNext}=await import('../src/copenhagen/characters.js');
+ assert.equal(CHARACTERS.find(c=>c.id==='thurah').name,'Monsieur Jardin');
+ connectCharacters({era:'h'});assert.equal(characterFor({script:'thurah'}).name,'Monsieur Jardin');
+ const p={script:'thurah'},m={},said=[authoredBegin(p,m).response];for(const id of ['church','statue','hall'])said.push(authoredNext(id,p,m).response);connectCharacters(null);
+ const all=said.join(' ');assert.doesNotMatch(all,/Thurah|East India/);assert.match(all,/Saly/);assert.match(all,/Moltke/);
+});
+
 const world=()=>({buildings:new SpatialIndex([]),water:[],roads:new SpatialIndex([]),pavement:new SpatialIndex([])});
 const walker=()=>({x:0,z:0,heading:0,speed:0,travelMode:'walk'});
 const person=(extra={})=>({id:'test-neighbour',x:0,z:-2,heading:0,speed:1,walking:true,pose:'walk',edge:{},...extra});
