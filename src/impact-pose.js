@@ -15,18 +15,20 @@ const root=new THREE.Matrix4(),part=new THREE.Matrix4(),temp=new THREE.Matrix4()
 // pelvis is at body.x/y/z, facing body.heading, pitched and rolled, possibly
 // metres from where the person was drawn. Knockdowns without a body (the
 // player falling off a bike) just tip over on the spot.
+// A rider knocked down on a raised deck (Cykelslangen) lies on the deck, not on the ground under it.
+const levelAt=(actor,x,z)=>actor.deckY??groundAt(x,z);
 export function applyImpactPose(mesh,index,actor){
  const k=actor.knockdown;if(!k)return;
  if(k.body){
-  const b=k.body,g=groundAt(actor.x,actor.z); // heights above the local ground (src/terrain.js)
-  root.makeTranslation(b.x,.13+b.y+groundAt(b.x,b.z),b.z);
+  const b=k.body,g=levelAt(actor,actor.x,actor.z); // heights above the local ground (src/terrain.js)
+  root.makeTranslation(b.x,.13+b.y+levelAt(actor,b.x,b.z),b.z);
   root.multiply(temp.makeRotationY(b.heading));root.multiply(temp.makeRotationX(b.pitch));root.multiply(temp.makeRotationZ(b.roll));
   root.multiply(temp.makeTranslation(0,-PIVOT,0));root.multiply(temp.makeRotationY(-(actor.heading||0)));
   root.multiply(temp.makeTranslation(-actor.x,-.13-g,-actor.z));
   mesh.getMatrixAt(index,part);part.premultiply(root);mesh.setMatrixAt(index,part);return;
  }
  const fall=fallAmount(actor);if(!fall)return;
- const prone=k.prone,g=groundAt(actor.x,actor.z);
+ const prone=k.prone,g=levelAt(actor,actor.x,actor.z);
  root.makeTranslation(actor.x,.13+g+fall*(prone?.12:.34),actor.z);
  root.multiply(temp.makeRotationY(actor.heading||0));
  // prone: pitched forward onto the face (forward is -z), otherwise onto the side.
