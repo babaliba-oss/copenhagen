@@ -19,3 +19,11 @@ test('an element that leaves the stack gets its own position back',async()=>{
  const docks=createTouchDocks(doc,win);docks.update(1000);assert.equal(toast.style.top,'8px','docked');
  toast.has.delete('important');docks.update(2000);assert.equal(toast.style.top,'');assert.equal(toast.style.bottom,'');assert.ok(!toast.has.has('dock-wait'),'an ordinary toast is back at its own spot');
 });
+test('the phone minimap is an obstacle: the stars go below it, not over it',async()=>{
+ const {createTouchDocks}=await import('../src/touch-docks.js');
+ const mk=(r,cls=[])=>{const c=new Set(cls);return {hidden:false,style:{top:'',bottom:''},offsetHeight:r.bottom-r.top,classList:{add:x=>c.add(x),remove:x=>c.delete(x),contains:x=>c.has(x)},getClientRects:()=>[1],getBoundingClientRect:()=>({...r,width:r.right-r.left,height:r.bottom-r.top})};};
+ const menu=mk({left:300,right:400,top:12,bottom:56}),minimap=mk({left:262,right:374,top:68,bottom:152}),wanted=mk({left:250,right:400,top:65,bottom:110}),body=mk({left:0,right:0,top:0,bottom:0},['touch']);
+ const doc={body,querySelector:s=>({'#touch-aux':menu,'#app>.minimap-card':minimap,'#wanted':wanted})[s]||null};
+ const win={innerHeight:900,getComputedStyle:()=>({visibility:'visible'})};
+ createTouchDocks(doc,win).update(1000);assert.equal(wanted.style.top,(152+GAP)+'px');
+});

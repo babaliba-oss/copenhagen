@@ -17,7 +17,7 @@ export function stack(items,fixed,top,bottom){
  return out;
 }
 const SELECTORS=['#wanted','#toast.important.visible','#people-interaction','#cph-hud','#market-prompt','#market-card','#radio-now','.edge-invite'];
-const OBSTACLES=['.topbar .wordmark','#touch-aux','#travel-controls','#touch-controls','.dashboard'];
+const OBSTACLES=['.topbar .wordmark','#touch-aux','#travel-controls','#touch-controls','.dashboard','#app>.minimap-card']; // the phone minimap has its own corner (under Menu upright, above the steering sideways): the stars and the radio card were drawn over it
 export function createTouchDocks(doc=document,win=window){
  let last=0;const styled=new Set(); // elements this pass has moved: put back when they leave it (the toast turns ordinary, touch ends)
  const restore=el=>{el.style.top='';el.style.bottom='';el.classList.remove('dock-wait');styled.delete(el);};
