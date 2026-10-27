@@ -966,7 +966,7 @@ async function previewStart(destination){
   if(version!==previewVersion||started)return;
   setStart(destination);history.replaceState(null,'',startUrl(location,city,destination));
  }catch(error){
-  console.error(error);if(version!==previewVersion)return;
+  if(!aborted(error))console.error(error);if(version!==previewVersion||aborted(error))return; // stepping on in the picker cancels the last preview's downloads: no error
   startPicker.set(startPoint);toast(`Could not load ${destination.name}. Try it again.`,{important:true});
  }finally{
   if(version===previewVersion){previewing=false;startPicker.busy(false);if(startAfterPreview){startAfterPreview=false;start();}}
