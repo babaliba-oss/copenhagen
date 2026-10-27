@@ -159,6 +159,7 @@ dialog{max-height:calc(var(--app-h,100dvh)*.94)}
 
 .pause-contact{margin:4px 0 0;font-size:14px;color:#4c5a55}.pause-contact a{color:#d4572f;font-weight:600;text-underline-offset:3px}
 @media(pointer:coarse){.pause-contact{font-size:15px;text-align:center}.pause-contact a{display:inline-block;padding:10px 4px}}
+@media(pointer:coarse){#sources-dialog .source-links{flex-wrap:wrap;gap:0 18px}#sources-dialog .source-links a{display:inline-flex;align-items:center;min-height:44px}} /* the source links were 26 px tall on a phone, squeezed into three columns of two lines */
 
 /* Brand mark: one bold O. */
 .brand-icon{display:grid;place-items:center;padding:0;letter-spacing:0;font-size:30px;line-height:1;font-family:Manrope,sans-serif;font-weight:800}
