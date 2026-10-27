@@ -94,6 +94,9 @@ body.arrest-cinematic .vignette{background:radial-gradient(ellipse at center,tra
 #busted-overlay .end-note{font-size:11px;color:#aebebc;max-width:700px;line-height:1.6}
 @media(max-width:760px){.end-columns{grid-template-columns:1fr}#busted-overlay .end-card{gap:10px;padding:28px 16px}#busted-overlay h2{font-size:clamp(56px,16vw,96px)}}
 @media(max-height:620px){#busted-overlay h2{font-size:48px}#busted-overlay .end-card{justify-content:flex-start}}
+#busted-overlay .end-actions .ghost-btn{margin:0} /* Restart kept the 20 px top margin of "#busted-overlay button" and sat 20 px lower than Continue */
+/* Phones held sideways (412 px tall): the card was 518 px, Continue and Restart under the bottom edge. Tighter, the stats in three columns. */
+@media(max-height:500px){#busted-overlay .end-card{padding:12px 20px;gap:6px}#busted-overlay h2{font-size:40px;margin:0}#busted-overlay .end-subtitle{font-size:16px}.end-columns{margin-top:4px;gap:10px}.end-panel{padding:10px 14px}.end-stats{grid-template-columns:repeat(3,1fr);gap:4px 14px}.end-stats strong{font-size:18px}.end-actions{margin-top:6px}#busted-overlay .end-actions :is(.primary-btn,.ghost-btn){padding:10px 16px;min-height:44px}#busted-overlay .end-note{font-size:10px;line-height:1.4}}
 @media(prefers-reduced-motion:reduce){body.arrest-cinematic .vignette{transition:none}}
 
 /* ?frame=… video capture box: body becomes the containing block for every fixed HUD element
