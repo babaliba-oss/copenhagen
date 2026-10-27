@@ -149,6 +149,13 @@ test('deployed spikes shred tyres, arrest the stopped driver and rearm after cle
  f.police.level=0;f.tick(.1,{started:false});assert.equal(f.block.deployed,false,'escaping on foot still cleans up patrol cars');
  f.block.reset();assert.equal(f.block.snapshot().phase,'idle');assert.equal(f.block.plan,null);
 });
+test('an arrest on foot is made by the officers already out, from where they stand',()=>{
+ const f=pursuitFixture();f.car.travelMode='walk';const look={tag:'drawn'};
+ f.police.units=[{id:'u1',x:f.car.x+90,z:f.car.z,heading:0,officer:{x:f.car.x+1,z:f.car.z+.4,heading:1,back:false,look}},{id:'u2',x:f.car.x+95,z:f.car.z,heading:0,officer:{x:f.car.x-.6,z:f.car.z+.9,heading:2,back:false}}];
+ f.block.startArrest(f.car);const [lead,second]=f.block.snapshot().arrest.officers;
+ assert.ok(Math.hypot(lead.x-f.car.x-1,lead.z-f.car.z-.4)<.01||Math.hypot(lead.x-f.car.x+.6,lead.z-f.car.z-.9)<.01,'the lead starts where an officer on foot stood');
+ assert.ok(Math.hypot(second.x-f.car.x,second.z-f.car.z)<2,'and so does the second, not 90 m off at the car');
+});
 test('walk, bike and scooter arrests stay upright and never create a phantom car door',()=>{
  for(const mode of ['walk','bike','scooter']){
   const f=pursuitFixture();f.car.travelMode=mode;f.block.startArrest(f.car);

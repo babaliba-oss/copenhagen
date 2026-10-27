@@ -122,6 +122,9 @@ export function createRoadblock(scene,{world,police,carModel,playerLook=null,gra
   // Roadblock officers close by join in; otherwise two officers jump out of each of the nearest patrol cars.
   if(deployed)for(const o of [...posts].sort((a,b)=>dist(a,car)-dist(b,car)))if(dist(o,car)<55&&squad.length<6){o.busy=true;squad.push(o);}
   const units=[...(police.units||[])].sort((a,b)=>dist(a,car)-dist(b,car));
+  // Officers already out on foot (police.js FOOT_CHASE) are the ones at hand: they make the arrest from where they stand, in the
+  // look they were drawn with (foot-officers.js). They used to vanish at the arrest, and two more ran in from cars 100 m off.
+  for(const u of units){const f=u.officer;if(!f||f.back||squad.length>=6||dist(f,car)>40)continue;squad.push({x:f.x,z:f.z,heading:f.heading,look:f.look||officerLook(40+squad.length,squad.length%2===1),gait:{},speed:0,groundY:.13,spawned:true,id:`officer-f${squad.length}`});}
   for(const u of units){if(squad.length>=6)break;
    for(const side of [-1,1]){if(squad.length>=6)break;const s=Math.sin(u.heading),c=Math.cos(u.heading);
     const o={x:u.x+c*1.6*side,z:u.z-s*1.6*side,heading:u.heading,look:officerLook(40+squad.length,squad.length%2===1),gait:{},speed:0,groundY:.13,spawned:true,id:`officer-x${squad.length}`};squad.push(o);}

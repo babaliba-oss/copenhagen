@@ -21,7 +21,8 @@ export function createFootOfficers(simulation,parent=null){
    for(const u of units){
     if(ended||!u.officer||officers.has(u))continue;
     if(officers.size>=FOOT_OFFICERS.max)break;
-    officers.set(u,{x:u.officer.x,z:u.officer.z,heading:u.officer.heading,speed:0,running:false,groundY:.13,look:officerLook(20+serial++%8,false),gait:{},id:`foot-${u.id}`,back:false});
+    const look=u.officer.look||=officerLook(20+serial++%8,false); // kept on the officer: the arrest scene (roadblock.js) carries on with the same person
+    officers.set(u,{x:u.officer.x,z:u.officer.z,heading:u.officer.heading,speed:0,running:false,groundY:.13,look,gait:{},id:`foot-${u.id}`,back:false});
    }
    for(const [u,o]of officers){
     const s=u.officer;if(ended||!s||!units.includes(u)){officers.delete(u);continue;}
