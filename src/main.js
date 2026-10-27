@@ -1149,9 +1149,9 @@ $('sound-btn').addEventListener('click',async()=>{sound=!sound;peopleInteraction
 for(const id of ['view-btn','look-btn','sound-btn','zoom-in','zoom-out'])$(id).addEventListener('click',focusWorldControls);
 // Music on/off: U and the phone Menu. Off silences the game's own music and switches the radio off; on brings back
 // the station you had. Works with the sound off too (a soundscape made later starts with the choice).
-let musicChoice=(()=>{try{return localStorage.getItem('cph-music')!=='0';}catch{return true;}})(),stationBeforeMute=0;
+let musicChoice=(()=>{try{return localStorage.getItem('cph-music')!=='0';}catch{return true;}})(),stationBeforeMute=(()=>{try{return +localStorage.getItem('cph-music-station')||0;}catch{return 0;}})(); // kept over a reload: Music on after one brought the game music back but not the radio
 const musicOn=()=>musicChoice||!!radio?.station;
-function setMusic(on=!musicOn()){musicChoice=on;soundscape?.music(on);try{localStorage.setItem('cph-music',on?'1':'0');}catch{}if(radio){if(!on&&radio.station){stationBeforeMute=radio.station;radio.set(0);storeStation(0);}else if(on&&!radio.station&&stationBeforeMute){radio.set(stationBeforeMute);storeStation(stationBeforeMute);}}return on;}
+function setMusic(on=!musicOn()){musicChoice=on;soundscape?.music(on);try{localStorage.setItem('cph-music',on?'1':'0');}catch{}if(radio){if(!on&&radio.station){stationBeforeMute=radio.station;try{localStorage.setItem('cph-music-station',String(stationBeforeMute));}catch{}radio.set(0);storeStation(0);}else if(on&&!radio.station&&stationBeforeMute){radio.set(stationBeforeMute);storeStation(stationBeforeMute);}}return on;}
 // Car radio: L (Shift+L back), the top-bar button, or a click or tap on the now-playing card (on touch screens the only way).
 // Every change, Radio off included, is remembered for the next drive.
 function tuneRadio(step=1){if(!radio)return;radio.next(step);storeStation(radio.station);if(!sound)toast('Turn the sound on to hear the radio');}
