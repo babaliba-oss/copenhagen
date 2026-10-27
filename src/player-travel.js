@@ -171,7 +171,11 @@ export class PlayerTravel{
   const ride=this.riding,from={...this.actor};if(!ride)return;
   const spot=exitPosition(this.actor,this.mode,this.world,[...this.parked(),...obstacles]);
   if(!spot){this.actor.speed=0;ride.speed=0;return false;} // no room to land beside it: the rider stays on (landing on the fallen ride trapped the walker)
-  Object.assign(ride,{speed:0,steer:0,parked:true,fallen:{side:Math.random()<.5?-1:1,elapsed:0}});
+  // It tips over to a random side; on a raised deck (Cykelslangen) to a side where its top lands on the deck, not out through the railing.
+  // (The renderer turns it about z after the heading, so the top ends at -side along the ride's local x.)
+  const lands=s=>raisedDeckAt(ride.x-s*Math.cos(ride.heading||0)*1.1,ride.z+s*Math.sin(ride.heading||0)*1.1)!=null;
+  let side=Math.random()<.5?-1:1;if(ride.deckY!=null&&!lands(side)&&lands(-side))side=-side;
+  Object.assign(ride,{speed:0,steer:0,parked:true,fallen:{side,elapsed:0}});
   this.actor=makeActor({x:spot.x,z:spot.z,heading:from.heading,deckY:spot.deckY},'walk',from.distance);this.mode='walk';this.riding=null;this.sprint=false;this.transition=null;
   this.actor.knockdown={elapsed:.001,duration:clamp(1.8+speed*.3,2,4.5),prone:speed>4.5,side:ride.fallen.side};
  }
