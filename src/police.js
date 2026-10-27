@@ -72,7 +72,7 @@ export const ON_FOOT={range:80,after:5};
 // a clear, dry line. The officer sees the player within `sight` m (a clear line), arrests from the usual arrest range, or
 // takes hold within `grab` m of someone on foot slower than `pace` (walking), and walks back to the car at `back` m/s
 // (gone at once when out of the player's view) once the player drives off on a road, or strays `leash` m from the car.
-export const FOOT_CHASE={run:4.4,back:3.5,slow:3,range:120,after:1.5,max:2,repath:1,moved:8,direct:40,link:30,sight:90,grab:1.6,pace:2.5,expand:6000,leash:300,door:1.3};
+export const FOOT_CHASE={run:4.4,back:3.5,slow:3,range:120,after:1.5,max:2,repath:1,moved:8,direct:40,link:30,sight:90,grab:1.6,pace:2.5,expand:6000,leash:300,door:1.3,apart:.9};
 const FOOT_CELL=20;
 // Officer positions are kept on the unit (unit.officer): {x,z,heading,speed,back,path,k,...}; the renderer draws them there.
 const newOfficer=(x,z,heading)=>({x,z,heading,speed:0,back:false,path:null,k:0,plan:0,gx:NaN,gz:NaN});
@@ -437,6 +437,10 @@ export class PoliceSimulation{
    {let l=Math.hypot(path[0]-from.x,path[1]-from.z);for(let i=2;i<path.length;i+=2)l+=Math.hypot(path[i]-path[i-2],path[i+1]-path[i-1]);this.footBy=Math.max(this.footBy,this.time+l/FOOT_CHASE.run+CONTACT.slack);} // the officer's fair chance to get there (as CONTACT): no escape on the clock while they run over
    this.message=offRoad?'An officer gets out and comes after you on foot.':'An officer gets out and walks over.';
   }
+  // Two officers out keep `apart` m between them: units parked near each other sent theirs down the same footway route, and they
+  // ran in one body (0.7-1 m apart for 130 m at Rundetårn) and stood on one spot at the arrest. The later one steps aside (not into a house).
+  {const f=this.units.filter(u=>u.officer);for(let i=1;i<f.length;i++)for(let j=0;j<i;j++){const a=f[j].officer,b=f[i].officer,dx=b.x-a.x,dz=b.z-a.z,d=Math.hypot(dx,dz);if(d>=FOOT_CHASE.apart)continue;
+   const ux=d>.01?dx/d:Math.cos(a.heading),uz=d>.01?dz/d:-Math.sin(a.heading);for(const [vx,vz] of [[ux,uz],[-uz,ux],[uz,-ux]]){const q={x:a.x+vx*FOOT_CHASE.apart,z:a.z+vz*FOOT_CHASE.apart};if(this.footFree(b,q)){b.x=q.x;b.z=q.z;break;}}}}
   this.seen=this.units.some(u=>this.sees(u,player));if(this.seen)this.sighted=true;
   const after=o=>o&&!o.back; // an officer out after the player (not walking back)
   const canArrest=this.units.some(u=>distance(u,player)<arrestRange&&this.clearSight(u,player)||after(u.officer)&&distance(u.officer,player)<arrestRange&&this.clearSight(u.officer,player));

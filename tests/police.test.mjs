@@ -138,6 +138,12 @@ test('foot chase: off the roads an officer parks, gets out and follows the playe
  assert.equal(p.busted,true,'a player standing in the pedestrian street is arrested');assert.ok(round,'the officer went round the house on the footway (the straight line goes through it)');
  assert.ok(most>=1&&most<=FOOT_CHASE.max,`at most ${FOOT_CHASE.max} officers out (${most})`);assert.ok(t<30,`arrested after ${t.toFixed(1)} s`);
 });
+test('foot chase: two officers from units parked together keep a step apart, also at the arrest',()=>{
+ const {p,house}=footStreet(),me={x:0,z:50,heading:0,speed:0,walking:true,travelMode:'walk'};p.units=[-30,-24].map(x=>p.newUnit({edge:p.graph.edges[0],s:200+x,x,z:0,heading:-Math.PI/2},'chase',false));
+ let apart=Infinity,two=0;for(let t=0;t<40&&!p.busted;t+=1/30){p.step(1/30,me);const out=p.units.filter(u=>u.officer);
+  if(out.length>1){two++;apart=Math.min(apart,Math.hypot(out[0].officer.x-out[1].officer.x,out[0].officer.z-out[1].officer.z));for(const u of out)assert.ok(!house(u.officer.x,u.officer.z));}}
+ assert.equal(p.busted,true);assert.ok(two>30,'both officers out');assert.ok(apart>=FOOT_CHASE.apart-.01,`never in one another (${apart.toFixed(2)} m apart)`);
+});
 test('foot chase: running gets away from the officer, walking does not; driving off on a road calls them back',()=>{
  const {p,house}=footStreet(),me={x:0,z:50,heading:-Math.PI/2,speed:0,walking:true,travelMode:'walk'};
  let t=0;for(;t<8;t+=1/30)p.step(1/30,me);assert.ok(p.units.some(u=>u.officer&&!u.officer.back),'an officer is out');
