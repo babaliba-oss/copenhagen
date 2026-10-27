@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import {terrain,waterAt,raisedDecks} from './terrain.js';
+import {terrain,waterAt,raisedDecks,groundAt} from './terrain.js';
 import {drapeGeometry,dropSunkenSurfaces,removeLegacyWater} from './terrain-mesh.js';
 import {inWaterPolygons,SpatialIndex,pointInPolygon} from './geo.js';
 
@@ -16,17 +16,22 @@ function onBridge(decks,x,z){if(!decks?.length)return false;let index=bridgeInde
 // Under a raised deck (terrain.js, quay.js findRaisedDecks: Cykelslangen) the tiles carry the deck's own paving on the ground,
 // cut out of the footway it crosses (the dissolve puts cycle tracks over footways): the ground there takes the paving
 // beside it, the nearest outside the deck within 12 m (none: left bare). Over the water it is dropped like other paving.
+// Where the deck is lower than LOW_DECK over the ground (its ramps: nobody gets under, nobody sees it) the paving goes: kept
+// there, it stood up to 0.26 m through the deck's first 20 m at Havneholmen (pale patches in the red), the deck lying 0.035 m
+// over the ground at its vertices and the paving up to 0.085 m, each following the steep quay by its own triangles.
+const LOW_DECK=2.4;
 export function underRaisedDecks(floats,raised){
- if(!raised?.length)return floats;const R=raised.map(d=>({rings:d.rings,b:d.bbox||d.rings[0].reduce((b,[x,z])=>[Math.min(b[0],x),Math.min(b[1],z),Math.max(b[2],x),Math.max(b[3],z)],[Infinity,Infinity,-Infinity,-Infinity])}));
- const inside=(x,z)=>R.some(({rings,b})=>x>=b[0]&&x<=b[2]&&z>=b[1]&&z<=b[3]&&pointInPolygon(x,z,rings)),under=[];
+ if(!raised?.length)return floats;const R=raised.map(d=>({rings:d.rings,b:d.bbox||d.rings[0].reduce((b,[x,z])=>[Math.min(b[0],x),Math.min(b[1],z),Math.max(b[2],x),Math.max(b[3],z)],[Infinity,Infinity,-Infinity,-Infinity]),caps:d.caps,top:d.top,ramp:d.ramp}));
+ const deckOver=(x,z)=>R.find(({rings,b})=>x>=b[0]&&x<=b[2]&&z>=b[1]&&z<=b[3]&&pointInPolygon(x,z,rings)),inside=(x,z)=>!!deckOver(x,z),under=[];
+ const low=(x,z)=>{const d=deckOver(x,z);if(!d?.caps?.length||!Number.isFinite(d.top)||!d.ramp)return false;let h=d.top;for(const [px,pz,g] of d.caps)h=Math.min(h,g+d.ramp*Math.hypot(px-x,pz-z));return h-groundAt(x,z)<LOW_DECK;}; // quay.js findRaisedDecks heightAt, less its floor over the ground
  for(let i=0;i<floats.length;i+=18){const x=(floats[i]+floats[i+6]+floats[i+12])/3,z=(floats[i+2]+floats[i+8]+floats[i+14])/3;if(inside(x,z))under.push(i);}
  if(!under.length)return floats;const set=new Set(under),out=[];for(let i=0;i<floats.length;i+=18)if(!set.has(i))out.push(i);
- const keep=[];for(const i of under){const x=(floats[i]+floats[i+6]+floats[i+12])/3,z=(floats[i+2]+floats[i+8]+floats[i+14])/3;let best=144,src=-1;
+ const keep=[];for(const i of under){const x=(floats[i]+floats[i+6]+floats[i+12])/3,z=(floats[i+2]+floats[i+8]+floats[i+14])/3;let best=144,src=-1;if(low(x,z))continue;
   for(const j of out)for(let k=0;k<18;k+=6){const q=(floats[j+k]-x)**2+(floats[j+k+2]-z)**2;if(q<best){best=q;src=j+k;}}
   if(src<0)continue;keep.push(i);for(let k=0;k<18;k+=6){floats[i+k+3]=floats[src+3];floats[i+k+4]=floats[src+4];floats[i+k+5]=floats[src+5];}}
  if(keep.length===under.length)return floats;const kept=new Set(keep),res=new Float32Array(floats.length-(under.length-keep.length)*18);let o=0;for(let i=0;i<floats.length;i+=18)if(!set.has(i)||kept.has(i)){res.set(floats.subarray(i,i+18),o);o+=18;}return res;
 }
-const raisedRings=()=>raisedDecks().map(d=>({rings:d.rings,bbox:d.bbox}));
+const raisedRings=()=>raisedDecks().map(d=>({rings:d.rings,bbox:d.bbox,caps:d.caps,top:d.top,ramp:d.ramp}));
 export function buildSurfaceTile(floats,water,bridges=bridgeDecks,raised=raisedRings()){
  floats=underRaisedDecks(floats,raised);
  const g=new THREE.BufferGeometry(),buffer=new THREE.InterleavedBuffer(floats,6);

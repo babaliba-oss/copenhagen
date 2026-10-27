@@ -320,7 +320,7 @@ export function findRaisedDecks(water,land={},{ground=()=>0}={}){
   const chain=(i,j)=>{const c=[];for(let k=i;;k=(k+1)%r.length){c.push(r[k]);if(k===j)break;}return c;},s1=chain(A,B),s2=chain(B,A).reverse(),len=c=>{let l=0;for(let i=1;i<c.length;i++)l+=Math.hypot(c[i][0]-c[i-1][0],c[i][1]-c[i-1][1]);return l;};
   const at=(c,f)=>{let t=f*len(c);for(let i=1;i<c.length;i++){const l=Math.hypot(c[i][0]-c[i-1][0],c[i][1]-c[i-1][1]);if(t<=l||i===c.length-1){const u=l?Math.min(1,t/l):0;return [c[i-1][0]+(c[i][0]-c[i-1][0])*u,c[i-1][1]+(c[i][1]-c[i-1][1])*u];}t-=l;}return c[0];};
   const m=Math.max(2,Math.ceil(Math.max(len(s1),len(s2))/2)),centre=[];for(let k=0;k<=m;k++){const a=at(s1,k/m),b=at(s2,k/m);centre.push([(a[0]+b[0])/2,(a[1]+b[1])/2]);}
-  out.push({deck:d,rings:d.rings,bbox:[x0,z0,x1,z1],heightAt,top,caps,centre,name:d.name||'',kind:d.kind||''});}
+  out.push({deck:d,rings:d.rings,bbox:[x0,z0,x1,z1],heightAt,top,caps,ramp:RAISED.RAMP,centre,name:d.name||'',kind:d.kind||''});}
  return out;
 }
 // The raised decks drawn: an orange-red riding surface on a pale slab half a metre deep, steel railings along both sides

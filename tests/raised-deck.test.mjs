@@ -40,3 +40,12 @@ test('riders come onto the deck at its ends and stay on it; under it the ground 
   assert.equal(travelCollision({...on,x:-.5},'bike',w,[],[],on),null);assert.equal(travelCollision({x:0,z:-.5,heading:0},'walk',w,[],[],{x:0,z:0,deckY:null}),'water');
  }finally{setRaisedDecks([]);}
 });
+test('paving under the deck stays only where it stands high enough to be seen under; its low ramps cover the ground',async()=>{
+ const {underRaisedDecks}=await import('../src/surface-tiles.js');
+ const [d]=findRaisedDecks(water,{pavement:[snake]}),tri=(x,z,c)=>[x-1,.045,z-1,c,c,c,x+1,.045,z-1,c,c,c,x,.045,z+1,c,c,c];
+ const floats=new Float32Array([...tri(-100,0,.2),...tri(-60,0,.3),...tri(-100,4,.9),...tri(-60,4,.8)]); // under the low ramp, under the high part, and the paving beside each
+ const out=underRaisedDecks(floats,[{rings:d.rings,bbox:d.bbox,caps:d.caps,top:d.top,ramp:d.ramp}]),xs=[];for(let i=0;i<out.length;i+=18)xs.push([out[i]+1,out[i+2]+1,+out[i+3].toFixed(1)]);
+ assert.ok(d.heightAt(-100,0)<2.4&&d.heightAt(-60,0)>2.4);
+ assert.deepEqual(xs.map(([x,z])=>[x,z]).sort((a,b)=>a[0]-b[0]||a[1]-b[1]),[[-100,4],[-60,0],[-60,4]],'the low one goes');
+ assert.equal(xs.find(([x,z])=>x===-60&&z===0)[2],.8,'the high one takes the paving beside it');
+});
