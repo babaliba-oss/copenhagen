@@ -906,7 +906,7 @@ const transitBodies=()=>[...(tramSim?.bodies||[]),...(buses?.bodies||[]),...(tra
 const rangedProps=[]; /* instanced props drawn near the player only (instance-range.js); updated each frame */
 let furnitureNear=[],furnitureNearAt=-1e9,furnitureSets=null; // furnitureSets: the mapped furniture (set at boot)
 const nearFurniture=()=>{if(!car||travel?.mode==='car'||!(furnitureSets?.knockables?.near||parkedCars))return [];const now=performance.now();if(now-furnitureNearAt>250){furnitureNearAt=now;furnitureNear=furnitureSets?.knockables?.near?furnitureSets.knockables.near(car.x,car.z,20):[];parkedCars?.near(car.x,car.z,20,furnitureNear);if(Array.isArray(periodLife?.knockables))for(const k of periodLife.knockables)k.near?.(car.x,car.z,20,furnitureNear);}return furnitureNear;}; /* 1760: the quay cargo (barrels, crates, sacks) too: the coach knocks it over, on foot you walked through it */
-const nearRiders=()=>{const out=[];if(car&&typeof cyclists!=='undefined'&&cyclists?.riders)for(const c of cyclists.riders)if(!c.playerTaken&&Math.abs(c.x-car.x)<30&&Math.abs(c.z-car.z)<30)out.push({x:c.x,z:c.z,heading:c.heading||0,halfWidth:.32,halfLength:.9,speed:c.speed||0});return out;}; // NPC cyclists: a walker or the player's bike passed through them
+const nearRiders=()=>{const out=[];if(car&&typeof cyclists!=='undefined'&&cyclists?.riders)for(const c of cyclists.riders)if(!c.playerTaken&&(c.deckY!=null)===(car.deckY!=null)/* up on a raised deck or below it: not in each other's way */&&Math.abs(c.x-car.x)<30&&Math.abs(c.z-car.z)<30)out.push({x:c.x,z:c.z,heading:c.heading||0,halfWidth:.32,halfLength:.9,speed:c.speed||0});return out;}; // NPC cyclists: a walker or the player's bike passed through them
 const travelObstacles=()=>[...(mobility?.cars.filter(c=>c.edge)||[]),...(tramSim?.bodies||[]),...(buses?.bodies||[]),...(police?.obstacles||[]),...nearFurniture(),...(travel?.mode!=='car'?nearRiders():[])];
 function interactTravel(id=null){
  if(!ready||!started||paused||mapOpen||police?.busted)return;
@@ -1251,7 +1251,7 @@ function frame(now){
     {const hit=parkedCars?.step(step,driving?car:null,world);if(hit>2.5&&driving){impacts.damage(car,hit,'vehicle');police.report('property',`parked-car:${parkedCars.lastHit()}`,hit);}}
     if(driving){
      police.observe(previous,car,mobility.cars,[]);
-     {const riders=SCRATCH.riders;riders.length=0;for(const c of cyclists.riders)if(!c.playerTaken)riders.push(c);for(const c of npcScooters.riders)riders.push(c);
+     {const riders=SCRATCH.riders;riders.length=0;for(const c of cyclists.riders)if(!c.playerTaken&&(c.deckY!=null)===(car.deckY!=null))riders.push(c); /* a rider up on a raised deck is out of a car's way */for(const c of npcScooters.riders)riders.push(c);
       impacts.collide(previous,car,people,riders,fillList(SCRATCH.hitCars,mobility.cars,police.obstacles),police);}
      if(r.collision==='building'){impacts.damage(car,Math.abs(previous.speed),'building');finale.buildingImpact({...car,speed:previous.speed},Math.abs(previous.speed),world,police);}
      else if(r.scrape>=2){impacts.damage(car,r.scrape,'building');finale.buildingImpact({...car,speed:r.scrape},r.scrape,world,police);} /* slid along a wall (physics.js): the speed that went into it still counts */
@@ -1689,7 +1689,7 @@ async function boot(){
    // Copenhagen has no street trams: its trams.json holds the S-train route relations, which run through the
    // Boulevard tunnel; drawn as tram track they laid rails and contact wire across Nørreport at street level.
    tramSim=new TramSimulation(tramData,world);tramSim.reset(car);tramRenderer=createTramRenderer(scene,tramSim);tramRenderer.update(car);
-   cyclists=city.id==='copenhagen'?new CityCyclists(mobility.roads,world,64,undefined,{parked:parkedCars?(x,z,r)=>parkedCars.near(x,z,r):null}):new Cyclists(data,helsinki?8:0); /* the riders follow Helsinki's harbour cycleway: elsewhere (1760, Tampere) 8 stood at NaN, posed and drawn every frame */cyclistRenderer=createCyclistRenderer(scene,cyclists);cyclistRenderer.update(car);
+   cyclists=city.id==='copenhagen'?new CityCyclists(mobility.roads,world,64,undefined,{parked:parkedCars?(x,z,r)=>parkedCars.near(x,z,r):null,walks:mobilityData?.walks} /* walks: the way onto Cykelslangen (a cycle-only link) */):new Cyclists(data,helsinki?8:0); /* the riders follow Helsinki's harbour cycleway: elsewhere (1760, Tampere) 8 stood at NaN, posed and drawn every frame */cyclistRenderer=createCyclistRenderer(scene,cyclists);cyclistRenderer.update(car);
    npcScooters=new ScooterRiders(mobility.walks,world,city.id.startsWith('copenhagen')?{count:0}:undefined);npcScooters.reset(car);npcScooterRenderer=createScooterRiderRenderer(scene,npcScooters);npcScooterRenderer.update(car);
    birds=createBirds(data,{colonies:birdColonies});cityModel.add(birds.group);
    safeBirdFlight=createBirdFlightClearance({buildings:world.cameraBuildings,stalls:market.stalls||[],water:world.water});

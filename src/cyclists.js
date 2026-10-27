@@ -63,11 +63,12 @@ export function createCyclistRenderer(scene,sim){
  let baked=null;
  const actors=sim.riders.map((r,i)=>({rider:i,x:0,z:0,heading:0,speed:0,pose:'cycle',groundY:.10,bike:{hipY:1.06,hipZ:.2,crankY:.36,crankZ:.08,crankR:.17,crank:0,barX:.27,barY:1.15,barZ:-.32}}));
  return {group,update(player){
-  sim.riders.forEach((r,i)=>{for(const {mesh,pose} of specs){const [x,y,z,rx]=pose(r),c=Math.cos(r.heading),s=Math.sin(r.heading);tmp.position.set(r.x+x*c+z*s,y+.10+groundAt(r.x,r.z),r.z-x*s+z*c);tmp.rotation.set(rx,r.heading,0,'YXZ');tmp.scale.setScalar(!r.playerTaken&&Math.hypot(r.x-player.x,r.z-player.z)<420?1:0);tmp.updateMatrix();mesh.setMatrixAt(i,tmp.matrix);if(r.knockdown&&!r.playerTaken)applyImpactPose(mesh,i,r);}});
+  const level=r=>r.deckY??groundAt(r.x,r.z); // up on a raised deck (city-cyclists.js deckY: the deck's surface under the rider) or on the ground
+  sim.riders.forEach((r,i)=>{const y0=level(r);for(const {mesh,pose} of specs){const [x,y,z,rx]=pose(r),c=Math.cos(r.heading),s=Math.sin(r.heading);tmp.position.set(r.x+x*c+z*s,y+.10+y0,r.z-x*s+z*c);tmp.rotation.set(rx,r.heading,0,'YXZ');tmp.scale.setScalar(!r.playerTaken&&Math.hypot(r.x-player.x,r.z-player.z)<420?1:0);tmp.updateMatrix();mesh.setMatrixAt(i,tmp.matrix);if(r.knockdown&&!r.playerTaken)applyImpactPose(mesh,i,r);}});
   specs.forEach(({mesh})=>mesh.instanceMatrix.needsUpdate=true);
   riders.begin();baked?.begin(player);
-  sim.riders.forEach((r,i)=>{if(r.playerTaken||Math.hypot(r.x-player.x,r.z-player.z)>=420)return;const a=actors[i];a.x=r.x;a.z=r.z;a.heading=r.heading;a.speed=r.speed;a.knockdown=r.knockdown;a.bike.crank=r.phase*.42;
-   if(!a.knockdown&&baked&&drawRider(baked,a,looks[i],a.bike.crank,{y:.10+groundAt(a.x,a.z),heading:a.heading}))return; // the character model on the bike
+  sim.riders.forEach((r,i)=>{if(r.playerTaken||Math.hypot(r.x-player.x,r.z-player.z)>=420)return;const a=actors[i];a.x=r.x;a.z=r.z;a.heading=r.heading;a.speed=r.speed;a.knockdown=r.knockdown;a.bike.crank=r.phase*.42;const y0=level(r);a.groundY=.10+y0-groundAt(a.x,a.z);
+   if(!a.knockdown&&baked&&drawRider(baked,a,looks[i],a.bike.crank,{y:.10+y0,heading:a.heading}))return; // the character model on the bike
    riders.draw(a,looks[i],a);});
   riders.end();baked?.end();
  },
