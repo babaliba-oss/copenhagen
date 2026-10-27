@@ -170,5 +170,6 @@ body.busted #radio-now,body.arrest-cinematic #radio-now{visibility:hidden}
 @media (max-height:500px){#big-map{width:min(1400px,calc(100vw - 24px));height:calc(var(--app-h,100dvh) - 16px);padding:8px 12px 6px;gap:6px}#big-map .bm-top{flex-wrap:nowrap;gap:10px}#big-map .bm-top>div:first-child{flex:0 0 auto;min-width:0}#big-map .eyebrow{display:none}#big-map h2{font-size:18px}#big-map .bm-legend{display:flex;flex:1;gap:4px 9px;font-size:11px;justify-content:flex-end}#big-map .bm-tools button{height:34px;min-width:34px;padding:0 10px;font-size:13px}#big-map .bm-hint{font-size:11px}}
 body:not(.clean-capture):not(.touch).driving #cph-hud{top:236px;max-height:calc(100vh - 460px);overflow:hidden} /* extra HUD on (H): below the location line and the coordinates box */
 body.era-1760 .bm-route-key{background:#c08a2a!important} /* the 1760 route is drawn amber */
+body.era-1760 .bm-race-key{background:#b5462e!important} /* and its race starts sealing-wax red (game.js), not purple */
 body:not(.touch) #cph-hud .cph-card.settled p:not(.cph-go):not(.cph-kick):not(.cph-timer):not(.cph-race-time){display:none} /* desktop: the story once read; J has it */
 body:not(.touch) #cph-hud .cph-saga.settled li:not(.c){display:none}
