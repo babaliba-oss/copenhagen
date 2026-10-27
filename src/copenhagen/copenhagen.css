@@ -28,7 +28,7 @@ body:not(.driving) #cph-hud,body.busted #cph-hud{visibility:hidden} /* the game 
 .cph-jcard{width:min(760px,100%);max-height:calc(var(--app-h,100vh) - 32px);overflow:auto;padding:20px;border-radius:16px;background:#f8f5ee;color:#30312e;display:grid;gap:14px}
 .cph-jtop{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
 .cph-jcard h2{margin:2px 0 0;font-family:Spectral,Georgia,serif;font-size:34px}
-.cph-jlist{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:10px}
+.cph-jlist{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(300px,100%),1fr));gap:10px} /* min(): on a 360 px phone the card has 288 px inside, and a 300 px column ran 12 px past its padding with a sideways scroll */
 .cph-jq{border:1px solid rgba(48,49,46,.15);border-left:4px solid #c8202a;border-radius:12px;padding:12px 14px;display:grid;gap:6px;background:#fff}
 .cph-jq.done{border-left-color:#2f7d6c;opacity:.85}
 .cph-jq.act{background:#fff6f2}
