@@ -74,6 +74,11 @@ const STALLED_AFTER=40;
 const PLAYER_WAIT=6,BACK_HOLD=6; // s a car stands held by the player (in its way, head-on or across its lane) before it goes round or backs off; s it then keeps off
 // How far ahead a car plans its route, and so how far it looks for junctions and tram tracks.
 const LOOKAHEAD=45;
+// Spawning: no walker placed with WALK_CROWD.max others already within WALK_CROWD.r metres. The per-edge limit (one per 8 m) let
+// a teleport fill the one dense mesh of short paths near the player: by Marmorkirken (Frederiksgade's pavements are cut at the kerbs,
+// so most walker edges within 130 m ring the church) the unplaced walkers kept trying every frame and 88 stood within 35 m.
+export const WALK_CROWD={r:35,max:24};
+const crowded=(cells,p)=>{const {r,max}=WALK_CROWD,cx=Math.floor(p.x/r),cz=Math.floor(p.z/r);let n=0;for(let i=-1;i<=1;i++)for(let j=-1;j<=1;j++)for(const b of cells.get((cx+i)*65536+cz+j)||NO_EDGES)if(hypot(b.x-p.x,b.z-p.z)<r&&++n>=max)return true;return false;};
 // Same direction only: the car behind gives way when two footprints touch (merging lanes); the leader may pull away.
 // Side by side, the lower id goes first. Previously both refused to move and deadlocked forever.
 const yieldsTo=(a,b)=>{if(Math.cos(a.heading-b.heading)<.9)return true;const forward=(b.x-a.x)*-Math.sin(a.heading)+(b.z-a.z)*-Math.cos(a.heading);return forward>.3||(forward>-.3&&b.id<a.id);};
@@ -299,7 +304,7 @@ export class Mobility {
   const graph=a.walking?this.walks:this.roads;
   // Prefer nearby routes; edge midpoint avoids choosing a remote end of a long road.
   const nearby=this.spawnCandidates(a,player,graph,()=>(a.stationOnly?this.stationEdges:a.corridorOnly?this.corridorEdges:this.edgesNear(graph,player,a.walking?this.walkSpawn:320)).filter(e=>{const p=e.points[Math.floor(e.points.length/2)],d=hypot(p[0]-player.x,p[1]-player.z);return (!a.walking||!e.crossing)&&d<(a.walking?200:a.corridorOnly?520:320)&&e.length>(a.walking?3:10)&&!(!a.walking&&(this.obstructed?.has(e)||this.trap(e,2)));}));
-  let occupancy=null; // walkers per edge, counted once per spawn rather than once per trial
+  let occupancy=null,crowd=null; // walkers per edge (and per WALK_CROWD.r cell), counted once per spawn rather than once per trial
   for(let trial=0;trial<80&&nearby.length;trial++){
    a.edge=nearby[Math.floor(this.random()*nearby.length)];a.s=this.random()*a.edge.length;a.plan=[];a.prevDir=undefined;a.ox=undefined;a.gapBy=null;a.gapHeld=0;
    const p=this.position(a);
@@ -307,7 +312,7 @@ export class Mobility {
    if(!a.walking&&(this.cars.some(b=>b!==a&&b.edge&&trafficFootprintsOverlap(p,b))||this.hitsBody(carBox(p,1))||this.inConflict(a.edge,a.s)))continue;
    // Walkers spread out: at most one per 8 m of footway. Where few paths are near (a pier, a quay between
    // canals) the 300 walkers otherwise all landed on the same few edges and moved about as one clump.
-   if(a.walking){if(!occupancy){occupancy=new Map();for(const b of this.people)if(b!==a&&b.edge)occupancy.set(b.edge,(occupancy.get(b.edge)||0)+1);}if((occupancy.get(a.edge)||0)>=Math.max(1,a.edge.length/8))continue;}
+   if(a.walking){if(!occupancy){occupancy=new Map();crowd=new Map();for(const b of this.people)if(b!==a&&b.edge){occupancy.set(b.edge,(occupancy.get(b.edge)||0)+1);const k=Math.floor(b.x/WALK_CROWD.r)*65536+Math.floor(b.z/WALK_CROWD.r);let l=crowd.get(k);if(!l)crowd.set(k,l=[]);l.push(b);}}if((occupancy.get(a.edge)||0)>=Math.max(1,a.edge.length/8)||crowded(crowd,p))continue;}
    if(this.streetWalking&&(a.walking?this.cars:this.people).some(b=>b.edge&&Math.abs(b.x-p.x)<4.5&&Math.abs(b.z-p.z)<4.5))continue; // 1760: not under a coach, nor a coach on top of someone
    if(this.world.buildings.at(p.x,p.z)||(a.walking?!this.walkable(p.x,p.z,a.edge)||!this.walkRoom(a.edge,a.s):!vehicleFitsRoad(p,this.world)))continue;
    // A long straight main road is almost always in view; corridor cars may appear there, but only in the far haze.

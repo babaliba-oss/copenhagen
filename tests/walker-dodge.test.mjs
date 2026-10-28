@@ -46,3 +46,14 @@ test('walkers held up by the player\'s standing car turn back',()=>{
  for(let i=0;i<60*20;i++){sim.step(1/60,player);if(a.edge&&a.speed<.05)held+=1/60;}
  assert.ok(a.x<-6,`walked back from the car (x ${a.x.toFixed(1)})`);assert.ok(held<5,`stood ${held.toFixed(1)} s`);
 });
+// A teleport next to one dense mesh of short paths (Marmorkirken: the streets' pavements cut at the kerbs, the paths round the
+// church the walkers' only edges near) filled it: 88 walkers within 35 m. Spawning keeps to WALK_CROWD.max within WALK_CROWD.r.
+test('walkers spawned round one dense mesh of paths do not pile into it',async()=>{
+ const {WALK_CROWD}=await import('../src/mobility.js'),n=[],edges=[],id=(i,j)=>i*7+j;for(let i=0;i<7;i++)for(let j=0;j<7;j++)n.push([i*4,j*4]);
+ const e=(a,b)=>({from:a,to:b,points:[n[a],n[b]],lane:0,signal:-1,crossing:false});
+ for(let i=0;i<7;i++)for(let j=0;j<7;j++){if(i<6)edges.push(e(id(i,j),id(i+1,j)),e(id(i+1,j),id(i,j)));if(j<6)edges.push(e(id(i,j),id(i,j+1)),e(id(i,j+1),id(i,j)));}
+ const sim=new Mobility({roads:{nodes:[],edges:[]},walks:{nodes:n,edges},signals:[]},{roads:{at:()=>false},pavement:{at:()=>true},buildings:{at:()=>false}},{cars:0,people:120,random:(s=>()=>(s=s*16807%2147483647)/2147483647)(7)});
+ const player={x:12,z:-40,heading:0,speed:0,travelMode:'walk'};sim.reset(player);let most=0;
+ for(let i=0;i<60*20;i++){sim.step(1/60,player);if(i%30===0)most=Math.max(most,sim.people.filter(a=>a.edge&&Math.hypot(a.x-12,a.z-12)<WALK_CROWD.r).length);}
+ assert.ok(most<=WALK_CROWD.max,`${most} walkers in the mesh`);assert.ok(most>=WALK_CROWD.max*.75,`still peopled: ${most}`);
+});
