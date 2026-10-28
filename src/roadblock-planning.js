@@ -5,7 +5,7 @@ import {groundAt,lakeAt} from './terrain.js';
 // Pursuit settings, in seconds and metres. Nothing here identifies a city.
 export const ROADBLOCK={
  minLevel:5,chance:.75,delay:[8,14],warningLead:4,retry:7,maxAttempts:5,
- minAhead:165,maxAhead:420,minMovingSpeed:3,minDeployDistance:65,
+ minAhead:165,maxAhead:650,minMovingSpeed:3,minDeployDistance:65,
  lineSetback:13,minWidth:4.5,maxWidth:23,maxCrossSlope:.12,
  arrestCrawl:{speed:1.2,time:1,limit:7},
 };
@@ -38,18 +38,27 @@ function occupied(p,obstacles,margin=3){
   return Math.abs(dx*Math.cos(h)-dz*Math.sin(h))<(b.halfWidth??b.hw??1)+margin&&Math.abs(dx*Math.sin(h)+dz*Math.cos(h))<(b.halfLength??b.hl??2.4)+margin;
  });
 }
-function visibleFrom(world,viewer,p,isVisible){
- // A supplied frustum check is intentionally conservative: an overhead
- // camera may see over a building that hides the site at street level.
- if(isVisible)return !!isVisible(p);
+// The camera's sight line to a point 2 m above the site's ground (an officer's head, a patrol car's roof) is cut where a
+// mapped building stands taller than the line there, sampled every 2 m. Footprints without a height (road walls) never
+// hide anything, and a high camera looks over the roofs, so the check only ever lets a low chase camera lose sight.
+function hiddenByBuildings(world,eye,p,heightAt){
+ const index=world.sightBuildings||world.cameraBuildings||world.buildings;if(!index)return false;
+ const top=heightAt(p.x,p.z)+2,dx=p.x-eye.x,dz=p.z-eye.z,n=Math.ceil(Math.hypot(dx,dz)/2);
+ for(let i=1;i<n;i++){const t=i/n,x=eye.x+dx*t,z=eye.z+dz*t,b=index.at(x,z);if(b&&b.height>0&&heightAt(x,z)+b.height>eye.y+(top-eye.y)*t)return true;}
+ return false;
+}
+function visibleFrom(world,viewer,p,isVisible,eye=null,heightAt=groundAt){
+ // A supplied frustum check alone is conservative: it counts a site behind a block of houses as in view. Given the
+ // camera's position (eye), a site the houses hide from it is out of view too.
+ if(isVisible)return !!isVisible(p)&&!(eye&&Number.isFinite(eye.y)&&hiddenByBuildings(world,eye,p,heightAt));
  // Without a camera callback, conservatively treat the whole unobstructed
  // area as visible. We can still deploy around a building, never in clear view.
  const n=Math.ceil(distance(viewer,p)/1.5);
  for(let i=2;i<n;i++)if((world.cameraBuildings||world.buildings)?.at(viewer.x+(p.x-viewer.x)*i/n,viewer.z+(p.z-viewer.z)*i/n))return false;
  return true;
 }
-export function roadblockVisible(plan,world,viewer,isVisible){
- return [plan.strip.a,plan.strip.b,...plan.cars,...plan.officers].some(p=>visibleFrom(world,viewer,p,isVisible));
+export function roadblockVisible(plan,world,viewer,isVisible,eye=null,heightAt=groundAt){
+ return [plan.strip.a,plan.strip.b,...plan.cars,...plan.officers].some(p=>visibleFrom(world,viewer,p,isVisible,eye,heightAt));
 }
 export function roadblockClear(plan,world,{obstacles=[],heightAt=groundAt}={}){
  const points=stripPoints(plan.strip);
@@ -110,7 +119,7 @@ export function roadblockDistanceAhead(plan,car){
  }
  return remaining;
 }
-export function planRoadblock(world,graph,car,{config=ROADBLOCK,isVisible=null,obstacles=[],heightAt=groundAt}={}){
+export function planRoadblock(world,graph,car,{config=ROADBLOCK,isVisible=null,eye=null,obstacles=[],heightAt=groundAt}={}){
  if(!car)return null;
  const edges=graphEdges(graph),sign=car.speed<0?-1:1,fx=-Math.sin(car.heading)*sign,fz=-Math.cos(car.heading)*sign;
  let nearest=null,best=Infinity;
@@ -135,7 +144,7 @@ export function planRoadblock(world,graph,car,{config=ROADBLOCK,isVisible=null,o
    // Do not span a junction or put the patrol line around a tight bend.
    if(p.forward.x*further.forward.x+p.forward.z*further.forward.z<.97)continue;
    const plan=layout(world,p,p.forward,config,{obstacles,heightAt});
-   if(!plan||roadblockVisible(plan,world,car,isVisible))continue;
+   if(!plan||roadblockVisible(plan,world,car,isVisible,eye,heightAt))continue;
    const road=world.roads.at(p.x,p.z);
    return {...plan,edgeId:edge.id,roadName:road?.name||edge.name||null,distanceAhead:travelled+s-start,route};
   }

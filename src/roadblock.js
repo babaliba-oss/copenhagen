@@ -27,7 +27,7 @@ export const officerLook=(seed,vest=false)=>personLook(9000+seed*13,vest?VEST_LO
 // BUSTED card comes up – while the cuffs are going on; the scene keeps playing behind it.
 export const ARREST={reach:3,run:7,door:.35,pull:[.15,.8],drag:[.8,1.35],down:[1.35,1.65],cuff:[1.65,3.4],up:[3.4,4.2],walk:[4.2,7],card:2.2};
 
-export function createRoadblock(scene,{world,police,carModel,playerLook=null,graph=police.graph,isVisible=null,obstacles=()=>[],onWarning=null,random=Math.random,config={}}){
+export function createRoadblock(scene,{world,police,carModel,playerLook=null,graph=police.graph,isVisible=null,eye=null,obstacles=()=>[],onWarning=null,random=Math.random,config={}}){
  const settings={...ROADBLOCK,...config,arrestCrawl:{...ROADBLOCK.arrestCrawl,...config.arrestCrawl}};
  const group=new THREE.Group();group.name='Police roadblock';scene.add(group);
  const stripGroup=new THREE.Group();stripGroup.name='Spike strip';group.add(stripGroup);
@@ -85,13 +85,13 @@ export function createRoadblock(scene,{world,police,carModel,playerLook=null,gra
   if(pending&&time-warningAt>=settings.warningLead){
    const d=dist(car,pending.centre),ahead=roadblockDistanceAhead(pending,car),safeDistance=Math.max(settings.minDeployDistance,Math.abs(car.speed||0)*2.5);
    if(ahead===null||d<safeDistance||ahead<safeDistance)retry('route-changed');
-   else if(roadblockVisible(pending,world,car,isVisible))retry('in-view');
+   else if(roadblockVisible(pending,world,car,isVisible,eye?.()))retry('in-view'); // eye: the camera's position, so the houses it cannot see through hide a site
    else if(!roadblockClear(pending,world,{obstacles:obstacles()}))retry('occupied');
    else{deploy(pending);pending=null;phase='deployed';lastReason=null;}
   }
   if(phase==='waiting'&&time>=nextAttempt&&Math.abs(car.speed||0)>=settings.minMovingSpeed){
    attempts++;
-   pending=planRoadblock(world,graph,car,{config:settings,isVisible,obstacles:obstacles()});
+   pending=planRoadblock(world,graph,car,{config:settings,isVisible,eye:eye?.(),obstacles:obstacles()});
    if(pending){phase='warning';warningAt=time;onWarning?.(`Police are setting up a spike strip${pending.roadName?' on '+pending.roadName:' ahead'}. Find another route.`);}
    else retry('no-safe-site');
   }

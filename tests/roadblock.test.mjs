@@ -107,6 +107,17 @@ test('a hidden block around a bend remains ahead on the road, while a U-turn can
  assert.ok(roadblockDistanceAhead(plan,{x:100,z:30,heading:Math.PI,speed:10})<plan.distanceAhead,'progress follows the corner');
  assert.equal(roadblockDistanceAhead(plan,{...f.car,heading:Math.PI/2}),null,'heading back up the approach is no longer on the selected route');
 });
+test('houses between the camera and a site round the corner hide it, unless the camera looks over the roofs',()=>{
+ const f=cityFixture();f.graph={nodes:[[-20,0],[100,0],[100,500]],edges:[{from:0,to:1,points:[[-20,0],[100,0]]},{from:1,to:2,points:[[100,0],[100,500]]}]};
+ f.world.roads.at=(x,z)=>x>=-20&&x<=107&&Math.abs(z)<=7||Math.abs(x-100)<=7&&z>=0&&z<=500;
+ const block={height:15};f.world.buildings={at:(x,z)=>x>=20&&x<=92&&z>=12&&z<=600?block:null};
+ const inFrame={isVisible:()=>true,heightAt:()=>0};
+ assert.equal(planRoadblock(f.world,f.graph,f.car,inFrame),null,'frustum alone: in view');
+ const plan=planRoadblock(f.world,f.graph,f.car,{...inFrame,eye:{x:8,y:4,z:0}});assert.ok(plan,'the block of houses hides the side street from a chase camera');
+ assert.ok(plan.centre.z>12);
+ assert.equal(planRoadblock(f.world,f.graph,f.car,{...inFrame,eye:{x:8,y:300,z:0}}),null,'a high camera sees over the roofs');
+ block.height=0;assert.equal(planRoadblock(f.world,f.graph,f.car,{...inFrame,eye:{x:8,y:4,z:0}}),null,'a footprint without a height hides nothing');
+});
 function pursuitFixture(options={}){
  const f=cityFixture(),warnings=[];
  const police={level:0,busted:false,units:[],setParked(cars){this.units=cars.map(p=>({...p,parked:true}));},arrestNow(){this.busted=true;this.level=0;return true;}};
