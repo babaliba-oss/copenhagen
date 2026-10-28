@@ -110,13 +110,14 @@ export function trimDeadEndsAtHouses(roads,houses,{front=3.3,half=1.1,keep=4,ste
 export function dropLateBridges(city,walks,gone,roads=null){
  const ids=new Set(Object.keys(gone||{}));if(!ids.size||!city)return [];const late=[];
  for(const key of ['roads','pavement']){if(!city[key])continue;city[key]=city[key].filter(p=>{if(!ids.has(p.id))return true;late.push(p);return false;});}
- if(late.length&&walks?.edges)dropWalksThroughBuildings(walks,late,{clearance:0});
+ if(late.length&&walks?.edges){const before=new Set(walks.edges);dropWalksThroughBuildings(walks,late,{clearance:0});const after=new Set(walks.edges);dropStranded(walks,[...before].filter(e=>!after.has(e)));} /* and the footway stubs left on the quay (Bryghusbroen: 9 nodes on Christians Brygge) */
  const carried=late.filter(p=>/Ajorata/.test(p.kind||''));if(carried.length&&roads?.edges){const before=new Set(roads.edges);dropWalksThroughBuildings(roads,carried,{clearance:0});const after=new Set(roads.edges);dropStranded(roads,[...before].filter(e=>!after.has(e)));}
  return late;
 }
 // The lanes left cut off by dropped ones (Nyhavnsbroen left a 1 m stub of its ramp, an island of two nodes: the GPS
 // line and the Harbour Run took it as Nyhavn's nearest node and found no way from it): a piece of under `max` nodes
-// that a dropped lane used to join to the rest goes too.
+// that a dropped lane used to join to the rest goes too (Holmen's 39 nodes of lanes with Værftsbroen, 1860-70: the naval
+// yard was reached by ferry, so no coach goes there).
 function dropStranded(g,dropped,max=40){
  if(!dropped.length)return;const adj=new Map(),link=(a,b)=>{let l=adj.get(a);if(!l)adj.set(a,l=[]);l.push(b);};for(const e of g.edges){link(e.from,e.to);link(e.to,e.from);}
  const gone=new Set();for(const e of dropped)for(const s of [e.from,e.to]){if(gone.has(s)||!adj.has(s))continue;const seen=new Set([s]),q=[s];while(q.length&&seen.size<max){for(const w of adj.get(q.pop())||[])if(!seen.has(w)){seen.add(w);q.push(w);}}if(seen.size<max)for(const v of seen)gone.add(v);}

@@ -60,12 +60,13 @@ test('1760: the bridges listed as built later are left out, with the footways an
  for(const [id,why] of Object.entries(gone))assert.ok(typeof why==='string'&&why.length>10,`${id} has a reason`);
  const city=expandCity(JSON.parse(zlib.gunzipSync(fs.readFileSync('public/cities/copenhagen-1760/city.pack')))),{walks,roads}=expandMobility(JSON.parse(fs.readFileSync('public/cities/copenhagen-1760/mobility.json','utf8'))),n=walks.edges.length,m=roads.edges.length;
  const late=dropLateBridges(city,walks,gone,roads);assert.equal(late.length,Object.keys(gone).length,'every id is in the 1760 data');
- assert.ok(late.every(p=>/\(Silta\)/.test(p.kind)),'only bridges');assert.ok(walks.edges.length<n,'the footways across them go');
- assert.deepEqual(late.filter(p=>/Ajorata/.test(p.kind)).map(p=>p.name),['Nyhavnsbroen'],'one carriage bridge: Nyhavn\'s, 1874');
+ {const silta=late.filter(p=>/\(Silta\)/.test(p.kind)),touch=(p,q)=>p.bbox[0]<=q.bbox[2]+3&&q.bbox[0]<=p.bbox[2]+3&&p.bbox[1]<=q.bbox[3]+3&&q.bbox[1]<=p.bbox[3]+3;assert.ok(late.every(p=>silta.includes(p)||silta.some(q=>touch(p,q))),'only bridges, and the untagged footways, cycle track and island lying on them');}assert.ok(walks.edges.length<n,'the footways across them go');
+ assert.deepEqual([...new Set(late.filter(p=>/Ajorata/.test(p.kind)).map(p=>p.name))].sort(),['Bryghusbroen','Børsbroen','Christian D. IV\'s Bro','Danneskiold-Samsøes Allé','Nyhavnsbroen'],'carriage bridges: Nyhavn 1874, Bryghusbroen 1935, Børsbroen 1880, Christian IV\'s 1961, Værftsbroen to Holmen 1860-70');
  assert.ok(roads.edges.length<m&&!roads.edges.some(e=>e.points.some(([x,z])=>x>950&&x<975&&z<30)&&e.points.some(([x,z])=>x>950&&x<975&&z>50)),'no lane crosses the mouth of Nyhavn');
  {const adj=new Map();for(const e of roads.edges)for(const [a,b] of [[e.from,e.to],[e.to,e.from]])(adj.get(a)||adj.set(a,[]).get(a)).push(b);const s=roads.edges[0].from,seen=new Set([s]),q=[s];while(q.length)for(const w of adj.get(q.pop()))if(!seen.has(w)){seen.add(w);q.push(w);}
   assert.equal(seen.size,adj.size,'no stub of a dropped bridge is left as an island of lanes (the Harbour Run started from one and was never planned)');}
  assert.ok(![...city.roads,...city.pavement].some(p=>p.id in gone));
+ assert.ok(!roads.edges.some(e=>e.points.some(([x,z])=>x>1550&&z<95&&z>-300)),'no coach on Holmen: no land link before 1860');assert.ok(roads.edges.some(e=>e.points.some(([x,z])=>x>640&&x<690&&z>520&&z<565)&&e.points.some(([x,z])=>x>720&&x<770&&z>600&&z<650)),'Knippelsbro still carries the coaches');
  assert.ok(city.pavement.some(p=>p.name==='Ved Norgesporten')&&city.pavement.some(p=>p.name==='Grønne Bro'),'the citadel\'s Norway Gate and Rosenborg\'s bridge stay');
 });
 
