@@ -16,6 +16,7 @@ const TRAFFIC_CELLS=256,trafficCell=(gx,gz)=>(Math.imul(gx,73856093)^Math.imul(g
 import {mergeGraph} from './graph-extension.js';
 import {inWaterPolygons} from './geo.js';
 export const TRAFFIC_MAX_SPEED=50/3.6;
+export const FIT_WARM={r:480,move:40,ms:.4};
 export const nearStation=p=>hypot(p.x+620,p.z+45)<430;
 export const inStationTrafficArea=p=>p.x>-885&&p.x<-440&&p.z>-145&&p.z<55;
 export function prepareGraph(graph){
@@ -351,6 +352,13 @@ export class Mobility {
  // An edge whose lane runs off the mapped carriageway somewhere would stop a car there for good: route
  // around it when there is a choice. Checked once per edge, when a car first considers it.
  fits(e){if(e.fits===undefined){e.fits=true;for(let s=Math.min(1,e.length/2);s<e.length;s+=2)if(!vehicleFitsRoad(routePoint(e,s),this.world)){e.fits=false;break;}}return e.fits;}
+ // fits() is worked out the first time a car or a spawn looks at an edge (vehicleFitsRoad every 2 m): driving into a part of
+ // town not seen yet, spawnCandidates' trap() test on the new edges within 320 m took 5-30 ms in one step. The edges within
+ // FIT_WARM.r of the player are worked out ahead, at most FIT_WARM.ms a step (the same answers, only earlier).
+ warmFits(player){
+  const t=performance.now(),at=this._fitAt;if(!at||hypot(at.x-player.x,at.z-player.z)>FIT_WARM.move){this._fitAt={x:player.x,z:player.z};this._fitQueue=this.edgesNear(this.roads,player,FIT_WARM.r).filter(e=>e.fits===undefined);}
+  const q=this._fitQueue;while(q.length&&performance.now()-t<FIT_WARM.ms)this.fits(q.pop());
+ }
  trap(e,depth){
   if(!this.fits(e))return true;if(!depth)return false;
   const key=depth*1e6+e.id;this.traps??=new Map();if(this.traps.has(key))return this.traps.get(key);
@@ -522,7 +530,7 @@ export class Mobility {
   // Walkers by 1.5 m cell in a fixed hash table (no garbage), for walkGap.
   {const head=this._walkHead||(this._walkHead=new Int32Array(WALK_CELLS)),chain=this._walkNext?.length>=this.people.length?this._walkNext:(this._walkNext=new Int32Array(this.people.length));head.fill(-1);
   for(let i=0;i<this.people.length;i++){const p=this.people[i];if(!p.edge||p.knockdown)continue;const h=walkCell(Math.floor(p.x/1.5),Math.floor(p.z/1.5));chain[i]=head[h];head[h]=i;}}
-  const tramList=this.trams?.trams||[];this.updateParked();
+  const tramList=this.trams?.trams||[];this.updateParked();this.warmFits(player);
   const undo=(a,oldS,oldEdge,oldPrev,by)=>{if(a.edge!==oldEdge){a.plan?.unshift(a.edge);a.prevDir=oldPrev;}a.s=oldS;a.edge=oldEdge;a.speed=0;a.waiting=(a.waiting||0)+dt;a.stuck=(a.stuck||0)+dt;if(!a.walking){a.hold=by?'contact':'road';a.holdBy=by;}};
   const nCars=this.cars.length,nAgents=nCars+this.people.length;
   for(let ai=0;ai<nAgents;ai++){const a=ai<nCars?this.cars[ai]:this.people[ai-nCars];
