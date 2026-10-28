@@ -220,3 +220,12 @@ test('the repeat bonus expires and a fresh pursuit starts without old incident h
  escaped.report('vehicle','a',9);assert.equal(escaped.heat,6,'escape clears the combo and contact history');
  escaped.reset();escaped.report('vehicle','a',9);assert.equal(escaped.heat,6,'restart also clears it');
 });
+test('a unit whose road route to the player is longer than the route field\'s reach keeps driving on a coarse field instead of standing at the end of its street',()=>{
+ /* a one-way loop: the unit 100 m from the player as the crow flies, 3.75 km away by road */
+ const g=prepareGraph({nodes:[[100,100],[100,0],[100,-1800],[0,-1800],[0,0],[0,100]],edges:[[0,1],[1,2],[2,3],[3,4],[4,5]].map(([from,to],i,a)=>({from,to,lane:0,points:[[100,100],[100,0],[100,-1800],[0,-1800],[0,0],[0,100]].slice(from,to+1)}))});
+ const p=new PoliceSimulation(g,world),car={x:0,z:50,heading:0,speed:0};p.escalate({level:3});p.dispatch=1e9;p.plan(car);
+ const start=g.edges[0];assert.ok(!Number.isFinite(p.costs[start.to]),'out of the ordinary field\'s reach');
+ const unit=p.newUnit({edge:start,s:50,x:100,z:50,heading:0},'chase',false);p.units=[unit];
+ for(let i=0;i<5*30;i++)p.step(1/30,car);
+ assert.notEqual(unit.edge,start,'it drove on past the end of its street');assert.ok(unit.z<-40&&unit.speed>5,`on its way round (z ${unit.z.toFixed(0)}, ${unit.speed.toFixed(1)} m/s)`);
+});

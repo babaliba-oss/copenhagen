@@ -49,6 +49,9 @@ export const heatForLevel=level=>[0,3,6,10,16,24][Math.max(0,Math.min(5,Math.rou
 // away out of the player's view – behind them or behind a building.
 // Route field reach in metres of road (units are retired 450 m out; spawn and backup points are well inside).
 export const ROUTE_REACH=1500;
+// Units whose route is longer than that follow a field of up to FAR_REACH m (every spot within 450 m of the player is
+// within 6 km by road in today's Copenhagen), searched only as far as the unit needing it (farField).
+export const FAR_REACH=6000,FAR_EVERY=5;
 export const SURGE={spawn:[60,110],dispatch:.7,minUnits:3,bustTime:2,arrestRange:40,sight:220,escapeScale:3,cruise:6,duration:40,backupAfter:2,backupSpawn:[26,42]};
 export const BUST_TIME=4;
 // Hands-on arrest, everywhere: a unit physically at the car (centre to centre
@@ -115,9 +118,9 @@ export class PoliceSimulation{
  refreshGraph(){this.grid=null;
   this.incoming=Array.from({length:this.graph.nodes.length},()=>[]);
   for(const e of this.graph.edges)this.incoming[e.to].push(e);
-  this.costs=[];this.target=null;this.intercept=null;this.predicted=null;this.repath=0;
+  this.costs=[];this.target=null;this.far=null;this.intercept=null;this.predicted=null;this.repath=0;
  }
- reset(){this.time=0;this.heat=0;this.units=[];this.contacts=new Map();this.recentIncidents=[];this.recklessSeconds=0;this.recklessAt=-Infinity;this.blocked=new Map();this.escape=0;this.bust=0;this.contact=0;this.stopped=0;this.backupAt=-Infinity;this.grace=0;this.repath=0;this.dispatch=0;this.costs=[];this.target=null;this.message=null;this.serial=0;this.busted=false;this.lastSeen=null;this.seen=false;this.intercept=null;this.predicted=null;this.pressure=false;this.surgeUntil=-Infinity;this.minUnits=0;this.sighted=false;this.contactBy=0;this.contactPlanned=false;this.footBy=0;this.units=[...(this.parked||[])];}
+ reset(){this.time=0;this.heat=0;this.units=[];this.contacts=new Map();this.recentIncidents=[];this.recklessSeconds=0;this.recklessAt=-Infinity;this.blocked=new Map();this.escape=0;this.bust=0;this.contact=0;this.stopped=0;this.backupAt=-Infinity;this.grace=0;this.repath=0;this.dispatch=0;this.costs=[];this.target=null;this.far=null;this.farAt=0;this.message=null;this.serial=0;this.busted=false;this.lastSeen=null;this.seen=false;this.intercept=null;this.predicted=null;this.pressure=false;this.surgeUntil=-Infinity;this.minUnits=0;this.sighted=false;this.contactBy=0;this.contactPlanned=false;this.footBy=0;this.units=[...(this.parked||[])];}
  // A pursuit starting from no stars: nobody has seen the player yet and no unit is on its way (see CONTACT).
  startContact(){this.sighted=false;this.contactBy=this.time+CONTACT.fallback;this.contactPlanned=false;}
  get contactMade(){return this.sighted||this.time>=this.contactBy;}
@@ -214,13 +217,22 @@ export class PoliceSimulation{
   // Long harbour edges can be hundreds of metres: the coarse graph search
   // alone stops a patrol 10–15 m short of the actual car. Refine its stop point.
   if(target){const {edge,s:centre}=target,radius=Math.max(5,edge.length/12);for(let s=Math.max(0,centre-radius);s<=Math.min(edge.length,centre+radius);s+=.5){const p=routePoint(edge,s,edge.lane,undefined,undefined,c),d=distance(p,player);if(d<nearest&&vehicleFitsRoad(p,this.world)){nearest=d;target={edge,s};}}}
+  return this.search(target,ROUTE_REACH); /* units live within 450 m of the player: the rest of the city is never driven */
+ }
+ search(target,reach,goal=-1){
   const costs=new Float64Array(this.graph.nodes.length).fill(Infinity),field={target,costs};if(!target)return field;
   const {edge,s}=target;costs[edge.from]=s;heapSize=0;push(s,edge.from);
-  while(heapSize){const cost=pop(),node=popped;if(cost!==costs[node])continue;if(cost>ROUTE_REACH)break; /* units live within 450 m of the player: the rest of the city is never driven */
+  while(heapSize){const cost=pop(),node=popped;if(cost!==costs[node])continue;if(cost>reach||node===goal)break; /* goal: every cost set so far leads down a real route to the target */
    for(const e of this.incoming[node]){if((this.blocked.get(e.id)||0)>this.time)continue;const next=cost+e.length;if(next<costs[e.from]){costs[e.from]=next;push(next,e.from);}}
   }
   return field;
  }
+ // A unit whose road route to the target is longer than ROUTE_REACH (the harbour, a canal, a one-way maze or an edge blocked
+ // by a stuck unit between it and a player 85-450 m away) found no next edge and stood still until it was retired (3.5% of
+ // the road spots a unit can stand on 85-450 m from a player in today's Copenhagen). It follows a coarse field instead: the
+ // same search from the chase target, out to the unit (FAR_REACH at most), run again when it has no route for a unit or is
+ // FAR_EVERY s old (it lags the target by up to that; the unit takes the ordinary field once back within reach).
+ farField(unit){const f=this.far,goal=unit.edge.to,old=!f||this.time>=this.farAt;if(old||!Number.isFinite(f.costs[goal])&&!f.tried.has(goal)){const tried=old?new Set():f.tried;tried.add(goal);this.far=this.search(this.target,FAR_REACH,goal);this.far.tried=tried;if(old)this.farAt=this.time+FAR_EVERY;}return this.far;} // tried: goals searched for since the last fresh run (one with no route at all is not searched again every frame)
  spawn(player,traffic){
   if(!this.target)return;
   const candidates=[],role=this.units.length%2?'intercept':'chase',surge=this.surging,[near,far]=surge?SURGE.spawn:[65,150];
@@ -273,7 +285,7 @@ export class PoliceSimulation{
   return best;
  }
  // Interceptors only cut ahead of a player who is visibly driving away.
- fieldFor(unit){return unit.role==='intercept'&&this.intercept?.target?this.intercept:this;}
+ fieldFor(unit){const f=unit.role==='intercept'&&this.intercept?.target?this.intercept:this,on=g=>!!g.costs&&(unit.edge===g.target?.edge||Number.isFinite(g.costs[unit.edge.to]));return on(f)?f:on(this)||!this.target?this:this.farField(unit);}
  clearSight(a,b){
   // At high wanted levels, platform furniture does not hide a car from units
   // in the adjacent lane. Real buildings still block the line of sight.
