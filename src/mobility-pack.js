@@ -3,6 +3,7 @@
 // coordinates in centimetres, one array per edge field, crossings as a list of edge indices, and each edge's
 // inner points as centimetre deltas, or -1-i when it runs back along edge i. Copenhagen: 20.7 MB of JSON to
 // 5.3 MB (3.3 MB to 1.6 MB compressed). expandMobility accepts either form.
+import polygonClipping from 'polygon-clipping';
 const FIELDS='crossing from lane length points signal to'.split(' ');
 const cm=v=>Math.round(v*100);
 
@@ -112,7 +113,69 @@ export function dropLateBridges(city,walks,gone,roads=null){
  for(const key of ['roads','pavement']){if(!city[key])continue;city[key]=city[key].filter(p=>{if(!ids.has(p.id))return true;late.push(p);return false;});}
  if(late.length&&walks?.edges){const before=new Set(walks.edges);dropWalksThroughBuildings(walks,late,{clearance:0});const after=new Set(walks.edges);dropStranded(walks,[...before].filter(e=>!after.has(e)));} /* and the footway stubs left on the quay (Bryghusbroen: 9 nodes on Christians Brygge) */
  const carried=late.filter(p=>/Ajorata/.test(p.kind||''));if(carried.length&&roads?.edges){const before=new Set(roads.edges);dropWalksThroughBuildings(roads,carried,{clearance:0});const after=new Set(roads.edges);dropStranded(roads,[...before].filter(e=>!after.has(e)));}
+ clipToDryGround(city,walks,roads,late);
  return late;
+}
+// Whether two polygons ({rings, bbox}) share any area (even-odd over every ring): a vertex of one inside the other, or two
+// edges crossing. Cheap next to the clipping it saves.
+function overlaps(p,q){
+ const inside=(x,z,rings)=>{let c=false;for(const r of rings)for(let i=0,k=r.length-1;i<r.length;k=i++){const a=r[i],b=r[k];if((a[1]>z)!==(b[1]>z)&&x<(b[0]-a[0])*(z-a[1])/(b[1]-a[1])+a[0])c=!c;}return c;};
+ const [x0,z0,x1,z1]=p.bbox,inBox=([x,z])=>x>=x0&&x<=x1&&z>=z0&&z<=z1;
+ for(const r of p.rings)for(const v of r)if(inside(v[0],v[1],q.rings))return true;
+ for(const r of q.rings)for(const v of r)if(inBox(v)&&inside(v[0],v[1],p.rings))return true;
+ const cross=(a,b,c,d)=>{const o=(p,q,r)=>(q[0]-p[0])*(r[1]-p[1])-(q[1]-p[1])*(r[0]-p[0]);return o(a,b,c)*o(a,b,d)<0&&o(c,d,a)*o(c,d,b)<0;};
+ for(const s of q.rings)for(let j=1;j<s.length;j++){const c=s[j-1],d=s[j];if(Math.max(c[0],d[0])<x0||Math.min(c[0],d[0])>x1||Math.max(c[1],d[1])<z0||Math.min(c[1],d[1])>z1)continue;for(const r of p.rings)for(let i=1;i<r.length;i++)if(cross(r[i-1],r[i],c,d))return true;}
+ return false;
+}
+// A closed ring cut to a box [x0,z0,x1,z1] grown by a metre (Sutherland-Hodgman, one side at a time); closed again.
+function toBox(ring,[x0,z0,x1,z1]){
+ let r=ring.slice(0,-1);x0-=1;z0-=1;x1+=1;z1+=1;
+ for(const [k,v,keepAbove] of [[0,x0,true],[0,x1,false],[1,z0,true],[1,z1,false]]){if(!r.length)break;const ins=p=>keepAbove?p[k]>=v:p[k]<=v,out=[];
+  for(let i=0;i<r.length;i++){const a=r[i],b=r[(i+1)%r.length],ia=ins(a),ib=ins(b);if(ia)out.push(a);if(ia!==ib){const t=(v-a[k])/(b[k]-a[k]),q=[a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t];q[k]=v;out.push(q);}}r=out;}
+ return r.length?[...r,r[0]]:[];
+}
+// Paving left over the water once the era's bridges are settled, cut back to the dry ground (in place): the short
+// ramps mapped under a dropped bridge's name (Nyhavnsbroen's and Børsbroen's, about 15 m² each over the harbour, drew a
+// deck plate sticking out from the quay; dropping them whole took Nyhavn's and Børsgade's quay lanes too). A bridge
+// tagged as one (Silta) stands as mapped. The lanes and footway edges running over the cut-off parts are cut back to
+// the shore, and the stubs they strand go. Returns the number of polygons cut.
+function clipToDryGround(city,walks,roads,late){
+ const water=city?.water||[];if(!water.length)return 0;const silta=p=>/silta/i.test(p.kind||''),hit=(a,b)=>a[0]<=b[2]&&b[0]<=a[2]&&a[1]<=b[3]&&b[1]<=a[3];
+ const names=new Set(late.filter(p=>silta(p)&&p.name).map(p=>p.name)),decks=[...(city.roads||[]),...(city.pavement||[])].filter(silta);
+ const area=m=>{let s=0;for(const poly of m)poly.forEach((r,i)=>{let a=0;for(let k=0;k<r.length-1;k++)a+=r[k][0]*r[k+1][1]-r[k+1][0]*r[k][1];s+=(i?-1:1)*Math.abs(a/2);});return s;};
+ const round=poly=>poly.map(r=>r.map(([x,z])=>[+x.toFixed(2),+z.toFixed(2)])),box=poly=>poly[0].reduce((b,[x,z])=>[Math.min(b[0],x),Math.min(b[1],z),Math.max(b[2],x),Math.max(b[3],z)],[Infinity,Infinity,-Infinity,-Infinity]);
+ const wet=[];let cut=0;
+ for(const key of ['roads','pavement']){if(!city[key])continue;const out=[];
+  for(const p of city[key]){if(silta(p)||!(p.rings?.[0]?.length>2)||!p.bbox){out.push(p);continue;}
+   if(!names.has(p.name)){out.push(p);continue;}
+   const ws=water.filter(w=>w.rings?.[0]?.length>2&&hit(w.bbox,p.bbox)).map(w=>({rings:w.rings.map(r=>toBox(r,p.bbox)).filter(r=>r.length>3)})).filter(w=>w.rings.length&&overlaps(p,w));if(!ws.length){out.push(p);continue;} /* the water cut to the polygon's box first: the sea's 1400 vertices around each quay street were most of a second */
+   let off,dry;try{off=polygonClipping.intersection(p.rings,polygonClipping.union(...ws.map(w=>w.rings)));if(area(off)<.5){out.push(p);continue;}dry=polygonClipping.difference(p.rings,...ws.map(w=>w.rings));}catch{out.push(p);continue;}
+   cut++;for(const poly of dry){if(area([poly])<.5)continue;const rings=round(poly);out.push({...p,rings,bbox:box(rings)});} /* each dry piece keeps the polygon's id and kind */
+   const on=decks.filter(d=>hit(d.bbox,p.bbox));if(on.length)try{off=polygonClipping.difference(off,...on.map(d=>d.rings));}catch{} /* not where a standing bridge's deck covers it */
+   for(const poly of off)if(area([poly])>=.5)wet.push({rings:poly});}
+  city[key]=out;}
+ if(wet.length)for(const g of [walks,roads])if(g?.edges)dropStranded(g,trimThrough(g,wet));
+ return cut;
+}
+// Edges running at least `run` metres through `polys` ({rings}) are cut back to their dry ends (in place): the piece
+// up to where the line first enters, and the one from where it last leaves, each to a new dead-end node shared by the
+// edge and its way back, so the land part of a way crossing the water stays.
+// A piece under a metre goes. Returns the edges cut.
+function trimThrough(g,polys,{run=1,res=.5}={}){
+ const boxes=polys.map(p=>p.rings[0].reduce((b,[x,z])=>[Math.min(b[0],x),Math.min(b[1],z),Math.max(b[2],x),Math.max(b[3],z)],[Infinity,Infinity,-Infinity,-Infinity]));
+ const inside=(x,z,rings)=>{let c=false;for(const r of rings)for(let i=0,k=r.length-1;i<r.length;k=i++){const a=r[i],b=r[k];if((a[1]>z)!==(b[1]>z)&&x<(b[0]-a[0])*(z-a[1])/(b[1]-a[1])+a[0])c=!c;}return c;};
+ const wet=(x,z)=>polys.some((p,i)=>{const b=boxes[i];return x>=b[0]&&x<=b[2]&&z>=b[1]&&z<=b[3]&&inside(x,z,p.rings);});
+ const added=[],node=(x,z)=>{for(const [n,ax,az] of added)if(Math.hypot(ax-x,az-z)<.3)return n;const n=g.nodes.length;g.nodes.push([x,z]);added.push([n,x,z]);return n;};
+ const len=P=>{let l=0;for(let i=1;i<P.length;i++)l+=Math.hypot(P[i][0]-P[i-1][0],P[i][1]-P[i-1][1]);return l;};
+ const cut=[],out=[];
+ for(const e of g.edges){const P=e.points;if(e.crossing||!(P?.length>1)||!boxes.some(b=>P.some((p,i)=>i&&Math.max(p[0],P[i-1][0])>=b[0]&&Math.min(p[0],P[i-1][0])<=b[2]&&Math.max(p[1],P[i-1][1])>=b[1]&&Math.min(p[1],P[i-1][1])<=b[3]))){out.push(e);continue;} /* no segment's box meets the water's */
+  const S=[];for(let i=1;i<P.length;i++){const a=P[i-1],b=P[i],l=Math.hypot(b[0]-a[0],b[1]-a[1]),k=Math.max(1,Math.ceil(l/res));for(let j=i===1?0:1;j<=k;j++){const x=a[0]+(b[0]-a[0])*j/k,z=a[1]+(b[1]-a[1])*j/k;S.push({i,x,z,w:wet(x,z)});}}
+  let longest=0,cur=0;for(let k=1;k<S.length;k++){cur=S[k].w&&S[k-1].w?cur+Math.hypot(S[k].x-S[k-1].x,S[k].z-S[k-1].z):0;longest=Math.max(longest,cur);}if(longest<run){out.push(e);continue;}
+  cut.push(e);const first=S.findIndex(s=>s.w),last=S.findLastIndex(s=>s.w);
+  const edge=(a,b)=>{const lo=a,hi=b;for(let n=0;n<12;n++){const m={x:(a.x+b.x)/2,z:(a.z+b.z)/2};if(wet(m.x,m.z)===lo.w)a={...m,w:lo.w};else b={...m,w:hi.w};}return [+((a.x+b.x)/2).toFixed(2),+((a.z+b.z)/2).toFixed(2)];}; /* the shore between a dry and a wet sample, to a centimetre */
+  if(first>0){const q=edge(S[first-1],S[first]),pts=[...P.slice(0,S[first-1].i),[S[first-1].x,S[first-1].z],q].filter((p,k,A)=>!k||Math.hypot(p[0]-A[k-1][0],p[1]-A[k-1][1])>.01),l=len(pts);if(l>=1)out.push({...e,to:node(q[0],q[1]),points:pts,length:l});}
+  if(last<S.length-1){const q=edge(S[last+1],S[last]),pts=[q,[S[last+1].x,S[last+1].z],...P.slice(S[last+1].i)].filter((p,k,A)=>!k||Math.hypot(p[0]-A[k-1][0],p[1]-A[k-1][1])>.01),l=len(pts);if(l>=1)out.push({...e,from:node(q[0],q[1]),points:pts,length:l});}}
+ g.edges=out;return cut;
 }
 // The lanes left cut off by dropped ones (Nyhavnsbroen left a 1 m stub of its ramp, an island of two nodes: the GPS
 // line and the Harbour Run took it as Nyhavn's nearest node and found no way from it): a piece of under `max` nodes
