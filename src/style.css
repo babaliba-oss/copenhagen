@@ -113,6 +113,9 @@ body.framed canvas{position:absolute;left:0;top:0}
 
 /* Arrest scene still playing (src/roadblock.js): the card comes up over the cuffing, so keep the street visible behind it. */
 #busted-overlay.live{background:linear-gradient(180deg,transparent 0%,#0f1a2233 35%,#0f1a22c4 80%);backdrop-filter:none}
+/* With the street showing through, a bright scene (daylight facades, sky) left the panels' grey labels at 1.2:1 and the white values at 2.2:1: the panels get their own dark ground (4.7:1 and 8.3:1 over the same scene), and the lines above and below them a shadow. */
+#busted-overlay.live .end-panel{background:#0f1a22a6}
+#busted-overlay.live :is(.end-card>.eyebrow,.end-subtitle,.end-note){text-shadow:0 1px 3px #000c,0 0 12px #0009}
 
 /* Invitation to extend the map, shown when the car reaches the playable edge. */
 .edge-invite{position:absolute;left:50%;top:84px;transform:translateX(-50%);z-index:20;display:flex;flex-direction:column;gap:6px;max-width:360px;padding:16px 40px 16px 18px;border-radius:14px;background:#f7f4ecf2;color:#24332e;box-shadow:0 10px 30px #0003;font-size:14px}
