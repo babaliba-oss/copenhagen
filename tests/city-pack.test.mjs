@@ -70,17 +70,22 @@ test('1760: the bridges listed as built later are left out, with the footways an
  assert.ok(city.pavement.some(p=>p.name==='Ved Norgesporten')&&city.pavement.some(p=>p.name==='Grønne Bro'),'the citadel\'s Norway Gate and Rosenborg\'s bridge stay');
 });
 
-test('1760: a dropped bridge\'s ramps are cut to the dry ground; their land parts and the quay lanes over them stay',async()=>{
+test('1760: a dropped bridge\'s ramps and today\'s footways over the moat are cut to the dry ground; their land parts, the quay lanes and the footway ends stay',async()=>{
  const zlib=await import('node:zlib'),{default:pc}=await import('polygon-clipping'),{dropLateBridges}=await import('../src/mobility-pack.js');
  const era=JSON.parse(fs.readFileSync('public/cities/copenhagen-1760/era.json','utf8')),city=expandCity(JSON.parse(zlib.gunzipSync(fs.readFileSync('public/cities/copenhagen-1760/city.pack')))),{walks,roads}=expandMobility(JSON.parse(fs.readFileSync('public/cities/copenhagen-1760/mobility.json','utf8')));
  const area=m=>{let s=0;for(const poly of m)poly.forEach((r,i)=>{let a=0;for(let k=0;k<r.length-1;k++)a+=r[k][0]*r[k+1][1]-r[k+1][0]*r[k][1];s+=(i?-1:1)*Math.abs(a/2);});return s;},hit=(a,b)=>a[0]<=b[2]&&b[0]<=a[2]&&a[1]<=b[3]&&b[1]<=a[3];
- const ids=['1132467848','1132467849','1113367435','1111604188'].map(i=>'osm-way-'+i),of=id=>[...city.roads,...city.pavement].filter(p=>p.id===id),wet=p=>{const ws=city.water.filter(w=>hit(w.bbox,p.bbox));return ws.length?area(pc.intersection(p.rings,pc.union(...ws.map(w=>w.rings)))):0;};
+ const ids=['1132467848','1132467849','1113367435','1111604188','1071978423','1240985221'].map(i=>'osm-way-'+i),of=id=>[...city.roads,...city.pavement].filter(p=>p.id===id),wet=p=>{const ws=city.water.filter(w=>hit(w.bbox,p.bbox));return ws.length?area(pc.intersection(p.rings,pc.union(...ws.map(w=>w.rings)))):0;};
  const before=new Map(ids.map(id=>[id,of(id).reduce((s,p)=>s+area([p.rings]),0)]));for(const id of ids)assert.ok(of(id).reduce((s,p)=>s+wet(p),0)>14,`${id} reaches over the water as mapped`);
+ const len=e=>e.points.reduce((s,p,i,a)=>i?s+Math.hypot(p[0]-a[i-1][0],p[1]-a[i-1][1]):0,0),box=e=>e.points.some(([x,z])=>x>780&&x<1000&&z>-1250&&z<-950),walkM=walks.edges.filter(box).reduce((s,e)=>s+len(e),0);
  dropLateBridges(city,walks,era.lateBridges,roads);
  for(const id of ids){const ps=of(id);assert.ok(ps.length,`${id} keeps its land part`);assert.ok(ps.reduce((s,p)=>s+wet(p),0)<.5,`${id}: nothing over the water`);const kept=ps.reduce((s,p)=>s+area([p.rings]),0);assert.ok(kept>before.get(id)*.5&&kept<before.get(id)-10,`${id}: the dry part stays (${kept.toFixed(0)} of ${before.get(id).toFixed(0)} m²)`);}
- {const {pointInPolygon}=await import('../src/geo.js');for(const id of ids)assert.ok(roads.edges.some(e=>e.points.some((q,i,a)=>i&&[0,.5].some(t=>of(id).some(p=>pointInPolygon(a[i-1][0]+(q[0]-a[i-1][0])*t,a[i-1][1]+(q[1]-a[i-1][1])*t,p.rings))))),`${id}: the quay lane over the ramp's dry part stays`);}
+ assert.equal(of('osm-way-1071978423').length,2,'the Churchillparken footway in two pieces, one either side of the moat');
+ const {pointInPolygon}=await import('../src/geo.js');for(const id of ids.slice(0,4))assert.ok(roads.edges.some(e=>e.points.some((q,i,a)=>i&&[0,.5].some(t=>of(id).some(p=>pointInPolygon(a[i-1][0]+(q[0]-a[i-1][0])*t,a[i-1][1]+(q[1]-a[i-1][1])*t,p.rings))))),`${id}: the quay lane over the ramp's dry part stays`);
+ const moat=city.water.filter(w=>/^osm-way--5/.test(w.id)),over=walks.edges.filter(e=>e.points.some((p,i,a)=>i&&[.25,.5,.75].some(t=>{const x=a[i-1][0]+(p[0]-a[i-1][0])*t,z=a[i-1][1]+(p[1]-a[i-1][1])*t;return moat.some(w=>hit(w.bbox,[x,z,x,z])&&pointInPolygon(x,z,w.rings));})));
+ assert.deepEqual(over,[],'no footway edge over the moat');const after=walks.edges.filter(box).reduce((s,e)=>s+len(e),0);assert.ok(walkM-after>200&&walkM-after<300,`only the stretches over the moat go, the land parts stay walkable (${(walkM-after).toFixed(0)} m of footway edges gone by Nyboder)`);
  for(const e of walks.edges)assert.ok(walks.nodes[e.from]&&walks.nodes[e.to],'every edge ends at a node');
 });
+
 
 test('a road dead end at a house is cut back until a coach standing at it is clear of the wall; a short one goes with its way back',async()=>{
  const {trimDeadEndsAtHouses}=await import('../src/mobility-pack.js'),{SpatialIndex}=await import('../src/geo.js');

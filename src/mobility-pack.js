@@ -136,19 +136,21 @@ function toBox(ring,[x0,z0,x1,z1]){
 }
 // Paving left over the water once the era's bridges are settled, cut back to the dry ground (in place): the short
 // ramps mapped under a dropped bridge's name (Nyhavnsbroen's and Børsbroen's, about 15 m² each over the harbour, drew a
-// deck plate sticking out from the quay; dropping them whole took Nyhavn's and Børsgade's quay lanes too). A bridge
-// tagged as one (Silta) stands as mapped. The lanes and footway edges running over the cut-off parts are cut back to
-// the shore, and the stubs they strand go. Returns the number of polygons cut.
+// deck plate sticking out from the quay; dropping them whole took Nyhavn's and Børsgade's quay lanes too), and today's
+// paving that crosses water only the era has (water drawn for the era: a generated id, negative, not the sea; 1760's
+// moat west of Kastellet under the Nyboder and Churchillparken footways, drawn as decks over it). A bridge tagged as one
+// (Silta) stands as mapped. The lanes and footway edges running over the cut-off parts are cut back to the shore, and
+// the stubs they strand go. Returns the number of polygons cut.
+const eraWater=w=>/^osm-(way|relation)--\d+$/.test(w.id||'')&&w.kind!=='sea';
 function clipToDryGround(city,walks,roads,late){
  const water=city?.water||[];if(!water.length)return 0;const silta=p=>/silta/i.test(p.kind||''),hit=(a,b)=>a[0]<=b[2]&&b[0]<=a[2]&&a[1]<=b[3]&&b[1]<=a[3];
- const names=new Set(late.filter(p=>silta(p)&&p.name).map(p=>p.name)),decks=[...(city.roads||[]),...(city.pavement||[])].filter(silta);
+ const names=new Set(late.filter(p=>silta(p)&&p.name).map(p=>p.name)),era=water.filter(eraWater),decks=[...(city.roads||[]),...(city.pavement||[])].filter(silta);
  const area=m=>{let s=0;for(const poly of m)poly.forEach((r,i)=>{let a=0;for(let k=0;k<r.length-1;k++)a+=r[k][0]*r[k+1][1]-r[k+1][0]*r[k][1];s+=(i?-1:1)*Math.abs(a/2);});return s;};
  const round=poly=>poly.map(r=>r.map(([x,z])=>[+x.toFixed(2),+z.toFixed(2)])),box=poly=>poly[0].reduce((b,[x,z])=>[Math.min(b[0],x),Math.min(b[1],z),Math.max(b[2],x),Math.max(b[3],z)],[Infinity,Infinity,-Infinity,-Infinity]);
  const wet=[];let cut=0;
  for(const key of ['roads','pavement']){if(!city[key])continue;const out=[];
-  for(const p of city[key]){if(silta(p)||!(p.rings?.[0]?.length>2)||!p.bbox){out.push(p);continue;}
-   if(!names.has(p.name)){out.push(p);continue;}
-   const ws=water.filter(w=>w.rings?.[0]?.length>2&&hit(w.bbox,p.bbox)).map(w=>({rings:w.rings.map(r=>toBox(r,p.bbox)).filter(r=>r.length>3)})).filter(w=>w.rings.length&&overlaps(p,w));if(!ws.length){out.push(p);continue;} /* the water cut to the polygon's box first: the sea's 1400 vertices around each quay street were most of a second */
+  for(const p of city[key]){if(silta(p)||/--\d+$/.test(p.id||'')||!(p.rings?.[0]?.length>2)||!p.bbox){out.push(p);continue;} /* generated paving (1760's Brosten) is drawn for the era */
+   const ws=(names.has(p.name)?water:era).filter(w=>w.rings?.[0]?.length>2&&hit(w.bbox,p.bbox)).map(w=>({rings:w.rings.map(r=>toBox(r,p.bbox)).filter(r=>r.length>3)})).filter(w=>w.rings.length&&overlaps(p,w));if(!ws.length){out.push(p);continue;} /* the water cut to the polygon's box first: the sea's 1400 vertices around each quay street were most of a second */
    let off,dry;try{off=polygonClipping.intersection(p.rings,polygonClipping.union(...ws.map(w=>w.rings)));if(area(off)<.5){out.push(p);continue;}dry=polygonClipping.difference(p.rings,...ws.map(w=>w.rings));}catch{out.push(p);continue;}
    cut++;for(const poly of dry){if(area([poly])<.5)continue;const rings=round(poly);out.push({...p,rings,bbox:box(rings)});} /* each dry piece keeps the polygon's id and kind */
    const on=decks.filter(d=>hit(d.bbox,p.bbox));if(on.length)try{off=polygonClipping.difference(off,...on.map(d=>d.rings));}catch{} /* not where a standing bridge's deck covers it */
@@ -159,8 +161,8 @@ function clipToDryGround(city,walks,roads,late){
 }
 // Edges running at least `run` metres through `polys` ({rings}) are cut back to their dry ends (in place): the piece
 // up to where the line first enters, and the one from where it last leaves, each to a new dead-end node shared by the
-// edge and its way back, so the land part of a way crossing the water stays.
-// A piece under a metre goes. Returns the edges cut.
+// edge and its way back, so the land part of a footway crossing the water stays walkable (by Nyboder: 262 and
+// 118 m edges, 57 and 80 m of them over 1760's moat). A piece under a metre goes. Returns the edges cut.
 function trimThrough(g,polys,{run=1,res=.5}={}){
  const boxes=polys.map(p=>p.rings[0].reduce((b,[x,z])=>[Math.min(b[0],x),Math.min(b[1],z),Math.max(b[2],x),Math.max(b[3],z)],[Infinity,Infinity,-Infinity,-Infinity]));
  const inside=(x,z,rings)=>{let c=false;for(const r of rings)for(let i=0,k=r.length-1;i<r.length;k=i++){const a=r[i],b=r[k];if((a[1]>z)!==(b[1]>z)&&x<(b[0]-a[0])*(z-a[1])/(b[1]-a[1])+a[0])c=!c;}return c;};
