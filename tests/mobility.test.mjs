@@ -91,3 +91,22 @@ test('a shoved coach (1760) pulls back into its lane once it has come to rest, i
  for(let i=0;i<240;i++)sim.step(1/30,player);
  assert.equal(a.knocked,undefined);assert.ok(a.z<-45,`drives on along its lane, z=${a.z.toFixed(1)}`);assert.ok(Math.abs(a.x-1.5)<.3,`back in the lane, x=${a.x.toFixed(2)}`);
 });
+test('coaches held by the player standing in their way go round it where the street leaves room, or back off, instead of waiting for good',async()=>{
+ // Seen in 1760 (and today): the player stopped head-on in a coach's lane, or across it, held it and the one queued behind
+ // it for 70 s and more, and the player pressed between them could move neither way until R.
+ const {boxesOverlap,carBox}=await import('../src/lane-model.js');
+ const run=(width,heading)=>{
+  const graph={nodes:[[0,0],[0,-200]],edges:[{from:0,to:1,points:[[0,0],[0,-200]],length:200,lane:1.6,signal:-1},{from:1,to:0,points:[[0,-200],[0,0]],length:200,lane:1.6,signal:-1}]};
+  const m=new Mobility({roads:graph,walks:{nodes:[],edges:[]},signals:[]},{roads:{at:x=>Math.abs(x)<width},buildings:{at:()=>undefined},water:[]},{cars:2,people:0});
+  m.time=10;m.visibilityTest=()=>true;m.spawn=a=>{a.edge=null;}; // nothing respawns: a recycled coach would just vanish
+  const [a,b]=m.cars,put=(c,s)=>{Object.assign(c,{edge:m.roads.edges[0],s,plan:[],cruise:6,speed:4,halfLength:3.4,halfWidth:.95});Object.assign(c,m.position(c));};put(a,30);put(b,20);
+  const player={x:1.6,z:-60,heading,speed:0,halfLength:3.4,halfWidth:.95};let held=0,touched=false;
+  for(let t=0;t<40;t+=1/30){m.step(1/30,player);if(Math.abs(a.speed)<.3&&Math.hypot(a.x-player.x,a.z-player.z)<10)held+=1/30;touched||=boxesOverlap(carBox(a),carBox(player))||boxesOverlap(carBox(b),carBox(a));}
+  return {a,b,held,touched,player};};
+ {const {a,b,held,touched}=run(6,Math.PI); // head-on in its lane on a two-lane street: round it by the other lane, then back to its own
+  assert.ok(held<8,`held ${held.toFixed(1)} s`);assert.ok(a.z<-100&&b.z<-75,`both went on past (z ${a.z.toFixed(0)}, ${b.z.toFixed(0)})`);assert.ok(Math.abs(a.x-1.6)<.3,'back in its lane');assert.ok(!touched);}
+ {const {a,b,touched,player}=run(2.9,Math.PI/2); // across a narrow street: no way round; the two back off and leave the player room
+  assert.ok(player.z-a.z<-(3.4+3.4+3),`a gap of ${(a.z-player.z-6.8).toFixed(1)} m in front of the player`);assert.ok(b.z-a.z>6.8&&!touched,'the one behind backed off first');}
+ {const {a,player}=run(6,0); // the player stopped the same way (at a red light, say): the coach behind waits its turn
+  assert.ok(a.z>player.z+6&&!a.around&&a.hold==='follow','still queued behind the player');}
+});
