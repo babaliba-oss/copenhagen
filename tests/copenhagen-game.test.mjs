@@ -8,7 +8,7 @@ globalThis.document={body,createElement:()=>{const e=new El();body.last=e;return
 Object.defineProperty(body,'append',{value:(...els)=>{for(const e of els)if(e.id)ids.set(e.id,e);}});
 globalThis.localStorage={getItem:k=>store.get(k)??null,setItem:(k,v)=>store.set(k,String(v)),removeItem:k=>store.delete(k)};globalThis.sessionStorage={getItem:()=>null,setItem(){},removeItem(){}};
 globalThis.addEventListener=globalThis.removeEventListener=()=>{};globalThis.fetch=async()=>{throw Error('offline');};
-const THREE=await import('three'),{expandCity}=await import('../src/city-pack.js'),{expandMobility}=await import('../src/mobility-pack.js'),{SpatialIndex}=await import('../src/geo.js');
+const THREE=await import('three'),{expandCity}=await import('../src/city-pack.js'),{expandMobility}=await import('../src/mobility-pack.js'),{SpatialIndex,inWaterPolygons}=await import('../src/geo.js');
 const {createCopenhagenGame}=await import('../src/copenhagen/game.js'),{JOBS,SAGAS}=await import('../src/copenhagen/data.js');
 const cities=JSON.parse(fs.readFileSync('public/cities/index.json','utf8')).cities;
 function play(id){
@@ -17,7 +17,7 @@ function play(id){
  const me={x:0,z:0,speed:0,heading:0},banner=()=>ids.get('cph-banner')?.innerHTML.replace(/<[^>]+>/g,'')||'';
  const at=([x,z],mode='car',steps=2,dt=1/30)=>{me.x=x;me.z=z;for(let i=0;i<steps;i++)g.update(dt,me,mode,{running:true});};
  const line=()=>(g.route()||[]).reduce((s,p,i,a)=>i?s+Math.hypot(p[0]-a[i-1][0],p[1]-a[i-1][1]):0,0);
- return {g,at,banner,line,job:()=>g.minimapTargets().at(-1).p};
+ return {g,at,banner,line,job:()=>g.minimapTargets().at(-1).p,data};
 }
 test('today: a job picked up where the last was delivered waits, and each delivery clock follows the way round the houses',()=>{
  const {g,at,banner,line,job}=play('copenhagen'),k=JOBS.findIndex(j=>j.b[2]==='Den Sorte Diamant');assert.equal(JOBS[k+1].a[2],'Den Sorte Diamant');
@@ -44,4 +44,10 @@ test('arriving on a race start by the map or a reset does not start the race; dr
  const {g,at}=play('copenhagen-1760'),start=g.minimapTargets().find(t=>t.small).p;
  at([start[0]+60,start[1]],'car',2);g.teleported();at(start,'car',3);assert.equal(g.debug().race,null,'not started on arrival');
  at([start[0]+60,start[1]],'car',2);at(start,'car',2);assert.ok(g.debug().race,'started after driving off and back');
+});
+test('today: the Opera\'s GPS line ends on its own side of the canal, by car and on foot',()=>{
+ store.delete('cph-game-v1'); /* the first test's deliveries moved the save on */const {g,at,job,data}=play('copenhagen'),roads=new SpatialIndex(data.roads),pave=new SpatialIndex(data.pavement||[]);assert.equal(JOBS[0].b[2],'Operaen');
+ const wet=P=>{let w=0;for(let i=1;i<P.length;i++){const a=P[i-1],b=P[i],L=Math.hypot(b[0]-a[0],b[1]-a[1]),n=Math.ceil(L);for(let j=0;j<n;j++){const x=a[0]+(b[0]-a[0])*(j+.5)/n,z=a[1]+(b[1]-a[1])*(j+.5)/n;if(inWaterPolygons(data.water,x,z)&&!roads.at(x,z)&&!pave.at(x,z))w+=L/n;}}return w;};
+ at([5000,5000],'car',90);const A=job();at(A);assert.equal(g.debug().state,'b');
+ for(const m of ['car','walk']){at(A,m,1,.001);const w=wet(g.route());assert.ok(w<3,`${m}: ${w|0} m of the line over open water`);} /* was 67 m straight over the canal from Papirøen */
 });
