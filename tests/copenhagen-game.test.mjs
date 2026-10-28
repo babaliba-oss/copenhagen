@@ -40,3 +40,8 @@ test('1760: Fire Watch can be done by coach, and the coach line ignores today\'s
 test('a map saga (Holger Danske) starts with "find the X", not a red beam it does not have',()=>{
  const {g,banner}=play('copenhagen-1760');g.api.sagaAccept('holger');assert.match(banner(),/find the X on the map/);assert.doesNotMatch(banner(),/red beam/);
 });
+test('arriving on a race start by the map or a reset does not start the race; driving off and back does',()=>{
+ const {g,at}=play('copenhagen-1760'),start=g.minimapTargets().find(t=>t.small).p;
+ at([start[0]+60,start[1]],'car',2);g.teleported();at(start,'car',3);assert.equal(g.debug().race,null,'not started on arrival');
+ at([start[0]+60,start[1]],'car',2);at(start,'car',2);assert.ok(g.debug().race,'started after driving off and back');
+});
