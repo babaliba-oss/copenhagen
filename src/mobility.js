@@ -8,7 +8,19 @@ const hypot=(x,z)=>Math.sqrt(x*x+z*z); // not Math.hypot: in optimised code it a
 // Every car and walker is made with all the fields step() and spawn() give it, in one order: they were added as each
 // first came up, in different orders, so the agents had dozens of shapes and step() was thrown back out of its
 // optimised code ('wrong map') every few seconds, running at half speed and twice the garbage until optimised again.
-const newAgent=(id,walking,cruise,side,stationOnly,corridorOnly)=>({id,stationOnly,corridorOnly,walking,edge:null,s:0,speed:0,cruise,side,dodge:0,yieldSide:undefined,yieldHeld:0,unpocket:false,x:0,z:0,heading:0,playerTaken:undefined,conversation:undefined,knocked:undefined,damage:undefined,plan:[],prevDir:undefined,ox:undefined,oz:undefined,gapBy:null,gapHeld:0,offset:undefined,waiting:0,passing:null,unjam:null,unjamUntil:0,gridlock:0,hold:null,holdBy:null,atSignal:false,deadlocked:false,hiddenFor:0,panicUntil:0,turnAfter:0,turnedAt:undefined,holdUntil:0,retryAt:0,running:false,stuck:0,progressPoint:null,waitFrom:null,kerbUntil:0,playerHeld:0,playerWait:0,around:null,backUntil:0,backQueued:false});
+const newAgent=(id,walking,cruise,side,stationOnly,corridorOnly)=>settleShape({id,stationOnly,corridorOnly,walking,edge:null,s:0,speed:0,cruise,side,dodge:0,yieldSide:undefined,yieldHeld:0,unpocket:false,x:0,z:0,heading:0,playerTaken:undefined,conversation:undefined,knocked:undefined,damage:undefined,plan:[],prevDir:undefined,ox:undefined,oz:undefined,gapBy:null,gapHeld:0,offset:undefined,waiting:0,passing:null,unjam:null,unjamUntil:0,gridlock:0,hold:null,holdBy:null,atSignal:false,deadlocked:false,hiddenFor:0,panicUntil:0,turnAfter:0,turnedAt:undefined,holdUntil:0,retryAt:0,running:false,stuck:0,progressPoint:null,waitFrom:null,kerbUntil:0,playerHeld:0,playerWait:0,around:null,backUntil:0,backQueued:false,halfLength:undefined,halfWidth:undefined,knockdown:undefined,impactCooldown:undefined,pose:undefined,reaction:undefined}); // the last six: the 1760 coach's size (main.js), knock-downs (impacts.js), poses (crowd-reaction.js, people-interaction.js)
+// Each field is given, once, every kind of value it will ever hold, then set back: its first fraction where it started at 0, its first
+// number where it started null or undefined (or the reverse), or its first object of another shape each changed every agent's shape
+// mid-game (field representations: V8 deprecates the map), and all the optimised code that had seen agents was thrown out at once
+// (walkers' code most: 'wrong map', 5-15 steps of 3-11 ms each while it was optimised again; a few times a minute, later ones from
+// rare events such as a first car passing another or a first scare). Settled here, in the constructor, the shape never changes again.
+const MIXED=new Set(['yieldSide','ox','oz','offset','turnedAt','passing','halfLength','halfWidth','impactCooldown']); // a number or undefined/null
+function settleShape(a){
+ for(const k of Object.keys(a)){const v=a[k];if(k==='id'||typeof v==='boolean')continue; // id stays a small integer (an index)
+  if(typeof v==='number')a[k]=.5;else if(MIXED.has(k)){a[k]=.5;a[k]=null;}else{a[k]={};a[k]=[];a[k]='';a[k]=null;}a[k]=v;}
+ return a;
+}
+const ROAD_EDGE_FIELDS=['_gi','fits','zones','bounds'],WALK_EDGE_FIELDS=['_gi','_room','_roomOf'],edgeFields=(e,keys)=>{for(const k of keys)if(!(k in e))e[k]=undefined;};
 const STANDING_PROBES=[3,6,10,15]; // metres ahead checked for a standing bus
 const NEXT_ONE=[null],NO_EDGES=[],REACH_P={x:0,z:0,heading:0}; // the next planned edge, passed to cornerSpeedLimit without a fresh array per car
 // Walker grid cells (mobility step): a 1024-slot hash of 1.5 m cells; collisions only cost a distance test.
@@ -88,6 +100,9 @@ export class Mobility {
   this.walkSpawn=walkSpawn;this.walkRecycle=walkRecycle;this.streetWalking=streetWalking; /* 1760: no pavements, people walk in the street (walkable) and give way to coaches (coachYield) */this.spawnBudget=6; // walkers appear within walkSpawn m of the player and are recycled past walkRecycle
   this.roads=prepareGraph(data.roads);this.walks=prepareGraph(data.walks);this.signals=data.signals;this.signalControl=annotateJunctions(this.roads,data.signals||[]);annotateCrossings(this.walks,this.signalControl);this.signalAxes=this.signalControl.axes;this.world=world;this.random=random;this.time=0;this.collisions=0;this.externalObstacles=[];this.externalBodies=[];this.trams=null;this.edgeCars=new Map();this.boxCars=new Map();this.approaching=new Map();
   if(world?.laneWalls)this.walledLanes=markWalledLanes(this.roads.edges,world.laneWalls); // lanes through a wall the model draws on the road (road-walls.json) are routed round
+  // What step() and spawn() work out per edge later (fits, conflict zones, walkers' room...) has its field from the start: each first
+  // one added gave that edge a new shape mid-game, and the optimised code reading edges was thrown out ('wrong map').
+  for(const e of this.roads.edges)edgeFields(e,ROAD_EDGE_FIELDS);for(const e of this.walks.edges)edgeFields(e,WALK_EDGE_FIELDS);
   this.stationEdges=this.roads.edges.filter(e=>e.points.some(([x,z])=>inStationTrafficArea({x,z})));
   // Main-road pool: extra cars that live only on a busy corridor (e.g. Olympia terminal → Kauppatori), both directions.
   this.corridor=corridor;this.corridorEdges=corridor?this.roads.edges.filter(e=>e.length>10&&corridor(...e.points[Math.floor(e.points.length/2)])):[];
@@ -111,6 +126,7 @@ export class Mobility {
   this.corridorEdges=this.corridor?this.roads.edges.filter(e=>e.length>10&&this.corridor(...e.points[Math.floor(e.points.length/2)])):[];
   this.corridorIds=new Set(this.corridorEdges.map(e=>e.id));
   if(this.trams)this.attachTrams(this.trams);if(this.buses)this.attachBuses(this.buses);
+  for(let i=roads;i<this.roads.edges.length;i++)edgeFields(this.roads.edges[i],ROAD_EDGE_FIELDS);for(let i=walks;i<this.walks.edges.length;i++)edgeFields(this.walks.edges[i],WALK_EDGE_FIELDS);
   return {roads:this.roads.edges.slice(roads),walks:this.walks.edges.slice(walks),signalOffset:offset};
  }
  // True when a body (an oriented box) covers any car lane position.

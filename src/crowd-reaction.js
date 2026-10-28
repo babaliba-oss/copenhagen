@@ -56,11 +56,11 @@ export function createCrowdReaction({sight=null,scare=null,hold=null,random=rng(
  function step(dt){
   time+=dt;
   for(const a of reacting){const v=view(a);
-   if(time>=a.reaction.until){a.pose=a.reaction.prevPose;delete a.reaction;reacting.delete(a);continue;}
+   if(time>=a.reaction.until){a.pose=a.reaction.prevPose;a.reaction=undefined;reacting.delete(a);continue;}
    // Free crowds draw their own pose; graph walkers get it through street-life's view (same field).
    a.pose=v?.pose??a.reaction.prevPose;if(v?.heading!=null&&!(a.speed>.3))a.heading=v.heading;
   }
  }
- function reset(){for(const a of reacting){a.pose=a.reaction.prevPose;delete a.reaction;}reacting.clear();}
+ function reset(){for(const a of reacting){a.pose=a.reaction.prevPose;a.reaction=undefined;}reacting.clear();}
  return {alarm,step,view,reset,get reacting(){return reacting.size;},snapshot(){const kinds={};for(const a of reacting)kinds[a.reaction.kind]=(kinds[a.reaction.kind]||0)+1;return {reacting:reacting.size,kinds};}};
 }

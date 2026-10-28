@@ -26,6 +26,15 @@ test('cars and pedestrians move on Helsinki routes without entering buildings',(
  for(const p of [...after.cars,...after.people])assert.equal(world.buildings.at(p.x,p.z),undefined);
  for(const p of after.cars)assert.ok(world.roads.at(p.x,p.z));
 });
+test('cars, walkers and the edges they use keep one shape while the simulation runs (no fields added mid-game)',()=>{
+ const sim=new Mobility(structuredClone(network),world,{random:seeded(),cars:20,people:30}),player={...city.landmarks[0],speed:0};
+ const keys=o=>Object.keys(o).join(),agent=keys(sim.cars[0]),road=new Map(sim.roads.edges.map(e=>[e,keys(e)])),walk=new Map(sim.walks.edges.map(e=>[e,keys(e)]));
+ const a=sim.people[0];assert.equal(a.x,0);assert.equal(a.offset,undefined);assert.equal(a.edge,null);assert.equal(a.walking,true);assert.ok(Number.isInteger(a.id)); // the shape settling leaves the values as made
+ sim.reset(player);for(let i=0;i<240;i++){player.x+=.4;sim.step(1/30,player);}
+ for(const b of [...sim.cars,...sim.people])assert.equal(keys(b),agent);
+ for(const [e,k] of road)assert.equal(keys(e),k);for(const [e,k] of walk)assert.equal(keys(e),k);
+ assert.ok(sim.roads.edges.some(e=>e.fits!==undefined)&&sim.walks.edges.some(e=>e._room!==undefined)); // those fields were worked out meanwhile
+});
 test('traffic stops for a player ahead and makes solid contact',()=>{
  const graph={nodes:[[0,0],[0,-200]],edges:[{from:0,to:1,points:[[0,0],[0,-200]],length:200,lane:0,signal:-1}]};
  const sim=new Mobility({roads:structuredClone(graph),walks:{nodes:[],edges:[]},signals:[]},{roads:{at:()=>true},buildings:{at:()=>undefined}},{cars:1,people:0});
