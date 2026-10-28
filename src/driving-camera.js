@@ -23,8 +23,13 @@ export function drivingCameraPose(car,heading,zoom=240,look=0,buildings=null,asp
  // across the road. Shorten it before the wall, retaining the driving target.
  // The lens keeps CAMERA_CLEARANCE from the footprints all round: the city model's facades stand up to a metre
  // outside them (cornices, bays, a footprint mapped short), and a lens 0.25 m off the footprint sat inside the drawn wall.
- const clear=(h,max)=>{for(let d=1;d<=max;d+=.25){const x=car.x+Math.sin(h)*d,z=car.z+Math.cos(h)*d;
-  if(buildings.at(x,z)||CLEAR_RING.some(([dx,dz])=>buildings.at(x+dx*CAMERA_CLEARANCE.r,z+dz*CAMERA_CLEARANCE.r)))return Math.max(.5,d-.5);}return max;};
+ // An obstacle the car itself stands in (or the first metre of the boom crosses) does not block it: the car is evidently not
+ // inside a wall there (a camera-wall strip over a mapped road, a footprint over a passage), and it collapsed the boom to 0.5 m
+ // every frame, the screen solid grey. buildings.at(x,z,skip) passes over those (SpatialIndex); a plain at(x,z) predicate has
+ // its own-position answer ignored instead.
+ const own=h=>{const s=new Set();for(let d=0;d<=1;d+=.5){const x=car.x+Math.sin(h)*d,z=car.z+Math.cos(h)*d;for(let p;(p=buildings.at(x,z,s))&&!s.has(p);)s.add(p);}return s;};
+ const clear=(h,max)=>{const s=own(h),hit=(x,z)=>{const p=buildings.at(x,z,s);return p&&!s.has(p);};for(let d=1;d<=max;d+=.25){const x=car.x+Math.sin(h)*d,z=car.z+Math.cos(h)*d;
+  if(hit(x,z)||CLEAR_RING.some(([dx,dz])=>hit(x+dx*CAMERA_CLEARANCE.r,z+dz*CAMERA_CLEARANCE.r)))return Math.max(.5,d-.5);}return max;};
  const aim=heading; // the target stays straight ahead of the car even when the boom swings
  if(buildings){const full=distance;distance=clear(heading,full);
   // Backed up against a wall: swing the boom up to 40 degrees to whichever side is open, rather than a lens

@@ -34,6 +34,17 @@ test('driving camera keeps off drawn walls that stand clear of the footprints (c
  for(let i=0;i<40;i++)p=drivingCameraPose({x:113.5,z:103.7},0,150,0,new SpatialIndex(cameraWallStrips(near)));
  assert.ok(segDist(p.position[0],p.position[2],near)>=.9,`lens ${segDist(p.position[0],p.position[2],near).toFixed(2)} m from a drawn wall`);
 });
+test('an obstacle the car itself stands in does not collapse the boom',()=>{
+ /* a camera-wall strip lying along the road under the car (Papirøen's road node 1447.5,170.4 stood in one): the boom collapsed to 0.5 m */
+ const along=new SpatialIndex(cameraWallStrips([0,-5,0,20]));let p;for(let i=0;i<40;i++)p=drivingCameraPose({x:0,z:0},0,150,0,along);
+ assert.ok(p.position[2]>8,`boom ${p.position[2].toFixed(2)} m`);
+ /* a wall across the boom that the car is not in still stops it */
+ const both=new SpatialIndex(cameraWallStrips([0,-5,0,20,-5,6,5,6]));for(let i=0;i<40;i++)p=drivingCameraPose({x:0,z:0},0,150,0,both);
+ assert.ok(p.position[2]<5,`boom ${p.position[2].toFixed(2)} m`);
+ /* the same through a plain at(x,z) predicate (a footprint over the car and the boom) */
+ for(let i=0;i<40;i++)p=drivingCameraPose({x:0,z:0},0,150,0,{at:(x,z)=>Math.abs(x)<2&&z>-3&&z<30});
+ assert.ok(p.position[2]>8);
+});
 test('a swung boom keeps the car near the middle of a portrait phone view',()=>{
  const wall={at:(x,z)=>z>=3&&x>-1}; /* wall right behind, open to the left: the boom swings */
  const off=p=>{const a=Math.atan2(-p.position[0],-p.position[2])-Math.atan2(p.target[0]-p.position[0],p.target[2]-p.position[2]);return Math.abs(Math.atan2(Math.sin(a),Math.cos(a)));};
