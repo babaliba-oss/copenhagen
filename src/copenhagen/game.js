@@ -270,7 +270,7 @@ export function createCopenhagenGame({scene,city,mobilityData,cityData,toast,sou
  function showLore(q,card){loreQ.push([q,card]);if(!loreOpen)nextLore();}
  function nextLore(){const it=loreQ.shift();if(!it){loreOpen=false;lore.hidden=true;return;}const [q,[t,txt]]=it;loreOpen=true;$('cph-lore-kick').textContent=q.title;$('cph-lore-title').textContent=t;$('cph-lore-text').textContent=txt;lore.hidden=false;}
  $('cph-lore-go').onclick=()=>nextLore();
- function startSaga(id){const q=byId[id];save.active={id,done:[],t:q.limit||0,shown:-1};persist();routeFor=null;wayTo=null;banner('Saga started',`${esc(q.title)} · follow the red beam`,'pick');}
+ function startSaga(id){const q=byId[id];save.active={id,done:[],t:q.limit||0,shown:-1};persist();routeFor=null;wayTo=null;banner('Saga started',`${esc(q.title)} · ${q.steps[0].clue?'find the X on the map':'follow the red beam'}`,'pick');} /* Holger's map has no beam to follow */
  function endSaga(win){const q=byId[save.active.id];if(win){save.done[q.id]=1;save.money+=q.pay;banner('Saga complete',`${esc(q.title)} · +${fmtKr(q.pay)} ${UNIT}`,'rank');}else banner('Saga failed',`${esc(q.title)} · talk to ${esc(giverName(q))} to try again`,'fail');save.active=null;persist();routeFor=null;}
  const api={
   era:ERA,

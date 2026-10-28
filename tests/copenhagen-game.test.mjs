@@ -37,3 +37,6 @@ test('1760: Fire Watch can be done by coach, and the coach line ignores today\'s
  assert.equal(g.debug().started,true);assert.equal(store.has('cph-game-v1-1760')&&JSON.parse(store.get('cph-game-v1-1760')).done.fire,1,'saga complete');
  assert.ok(total/q.limit<11,`${total|0} m in ${q.limit} s`);
 });
+test('a map saga (Holger Danske) starts with "find the X", not a red beam it does not have',()=>{
+ const {g,banner}=play('copenhagen-1760');g.api.sagaAccept('holger');assert.match(banner(),/find the X on the map/);assert.doesNotMatch(banner(),/red beam/);
+});
