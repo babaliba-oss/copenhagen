@@ -44,11 +44,15 @@ export function drivingCameraPose(car,heading,zoom=240,look=0,buildings=null,asp
  const y=car.y??groundAt(car.x,car.z),px=car.x+Math.sin(heading)*distance,pz=car.z+Math.cos(heading)*distance;
  // A wall right behind: the short boom rises instead, looking down over the vehicle (at 0.5 m back and 2.5 m up
  // the lens sat inside the 1760 coach's body).
- const short=Math.max(0,3.6-distance),lift=short*1.05,far=ahead+short*2.2; // and aims further ahead, so it never looks straight down on the roof
+ const short=Math.max(0,3.6-distance),lift=short*1.05,ly=Math.max(y+2.4+distance*.11+lift,groundAt(px,pz)+1.4);let far=ahead+short*2.2; // and aims further ahead, so it never looks straight down on the roof
+ // ...but not so far ahead that the car leaves the frame: a 0.5-1 m boom, lifted, aiming ~10 m ahead looked 25 degrees down
+ // while the car sat 80 degrees down, under the bottom edge. The aim comes back toward the car until its body is within 60%
+ // of the (narrowest) vertical half-view below the view's centre; a normal boom (car ~17 degrees down) is unchanged.
+ const dip=Math.atan2(ly-y-.8,distance)-DRIVE_FOV.min*Math.PI/360*.6;if(dip>0)far=Math.min(far,Math.max(0,(ly-y-1.15)/Math.tan(dip)-distance));
  // A swung boom on a narrow (portrait phone) screen: straight ahead put the car 12 degrees off a 15 degree half-view, half
  // off the edge. The aim turns toward the boom's line just far enough that the car's centre stays within 35% of the half-view.
  let to=aim;if(swing&&aspect){const half=Math.atan(Math.tan(DRIVE_FOV.min*Math.PI/360)*aspect)*.35;for(let t=0;t<=1.001;t+=.1){to=aim+swing*t;const a=Math.atan2(car.x-px,car.z-pz)-Math.atan2(-Math.sin(to)*far-px+car.x,-Math.cos(to)*far-pz+car.z);if(Math.abs(Math.atan2(Math.sin(a),Math.cos(a)))<=half)break;}}
- return {position:[px,Math.max(y+2.4+distance*.11+lift,groundAt(px,pz)+1.4),pz],target:[car.x-Math.sin(to+look)*far,y+1.15,car.z-Math.cos(to+look)*far]};
+ return {position:[px,ly,pz],target:[car.x-Math.sin(to+look)*far,y+1.15,car.z-Math.cos(to+look)*far]};
 }
 
 // ---- Drive-camera feel: speed FOV, heading lag/settle, roll, look, shake ----

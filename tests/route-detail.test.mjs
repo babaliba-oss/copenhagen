@@ -45,6 +45,15 @@ test('an obstacle the car itself stands in does not collapse the boom',()=>{
  for(let i=0;i<40;i++)p=drivingCameraPose({x:0,z:0},0,150,0,{at:(x,z)=>Math.abs(x)<2&&z>-3&&z<30});
  assert.ok(p.position[2]>8);
 });
+test('a collapsed boom still has the car in frame',()=>{
+ /* a wall right behind on every side: 0.5 m boom, lifted; the lens aimed ~10 m ahead and the car sat under the bottom edge */
+ const wall={at:(x,z)=>z>=1.6};let p;for(let i=0;i<40;i++)p=drivingCameraPose({x:0,z:0,y:0},0,150,0,wall,.49);
+ assert.ok(p.position[2]<=.75,'boom collapsed');
+ const [cx,cy,cz]=p.position,[tx,ty,tz]=p.target,f=[tx-cx,ty-cy,tz-cz],c=[-cx,.8-cy,-cz],cos=(f[0]*c[0]+f[1]*c[1]+f[2]*c[2])/Math.hypot(...f)/Math.hypot(...c);
+ assert.ok(Math.acos(cos)<29*Math.PI/180*.65,`car ${(Math.acos(cos)*180/Math.PI).toFixed(1)} deg off the view axis`);
+ /* a full boom keeps its aim ahead of the car */
+ const open=drivingCameraPose({x:0,z:0,y:0},0,150,0,{at:()=>false});assert.ok(open.target[2]<-2.9);
+});
 test('a swung boom keeps the car near the middle of a portrait phone view',()=>{
  const wall={at:(x,z)=>z>=3&&x>-1}; /* wall right behind, open to the left: the boom swings */
  const off=p=>{const a=Math.atan2(-p.position[0],-p.position[2])-Math.atan2(p.target[0]-p.position[0],p.target[2]-p.position[2]);return Math.abs(Math.atan2(Math.sin(a),Math.cos(a)));};
