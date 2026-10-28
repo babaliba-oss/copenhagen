@@ -1,10 +1,10 @@
-import {pointInPolygon} from './geo.js';
+import {inWaterPolygons} from './geo.js';
 import {carSamples} from './physics.js';
 import {groundAt,lakeAt} from './terrain.js';
 
 // Pursuit settings, in seconds and metres. Nothing here identifies a city.
 export const ROADBLOCK={
- minLevel:5,chance:.75,delay:[8,14],warningLead:4,retry:7,maxAttempts:5,
+ minLevel:5,chance:.75,delay:[8,14],warningLead:4,retry:7,maxAttempts:5,sliceMs:2, // sliceMs: the site search runs a slice of at most this many ms a frame (roadblock.js)
  minAhead:165,maxAhead:650,minMovingSpeed:3,minDeployDistance:65,
  lineSetback:13,minWidth:4.5,maxWidth:23,maxCrossSlope:.12,
  arrestCrawl:{speed:1.2,time:1,limit:7},
@@ -13,7 +13,7 @@ export const headingAlong=(x,z)=>Math.atan2(-x,-z);
 const distance=(a,b)=>Math.hypot(a.x-b.x,a.z-b.z);
 const flagged=value=>value===true||value===1||value==='yes'||value==='true';
 const unsafeEdge=e=>flagged(e.bridge)||flagged(e.tunnel)||Number(e.layer)||e.roundabout||e.crossing||['footway','cycleway','path','steps','pedestrian'].includes(e.highway);
-const waterAt=(world,x,z)=>world.water?.some(p=>p.rings&&pointInPolygon(x,z,p.rings))||lakeAt(x,z)!==null;
+const waterAt=(world,x,z)=>inWaterPolygons(world.water,x,z)||lakeAt(x,z)!==null; // indexed (a scan of every harbour polygon per sample was most of a site's layout)
 const clearGround=(world,x,z)=>!world.buildings?.at(x,z)&&!world.trafficForbidden?.at(x,z)&&!waterAt(world,x,z);
 const roadAt=(world,x,z)=>clearGround(world,x,z)&&!!world.roads?.at(x,z);
 const walkAt=(world,x,z)=>clearGround(world,x,z)&&!!(world.roads?.at(x,z)||world.pavement?.at(x,z));
@@ -91,14 +91,31 @@ function layout(world,centre,forward,config,options){
  const plan={centre:middle,strip,cars,officers,forward,perp,face};
  return roadblockClear(plan,world,options)?plan:null;
 }
-// Work with both prepared simulation graphs and raw imported graphs, without
-// modifying the caller's data. This scan runs only on a bounded deployment retry.
-function graphEdges(graph){
- return (graph?.edges||[]).filter(e=>e.points?.length>1).map((e,id)=>{
-  if(e.cumulative&&Number.isFinite(e.length))return e;
-  const cumulative=[0];for(let i=1;i<e.points.length;i++)cumulative.push(cumulative.at(-1)+Math.hypot(e.points[i][0]-e.points[i-1][0],e.points[i][1]-e.points[i-1][1]));
-  return {...e,id:e.id??id,cumulative,length:cumulative.at(-1)};
- });
+// Work with both prepared simulation graphs and raw imported graphs, without modifying the caller's data. Kept per graph
+// (its edges array; rebuilt when an extension adds or replaces edges): the edges with their lengths, the edges leaving each
+// node (a prepared graph's own `outgoing`), and a 32 m grid of the segments a car can be found on, in typed arrays (a small
+// array per cell kept the young-generation collector copying them: 5-15 ms pauses mid-chase). Scanning every segment in the
+// city and rebuilding all this on each attempt took ~80 ms in today's Copenhagen (44k edges); the grid is built a slice at a
+// time (yield) the first time it is needed.
+const PLAN_CELL=32,planIndexes=new WeakMap();
+function* planIndex(graph){
+ const list=graph?.edges||[],had=planIndexes.get(list);if(had&&had.raw.length===list.length&&had.raw.every((e,i)=>e===list[i]))return had; // the same edge objects (an edge replaced in place is noticed: ~0.1 ms)
+ const edges=[],prepared=Array.isArray(graph?.outgoing)&&list.every(e=>e.cumulative&&Number.isFinite(e.length));let id=0,x0=Infinity,z0=Infinity,x1=-Infinity,z1=-Infinity;
+ const byNode=prepared?null:new Map(),outgoing=prepared?node=>graph.outgoing[node]||[]:node=>byNode.get(node)||[];
+ for(const raw of list){
+  if(!(raw.points?.length>1))continue;let e=raw;
+  if(!prepared){const cumulative=[0];for(let i=1;i<e.points.length;i++)cumulative.push(cumulative.at(-1)+Math.hypot(e.points[i][0]-e.points[i-1][0],e.points[i][1]-e.points[i-1][1]));e={...e,id:e.id??id,cumulative,length:cumulative.at(-1)};if(!byNode.has(e.from))byNode.set(e.from,[]);byNode.get(e.from).push(e);}
+  edges.push(e);id++;for(const q of e.points){if(q[0]<x0)x0=q[0];if(q[0]>x1)x1=q[0];if(q[1]<z0)z0=q[1];if(q[1]>z1)z1=q[1];}
+  if(id%500===0)yield;
+ }
+ const gx=Math.floor(x0/PLAN_CELL),gz=Math.floor(z0/PLAN_CELL),W=Math.max(1,Math.floor(x1/PLAN_CELL)-gx+1),H=Math.max(1,Math.floor(z1/PLAN_CELL)-gz+1),start=new Int32Array(W*H+1);
+ // Two passes over the safe segments: count per cell, then file (edge, segment) pairs at each cell's offset.
+ const each=function*(fill){for(let k=0;k<edges.length;k++){const e=edges[k];if(!unsafeEdge(e))for(let i=1;i<e.points.length;i++){const a=e.points[i-1],b=e.points[i];
+  for(let x=Math.floor(Math.min(a[0],b[0])/PLAN_CELL)-gx;x<=Math.floor(Math.max(a[0],b[0])/PLAN_CELL)-gx;x++)for(let z=Math.floor(Math.min(a[1],b[1])/PLAN_CELL)-gz;z<=Math.floor(Math.max(a[1],b[1])/PLAN_CELL)-gz;z++)fill(z*W+x,k,i);}
+  if(k%200===199)yield;}};
+ yield* each(c=>start[c+1]++);for(let c=0;c<W*H;c++)start[c+1]+=start[c];
+ const at=start.slice(0,W*H),pairs=new Int32Array(start[W*H]*2);yield* each((c,k,i)=>{const j=at[c]++;pairs[j*2]=k;pairs[j*2+1]=i;});
+ const index={raw:[...list],edges,outgoing,gx,gz,W,H,start,pairs};planIndexes.set(list,index);return index;
 }
 function pointOn(e,s,offset=0){
  let i=1;while(i<e.points.length-1&&e.cumulative[i]<s)i++;
@@ -119,22 +136,24 @@ export function roadblockDistanceAhead(plan,car){
  }
  return remaining;
 }
-export function planRoadblock(world,graph,car,{config=ROADBLOCK,isVisible=null,eye=null,obstacles=[],heightAt=groundAt}={}){
+// The search, as a generator: it yields between pieces of work of well under a millisecond (a slice of the index, a site's
+// layout, one point's sight line), so roadblock.js can spread it over frames. planRoadblock runs it through at once.
+export function* roadblockSearch(world,graph,car,{config=ROADBLOCK,isVisible=null,eye=null,obstacles=[],heightAt=groundAt}={}){
  if(!car)return null;
- const edges=graphEdges(graph),sign=car.speed<0?-1:1,fx=-Math.sin(car.heading)*sign,fz=-Math.cos(car.heading)*sign;
- let nearest=null,best=Infinity;
- for(const e of edges){
-  if(unsafeEdge(e))continue;
-  for(let i=1;i<e.points.length;i++){
-   const a=e.points[i-1],b=e.points[i],dx=b[0]-a[0],dz=b[1]-a[1],l=Math.hypot(dx,dz);if(l<.1)continue;
+ const {edges,outgoing,gx,gz,W,H,start:cellStart,pairs}=yield* planIndex(graph),sign=car.speed<0?-1:1,fx=-Math.sin(car.heading)*sign,fz=-Math.cos(car.heading)*sign;
+ car={x:car.x,z:car.z,speed:car.speed,heading:car.heading}; // where the search began: the car drives on while it runs
+ let nearest=null,best=Infinity,order=Infinity;
+ // The segments within 14 m: the cells around the car (ties go to the earlier edge and segment, as the full scan did).
+ for(let x=Math.max(0,Math.floor((car.x-14)/PLAN_CELL)-gx);x<=Math.min(W-1,Math.floor((car.x+14)/PLAN_CELL)-gx);x++)for(let z=Math.max(0,Math.floor((car.z-14)/PLAN_CELL)-gz);z<=Math.min(H-1,Math.floor((car.z+14)/PLAN_CELL)-gz);z++){
+  for(let j=cellStart[z*W+x];j<cellStart[z*W+x+1];j++){
+   const e=edges[pairs[j*2]],i=pairs[j*2+1],a=e.points[i-1],b=e.points[i],dx=b[0]-a[0],dz=b[1]-a[1],l=Math.hypot(dx,dz);if(l<.1)continue;
    const alignment=(dx*fx+dz*fz)/l;if(alignment<.4)continue;
    const t=Math.max(0,Math.min(1,((car.x-a[0])*dx+(car.z-a[1])*dz)/(l*l))),d=Math.hypot(car.x-a[0]-dx*t,car.z-a[1]-dz*t);
-   const score=d+8*(1-alignment);if(d<14&&score<best){best=score;nearest={edge:e,s:e.cumulative[i-1]+l*t};}
+   const score=d+8*(1-alignment),o=pairs[j*2]*65536+i;if(d<14&&(score<best||score===best&&o<order)){best=score;order=o;nearest={edge:e,s:e.cumulative[i-1]+l*t};}
   }
  }
  if(!nearest)return null;
  const minAhead=Math.max(config.minAhead,Math.abs(car.speed||0)*(config.warningLead+3.5)),maxAhead=Math.max(config.maxAhead,minAhead+110);
- const outgoing=new Map();for(const e of edges){if(!outgoing.has(e.from))outgoing.set(e.from,[]);outgoing.get(e.from).push(e);}
  let edge=nearest.edge,start=nearest.s,travelled=0;const seen=new Set(),route=[];
  while(edge&&travelled<maxAhead&&seen.size<30){
   if(seen.has(edge.id))break;seen.add(edge.id);
@@ -143,18 +162,21 @@ export function planRoadblock(world,graph,car,{config=ROADBLOCK,isVisible=null,e
    const p=pointOn(edge,s,edge.lane||0),further=pointOn(edge,s+config.lineSetback+4,edge.lane||0);
    // Do not span a junction or put the patrol line around a tight bend.
    if(p.forward.x*further.forward.x+p.forward.z*further.forward.z<.97)continue;
-   const plan=layout(world,p,p.forward,config,{obstacles,heightAt});
-   if(!plan||roadblockVisible(plan,world,car,isVisible,eye,heightAt))continue;
+   const plan=layout(world,p,p.forward,config,{obstacles,heightAt});yield;
+   if(!plan)continue;
+   let seenFrom=false;for(const q of [plan.strip.a,plan.strip.b,...plan.cars,...plan.officers]){if(visibleFrom(world,car,q,isVisible,eye,heightAt)){seenFrom=true;break;}yield;} // roadblockVisible, a point at a time
+   if(seenFrom)continue;
    const road=world.roads.at(p.x,p.z);
    return {...plan,edgeId:edge.id,roadName:road?.name||edge.name||null,distanceAhead:travelled+s-start,route};
   }
   travelled+=edge.length-start;
   const previous=edge,end=pointOn(edge,edge.length).forward;
-  const options=(outgoing.get(edge.to)||[]).filter(e=>e.to!==previous.from&&!seen.has(e.id)&&!unsafeEdge(e)).map(e=>({edge:e,alignment:end.x*pointOn(e,0).forward.x+end.z*pointOn(e,0).forward.z})).filter(o=>o.alignment>-.2).sort((a,b)=>b.alignment-a.alignment);
+  const options=outgoing(edge.to).filter(e=>e.points?.length>1&&e.to!==previous.from&&!seen.has(e.id)&&!unsafeEdge(e)).map(e=>({edge:e,alignment:end.x*pointOn(e,0).forward.x+end.z*pointOn(e,0).forward.z})).filter(o=>o.alignment>-.2).sort((a,b)=>b.alignment-a.alignment);
   edge=options[0]?.edge;start=0;
  }
  return null;
 }
+export function planRoadblock(world,graph,car,options){const search=roadblockSearch(world,graph,car,options);let r;do r=search.next();while(!r.done);return r.value;}
 
 // A swept segment against the strip's padded footprint also catches a fast
 // diagonal crossing whose end position has already passed the end of the strip.

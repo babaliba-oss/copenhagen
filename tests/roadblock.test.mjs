@@ -132,6 +132,12 @@ test('five-star deployment waits once, warns, and does not escalate ordinary dri
  f.tick(1);assert.equal(f.block.snapshot().phase,'warning');assert.equal(f.block.deployed,false);assert.equal(f.warnings.length,1);
  f.tick(2);assert.equal(f.block.deployed,true);assert.ok(f.police.units.every(u=>u.parked));assert.equal(f.police.level,5);
 });
+test('the site search is spread over frames and finds the same site as planned at once',()=>{
+ const f=pursuitFixture({config:{delay:[1,1],warningLead:2,retry:2,maxAttempts:3,sliceMs:0}});f.police.level=5;
+ let steps=0;while(f.block.snapshot().phase!=='warning'&&steps<200){f.tick(.1);steps++;}
+ assert.ok(steps>12,`one piece of work a step: ${steps} steps (11 when planned in one go)`);assert.equal(f.block.snapshot().phase,'warning');
+ const at=planRoadblock(f.world,f.graph,f.car,hidden);assert.deepEqual(f.block.snapshot().pending.centre,at.centre);
+});
 test('chance is rolled once per pursuit, with bounded retries for missing sites',()=>{
  let draws=0;const skipped=pursuitFixture({random:()=>{draws++;return .99;}});skipped.police.level=5;skipped.tick(80);
  assert.equal(draws,1);assert.equal(skipped.block.snapshot().phase,'skipped');

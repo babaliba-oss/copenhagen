@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import {createPersonBatch,advanceGait,personLook} from './person-model.js';
 import {createDoor} from './angry-drivers.js';
 import {groundAt} from './terrain.js';
-import {ROADBLOCK,planRoadblock,roadblockVisible,roadblockClear,roadblockDistanceAhead,crossesStrip} from './roadblock-planning.js';
+import {ROADBLOCK,roadblockSearch,roadblockVisible,roadblockClear,roadblockDistanceAhead,crossesStrip} from './roadblock-planning.js';
 export {ROADBLOCK,planRoadblock,spanAcross,headingAlong,crossesStrip} from './roadblock-planning.js';
 
 // Five-star pursuits can deploy a block on a suitable road ahead, in any city.
@@ -38,7 +38,7 @@ export function createRoadblock(scene,{world,police,carModel,playerLook=null,gra
   return {spec:{belt:.95,...carModel?.userData.spec},material:paint,paint:paint?.color||new THREE.Color('#9aa0a0')};
  };
  let deployed=false,standDown=false,burst=null,crawl=0,time=0,scene_=null,camera=null;
- let pursuit=false,phase='idle',attempts=0,nextAttempt=0,pending=null,warningAt=null,lastReason=null;
+ let pursuit=false,phase='idle',attempts=0,nextAttempt=0,pending=null,warningAt=null,lastReason=null,search=null; // search: the site search under way (roadblockSearch), run a slice a frame
  group.visible=false;
  function clearStrip(){
   for(const mesh of [...stripGroup.children]){stripGroup.remove(mesh);mesh.dispose?.();mesh.geometry?.dispose();mesh.material?.dispose();}
@@ -64,9 +64,9 @@ export function createRoadblock(scene,{world,police,carModel,playerLook=null,gra
  }
  function clearPursuit(){
   if(deployed)deploy(null);
-  pursuit=false;phase='idle';attempts=0;pending=null;warningAt=null;nextAttempt=0;burst=null;crawl=0;lastReason=null;
+  pursuit=false;phase='idle';attempts=0;pending=null;search=null;warningAt=null;nextAttempt=0;burst=null;crawl=0;lastReason=null;
  }
- function retry(reason){pending=null;warningAt=null;lastReason=reason;phase=attempts>=settings.maxAttempts?'unavailable':'waiting';nextAttempt=time+settings.retry;}
+ function retry(reason){pending=null;search=null;warningAt=null;lastReason=reason;phase=attempts>=settings.maxAttempts?'unavailable':'waiting';nextAttempt=time+settings.retry;}
  // The chance roll belongs to the pursuit, not the render/physics frame.
  // Clear/rearm even while on foot (main's `started` can be false for walkers).
  function step(dt,car,previous,{started=true,onBurst=null}={}){
@@ -75,13 +75,13 @@ export function createRoadblock(scene,{world,police,carModel,playerLook=null,gra
   if(!(police.level>0)){if(pursuit||deployed||pending)clearPursuit();standDown=false;return;}
   if(standDown||!car)return;
   const driving=started&&(!car.travelMode||car.travelMode==='car');
-  if(!driving){if(pending)retry('left-vehicle');crawl=0;return;} // a burst tyre stays burst: hopping out and back in dodged the arrest
+  if(!driving){if(pending||search)retry('left-vehicle');crawl=0;return;} // a burst tyre stays burst: hopping out and back in dodged the arrest
   if(!pursuit&&police.level>=settings.minLevel){
    pursuit=true;attempts=0;
    if(random()>=settings.chance){phase='skipped';lastReason='chance';}
    else{phase='waiting';nextAttempt=time+settings.delay[0]+random()*(settings.delay[1]-settings.delay[0]);}
   }
-  if(pursuit&&!deployed&&police.level<settings.minLevel){if(pending)retry('wanted-reduced');return;}
+  if(pursuit&&!deployed&&police.level<settings.minLevel){if(pending||search)retry('wanted-reduced');return;}
   if(pending&&time-warningAt>=settings.warningLead){
    const d=dist(car,pending.centre),ahead=roadblockDistanceAhead(pending,car),safeDistance=Math.max(settings.minDeployDistance,Math.abs(car.speed||0)*2.5);
    if(ahead===null||d<safeDistance||ahead<safeDistance)retry('route-changed');
@@ -90,10 +90,17 @@ export function createRoadblock(scene,{world,police,carModel,playerLook=null,gra
    else{deploy(pending);pending=null;phase='deployed';lastReason=null;}
   }
   if(phase==='waiting'&&time>=nextAttempt&&Math.abs(car.speed||0)>=settings.minMovingSpeed){
-   attempts++;
-   pending=planRoadblock(world,graph,car,{config:settings,isVisible,eye:eye?.(),obstacles:obstacles()});
-   if(pending){phase='warning';warningAt=time;onWarning?.(`Police are setting up a spike strip${pending.roadName?' on '+pending.roadName:' ahead'}. Find another route.`);}
-   else retry('no-safe-site');
+   attempts++;const at=eye?.();
+   search=roadblockSearch(world,graph,car,{config:settings,isVisible,eye:at&&{x:at.x,y:at.y,z:at.z},obstacles:obstacles()});phase='planning';
+  }
+  // The search runs a slice of at most sliceMs a frame, from where the car and camera were when it started. In today's
+  // Copenhagen an attempt is now ~1 ms of work at the median, up to ~50 ms where many sites are tried; it was 25 ms at the
+  // median and up to ~150 ms, all in one frame, rebuilding the road index each time.
+  if(search){
+   const end=performance.now()+settings.sliceMs;let r;do r=search.next();while(!r.done&&performance.now()<end);
+   if(r.done){search=null;pending=r.value;
+    if(pending){phase='warning';warningAt=time;onWarning?.(`Police are setting up a spike strip${pending.roadName?' on '+pending.roadName:' ahead'}. Find another route.`);}
+    else retry('no-safe-site');}
   }
   if(!deployed)return;
   if(burst&&burst.car!==car)burst=null; // a different car: the old burst no longer blocks the strip
