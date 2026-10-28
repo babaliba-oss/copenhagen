@@ -51,3 +51,11 @@ test('today: the Opera\'s GPS line ends on its own side of the canal, by car and
  at([5000,5000],'car',90);const A=job();at(A);assert.equal(g.debug().state,'b');
  for(const m of ['car','walk']){at(A,m,1,.001);const w=wet(g.route());assert.ok(w<3,`${m}: ${w|0} m of the line over open water`);} /* was 67 m straight over the canal from Papirøen */
 });
+test('today: near a job\'s end with nothing in the way, the line goes straight there, not round the block',()=>{
+ store.delete('cph-game-v1');const {g,at,line,job,data}=play('copenhagen'),houses=new SpatialIndex(data.buildings),roads=new SpatialIndex(data.roads),pave=new SpatialIndex(data.pavement||[]);
+ const clear=(a,b)=>{const n=Math.ceil(Math.hypot(b[0]-a[0],b[1]-a[1])*2);for(let i=1;i<n;i++){const x=a[0]+(b[0]-a[0])*i/n,z=a[1]+(b[1]-a[1])*i/n;if(houses.at(x,z)||inWaterPolygons(data.water,x,z))return false;}return true;};
+ at([5000,5000],'car',90);at(job());at(job());at([5000,5000],'car',90);at(job());assert.equal(JOBS[1].b[2],'Amalienborg');const B=job();let checked=0;
+ for(let k=0;k<8;k++){const P=[B[0]+25*Math.cos(k*Math.PI/4),B[1]+25*Math.sin(k*Math.PI/4)];if(!(roads.at(...P)||pave.at(...P))||!clear(P,B))continue;
+  for(const m of ['car','walk']){at(P,m==='car'?'walk':'car',1,.001);at(P,m,1,.001);assert.ok(line()<40,`${m} 25 m from Amalienborg: a ${line()|0} m line`);checked++;}} /* was 2352 m by car */
+ assert.ok(checked>=2,'some spots checked');
+});
