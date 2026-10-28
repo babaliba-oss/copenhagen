@@ -316,8 +316,8 @@ export function createCopenhagenGame({scene,city,mobilityData,cityData,toast,sou
   if(!journal.contains(document.activeElement))$('cph-jclose').focus({preventScroll:true}); // also after Abandon redraws it
  }
  // Keyboard: the journal takes the focus (its Close button) and Tab cycles its own buttons. Its keys were all swallowed while it was open, so Show me the way, Abandon and the story cards could only be reached with a mouse.
- function toggleJournal(v){const was=journalOpen;journalOpen=v??!journalOpen;journal.hidden=!journalOpen;if(journalOpen)renderJournal();else if(was&&(journal.contains(document.activeElement)||document.activeElement===document.body))$('world')?.focus();}
- journal.addEventListener('keydown',e=>{if(e.key!=='Tab')return;const f=[...journal.querySelectorAll('button,summary')].filter(n=>n.getClientRects().length);if(!f.length)return;const i=f.indexOf(document.activeElement);e.preventDefault();e.stopPropagation();f[e.shiftKey?(i<=0?f.length-1:i-1):(i<0||i===f.length-1?0:i+1)].focus();});
+ function toggleJournal(v){const was=journalOpen;journalOpen=v??!journalOpen;journal.hidden=!journalOpen;if(journalOpen)renderJournal();else if(was&&(journal.contains?.(document.activeElement)||document.activeElement===document.body))$('world')?.focus();}
+ journal.addEventListener?.('keydown',e=>{if(e.key!=='Tab')return;const f=[...journal.querySelectorAll('button,summary')].filter(n=>n.getClientRects().length);if(!f.length)return;const i=f.indexOf(document.activeElement);e.preventDefault();e.stopPropagation();f[e.shiftKey?(i<=0?f.length-1:i-1):(i<0||i===f.length-1?0:i+1)].focus();});
  let wayTo=null;
 
  // ---- target for the GPS line: a walk to a character, the saga, or the job ----
