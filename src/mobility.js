@@ -28,11 +28,11 @@ const TRAFFIC_CELLS=256,trafficCell=(gx,gz)=>(Math.imul(gx,73856093)^Math.imul(g
 import {mergeGraph} from './graph-extension.js';
 import {inWaterPolygons} from './geo.js';
 export const TRAFFIC_MAX_SPEED=50/3.6;
-export const FIT_WARM={r:480,move:40,ms:.4};
+export const FIT_WARM={r:480,move:40,samples:120}; // samples: vehicleFitsRoad tests a step (~3-5 µs each)
 // Placement work a step may spend on spawn trials (spots tried, each up to 80 per agent): 6 agents that found no spot tried 480 a step,
 // every step while it lasted (walkers trailing a fast car). An agent whose trials are cut short goes on with the rest of its 80 the next
 // step. Not while the map fills (the first 3 s, reset()).
-export const SPAWN_WORK={trials:160};
+export const SPAWN_WORK={trials:160,fitSamples:240}; // fitSamples: edges' fit worked out a step for spawning's candidates (after a jump: the rest wait)
 export const nearStation=p=>hypot(p.x+620,p.z+45)<430;
 export const inStationTrafficArea=p=>p.x>-885&&p.x<-440&&p.z>-145&&p.z<55;
 export function prepareGraph(graph){
@@ -101,7 +101,7 @@ const crowded=(cells,p)=>{const {r,max}=WALK_CROWD,cx=Math.floor(p.x/r),cz=Math.
 const yieldsTo=(a,b)=>{if(Math.cos(a.heading-b.heading)<.9)return true;const forward=(b.x-a.x)*-Math.sin(a.heading)+(b.z-a.z)*-Math.cos(a.heading);return forward>.3||(forward>-.3&&b.id<a.id);};
 export class Mobility {
  constructor(data,world,{cars=52,people=100,stationCars=0,corridorCars=0,corridor=null,random=Math.random,walkSpawn=200,walkRecycle=330,streetWalking=false}={}){
-  this.walkSpawn=walkSpawn;this.walkRecycle=walkRecycle;this.streetWalking=streetWalking; /* 1760: no pavements, people walk in the street (walkable) and give way to coaches (coachYield) */this.spawnBudget=6;this.spawnWork=Infinity; // walkers appear within walkSpawn m of the player and are recycled past walkRecycle
+  this.walkSpawn=walkSpawn;this.walkRecycle=walkRecycle;this.streetWalking=streetWalking; /* 1760: no pavements, people walk in the street (walkable) and give way to coaches (coachYield) */this.spawnBudget=6;this.spawnWork=Infinity;this.fitWork=Infinity; // walkers appear within walkSpawn m of the player and are recycled past walkRecycle
   this.roads=prepareGraph(data.roads);this.walks=prepareGraph(data.walks);this.signals=data.signals;this.signalControl=annotateJunctions(this.roads,data.signals||[]);annotateCrossings(this.walks,this.signalControl);this.signalAxes=this.signalControl.axes;this.world=world;this.random=random;this.time=0;this.collisions=0;this.externalObstacles=[];this.externalBodies=[];this.trams=null;this.edgeCars=new Map();this.boxCars=new Map();this.approaching=new Map();
   if(world?.laneWalls)this.walledLanes=markWalledLanes(this.roads.edges,world.laneWalls); // lanes through a wall the model draws on the road (road-walls.json) are routed round
   // What step() and spawn() work out per edge later (fits, conflict zones, walkers' room...) has its field from the start: each first
@@ -324,7 +324,7 @@ export class Mobility {
   if(a.corridorOnly&&!this.nearCorridor(player)){a.edge=null;a.speed=0;return;}
   const graph=a.walking?this.walks:this.roads;
   // Prefer nearby routes; edge midpoint avoids choosing a remote end of a long road.
-  const nearby=this.spawnCandidates(a,player,graph,()=>(a.stationOnly?this.stationEdges:a.corridorOnly?this.corridorEdges:this.edgesNear(graph,player,a.walking?this.walkSpawn:320)).filter(e=>{const p=e.points[Math.floor(e.points.length/2)],d=hypot(p[0]-player.x,p[1]-player.z);return (!a.walking||!e.crossing)&&d<(a.walking?200:a.corridorOnly?520:320)&&e.length>(a.walking?3:10)&&!(!a.walking&&(this.obstructed?.has(e)||this.trap(e,2)));}));
+  const nearby=this.spawnCandidates(a,player,graph,()=>(a.stationOnly?this.stationEdges:a.corridorOnly?this.corridorEdges:this.edgesNear(graph,player,a.walking?this.walkSpawn:320)).filter(e=>{const p=e.points[Math.floor(e.points.length/2)],d=hypot(p[0]-player.x,p[1]-player.z);return (!a.walking||!e.crossing)&&d<(a.walking?200:a.corridorOnly?520:320)&&e.length>(a.walking?3:10)&&!(!a.walking&&(this.obstructed?.has(e)||this.trap(e,2,this.spawnWork!==Infinity)!==false));}));
   let occupancy=null,crowd=null; // walkers per edge (and per WALK_CROWD.r cell), counted once per spawn rather than once per trial
   for(let trial=a.spawnTrials;trial<80&&nearby.length;trial++){if(this.spawnWork--<=0){a.spawnTrials=trial;a.edge=null;a.speed=0;return;} // out of this step's placement work: on from here next step
    a.edge=nearby[Math.floor(this.random()*nearby.length)];a.s=this.random()*a.edge.length;a.plan=[];a.prevDir=undefined;a.ox=undefined;a.gapBy=null;a.gapHeld=0;
@@ -371,19 +371,23 @@ export class Mobility {
  }
  // An edge whose lane runs off the mapped carriageway somewhere would stop a car there for good: route
  // around it when there is a choice. Checked once per edge, when a car first considers it.
- fits(e){if(e.fits===undefined){e.fits=true;for(let s=Math.min(1,e.length/2);s<e.length;s+=2)if(!vehicleFitsRoad(routePoint(e,s),this.world)){e.fits=false;break;}}return e.fits;}
+ fits(e){if(e.fits===undefined){e.fits=true;let n=0;for(let s=Math.min(1,e.length/2);s<e.length;s+=2){n++;if(!vehicleFitsRoad(routePoint(e,s),this.world)){e.fits=false;break;}}this.fitWork-=n;}return e.fits;}
  // fits() is worked out the first time a car or a spawn looks at an edge (vehicleFitsRoad every 2 m): driving into a part of
  // town not seen yet, spawnCandidates' trap() test on the new edges within 320 m took 5-30 ms in one step. The edges within
- // FIT_WARM.r of the player are worked out ahead, at most FIT_WARM.ms a step (the same answers, only earlier).
+ // FIT_WARM.r of the player are worked out ahead, at most FIT_WARM.samples tests a step (the same answers, only earlier), and
+ // spawning's candidates leave out the edges not yet known once SPAWN_WORK.fitSamples are spent in a step (after a jump of
+ // a few hundred metres: 100 new edges, 8 ms). Counted in tests rather than timed, so a seeded run goes the same way anywhere.
  warmFits(player){
-  const t=performance.now(),at=this._fitAt;if(!at||hypot(at.x-player.x,at.z-player.z)>FIT_WARM.move){this._fitAt={x:player.x,z:player.z};this._fitQueue=this.edgesNear(this.roads,player,FIT_WARM.r).filter(e=>e.fits===undefined);}
-  const q=this._fitQueue;while(q.length&&performance.now()-t<FIT_WARM.ms)this.fits(q.pop());
+  const at=this._fitAt;if(!at||hypot(at.x-player.x,at.z-player.z)>FIT_WARM.move){this._fitAt={x:player.x,z:player.z};this._fitQueue=this.edgesNear(this.roads,player,FIT_WARM.r).filter(e=>e.fits===undefined);}
+  this.fitWork=FIT_WARM.samples;const q=this._fitQueue;while(q.length&&this.fitWork>0)this.fits(q.pop());this.fitWork=SPAWN_WORK.fitSamples;
  }
- trap(e,depth){
+ // lazy: undefined (not known yet) where an edge's fit is still to be worked out and this step's fitWork is spent.
+ trap(e,depth,lazy=false){
+  if(lazy&&e.fits===undefined&&this.fitWork<=0)return undefined;
   if(!this.fits(e))return true;if(!depth)return false;
   const key=depth*1e6+e.id;this.traps??=new Map();if(this.traps.has(key))return this.traps.get(key);
   this.traps.set(key,false);let next=this.roads.outgoing[e.to].filter(o=>o.to!==e.from);if(!next.length)next=this.roads.outgoing[e.to]; // a dead end goes on by its U-turn: a trap when that lane is (1760: the way back along a wall)
-  const result=next.length>0&&next.every(o=>this.trap(o,depth-1));
+  let result=next.length>0;for(const o of next){const t=this.trap(o,depth-1,lazy);if(t===undefined){this.traps.delete(key);return undefined;}if(!t){result=false;break;}} // depth falls each call: this key is never read while open
   this.traps.set(key,result);return result;
  }
  pickNext(edge){
@@ -557,7 +561,7 @@ export class Mobility {
   // most of the steps over 4 ms). Now only the small method concerned is, and it is ready again in a few steps.
   this._spawns=0;this.spawnWork=this.time<3?Infinity:SPAWN_WORK.trials;const nCars=this.cars.length,nAgents=nCars+this.people.length;
   for(let ai=0;ai<nAgents;ai++){const a=ai<nCars?this.cars[ai]:this.people[ai-nCars];if(!a.playerTaken)this.stepAgent(a,player,traffic,coachCells,tramList);}
-  this.spawnWork=Infinity; // spawn() called from outside step(): unlimited
+  this.spawnWork=this.fitWork=Infinity; // spawn() called from outside step(): unlimited
   // The impact pass owns contact resolution. Do not push the player sideways
   // into a second, differently sized envelope and lock them there. Existing
   // overlap can retreat; only motion farther into traffic is stopped here.

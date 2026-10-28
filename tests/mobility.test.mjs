@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync,existsSync} from 'node:fs';
 import {gunzipSync} from 'node:zlib';
-import {Mobility,prepareGraph,routePoint,signalGreen,SPAWN_WORK} from '../src/mobility.js';
+import {Mobility,prepareGraph,routePoint,signalGreen,SPAWN_WORK,FIT_WARM} from '../src/mobility.js';
 import {SpatialIndex} from '../src/geo.js';
 const network=JSON.parse(readFileSync('public/data/mobility.json'));
 const city=JSON.parse(gunzipSync(readFileSync('public/data/city.pack')));
@@ -47,6 +47,18 @@ test('spawning spends at most SPAWN_WORK.trials spots a step, carries the rest o
  assert.ok(capped.worst<=SPAWN_WORK.trials,`at most ${SPAWN_WORK.trials} spots a step, got ${capped.worst}`);
  assert.ok(capped.carried>0,'some searches went on into the next step');
  assert.ok(capped.placed.at(-1)>=.95*free.placed.at(-1),`as many placed after 5 s: ${capped.placed} vs ${free.placed}`);
+});
+test('after a jump the lanes\' fit tests are spread over steps (FIT_WARM, SPAWN_WORK.fitSamples) and cars are still placed there',()=>{
+ const run=free=>{const saved=[FIT_WARM.samples,SPAWN_WORK.fitSamples];if(free)FIT_WARM.samples=SPAWN_WORK.fitSamples=1e9;try{
+  const sim=new Mobility(structuredClone(network),world,{random:seeded(),cars:30,people:0}),player={...city.landmarks[0],speed:0};sim.reset(player);
+  for(let i=0;i<200;i++)sim.step(1/60,player);
+  const far={x:player.x+1500,z:player.z+500,speed:0},fits=sim.fits;let n=0,worst=0,longest=0;sim.fits=function(e){if(e.fits===undefined){const k=Math.ceil(e.length/2);n+=k;longest=Math.max(longest,k);}return fits.call(this,e);};
+  for(let i=0;i<600;i++){n=0;sim.step(1/60,far);worst=Math.max(worst,n);}
+  return {worst,longest,placed:sim.cars.filter(a=>a.edge&&Math.hypot(a.x-far.x,a.z-far.z)<500).length};}finally{[FIT_WARM.samples,SPAWN_WORK.fitSamples]=saved;}};
+ const free=run(true),capped=run(false);
+ assert.ok(free.worst>FIT_WARM.samples+SPAWN_WORK.fitSamples+2*free.longest,`the jump's first step tests ${free.worst} spots`);
+ assert.ok(capped.worst<=FIT_WARM.samples+SPAWN_WORK.fitSamples+2*capped.longest,`at most a step's budget (and one edge over each), got ${capped.worst}`);
+ assert.ok(capped.placed>=.9*free.placed&&capped.placed>10,`cars placed by the new spot after 10 s: ${capped.placed} vs ${free.placed}`);
 });
 test('traffic stops for a player ahead and makes solid contact',()=>{
  const graph={nodes:[[0,0],[0,-200]],edges:[{from:0,to:1,points:[[0,0],[0,-200]],length:200,lane:0,signal:-1}]};
