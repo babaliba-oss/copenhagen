@@ -22,7 +22,7 @@ export const JOBS_1760 = [
   { t: 'Beer across the harbour', d: 'A small keg from Christianshavn for the inn on Kongens Nytorv. Over Knippelsbro, mind the toll man.', a: [55.67330, 12.59180, 'Christianshavn'], b: [55.67980, 12.58530, 'Kongens Nytorv'], pay: 192 },
   { t: 'Drawings for the marble church', d: 'Rolled drawings from Monsieur Jardin for the builders at Frederiks Kirke, by the new palaces. Keep them dry.', a: [55.67762, 12.58641, 'Holmens Kanal'], b: [55.68400, 12.59300, 'Amalienborg'], pay: 288 },
   { t: 'Bread for the Watch', d: 'Rye loaves for the guard at Nørreport before the gate closes.', a: [55.67820, 12.57338, 'Gammeltorv'], b: [55.68320, 12.57160, 'Nørreport'], pay: 96 },
-  { t: 'Tobacco to the Kastel', d: 'A twist of tobacco for an officer at Kastellet. He says the last boy was slow.', a: [55.68005, 12.58033, 'Østergade'], b: [55.69130, 12.59350, 'Kastellet'], pay: 144 },
+  { t: 'Tobacco to the Kastel', d: 'A twist of tobacco for an officer at Kastellet. He says the last boy was slow.', a: [55.68005, 12.58033, 'Østergade'], b: [55.68997, 12.59526, 'Kastellet'], pay: 144 }, // at Kongeporten: the footways and the road stop at the gate, and from the middle (55.69130, 12.59350) the line ran its last 146 m straight over the moat
 ];
 
 export const SAGAS = [
@@ -69,7 +69,7 @@ export const SAGAS = [
       { at: [55.68830, 12.58790], name: 'Nyboder', any: 1, nisse: 1, toast: ['Nisse fed', 'Nyboder. The sailors\' nisse.'] },
       { at: [55.67364, 12.59079], name: 'Christianshavns Kanal', any: 1, nisse: 1, toast: ['Nisse fed', 'Christianshavn. He wanted more butter.'] },
       { at: [55.67638, 12.58263], name: 'Holmens Kirke', any: 1, nisse: 1, toast: ['Nisse fed', 'Holmens Kirke. A church nisse. Very formal.'] },
-      { at: [55.69130, 12.59350], name: 'Kastellet', any: 1, nisse: 1, toast: ['Nisse fed', 'Kastellet. He salutes.'] }] },
+      { at: [55.68997, 12.59526], name: 'Kastellet', any: 1, nisse: 1, toast: ['Nisse fed', 'Kastellet. He salutes.'] }] },
   { id: 'holger', era: 'b', title: 'Holger Danske\'s Map', giver: 'ole', pay: 700,
     intro: 'Found this in a herring barrel. A map torn in three, no street names on it. Old sailors say it leads to Holger Danske, the knight who sleeps until Denmark needs him. No beams, no GPS. Just the map. Press K (or tap the saga card) to look at it.',
     go: 'First piece. North is up. Find the X. Press K, or tap the saga card, to look again.',

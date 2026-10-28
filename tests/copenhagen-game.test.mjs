@@ -9,7 +9,7 @@ Object.defineProperty(body,'append',{value:(...els)=>{for(const e of els)if(e.id
 globalThis.localStorage={getItem:k=>store.get(k)??null,setItem:(k,v)=>store.set(k,String(v)),removeItem:k=>store.delete(k)};globalThis.sessionStorage={getItem:()=>null,setItem(){},removeItem(){}};
 globalThis.addEventListener=globalThis.removeEventListener=()=>{};globalThis.fetch=async()=>{throw Error('offline');};
 const THREE=await import('three'),{expandCity}=await import('../src/city-pack.js'),{expandMobility}=await import('../src/mobility-pack.js'),{SpatialIndex,inWaterPolygons}=await import('../src/geo.js');
-const {createCopenhagenGame}=await import('../src/copenhagen/game.js'),{JOBS,SAGAS}=await import('../src/copenhagen/data.js');
+const {createCopenhagenGame}=await import('../src/copenhagen/game.js'),{JOBS,JOBS_1760,SAGAS}=await import('../src/copenhagen/data.js');
 const cities=JSON.parse(fs.readFileSync('public/cities/index.json','utf8')).cities;
 function play(id){
  let c=fs.readFileSync(`public/cities/${id}/city.pack`);if(c[0]===0x1f)c=gunzipSync(c);const data=expandCity(JSON.parse(c)),houses=new SpatialIndex(data.buildings);
@@ -58,4 +58,16 @@ test('today: near a job\'s end with nothing in the way, the line goes straight t
  for(let k=0;k<8;k++){const P=[B[0]+25*Math.cos(k*Math.PI/4),B[1]+25*Math.sin(k*Math.PI/4)];if(!(roads.at(...P)||pave.at(...P))||!clear(P,B))continue;
   for(const m of ['car','walk']){at(P,m==='car'?'walk':'car',1,.001);at(P,m,1,.001);assert.ok(line()<40,`${m} 25 m from Amalienborg: a ${line()|0} m line`);checked++;}} /* was 2352 m by car */
  assert.ok(checked>=2,'some spots checked');
+});
+test('no job or saga line, in either era, by car or on foot, runs over open water off the bridges',()=>{
+ for(const id of ['copenhagen','copenhagen-1760']){
+  store.clear();let {g,at,job,data}=play(id);const roads=new SpatialIndex(data.roads),pave=new SpatialIndex(data.pavement||[]),era=id==='copenhagen'?'m':'h',bad=[];
+  const wet=P=>{let w=0;for(let i=1;i<P.length;i++){const a=P[i-1],b=P[i],L=Math.hypot(b[0]-a[0],b[1]-a[1]),n=Math.ceil(L);for(let j=0;j<n;j++){const x=a[0]+(b[0]-a[0])*(j+.5)/n,z=a[1]+(b[1]-a[1])*(j+.5)/n;if(inWaterPolygons(data.water,x,z)&&!roads.at(x,z)&&!pave.at(x,z))w+=L/n;}}return w;};
+  const check=(label,here)=>{for(const m of ['car','walk']){at(here,m==='car'?'walk':'car',1,.001);at(here,m,1,.001);const w=wet(g.route()||[]);if(w>=3)bad.push(`${label} ${m}: ${w|0} m`);}};
+  let here=[5000,5000];at(here,'car',90);
+  for(let i=0;i<(era==='m'?JOBS:JOBS_1760).length;i++){const A=job();check(`job ${i} pick-up`,here);at(A);const B=job();check(`job ${i} delivery`,A);at(B);here=B;at(here,'car',90);}
+  for(const q of SAGAS.filter(s=>s.era===era||s.era==='b')){store.clear();({g,at}=play(id));const giver=g.people.find(p=>p.script===q.giver);g.api.sagaAccept(q.id);here=[giver.x,giver.z];
+   for(let k=0;k<q.steps.length;k++){at(here,'walk',1,.001);const P=g.route(),red=g.minimapTargets().filter(t=>t.color==='#e0313e').map(t=>t.p);if(!P||!red.some(p=>Math.hypot(p[0]-P.at(-1)[0],p[1]-P.at(-1)[1])<1))break; /* a map step: no line */
+    check(`${q.id} step ${k}`,here);here=P.at(-1);at(here,'car',3,.001);for(let n=0;n<4;n++)g.key('Escape');}}
+  assert.deepEqual(bad,[],id);} /* was: Tobacco to the Kastel and the nisse at Kastellet 43 m over the moat (no footway inside), Gefion's furrow 57 m by car from Kastellet's gate, the walk from the Opera 26 m over the canal */
 });
