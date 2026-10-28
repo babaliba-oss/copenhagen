@@ -531,125 +531,12 @@ export class Mobility {
   {const head=this._walkHead||(this._walkHead=new Int32Array(WALK_CELLS)),chain=this._walkNext?.length>=this.people.length?this._walkNext:(this._walkNext=new Int32Array(this.people.length));head.fill(-1);
   for(let i=0;i<this.people.length;i++){const p=this.people[i];if(!p.edge||p.knockdown)continue;const h=walkCell(Math.floor(p.x/1.5),Math.floor(p.z/1.5));chain[i]=head[h];head[h]=i;}}
   const tramList=this.trams?.trams||[];this.updateParked();this.warmFits(player);
-  const undo=(a,oldS,oldEdge,oldPrev,by)=>{if(a.edge!==oldEdge){a.plan?.unshift(a.edge);a.prevDir=oldPrev;}a.s=oldS;a.edge=oldEdge;a.speed=0;a.waiting=(a.waiting||0)+dt;a.stuck=(a.stuck||0)+dt;if(!a.walking){a.hold=by?'contact':'road';a.holdBy=by;}};
-  const nCars=this.cars.length,nAgents=nCars+this.people.length;
-  for(let ai=0;ai<nAgents;ai++){const a=ai<nCars?this.cars[ai]:this.people[ai-nCars];
-   if(a.playerTaken)continue;
-   a.hiddenFor=(this.visibilityTest?this.visibilityTest(a):hypot(a.x-player.x,a.z-player.z)<350)?0:(a.hiddenFor||0)+dt;
-   if(a.knockdown){a.speed=0;a.running=false;continue;}
-   if(a.walking&&this.time<(a.holdUntil||0)){a.speed=0;a.running=false;continue;}
-   if(a.walking&&a.conversation){a.speed=0;continue;}
-   // A car the player crashed into coasts on its own momentum, then sits where it stopped as an obstacle
-   // until it is out of sight (or long enough has passed) and gets recycled like any other car.
-   // A coach (1760: recoverKnocked set) that was shoved and has come to rest pulls back into its lane after a few seconds;
-   // like a wrecked car it used to stand in the street, horses frozen, until you drove 80 m away.
-   if(a.knocked&&this.recoverKnocked&&a.knocked.rest!=null&&this.time-a.knocked.rest>this.recoverKnocked&&this.rejoinLane(a)){a.knocked=undefined;continue;}
-   if(a.knocked){if(!stepKnocked(a,dt,this.world,this.time,{cars:this.cars,obstacles:this.externalObstacles,knock:(b,pose,impulse)=>{if(this.cars[b.id]===b&&b.edge){knockCar(b,impulse,this.time);this.collisions++;}}})&&(this.time-a.knocked.rest>REST_RECYCLE_AFTER&&hypot(a.x-player.x,a.z-player.z)>80&&!this.visibilityTest?.(a)||/* not while in view: wrecks vanished in front of the player */this.canRecycle(a,player)&&hypot(a.x-player.x,a.z-player.z)>160)){a.knocked=undefined;a.damage=undefined;a.edge=null;this.spawn(a,player);}continue;}
-   if(a.stationOnly){
-    if(!nearStation(player)){this.retire(a,player);continue;}
-    // Leaving the area: keep driving normally and recycle once unseen. (retire() would zero the speed every
-    // frame while the car is still in view, freezing it and everything queued behind it.)
-    if(a.edge&&!inStationTrafficArea(a)&&this.canRecycle(a,player))a.edge=null;
-    if(!a.edge){if(this.time<(a.retryAt||0))continue;a.retryAt=this.time+.5;this.spawn(a,player);continue;}
-   }
-   if(a.corridorOnly){
-    if(!this.nearCorridor(player)){this.retire(a,player);continue;}
-    if(a.edge&&!this.corridorIds.has(a.edge.id)&&this.canRecycle(a,player))a.edge=null;
-    if(!a.edge){if(this.time<(a.retryAt||0))continue;a.retryAt=this.time+.5;this.spawn(a,player);continue;}
-   }
-   if(!a.edge||(hypot(a.x-player.x,a.z-player.z)>(a.walking?this.walkRecycle:500)&&(a.walking||this.canRecycle(a,player)))){if(spawns++<this.spawnBudget||!a.edge&&this.time<3)this.spawn(a,player);continue;} // a few respawns per frame: after a turn dozens went at once (a hitch)
-   // A car that has made no progress for a long time is holding up a queue: recycle it unless it is close by.
-   // Away from the player a deadlocked car is recycled rather than squeezing through another one.
-   if(!a.walking&&((a.waiting||0)>STALLED_AFTER||a.deadlocked)&&hypot(a.x-player.x,a.z-player.z)>60){a.deadlocked=false;this.spawn(a,player);continue;}
-   const running=a.walking&&this.flee(a,player);
-   let desired=running?4.2+a.id%4*.2:a.cruise;const remaining=a.edge.length-a.s,dx=-Math.sin(a.heading),dz=-Math.cos(a.heading);
-   if(a.walking){
-    if(!running){const x=player.x-a.x,z=player.z-a.z,forward=x*dx+z*dz;if(forward>0&&forward<5&&Math.abs(x*dz-z*dx)<(this.streetWalking?(player.halfWidth??1)+.45:1.7)){desired=Math.min(desired,Math.max(0,(forward-2.8)*.85));
-      // Your car standing on the path: they wait a moment and turn back, as at a dead end. They stood in front of it for good,
-      // and everyone coming the same way queued behind them (seven stood over 20 s on the footway at -90,360).
-      if(desired<.1&&Math.abs(player.speed||0)<.5&&(a.playerHeld+=dt)>2.5){a.playerHeld=0;this.retire(a,player);continue;}}else a.playerHeld=0;}
-    if(a.edge.crossing&&a.s<.35&&!running&&!this.world.roads.at(a.x,a.z)&&!this.crossingClear(a.edge,player))desired=0;
-    // Never on a crossing: someone waiting for a gap out on the carriageway would hold up the cars (and the cars them).
-    // 1760: people running from the coach keep their distance and step round each other too (in the street they ran through one another).
-    if((!running||this.streetWalking)&&desired>0&&!a.edge.crossing){const g=this.walkGap(a,dx,dz);
-     if(g<desired){a.gapHeld=(a.gapHeld||0)+dt;let ring=false;
-      // Walkers each waiting for the next round a ring would never move: after a while the lowest id in it steps on.
-      if(a.gapHeld>4){let b=a.gapBy,min=a.id;for(let k=0;k<8&&b;k++){if(b===a){ring=min===a.id;break;}min=Math.min(min,b.id);b=b.gapBy;}}
-      if(!ring)desired=g;}
-     else a.gapHeld=0;}
-    else{a.gapBy=null;a.gapHeld=0;}
-    if((!running||this.streetWalking)&&!a.edge.crossing&&a.hiddenFor===0)this.walkDodge(a,dx,dz);else a.dodge=0;
-    if(this.streetWalking){if(!a.edge.crossing&&(coachCells.has(Math.floor(a.x/25)*65536+Math.floor(a.z/25))||Math.abs(player.x-a.x)<25&&Math.abs(player.z-a.z)<25)){const v=this.coachYield(a,player,desired);if(!running)desired=v;}else a.yieldSide=undefined;} // running from the player's coach, out of its way too
-   }else{
-    const plan=this.plan(a);let hold=null,holdBy=null;
-    if(plan.length)NEXT_ONE[0]=plan[0];desired=cornerSpeedLimit(a.edge,a.s,approachCruise(edgeCruise(a.edge,desired),plan[0],desired,remaining),plan.length?NEXT_ONE:NO_EDGES);
-    if(a.edge.roundabout)desired=Math.min(desired,6);
-    // Yield to circulating traffic before entering, never to an imaginary signal in the middle of the roundabout.
-    if(!a.edge.roundabout&&remaining<10&&this.roads.outgoing[a.edge.to].some(e=>e.roundabout)){
-     const entry=routePoint(a.edge,a.edge.length),b=this.cars.find(b=>b!==a&&b.edge?.roundabout&&hypot(b.x-entry.x,b.z-entry.z)<13)||this.externalObstacles.find(b=>b.edge?.roundabout&&hypot(b.x-entry.x,b.z-entry.z)<13);
-     if(b){const v=Math.max(0,(remaining-4)*1.2);if(v<desired){desired=v;hold='give way';holdBy=b;}}
-    }
-    // Gridlock (cars waiting on each other in a closed loop): the lowest id squeezes past the car it waits
-    // for when the player is near, and is recycled elsewhere. Junction and track rules keep this rare.
-    if(a.unjam&&(this.time>a.unjamUntil||a.unjam.edge===null))a.unjam=null;
-    a.gridlock=this.inGridlock(a)?(a.gridlock||0)+dt:0;
-    if(a.gridlock>1.5){a.gridlock=0;if(hypot(a.x-player.x,a.z-player.z)>60)a.deadlocked=true;else{a.unjam=a.holdBy;a.unjamUntil=this.time+5;}}
-    const zone=this.zoneLimit(a,plan,tramList);
-    if(zone<desired){desired=zone;hold=this.zoneWhy;holdBy=this.zoneBy;}
-    if(a.passing!=null&&!(this.cars[a.passing]?.edge&&trafficFootprintsOverlap(a,this.cars[a.passing])))a.passing=null;
-    {const head=this._trafficHead,chain=this._trafficNext,gx=Math.floor(a.x/20),gz=Math.floor(a.z/20);for(let ix=-1;ix<=1;ix++)for(let iz=-1;iz<=1;iz++)for(let ti=head[trafficCell(gx+ix,gz+iz)];ti>=0;ti=chain[ti]){const b=traffic[ti];if(b===a||b.edge===null)continue;const x=b.x-a.x,z=b.z-a.z;if(x>20||x<-20||z>20||z<-20)continue;
-     if(b===player&&a.around){const f=x*dx+z*dz;if(f>0&&f<20&&Math.abs(x*dz-z*dx)<(a.halfWidth??1)+(b.halfWidth??1)+.3){desired=0;hold='round';}continue;} // going round the player: sideways first, on once clear of it
-     if(b.ref?.parked||b.ref?.standing)continue; // standing buses: checked along the lane actually driven, below. The player on foot (player-travel.js: walking, no edge) counts as someone in the street
-     const forward=x*dx+z*dz,street=b.walking&&!b.edge?.crossing;if(forward<=(street?(a.halfLength??CAR_HALF_LENGTH)-.3:0)||forward>=20||Math.abs(x*dz-z*dx)>=(street?(a.halfWidth??1)+.45:2.1)||this.passes(a,b)||oncomingPasses(a,b))continue;
-     const v=Math.max(0,(forward-(a.halfLength??CAR_HALF_LENGTH)-(street?.5:b.halfLength??CAR_HALF_LENGTH)-1.3)*.85);if(v<desired){desired=v;hold='follow';holdBy=b.ref||b;} // stops ~1.3 m behind (6 m centres for two cars)
-    }}
-    if(this.standing?.length)for(const d of STANDING_PROBES){if(a.s+d>a.edge.length)break;const q=routePoint(a.edge,a.s+d,a.offset??a.edge.lane);if(this.standingAt(q)){const v=Math.max(0,(d-3.5)*.85);if(v<desired){desired=v;hold='follow';holdBy=null;}break;}}
-    // The player stopped in a car's way (head-on in its lane, or across it) held it for good, and the cars queued behind it,
-    // while the player, pressed between it and one behind, could move neither way (70 s and more in 1760 until R). After
-    // PLAYER_WAIT s held by the player the car goes round where the street leaves room (roomAround), else backs off a few
-    // metres (the cars queued behind it first, if they must) and keeps off while the player stands there. Once past (or after
-    // 12 s) it keeps to its lane again; backing off ends once the player is out of its way.
-    if(a.around&&(this.time>a.around.until||(player.x-a.x)*dx+(player.z-a.z)*dz<-((a.halfLength??CAR_HALF_LENGTH)+(player.halfLength??CAR_HALF_LENGTH))))a.around=null;
-    if(a.around)desired=Math.min(desired,3);
-    else if(this.time<(a.backUntil||0)){if(holdBy!==player&&!(a.backQueued&&holdBy&&this.time<(holdBy.backUntil||0)))a.backUntil=0;else{ /* while the player (or the car it backs for) is still in its way */desired=Math.min(desired,0);hold='back';holdBy=player;
-     if(this.time<a.backUntil-BACK_HOLD){const hl=a.halfLength??CAR_HALF_LENGTH,b=this.edgeCars.get(a.edge)?.find(b=>b!==a&&b.s<a.s&&a.s-b.s<hl+(b.halfLength??CAR_HALF_LENGTH)+2.5);if(a.backQueued||hypot(player.x-a.x,player.z-a.z)<=hl+(player.halfLength??CAR_HALF_LENGTH)+4.5){if(a.s>2*hl+2&&!b)desired=-1.2;else if(b&&!(this.time<b.backUntil)){b.backUntil=a.backUntil;b.backQueued=true;}}}}} /* 4.5 m clear of the player is room enough; the car behind backs for the one ahead */
-    a.playerWait=(holdBy===player&&Math.cos((player.heading||0)-a.heading)<.5||a.hold==='contact'&&a.holdBy===player)&&a.speed<.5?(a.playerWait||0)+dt:0; // not behind the player waiting its turn the same way (at a red light): only one it faces or that stands across it, or backs into it
-    if(a.playerWait>PLAYER_WAIT){a.playerWait=0;const k=this.roomAround(a,plan,player);if(k!==null)a.around={k,until:this.time+12};else{a.backUntil=this.time+3+BACK_HOLD;a.backQueued=false;}}
-    a.hold=hold;a.holdBy=holdBy;a.atSignal=hold==='signal';
-   }
-   a.speed+=Math.max(-7*dt,Math.min((running?8:a.walking?2:2.2)*dt,desired-a.speed));
-   if(!a.walking)a.speed=Math.min(edgeTopSpeed(a.edge,TRAFFIC_MAX_SPEED),a.speed);
-   const oldS=a.s,oldEdge=a.edge,oldPrev=a.prevDir;a.s+=a.speed*dt;
-   if(a.s>=a.edge.length){const next=a.walking?this.nextEdge(a):a.plan.length?a.plan.shift():this.pickNext(a.edge);if(!a.walking)a.prevDir=edgeEndDirection(a.edge);if(!next){a.s=oldS;this.retire(a,player,!a.walking&&hypot(a.x-player.x,a.z-player.z)>40);continue;}if(a.walking&&next.crossing&&!this.world.roads.at(a.x,a.z)&&!this.crossingClear(next,player)){a.s=oldS;a.speed=0;continue;}a.s-=a.edge.length;a.edge=next;}
-   const p=this.position(a);
-   // A step that cannot be taken is undone (undo, above the loop); a car keeps its planned route.
-   if(!a.walking){let by=sweptContact(a,p,player)?player:null;
-    if(!by)for(let bi=0;bi<nCars;bi++){const b=this.cars[bi];if(b===a||!b.edge)continue;const x=b.x-p.x,z=b.z-p.z,r=(a.halfLength??CAR_HALF_LENGTH)+(b.halfLength??CAR_HALF_LENGTH)+.5;if(x>r||x<-r||z>r||z<-r||!trafficFootprintsOverlap(p,b)||!yieldsTo(a,b))continue;if(this.passes(a,b)){a.passing=b.id;continue;}by=b;break;}
-    by||=this.bodyBlocking(a,p);
-    if(!by&&this.streetWalking)by=this.walkerUnder(p,a,traffic); // 1760: a coach stops rather than drive into someone in the street (moving off one is allowed; sliding its flank further over them, as it turns past someone waiting at its side, is not)
-    if(by){undo(a,oldS,oldEdge,oldPrev,by);if(a.stuck>4)this.retire(a,player);continue;}}
-   // The last half-step out of a crossing is still part of that crossing. Testing
-   // it as an ordinary footway strands pedestrians on the road and blocks cars.
-   const segmentEdge=a.walking&&oldEdge.crossing?oldEdge:a.edge;
-   if(this.world.buildings.at(p.x,p.z)||(a.walking?(!this.walkable(p.x,p.z,a.edge)||!a.unpocket&&!this.safeWalkSegment(a,p,segmentEdge)||coachCells?.has(Math.floor(p.x/25)*65536+Math.floor(p.z/25))&&this.coachOver(p,a)):!safeVehicleSegment(a,p,this.world)&&!this.kerbCorner(a,p,oldEdge))){undo(a,oldS,oldEdge,oldPrev,null);
-    // A walker whose step aside put it in a pocket of pavement between house corners (the 25 cm ground grid) could step
-    // neither on nor back: it turned round every 3 s for good at the door end of a path. After a second and a half it steps
-    // back onto the path's line.
-    if(a.walking&&a.stuck>1.5&&(a.ox||a.oz)){a.ox=0;a.oz=0;a.unpocket=true;}
-    // One whose way on runs under a coach standing for it (each waiting for the other) turns back after a second.
-    if(a.walking&&a.stuck>1&&coachCells){const c=this.coachOver(p,a);if(c)this.scare(a,c,2);}
-    // A footway that runs on into the carriageway (not a crossing) ends at the kerb: the walker turns there as at a dead end
-    // rather than standing 3 s, those behind queued at the same spot and stood in one another as each turned through them.
-    if(a.walking&&a.stuck>.4&&!a.edge.crossing){const q=routePoint(a.edge,Math.min(a.edge.length,a.s+.5),0,undefined,undefined,REACH_P);if(!this.walkable(q.x,q.z,a.edge)){this.retire(a,player);continue;}}
-    // A lane that runs off the mapped carriageway never clears; recycle it once it is not right beside the player.
-    if(a.stuck>3)this.retire(a,player,!a.walking&&a.stuck>8&&hypot(a.x-player.x,a.z-player.z)>40);continue;}
-   // Tiny successful steps between repeated failures are not real progress.
-   // Previously they reset the recovery timer, leaving actors stuck indefinitely.
-   if(!a.progressPoint||hypot(p.x-a.progressPoint.x,p.z-a.progressPoint.z)>.5){a.stuck=0;if(a.progressPoint){a.progressPoint.x=p.x;a.progressPoint.z=p.z;}else a.progressPoint={x:p.x,z:p.z};}
-   // Time spent without real progress (2 m), red lights included: a queue that never clears is stalled.
-   if(!a.walking){if(!a.waitFrom||hypot(p.x-a.waitFrom.x,p.z-a.waitFrom.z)>2){if(a.waitFrom){a.waitFrom.x=p.x;a.waitFrom.z=p.z;}else a.waitFrom={x:p.x,z:p.z};a.waiting=0;}else a.waiting=(a.waiting||0)+dt;}
-   a.unpocket=false;a.x=p.x;a.z=p.z;a.heading=p.heading; // p: position()'s point (its size fields are a's own)
-  }
+  // The per-agent work is in methods (stepAgent and the pieces it calls) rather than one loop body of ~14 KB of bytecode: a rare
+  // branch taken for the first time (a knock, a stuck walker, a gridlock) threw all of step() out of its optimised code, and
+  // optimising it again took 150-300 ms of compile time in which every step ran unoptimised at 5-15 ms (15-20 steps in a row:
+  // most of the steps over 4 ms). Now only the small method concerned is, and it is ready again in a few steps.
+  this._spawns=0;const nCars=this.cars.length,nAgents=nCars+this.people.length;
+  for(let ai=0;ai<nAgents;ai++){const a=ai<nCars?this.cars[ai]:this.people[ai-nCars];if(!a.playerTaken)this.stepAgent(a,player,traffic,coachCells,tramList);}
   // The impact pass owns contact resolution. Do not push the player sideways
   // into a second, differently sized envelope and lock them there. Existing
   // overlap can retreat; only motion farther into traffic is stopped here.
@@ -660,6 +547,145 @@ export class Mobility {
    const impulse=player.travelMode&&player.travelMode!=='car'?null:this.knock(a,player,next);
    if(impulse)player.speed=playerSpeedAfter(player,impulse);else{player.speed=0;a.speed=0;}
   }
+ }
+ // A step for one car or walker (step(): the lists it uses are built once per step).
+ stepAgent(a,player,traffic,coachCells,tramList){
+  const dt=this.dt,nCars=this.cars.length;
+  a.hiddenFor=(this.visibilityTest?this.visibilityTest(a):hypot(a.x-player.x,a.z-player.z)<350)?0:(a.hiddenFor||0)+dt;
+  if(a.knockdown){a.speed=0;a.running=false;return;}
+  if(a.walking&&this.time<(a.holdUntil||0)){a.speed=0;a.running=false;return;}
+  if(a.walking&&a.conversation){a.speed=0;return;}
+  // A car the player crashed into coasts on its own momentum, then sits where it stopped as an obstacle
+  // until it is out of sight (or long enough has passed) and gets recycled like any other car.
+  // A coach (1760: recoverKnocked set) that was shoved and has come to rest pulls back into its lane after a few seconds;
+  // like a wrecked car it used to stand in the street, horses frozen, until you drove 80 m away.
+  if(a.knocked){this.stepKnocked(a,player);return;}
+  if((a.stationOnly||a.corridorOnly)&&this.poolStep(a,player))return;
+  if(!a.edge||(hypot(a.x-player.x,a.z-player.z)>(a.walking?this.walkRecycle:500)&&(a.walking||this.canRecycle(a,player)))){if(this._spawns++<this.spawnBudget||!a.edge&&this.time<3)this.spawn(a,player);return;} // a few respawns per frame: after a turn dozens went at once (a hitch)
+  // A car that has made no progress for a long time is holding up a queue: recycle it unless it is close by.
+  // Away from the player a deadlocked car is recycled rather than squeezing through another one.
+  if(!a.walking&&((a.waiting||0)>STALLED_AFTER||a.deadlocked)&&hypot(a.x-player.x,a.z-player.z)>60){a.deadlocked=false;this.spawn(a,player);return;}
+  const running=a.walking&&this.flee(a,player);
+  let desired=running?4.2+a.id%4*.2:a.cruise;const remaining=a.edge.length-a.s,dx=-Math.sin(a.heading),dz=-Math.cos(a.heading);
+  if(a.walking){desired=this.walkerDesired(a,player,running,desired,dx,dz,coachCells);if(desired<0)return;}
+  else desired=this.carDesired(a,player,desired,remaining,dx,dz,traffic,tramList);
+  a.speed+=Math.max(-7*dt,Math.min((running?8:a.walking?2:2.2)*dt,desired-a.speed));
+  if(!a.walking)a.speed=Math.min(edgeTopSpeed(a.edge,TRAFFIC_MAX_SPEED),a.speed);
+  const oldS=a.s,oldEdge=a.edge,oldPrev=a.prevDir;a.s+=a.speed*dt;
+  if(a.s>=a.edge.length){const next=a.walking?this.nextEdge(a):a.plan.length?a.plan.shift():this.pickNext(a.edge);if(!a.walking)a.prevDir=edgeEndDirection(a.edge);if(!next){a.s=oldS;this.retire(a,player,!a.walking&&hypot(a.x-player.x,a.z-player.z)>40);return;}if(a.walking&&next.crossing&&!this.world.roads.at(a.x,a.z)&&!this.crossingClear(next,player)){a.s=oldS;a.speed=0;return;}a.s-=a.edge.length;a.edge=next;}
+  const p=this.position(a);
+  // A step that cannot be taken is undone (undoStep); a car keeps its planned route.
+  if(!a.walking){let by=sweptContact(a,p,player)?player:null;
+   if(!by)for(let bi=0;bi<nCars;bi++){const b=this.cars[bi];if(b===a||!b.edge)continue;const x=b.x-p.x,z=b.z-p.z,r=(a.halfLength??CAR_HALF_LENGTH)+(b.halfLength??CAR_HALF_LENGTH)+.5;if(x>r||x<-r||z>r||z<-r||!trafficFootprintsOverlap(p,b)||!yieldsTo(a,b))continue;if(this.passes(a,b)){a.passing=b.id;continue;}by=b;break;}
+   by||=this.bodyBlocking(a,p);
+   if(!by&&this.streetWalking)by=this.walkerUnder(p,a,traffic); // 1760: a coach stops rather than drive into someone in the street (moving off one is allowed; sliding its flank further over them, as it turns past someone waiting at its side, is not)
+   if(by){this.undoStep(a,oldS,oldEdge,oldPrev,by);if(a.stuck>4)this.retire(a,player);return;}}
+  // The last half-step out of a crossing is still part of that crossing. Testing
+  // it as an ordinary footway strands pedestrians on the road and blocks cars.
+  const segmentEdge=a.walking&&oldEdge.crossing?oldEdge:a.edge;
+  if(this.world.buildings.at(p.x,p.z)||(a.walking?(!this.walkable(p.x,p.z,a.edge)||!a.unpocket&&!this.safeWalkSegment(a,p,segmentEdge)||coachCells?.has(Math.floor(p.x/25)*65536+Math.floor(p.z/25))&&this.coachOver(p,a)):!safeVehicleSegment(a,p,this.world)&&!this.kerbCorner(a,p,oldEdge))){this.stepBlocked(a,p,player,oldS,oldEdge,oldPrev,coachCells);return;}
+  // Tiny successful steps between repeated failures are not real progress.
+  // Previously they reset the recovery timer, leaving actors stuck indefinitely.
+  if(!a.progressPoint||hypot(p.x-a.progressPoint.x,p.z-a.progressPoint.z)>.5){a.stuck=0;if(a.progressPoint){a.progressPoint.x=p.x;a.progressPoint.z=p.z;}else a.progressPoint={x:p.x,z:p.z};}
+  // Time spent without real progress (2 m), red lights included: a queue that never clears is stalled.
+  if(!a.walking){if(!a.waitFrom||hypot(p.x-a.waitFrom.x,p.z-a.waitFrom.z)>2){if(a.waitFrom){a.waitFrom.x=p.x;a.waitFrom.z=p.z;}else a.waitFrom={x:p.x,z:p.z};a.waiting=0;}else a.waiting=(a.waiting||0)+dt;}
+  a.unpocket=false;a.x=p.x;a.z=p.z;a.heading=p.heading; // p: position()'s point (its size fields are a's own)
+ }
+ // A step that cannot be taken is undone; a car keeps its planned route.
+ undoStep(a,oldS,oldEdge,oldPrev,by){if(a.edge!==oldEdge){a.plan?.unshift(a.edge);a.prevDir=oldPrev;}a.s=oldS;a.edge=oldEdge;a.speed=0;a.waiting=(a.waiting||0)+this.dt;a.stuck=(a.stuck||0)+this.dt;if(!a.walking){a.hold=by?'contact':'road';a.holdBy=by;}}
+ // The step a took (to p) ran into a house, off its ground or into a coach: undone (stepAgent), and what then.
+ stepBlocked(a,p,player,oldS,oldEdge,oldPrev,coachCells){this.undoStep(a,oldS,oldEdge,oldPrev,null);
+  // A walker whose step aside put it in a pocket of pavement between house corners (the 25 cm ground grid) could step
+  // neither on nor back: it turned round every 3 s for good at the door end of a path. After a second and a half it steps
+  // back onto the path's line.
+  if(a.walking&&a.stuck>1.5&&(a.ox||a.oz)){a.ox=0;a.oz=0;a.unpocket=true;}
+  // One whose way on runs under a coach standing for it (each waiting for the other) turns back after a second.
+  if(a.walking&&a.stuck>1&&coachCells){const c=this.coachOver(p,a);if(c)this.scare(a,c,2);}
+  // A footway that runs on into the carriageway (not a crossing) ends at the kerb: the walker turns there as at a dead end
+  // rather than standing 3 s, those behind queued at the same spot and stood in one another as each turned through them.
+  if(a.walking&&a.stuck>.4&&!a.edge.crossing){const q=routePoint(a.edge,Math.min(a.edge.length,a.s+.5),0,undefined,undefined,REACH_P);if(!this.walkable(q.x,q.z,a.edge)){this.retire(a,player);return;}}
+  // A lane that runs off the mapped carriageway never clears; recycle it once it is not right beside the player.
+  if(a.stuck>3)this.retire(a,player,!a.walking&&a.stuck>8&&hypot(a.x-player.x,a.z-player.z)>40);
+ }
+ // A car the player knocked (stepAgent): coasting, at rest as an obstacle, pulled back into its lane (a coach) or recycled.
+ stepKnocked(a,player){const dt=this.dt;
+  if(this.recoverKnocked&&a.knocked.rest!=null&&this.time-a.knocked.rest>this.recoverKnocked&&this.rejoinLane(a)){a.knocked=undefined;return;}
+  if(!stepKnocked(a,dt,this.world,this.time,{cars:this.cars,obstacles:this.externalObstacles,knock:(b,pose,impulse)=>{if(this.cars[b.id]===b&&b.edge){knockCar(b,impulse,this.time);this.collisions++;}}})&&(this.time-a.knocked.rest>REST_RECYCLE_AFTER&&hypot(a.x-player.x,a.z-player.z)>80&&!this.visibilityTest?.(a)||/* not while in view: wrecks vanished in front of the player */this.canRecycle(a,player)&&hypot(a.x-player.x,a.z-player.z)>160)){a.knocked=undefined;a.damage=undefined;a.edge=null;this.spawn(a,player);}
+ }
+ // Station and corridor cars (Helsinki) live only near their area: true when the step is done for this one.
+ poolStep(a,player){
+  if(a.stationOnly){
+   if(!nearStation(player)){this.retire(a,player);return true;}
+   // Leaving the area: keep driving normally and recycle once unseen. (retire() would zero the speed every
+   // frame while the car is still in view, freezing it and everything queued behind it.)
+   if(a.edge&&!inStationTrafficArea(a)&&this.canRecycle(a,player))a.edge=null;
+   if(!a.edge){if(this.time<(a.retryAt||0))return true;a.retryAt=this.time+.5;this.spawn(a,player);return true;}
+  }
+  if(a.corridorOnly){
+   if(!this.nearCorridor(player)){this.retire(a,player);return true;}
+   if(a.edge&&!this.corridorIds.has(a.edge.id)&&this.canRecycle(a,player))a.edge=null;
+   if(!a.edge){if(this.time<(a.retryAt||0))return true;a.retryAt=this.time+.5;this.spawn(a,player);return true;}
+  }
+  return false;
+ }
+ // How fast walker a may go this step (stepAgent); -1 when it was retired instead.
+ walkerDesired(a,player,running,desired,dx,dz,coachCells){const dt=this.dt;
+  if(!running){const x=player.x-a.x,z=player.z-a.z,forward=x*dx+z*dz;if(forward>0&&forward<5&&Math.abs(x*dz-z*dx)<(this.streetWalking?(player.halfWidth??1)+.45:1.7)){desired=Math.min(desired,Math.max(0,(forward-2.8)*.85));
+    // Your car standing on the path: they wait a moment and turn back, as at a dead end. They stood in front of it for good,
+    // and everyone coming the same way queued behind them (seven stood over 20 s on the footway at -90,360).
+    if(desired<.1&&Math.abs(player.speed||0)<.5&&(a.playerHeld+=dt)>2.5){a.playerHeld=0;this.retire(a,player);return -1;}}else a.playerHeld=0;}
+  if(a.edge.crossing&&a.s<.35&&!running&&!this.world.roads.at(a.x,a.z)&&!this.crossingClear(a.edge,player))desired=0;
+  // Never on a crossing: someone waiting for a gap out on the carriageway would hold up the cars (and the cars them).
+  // 1760: people running from the coach keep their distance and step round each other too (in the street they ran through one another).
+  if((!running||this.streetWalking)&&desired>0&&!a.edge.crossing){const g=this.walkGap(a,dx,dz);
+   if(g<desired){a.gapHeld=(a.gapHeld||0)+dt;let ring=false;
+    // Walkers each waiting for the next round a ring would never move: after a while the lowest id in it steps on.
+    if(a.gapHeld>4){let b=a.gapBy,min=a.id;for(let k=0;k<8&&b;k++){if(b===a){ring=min===a.id;break;}min=Math.min(min,b.id);b=b.gapBy;}}
+    if(!ring)desired=g;}
+   else a.gapHeld=0;}
+  else{a.gapBy=null;a.gapHeld=0;}
+  if((!running||this.streetWalking)&&!a.edge.crossing&&a.hiddenFor===0)this.walkDodge(a,dx,dz);else a.dodge=0;
+  if(this.streetWalking){if(!a.edge.crossing&&(coachCells.has(Math.floor(a.x/25)*65536+Math.floor(a.z/25))||Math.abs(player.x-a.x)<25&&Math.abs(player.z-a.z)<25)){const v=this.coachYield(a,player,desired);if(!running)desired=v;}else a.yieldSide=undefined;} // running from the player's coach, out of its way too
+  return desired;
+ }
+ // How fast car a may go this step (stepAgent), and what holds it (a.hold, a.holdBy).
+ carDesired(a,player,desired,remaining,dx,dz,traffic,tramList){const dt=this.dt;
+  const plan=this.plan(a);let hold=null,holdBy=null;
+  if(plan.length)NEXT_ONE[0]=plan[0];desired=cornerSpeedLimit(a.edge,a.s,approachCruise(edgeCruise(a.edge,desired),plan[0],desired,remaining),plan.length?NEXT_ONE:NO_EDGES);
+  if(a.edge.roundabout)desired=Math.min(desired,6);
+  // Yield to circulating traffic before entering, never to an imaginary signal in the middle of the roundabout.
+  if(!a.edge.roundabout&&remaining<10&&this.roads.outgoing[a.edge.to].some(e=>e.roundabout)){
+   const entry=routePoint(a.edge,a.edge.length),b=this.cars.find(b=>b!==a&&b.edge?.roundabout&&hypot(b.x-entry.x,b.z-entry.z)<13)||this.externalObstacles.find(b=>b.edge?.roundabout&&hypot(b.x-entry.x,b.z-entry.z)<13);
+   if(b){const v=Math.max(0,(remaining-4)*1.2);if(v<desired){desired=v;hold='give way';holdBy=b;}}
+  }
+  // Gridlock (cars waiting on each other in a closed loop): the lowest id squeezes past the car it waits
+  // for when the player is near, and is recycled elsewhere. Junction and track rules keep this rare.
+  if(a.unjam&&(this.time>a.unjamUntil||a.unjam.edge===null))a.unjam=null;
+  a.gridlock=this.inGridlock(a)?(a.gridlock||0)+dt:0;
+  if(a.gridlock>1.5){a.gridlock=0;if(hypot(a.x-player.x,a.z-player.z)>60)a.deadlocked=true;else{a.unjam=a.holdBy;a.unjamUntil=this.time+5;}}
+  const zone=this.zoneLimit(a,plan,tramList);
+  if(zone<desired){desired=zone;hold=this.zoneWhy;holdBy=this.zoneBy;}
+  if(a.passing!=null&&!(this.cars[a.passing]?.edge&&trafficFootprintsOverlap(a,this.cars[a.passing])))a.passing=null;
+  {const head=this._trafficHead,chain=this._trafficNext,gx=Math.floor(a.x/20),gz=Math.floor(a.z/20);for(let ix=-1;ix<=1;ix++)for(let iz=-1;iz<=1;iz++)for(let ti=head[trafficCell(gx+ix,gz+iz)];ti>=0;ti=chain[ti]){const b=traffic[ti];if(b===a||b.edge===null)continue;const x=b.x-a.x,z=b.z-a.z;if(x>20||x<-20||z>20||z<-20)continue;
+   if(b===player&&a.around){const f=x*dx+z*dz;if(f>0&&f<20&&Math.abs(x*dz-z*dx)<(a.halfWidth??1)+(b.halfWidth??1)+.3){desired=0;hold='round';}continue;} // going round the player: sideways first, on once clear of it
+   if(b.ref?.parked||b.ref?.standing)continue; // standing buses: checked along the lane actually driven, below. The player on foot (player-travel.js: walking, no edge) counts as someone in the street
+   const forward=x*dx+z*dz,street=b.walking&&!b.edge?.crossing;if(forward<=(street?(a.halfLength??CAR_HALF_LENGTH)-.3:0)||forward>=20||Math.abs(x*dz-z*dx)>=(street?(a.halfWidth??1)+.45:2.1)||this.passes(a,b)||oncomingPasses(a,b))continue;
+   const v=Math.max(0,(forward-(a.halfLength??CAR_HALF_LENGTH)-(street?.5:b.halfLength??CAR_HALF_LENGTH)-1.3)*.85);if(v<desired){desired=v;hold='follow';holdBy=b.ref||b;} // stops ~1.3 m behind (6 m centres for two cars)
+  }}
+  if(this.standing?.length)for(const d of STANDING_PROBES){if(a.s+d>a.edge.length)break;const q=routePoint(a.edge,a.s+d,a.offset??a.edge.lane);if(this.standingAt(q)){const v=Math.max(0,(d-3.5)*.85);if(v<desired){desired=v;hold='follow';holdBy=null;}break;}}
+  // The player stopped in a car's way (head-on in its lane, or across it) held it for good, and the cars queued behind it,
+  // while the player, pressed between it and one behind, could move neither way (70 s and more in 1760 until R). After
+  // PLAYER_WAIT s held by the player the car goes round where the street leaves room (roomAround), else backs off a few
+  // metres (the cars queued behind it first, if they must) and keeps off while the player stands there. Once past (or after
+  // 12 s) it keeps to its lane again; backing off ends once the player is out of its way.
+  if(a.around&&(this.time>a.around.until||(player.x-a.x)*dx+(player.z-a.z)*dz<-((a.halfLength??CAR_HALF_LENGTH)+(player.halfLength??CAR_HALF_LENGTH))))a.around=null;
+  if(a.around)desired=Math.min(desired,3);
+  else if(this.time<(a.backUntil||0)){if(holdBy!==player&&!(a.backQueued&&holdBy&&this.time<(holdBy.backUntil||0)))a.backUntil=0;else{ /* while the player (or the car it backs for) is still in its way */desired=Math.min(desired,0);hold='back';holdBy=player;
+   if(this.time<a.backUntil-BACK_HOLD){const hl=a.halfLength??CAR_HALF_LENGTH,b=this.edgeCars.get(a.edge)?.find(b=>b!==a&&b.s<a.s&&a.s-b.s<hl+(b.halfLength??CAR_HALF_LENGTH)+2.5);if(a.backQueued||hypot(player.x-a.x,player.z-a.z)<=hl+(player.halfLength??CAR_HALF_LENGTH)+4.5){if(a.s>2*hl+2&&!b)desired=-1.2;else if(b&&!(this.time<b.backUntil)){b.backUntil=a.backUntil;b.backQueued=true;}}}}} /* 4.5 m clear of the player is room enough; the car behind backs for the one ahead */
+  a.playerWait=(holdBy===player&&Math.cos((player.heading||0)-a.heading)<.5||a.hold==='contact'&&a.holdBy===player)&&a.speed<.5?(a.playerWait||0)+dt:0; // not behind the player waiting its turn the same way (at a red light): only one it faces or that stands across it, or backs into it
+  if(a.playerWait>PLAYER_WAIT){a.playerWait=0;const k=this.roomAround(a,plan,player);if(k!==null)a.around={k,until:this.time+12};else{a.backUntil=this.time+3+BACK_HOLD;a.backQueued=false;}}
+  a.hold=hold;a.holdBy=holdBy;a.atSignal=hold==='signal';
+  return desired;
  }
  // The player's sweep from `from` to `car` hit NPC `a`: shove it (see crash-physics.js). Returns the impulse,
  // or null when the cars were not really closing on each other.

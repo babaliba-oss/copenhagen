@@ -19,9 +19,11 @@ export function pointInPolygon(x,z,rings) {
 // Indexed polygons with long rings (1760's town-wide cobble areas and commons: 900-1,900 vertices, under every walker's
 // step) test only the edges crossing the point's 4 m band of z: the same crossings as pointInRing, a few instead of all.
 const RING_BANDS=new WeakMap(),BAND=4;
-function ringBands(ring){
-  let t=RING_BANDS.get(ring);if(t)return t;
-  let z0=Infinity,z1=-Infinity;for(const p of ring){if(p[1]<z0)z0=p[1];if(p[1]>z1)z1=p[1];}
+// The lookup is its own function: the builder's closures capture `ring`, so a function holding both allocated a context on
+// every call, the cached ones too (~1,000 calls a step from the road tests: ~60 KB of garbage a step).
+const ringBands=ring=>RING_BANDS.get(ring)||buildRingBands(ring);
+function buildRingBands(ring){
+  let t,z0=Infinity,z1=-Infinity;for(const p of ring){if(p[1]<z0)z0=p[1];if(p[1]>z1)z1=p[1];}
   // Each band holds the indices of its edges (edge i runs from ring[i] to the point before it), packed in one typed array:
   // an array of four coordinates per band per edge took ~20 MB on a phone (an edge 400 m tall copied into 100 bands).
   const base=Math.floor(z0/BAND),n=Math.floor(z1/BAND)-base+1,start=new Uint32Array(n+1),span=(i,f)=>{const a=ring[i],b=ring[i?i-1:ring.length-1];if(a[1]===b[1])return; // level edges never cross
