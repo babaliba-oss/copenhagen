@@ -112,7 +112,7 @@ const overlapsAny=(p,list)=>{const al=p.halfLength??2.36;for(let k=0;k<list.leng
 export class PoliceSimulation{
  constructor(graph,world){
   this.graph=graph;this.world=world;this.incoming=Array.from({length:graph.nodes.length},()=>[]);
-  graph.edges.forEach(e=>this.incoming[e.to].push(e));this.reset();
+  graph.edges.forEach(e=>this.incoming[e.to].push(e));this.reset();this.sampleGrid(); /* while the map loads: the first call took 25-40 ms in the frame the first unit was called */
  }
  // Extension edges retain their IDs; wanted state and units are left intact.
  refreshGraph(){this.grid=null;
@@ -221,27 +221,46 @@ export class PoliceSimulation{
  }
  search(target,reach,goal=-1){
   const costs=new Float64Array(this.graph.nodes.length).fill(Infinity),field={target,costs};if(!target)return field;
-  const {edge,s}=target;costs[edge.from]=s;heapSize=0;push(s,edge.from);
-  while(heapSize){const cost=pop(),node=popped;if(cost!==costs[node])continue;if(cost>reach||node===goal)break; /* goal: every cost set so far leads down a real route to the target */
-   for(const e of this.incoming[node]){if((this.blocked.get(e.id)||0)>this.time)continue;const next=cost+e.length;if(next<costs[e.from]){costs[e.from]=next;push(next,e.from);}}
+  const {edge,s}=target;costs[edge.from]=s;heapSize=0;
+  if(goal<0){push(s,edge.from);
+   while(heapSize){const cost=pop(),node=popped;if(cost!==costs[node])continue;if(cost>reach)break;
+    for(const e of this.incoming[node]){if((this.blocked.get(e.id)||0)>this.time)continue;const next=cost+e.length;if(next<costs[e.from]){costs[e.from]=next;push(next,e.from);}}
+   }
+   return field;
+  }
+  // Towards one goal (farField): A*, ordered by cost plus the straight distance on to the goal (never more than the road:
+  // consistent), so the search heads for the unit instead of filling every street within its route's length (up to ~20 ms
+  // for a goal across the harbour). Every cost it sets is the length of a real route to the target, and those on the
+  // goal's best route are exact, so a unit following the field still drives down its shortest route.
+  const N=this.graph.nodes,[gx,gz]=N[goal],h=v=>Math.hypot(N[v][0]-gx,N[v][1]-gz);push(s+h(edge.from),edge.from);
+  while(heapSize){const f=pop(),node=popped,cost=costs[node];if(f!==cost+h(node))continue;if(node===goal)break;
+   for(const e of this.incoming[node]){if((this.blocked.get(e.id)||0)>this.time)continue;const next=cost+e.length;if(next<=reach&&next<costs[e.from]){costs[e.from]=next;push(next+h(e.from),e.from);}}
   }
   return field;
  }
  // A unit whose road route to the target is longer than ROUTE_REACH (the harbour, a canal, a one-way maze or an edge blocked
  // by a stuck unit between it and a player 85-450 m away) found no next edge and stood still until it was retired (3.5% of
  // the road spots a unit can stand on 85-450 m from a player in today's Copenhagen). It follows a coarse field instead: the
- // same search from the chase target, out to the unit (FAR_REACH at most), run again when it has no route for a unit or is
- // FAR_EVERY s old (it lags the target by up to that; the unit takes the ordinary field once back within reach).
- farField(unit){const f=this.far,goal=unit.edge.to,old=!f||this.time>=this.farAt;if(old||!Number.isFinite(f.costs[goal])&&!f.tried.has(goal)){const tried=old?new Set():f.tried;tried.add(goal);this.far=this.search(this.target,FAR_REACH,goal);this.far.tried=tried;if(old)this.farAt=this.time+FAR_EVERY;}return this.far;} // tried: goals searched for since the last fresh run (one with no route at all is not searched again every frame)
+ // same search from the chase target, out to the unit (FAR_REACH at most), run again for a unit no field covers, and all
+ // dropped when FAR_EVERY s old (it lags the target by up to that; the unit takes the ordinary field once back within reach).
+ farField(unit){const goal=unit.edge.to;if(!this.far||this.time>=this.farAt){this.far=new Map();this.farAt=this.time+FAR_EVERY;}let f=this.far.get(goal);if(!f){for(const g of this.far.values())if(Number.isFinite(g.costs[goal])){f=g;break;}if(!f)this.far.set(goal,f=this.search(this.target,FAR_REACH,goal));}return f;} // far: the fields searched since the last fresh run, by goal (each search heads for its own unit: one replacing another left the first without a route); a goal with no route at all is searched once per run, not every frame
+ // The edges filed under the 200 m blocks (sampleGrid) within r of a point, in graph order: the only ones that can have a
+ // spot within r - 6 m of it (spawn and backup went through all 44k edges in today's Copenhagen: 2-40 ms a call).
+ nearEdges(x,z,r){
+  const {byCell}=this.sampleGrid(),seen=new Set();
+  for(let i=Math.floor((x-r)/200);i<=Math.floor((x+r)/200);i++)for(let j=Math.floor((z-r)/200);j<=Math.floor((z+r)/200);j++)for(const k of byCell.get(i*100003+j)||[])seen.add(k);
+  return [...seen].sort((a,b)=>a-b);
+ }
  spawn(player,traffic){
   if(!this.target)return;
   const candidates=[],role=this.units.length%2?'intercept':'chase',surge=this.surging,[near,far]=surge?SURGE.spawn:[65,150];
-  for(const edge of this.graph.edges){if(!Number.isFinite(this.costs[edge.to])&&edge!==this.target.edge)continue;
+  traffic=traffic.filter(a=>a.edge!==null&&distance(a,player)<far+12); // only these can be within 12 m of a spot (was every car and walker for every spot)
+  for(const k of this.nearEdges(player.x,player.z,far+12)){const edge=this.graph.edges[k];if(!Number.isFinite(this.costs[edge.to])&&edge!==this.target.edge)continue;
    const s=edge.length*.5,p=routePoint(edge,s,edge.lane,undefined,undefined,this.spawnPoint||={x:0,z:0,heading:0}),d=distance(p,player); /* copied into the candidate below */
    if(d<near||d>far||(this.blocked.get(edge.id)||0)>this.time)continue;
    // Surge: score by driving distance to the player, not as the crow flies, so the unit really arrives in seconds.
    const route=edge===this.target.edge?Math.max(0,this.target.s-s):edge.length-s+this.costs[edge.to];
-   if(!vehicleFitsRoad(p,this.world)||traffic.some(a=>a.edge!==null&&distance(p,a)<12)||this.units.some(a=>a.edge!==null&&distance(p,a)<12))continue;
+   if(!vehicleFitsRoad(p,this.world)||traffic.some(a=>distance(p,a)<12)||this.units.some(a=>a.edge!==null&&distance(p,a)<12))continue;
    const ahead=-(p.x-player.x)*Math.sin(player.heading)-(p.z-player.z)*Math.cos(player.heading);
    // Chase cars arrive from behind; every second unit tries to head the player off.
    candidates.push({edge,s,...p,ahead,route,score:(surge?Math.min(route,far*2):d)+((ahead>0)!==(role==='intercept')?50:0)});
@@ -262,11 +281,12 @@ export class PoliceSimulation{
  // view, when the first wave has not reached arrest range (boxed in by traffic).
  backup(player,traffic){
   const [near,far]=SURGE.backupSpawn,candidates=[];
-  for(const edge of this.graph.edges){
+  traffic=traffic.filter(a=>a.edge!==null&&distance(a,player)<far+9);
+  for(const k of this.nearEdges(player.x,player.z,far+12)){const edge=this.graph.edges[k];
    if(edge.points.every(q=>Math.hypot(q[0]-player.x,q[1]-player.z)>far+edge.length))continue;
    for(let s=4;s<=edge.length-4;s+=6){
     const p=routePoint(edge,s,edge.lane,undefined,undefined,this.spawnPoint||={x:0,z:0,heading:0}),d=distance(p,player);if(d<near||d>far)continue;
-    if(!vehicleFitsRoad(p,this.world)||traffic.some(a=>a.edge!==null&&distance(p,a)<9)||this.units.some(a=>a.edge!==null&&distance(p,a)<9))continue;
+    if(!vehicleFitsRoad(p,this.world)||traffic.some(a=>distance(p,a)<9)||this.units.some(a=>a.edge!==null&&distance(p,a)<9))continue;
     const ahead=-(p.x-player.x)*Math.sin(player.heading)-(p.z-player.z)*Math.cos(player.heading),visible=ahead>-6&&this.clearSight(p,player);
     candidates.push({edge,s,...p,score:d+(visible?60:0)+(Number.isFinite(this.costs[edge.to])?0:10)});
    }
@@ -376,11 +396,8 @@ export class PoliceSimulation{
   if(this.level&&this.time>=this.repath){
    this.plan(this.lastSeen);this.repath=this.time+2;this.intercept=null;
    const lead=Math.min(70,Math.max(0,player.speed)*3.2);
-   if(this.seen&&lead>25&&this.units.some(u=>u.role==='intercept')){
-    this.predicted={x:player.x-Math.sin(player.heading)*lead,z:player.z-Math.cos(player.heading)*lead};
-    this.intercept=this.field(this.predicted);
-   }
-  }
+   if(this.seen&&lead>25&&this.units.some(u=>u.role==='intercept'))this.predicted={x:player.x-Math.sin(player.heading)*lead,z:player.z-Math.cos(player.heading)*lead,due:true};
+  }else if(this.level&&this.predicted?.due){this.predicted.due=false;this.intercept=this.field(this.predicted);} // the next step: two fields in one step were up to ~8 ms
   const surge=this.surging,wanted=Math.max(surge?Math.max(this.level,SURGE.minUnits):this.level,this.level?this.minUnits:0),chasing=this.units.filter(u=>!u.parked).length;
   if(this.level&&chasing<wanted&&this.time>=this.dispatch){this.spawn(player,traffic);this.dispatch=this.time+(surge?SURGE.dispatch:Math.max(1.5,3.4-this.level*.4));}
   // Surge backup: the player has been stopped for a while and nobody is within arrest range yet.

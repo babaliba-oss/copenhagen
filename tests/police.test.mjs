@@ -44,8 +44,8 @@ test('one-star patrol gives up sooner than a pedestrian pursuit; unseen wanted l
 test('interceptors head for where the player is going, not where they were',()=>{
  const p=new PoliceSimulation(graph(),world),car={x:0,z:0,heading:0,speed:25};p.report('pedestrian',1);p.dispatch=1e9;
  p.units=[{id:'a',role:'chase',edge:p.graph.edges[0],s:30,x:0,z:70,heading:0,speed:0,stuck:0},{id:'b',role:'intercept',edge:p.graph.edges[0],s:25,x:0,z:75,heading:0,speed:0,stuck:0}];
- p.step(1/30,car);assert.equal(p.seen,true);
- assert.ok(p.intercept?.target,'intercept field planned');assert.ok(p.predicted.z<car.z-60,'lead point is ahead of the car');
+ p.step(1/30,car);assert.equal(p.seen,true);assert.equal(p.intercept,null,'not in the step that planned the chase field');
+ p.step(1/30,car);assert.ok(p.intercept?.target,'intercept field planned the step after');assert.ok(p.predicted.z<car.z-60,'lead point is ahead of the car');
  assert.equal(p.fieldFor(p.units[1]),p.intercept);assert.equal(p.fieldFor(p.units[0]),p);
 });
 test('wanted level has five steps and never exceeds five stars',()=>{
@@ -228,4 +228,6 @@ test('a unit whose road route to the player is longer than the route field\'s re
  const unit=p.newUnit({edge:start,s:50,x:100,z:50,heading:0},'chase',false);p.units=[unit];
  for(let i=0;i<5*30;i++)p.step(1/30,car);
  assert.notEqual(unit.edge,start,'it drove on past the end of its street');assert.ok(unit.z<-40&&unit.speed>5,`on its way round (z ${unit.z.toFixed(0)}, ${unit.speed.toFixed(1)} m/s)`);
+ const q=new PoliceSimulation(g,world);q.escalate({level:3});q.plan(car);const a={edge:g.edges[0],role:'chase'},b={edge:g.edges[1],role:'chase'};
+ for(const u of [a,b,a,b])assert.ok(q.next(u.edge,q.fieldFor(u)),'each of two units beyond reach keeps a route (the search heads for its own unit)');
 });
