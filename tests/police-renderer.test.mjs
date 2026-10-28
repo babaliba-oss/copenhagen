@@ -7,7 +7,7 @@ import {sirenMix} from '../src/police-siren.js';
 import {createVehicle} from '../src/vehicles.js';
 
 // Minimal canvas stand-in: every 2D context call is a no-op.
-const ctx=new Proxy({},{get:(t,k)=>k==='createRadialGradient'?()=>({addColorStop(){}}):()=>{},set:()=>true});
+const ctx=new Proxy({},{get:(t,k)=>k==='createRadialGradient'?()=>({addColorStop(){}}):k==='measureText'?()=>({width:1}):()=>{},set:()=>true}); // measureText: the officers' uniform lettering (person-model.js), made with the renderer
 function withDocument(run){
  const original=globalThis.document;globalThis.document={createElement:()=>({getContext:()=>ctx})};
  try{run();}finally{if(original===undefined)delete globalThis.document;else globalThis.document=original;}

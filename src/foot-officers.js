@@ -12,7 +12,10 @@ export const FOOT_OFFICERS={max:FOOT_CHASE.max};
 
 export function createFootOfficers(simulation,parent=null){
  const group=new Group(),officers=new Map();group.name='Police officers on foot';
- let serial=0,time=0,drawn=0,batch=null; // the batch (uniform textures) is made, and put in the scene, when the first officer gets out
+ let serial=0,time=0,drawn=0;
+ // The batch (uniform textures) is made with the renderer, while the map loads, and put in the scene when the first officer
+ // gets out: made then too, it took 12-50 ms in that frame (node, today's Copenhagen chase).
+ const batch=createPersonBatch(Math.max(1,FOOT_OFFICERS.max),{name:'Police officers on foot',police:true});group.add(batch.group);
  return {
   group,officers,get batch(){return batch;},
   update(dt){
@@ -29,8 +32,7 @@ export function createFootOfficers(simulation,parent=null){
     o.x=s.x;o.z=s.z;o.heading=s.heading;o.speed=s.speed;o.running=s.speed>2.5;o.back=s.back;
     advanceGait(o,o.gait,dt,o.look);
    }
-   if(!batch){batch=createPersonBatch(Math.max(1,FOOT_OFFICERS.max),{name:'Police officers on foot',police:true});group.add(batch.group);parent?.add(group);}
-   batch.begin(player);for(const o of officers.values())batch.draw(o,o.look,o.gait,time);batch.end();drawn=officers.size;
+   batch.begin(player);for(const o of officers.values())batch.draw(o,o.look,o.gait,time);batch.end();drawn=officers.size;if(!group.parent)parent?.add(group);
   },
   snapshot(){return [...officers.values()].map(o=>({id:o.id,x:+o.x.toFixed(2),z:+o.z.toFixed(2),speed:+o.speed.toFixed(2),back:o.back}));},
  };
