@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync,existsSync} from 'node:fs';
 import {gunzipSync} from 'node:zlib';
-import {Mobility,prepareGraph,routePoint,signalGreen} from '../src/mobility.js';
+import {Mobility,prepareGraph,routePoint,signalGreen,SPAWN_WORK} from '../src/mobility.js';
 import {SpatialIndex} from '../src/geo.js';
 const network=JSON.parse(readFileSync('public/data/mobility.json'));
 const city=JSON.parse(gunzipSync(readFileSync('public/data/city.pack')));
@@ -34,6 +34,19 @@ test('cars, walkers and the edges they use keep one shape while the simulation r
  for(const b of [...sim.cars,...sim.people])assert.equal(keys(b),agent);
  for(const [e,k] of road)assert.equal(keys(e),k);for(const [e,k] of walk)assert.equal(keys(e),k);
  assert.ok(sim.roads.edges.some(e=>e.fits!==undefined)&&sim.walks.edges.some(e=>e._room!==undefined)); // those fields were worked out meanwhile
+});
+test('spawning spends at most SPAWN_WORK.trials spots a step, carries the rest over, and fills the streets as fast within a few seconds',()=>{
+ const run=limit=>{const saved=SPAWN_WORK.trials;SPAWN_WORK.trials=limit;try{
+  const sim=new Mobility(structuredClone(network),world,{random:seeded(),cars:20,people:80}),player={...city.landmarks[0],speed:0};sim.reset(player);
+  for(let i=0;i<200;i++)sim.step(1/60,player); // past the first 3 s, when everyone may be placed at once
+  const far={x:player.x+900,z:player.z+300,speed:0};sim.visibilityTest=p=>p.x>far.x-300; /* most spots in view: most tried in vain */const spawn=sim.spawn,placed=[];let worst=0,carried=0,tried=0;sim.spawn=function(a,p){const w0=this.spawnWork;spawn.call(this,a,p);tried+=Math.max(0,w0)-Math.max(0,this.spawnWork);if(a.spawnTrials>0)carried++;}; // spots tried
+  for(let i=0;i<300;i++){tried=0;sim.step(1/60,far);worst=Math.max(worst,tried);if(i%60===59)placed.push(sim.people.filter(a=>a.edge&&Math.hypot(a.x-far.x,a.z-far.z)<250).length+sim.cars.filter(a=>a.edge).length);}
+  return {worst,placed,carried};}finally{SPAWN_WORK.trials=saved;}};
+ const free=run(1e9),capped=run(SPAWN_WORK.trials);
+ assert.ok(free.worst>SPAWN_WORK.trials,`the jump asks for more than a step's work (${free.worst})`);
+ assert.ok(capped.worst<=SPAWN_WORK.trials,`at most ${SPAWN_WORK.trials} spots a step, got ${capped.worst}`);
+ assert.ok(capped.carried>0,'some searches went on into the next step');
+ assert.ok(capped.placed.at(-1)>=.95*free.placed.at(-1),`as many placed after 5 s: ${capped.placed} vs ${free.placed}`);
 });
 test('traffic stops for a player ahead and makes solid contact',()=>{
  const graph={nodes:[[0,0],[0,-200]],edges:[{from:0,to:1,points:[[0,0],[0,-200]],length:200,lane:0,signal:-1}]};

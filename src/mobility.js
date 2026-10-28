@@ -8,7 +8,7 @@ const hypot=(x,z)=>Math.sqrt(x*x+z*z); // not Math.hypot: in optimised code it a
 // Every car and walker is made with all the fields step() and spawn() give it, in one order: they were added as each
 // first came up, in different orders, so the agents had dozens of shapes and step() was thrown back out of its
 // optimised code ('wrong map') every few seconds, running at half speed and twice the garbage until optimised again.
-const newAgent=(id,walking,cruise,side,stationOnly,corridorOnly)=>settleShape({id,stationOnly,corridorOnly,walking,edge:null,s:0,speed:0,cruise,side,dodge:0,yieldSide:undefined,yieldHeld:0,unpocket:false,x:0,z:0,heading:0,playerTaken:undefined,conversation:undefined,knocked:undefined,damage:undefined,plan:[],prevDir:undefined,ox:undefined,oz:undefined,gapBy:null,gapHeld:0,offset:undefined,waiting:0,passing:null,unjam:null,unjamUntil:0,gridlock:0,hold:null,holdBy:null,atSignal:false,deadlocked:false,hiddenFor:0,panicUntil:0,turnAfter:0,turnedAt:undefined,holdUntil:0,retryAt:0,running:false,stuck:0,progressPoint:null,waitFrom:null,kerbUntil:0,playerHeld:0,playerWait:0,around:null,backUntil:0,backQueued:false,halfLength:undefined,halfWidth:undefined,knockdown:undefined,impactCooldown:undefined,pose:undefined,reaction:undefined}); // the last six: the 1760 coach's size (main.js), knock-downs (impacts.js), poses (crowd-reaction.js, people-interaction.js)
+const newAgent=(id,walking,cruise,side,stationOnly,corridorOnly)=>settleShape({id,stationOnly,corridorOnly,walking,edge:null,s:0,speed:0,cruise,side,dodge:0,yieldSide:undefined,yieldHeld:0,unpocket:false,x:0,z:0,heading:0,playerTaken:undefined,conversation:undefined,knocked:undefined,damage:undefined,plan:[],prevDir:undefined,ox:undefined,oz:undefined,gapBy:null,gapHeld:0,offset:undefined,waiting:0,passing:null,unjam:null,unjamUntil:0,gridlock:0,hold:null,holdBy:null,atSignal:false,deadlocked:false,hiddenFor:0,panicUntil:0,turnAfter:0,turnedAt:undefined,holdUntil:0,retryAt:0,running:false,stuck:0,progressPoint:null,waitFrom:null,kerbUntil:0,playerHeld:0,playerWait:0,around:null,backUntil:0,backQueued:false,spawnTrials:0,halfLength:undefined,halfWidth:undefined,knockdown:undefined,impactCooldown:undefined,pose:undefined,reaction:undefined}); // the last six: the 1760 coach's size (main.js), knock-downs (impacts.js), poses (crowd-reaction.js, people-interaction.js)
 // Each field is given, once, every kind of value it will ever hold, then set back: its first fraction where it started at 0, its first
 // number where it started null or undefined (or the reverse), or its first object of another shape each changed every agent's shape
 // mid-game (field representations: V8 deprecates the map), and all the optimised code that had seen agents was thrown out at once
@@ -29,6 +29,10 @@ import {mergeGraph} from './graph-extension.js';
 import {inWaterPolygons} from './geo.js';
 export const TRAFFIC_MAX_SPEED=50/3.6;
 export const FIT_WARM={r:480,move:40,ms:.4};
+// Placement work a step may spend on spawn trials (spots tried, each up to 80 per agent): 6 agents that found no spot tried 480 a step,
+// every step while it lasted (walkers trailing a fast car). An agent whose trials are cut short goes on with the rest of its 80 the next
+// step. Not while the map fills (the first 3 s, reset()).
+export const SPAWN_WORK={trials:160};
 export const nearStation=p=>hypot(p.x+620,p.z+45)<430;
 export const inStationTrafficArea=p=>p.x>-885&&p.x<-440&&p.z>-145&&p.z<55;
 export function prepareGraph(graph){
@@ -97,7 +101,7 @@ const crowded=(cells,p)=>{const {r,max}=WALK_CROWD,cx=Math.floor(p.x/r),cz=Math.
 const yieldsTo=(a,b)=>{if(Math.cos(a.heading-b.heading)<.9)return true;const forward=(b.x-a.x)*-Math.sin(a.heading)+(b.z-a.z)*-Math.cos(a.heading);return forward>.3||(forward>-.3&&b.id<a.id);};
 export class Mobility {
  constructor(data,world,{cars=52,people=100,stationCars=0,corridorCars=0,corridor=null,random=Math.random,walkSpawn=200,walkRecycle=330,streetWalking=false}={}){
-  this.walkSpawn=walkSpawn;this.walkRecycle=walkRecycle;this.streetWalking=streetWalking; /* 1760: no pavements, people walk in the street (walkable) and give way to coaches (coachYield) */this.spawnBudget=6; // walkers appear within walkSpawn m of the player and are recycled past walkRecycle
+  this.walkSpawn=walkSpawn;this.walkRecycle=walkRecycle;this.streetWalking=streetWalking; /* 1760: no pavements, people walk in the street (walkable) and give way to coaches (coachYield) */this.spawnBudget=6;this.spawnWork=Infinity; // walkers appear within walkSpawn m of the player and are recycled past walkRecycle
   this.roads=prepareGraph(data.roads);this.walks=prepareGraph(data.walks);this.signals=data.signals;this.signalControl=annotateJunctions(this.roads,data.signals||[]);annotateCrossings(this.walks,this.signalControl);this.signalAxes=this.signalControl.axes;this.world=world;this.random=random;this.time=0;this.collisions=0;this.externalObstacles=[];this.externalBodies=[];this.trams=null;this.edgeCars=new Map();this.boxCars=new Map();this.approaching=new Map();
   if(world?.laneWalls)this.walledLanes=markWalledLanes(this.roads.edges,world.laneWalls); // lanes through a wall the model draws on the road (road-walls.json) are routed round
   // What step() and spawn() work out per edge later (fits, conflict zones, walkers' room...) has its field from the start: each first
@@ -322,7 +326,7 @@ export class Mobility {
   // Prefer nearby routes; edge midpoint avoids choosing a remote end of a long road.
   const nearby=this.spawnCandidates(a,player,graph,()=>(a.stationOnly?this.stationEdges:a.corridorOnly?this.corridorEdges:this.edgesNear(graph,player,a.walking?this.walkSpawn:320)).filter(e=>{const p=e.points[Math.floor(e.points.length/2)],d=hypot(p[0]-player.x,p[1]-player.z);return (!a.walking||!e.crossing)&&d<(a.walking?200:a.corridorOnly?520:320)&&e.length>(a.walking?3:10)&&!(!a.walking&&(this.obstructed?.has(e)||this.trap(e,2)));}));
   let occupancy=null,crowd=null; // walkers per edge (and per WALK_CROWD.r cell), counted once per spawn rather than once per trial
-  for(let trial=0;trial<80&&nearby.length;trial++){
+  for(let trial=a.spawnTrials;trial<80&&nearby.length;trial++){if(this.spawnWork--<=0){a.spawnTrials=trial;a.edge=null;a.speed=0;return;} // out of this step's placement work: on from here next step
    a.edge=nearby[Math.floor(this.random()*nearby.length)];a.s=this.random()*a.edge.length;a.plan=[];a.prevDir=undefined;a.ox=undefined;a.gapBy=null;a.gapHeld=0;
    const p=this.position(a);
    if(a.stationOnly&&!inStationTrafficArea(p))continue;
@@ -337,12 +341,12 @@ export class Mobility {
    if(distance<12||(this.visibilityTest?.(p)&&(a.walking?this.time>3&&!this.resetting&&distance<70:!(a.corridorOnly&&distance>300))))continue; // walkers too: people appeared on the pavement ahead
    if(!a.walking){const dx=p.x-player.x,dz=p.z-player.z,along=-dx*Math.sin(player.heading||0)-dz*Math.cos(player.heading||0),side=Math.abs(dx*Math.cos(player.heading||0)-dz*Math.sin(player.heading||0));if(along>-24&&along<(this.time<3?95:45)&&side<4.5)continue;} // a clear first 95 m when the drive starts
    if(!a.walking&&(this.cars.some(b=>b!==a&&b.edge&&hypot(p.x-b.x,p.z-b.z)<8)||this.externalObstacles.some(o=>o.edge!==null&&hypot(p.x-o.x,p.z-o.z)<8)))continue; // nor on a police unit, bus or tram (they blocked each other until one retired)
-   a.x=p.x;a.z=p.z;a.heading=p.heading;a.offset=undefined;a.prevDir=undefined;a.speed=edgeCruise(a.edge,a.cruise);a.waiting=0;a.passing=null;a.unjam=null;a.gridlock=0;a.hold=null;a.holdBy=null;a.around=null;a.backUntil=0;a.backQueued=false;a.playerWait=0;a.deadlocked=false;a.hiddenFor=0;a.panicUntil=0;a.running=false;a.stuck=0;a.progressPoint={x:p.x,z:p.z};return;
+   a.x=p.x;a.z=p.z;a.heading=p.heading;a.offset=undefined;a.prevDir=undefined;a.speed=edgeCruise(a.edge,a.cruise);a.waiting=0;a.passing=null;a.unjam=null;a.gridlock=0;a.hold=null;a.holdBy=null;a.around=null;a.backUntil=0;a.backQueued=false;a.playerWait=0;a.deadlocked=false;a.hiddenFor=0;a.panicUntil=0;a.running=false;a.stuck=0;a.progressPoint={x:p.x,z:p.z};a.spawnTrials=0;return;
   }
-  a.edge=null;a.speed=0;
+  a.edge=null;a.speed=0;a.spawnTrials=0;
  }
  // A reset (restart, map jump) respawns everyone against the old view's frustum: no visibility rule for walkers then.
- reset(player){this.resetting=true;try{this.updateParked();for(const a of [...this.cars,...this.people]){a.edge=null;a.playerTaken=undefined;a.conversation=undefined;}for(const a of [...this.cars,...this.people])this.spawn(a,player);}finally{this.resetting=false;}}
+ reset(player){this.resetting=true;try{this.updateParked();for(const a of [...this.cars,...this.people]){a.edge=null;a.playerTaken=undefined;a.conversation=undefined;a.spawnTrials=0;}for(const a of [...this.cars,...this.people])this.spawn(a,player);}finally{this.resetting=false;}}
  canRecycle(a,player){return hypot(a.x-player.x,a.z-player.z)>80&&(a.hiddenFor||0)>2;}
  retire(a,player,force=false){a.speed=0;
   // A walker at the end of its path or stuck there turns back (or stands) while you can see it: recycled on the spot it
@@ -551,8 +555,9 @@ export class Mobility {
   // branch taken for the first time (a knock, a stuck walker, a gridlock) threw all of step() out of its optimised code, and
   // optimising it again took 150-300 ms of compile time in which every step ran unoptimised at 5-15 ms (15-20 steps in a row:
   // most of the steps over 4 ms). Now only the small method concerned is, and it is ready again in a few steps.
-  this._spawns=0;const nCars=this.cars.length,nAgents=nCars+this.people.length;
+  this._spawns=0;this.spawnWork=this.time<3?Infinity:SPAWN_WORK.trials;const nCars=this.cars.length,nAgents=nCars+this.people.length;
   for(let ai=0;ai<nAgents;ai++){const a=ai<nCars?this.cars[ai]:this.people[ai-nCars];if(!a.playerTaken)this.stepAgent(a,player,traffic,coachCells,tramList);}
+  this.spawnWork=Infinity; // spawn() called from outside step(): unlimited
   // The impact pass owns contact resolution. Do not push the player sideways
   // into a second, differently sized envelope and lock them there. Existing
   // overlap can retreat; only motion farther into traffic is stopped here.
