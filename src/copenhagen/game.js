@@ -73,7 +73,19 @@ function makeGraph(g,undirected){
   return nearest(x,z);}
  // A straight run from node k to (x,z) with nothing solid on it (every 25 cm: the model's road walls are 0.6 m thick).
  function clear(k,x,z,blocked){if(k<0)return false;const [nx,nz]=g.nodes[k],m=Math.ceil(Math.hypot(x-nx,z-nz)*4);for(let s=1;s<m;s++)if(blocked(nx+(x-nx)*s/m,nz+(z-nz)*s/m))return false;return true;}
- return {nearest,nearestOpen,clear,route,warm,nodes:g.nodes};
+ // What route(a,b,blocked) needs, a slice at a time (about `ms` a call): b's tree grown as far as a, and every edge on the way
+ // tested for walls (a walled one drops the tree, as route does, and the next call grows a fresh one). True once route can
+ // run without either. A new target's first line grew its tree and tested ~100-140 new edges for walls in one frame:
+ // 10-40 ms at a pick-up or delivery (each test samples the edge every 0.5 m), and more where the line found a wall.
+ function prepare(a,b,blocked,ms){
+  if(a<0||b<0)return true;const end=performance.now()+ms;
+  for(let t=0;t<12;t++){const T=tree(b,!!blocked);while(!T.finished&&!T.done[a]){if(performance.now()>end)return false;grow(T,a,256);}
+   if(!blocked)return true;let hit=false;
+   for(let v=a,k=0;v!==b&&k<=n;k++){const e=T.next[v];if(!e)return true;if(e.walled===undefined){if(performance.now()>end)return false;e.walled=walled(e.points,blocked);}if(e.walled){hit=true;break;}v=e.to;}
+   if(!hit)return true;trees.delete(T.key);}
+  return true;
+ }
+ return {nearest,nearestOpen,clear,route,warm,prepare,nodes:g.nodes};
 }
 
 // ---------- the line on the street (eaten from behind as you ride it) ----------
@@ -117,7 +129,7 @@ function beam(scene,color,h=80){
  g.add(col,ring);g.visible=false;scene.add(g);return g;
 }
 
-export function createCopenhagenGame({scene,city,mobilityData,cityData,toast,soundOn=()=>true,audio=null,blocked=null}){ // blocked(x,z): a solid house there (the GPS line's last stretch)
+export function createCopenhagenGame({scene,city,mobilityData,cityData,toast,soundOn=()=>true,audio=null,blocked=null,routeSlice=2}){ // routeSlice: ms a frame for a new GPS line's groundwork (prepare) // blocked(x,z): a solid house there (the GPS line's last stretch)
  const proj=proj4('EPSG:4326',city.projection);
  const ll=([lat,lon])=>{const [x,y]=proj.forward([lon,lat]);return [x,-y];};
  const ERA=city.era===1760?'h':'m';
@@ -343,9 +355,9 @@ export function createCopenhagenGame({scene,city,mobilityData,cityData,toast,sou
  // The current and the next target's trees (both graphs; the pick-up times the delivery by the walk one) grow
  // in idle time instead, a slice at a time.
  let warmFor=[],warmJobs=[],warmQueued=false;
- function warmNext(p){if(!blocked||typeof requestIdleCallback!=='function')return;const next=race?race.r.cps[race.k+1]:state==='a'?job().B:save.active?null:jobs[(save.job+1)%jobs.length].A;
+ function warmNext(p){if(!blocked)return;const next=race?race.r.cps[race.k+1]:state==='a'?job().B:save.active?null:jobs[(save.job+1)%jobs.length].A;
   if(p!==warmFor[0]||next!==warmFor[1]||mode!==warmFor[2]){warmFor=[p,next,mode];const G=mode==='car'?road:walk,H=G===road?walk:road;warmJobs=[];for(const q of [p,next])if(q)warmJobs.push({G,q,b:null},{G:H,q,b:null});}
-  if(warmJobs.length&&!warmQueued){warmQueued=true;requestIdleCallback(runWarm);}}
+  if(!warmJobs.length||warmQueued)return;if(typeof requestIdleCallback==='function'){warmQueued=true;requestIdleCallback(runWarm);}else{const end=performance.now()+2+routeSlice/2;runWarm({timeRemaining:()=>end-performance.now()});}} // no idle callbacks (Safari): a slice in the frame instead, ~routeSlice/2 ms; every new target's tree grew in one frame there
  function runWarm(dl){warmQueued=false;while(warmJobs.length&&dl.timeRemaining()>2){const j=warmJobs[0];if(j.b===null){j.b=j.plain?j.G.nearest(j.q[0],j.q[1]):j.G.nearestOpen(j.q[0],j.q[1],sight);continue;}if(j.G.warm(j.b,dl.timeRemaining()-1.5,!j.plain))warmJobs.shift();}}
  // The nearest graph node is often behind the car: the route then ran back to it and returned past the car
  // (a loop around the player). Start from the closest point of the route's first 60 m instead.
@@ -453,8 +465,9 @@ export function createCopenhagenGame({scene,city,mobilityData,cityData,toast,sou
   if(wayTo&&dist(wayTo,here)<8){wayTo=null;routeFor=null;}
   // GPS line
   routeT-=dt;const tg=target();
-  if(!routeFor||dist(routeFor,tg.p)>1||routeT<=0&&line.progress(actor.x,actor.z)>25){routeT=3;rebuild();}
+  if(!routeFor||dist(routeFor,tg.p)>1||routeT<=0&&line.progress(actor.x,actor.z)>25){const G=mode==='car'?road:walk;if(!blocked||G.prepare(G.nearest(actor.x,actor.z),G.nearestOpen(tg.p[0],tg.p[1],sight),blocked,routeSlice)){routeT=3;rebuild();}} // the old line stays until the new one's tree and wall tests are done, routeSlice ms a frame (prepare)
   warmNext(tg.p);
+  if(state==='a'&&blocked&&!race){const j=job();walk.prepare(walk.nearest(...j.A),walk.nearestOpen(...j.B,sight),blocked,routeSlice/2);} // the pick-up's clock times the walk from A to B (below): its tree and wall tests were the rest of that frame's 10-20 ms
   line.progress(actor.x,actor.z);
   hudClock+=dt;if(hudClock>.2){hudClock=0;updateHud();} // 5 Hz is plenty for distances and timers
  }
