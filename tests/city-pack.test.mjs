@@ -54,13 +54,17 @@ test('the walkers\' footways are cut to the pavement: stretches on the carriagew
  assert.ok(!w.edges.some(mid)&&m.walks.edges.some(mid),'the street centreline by 507,-304 is gone for walkers, there for the GPS');
 });
 
-test('1760: the bridges listed as built later are left out, with the footways along them, and each is a footbridge in the data',async()=>{
+test('1760: the bridges listed as built later are left out, with the footways and lanes along them, and each is a bridge in the data',async()=>{
  const fs=await import('node:fs'),zlib=await import('node:zlib'),{dropLateBridges}=await import('../src/mobility-pack.js');
  const era=JSON.parse(fs.readFileSync('public/cities/copenhagen-1760/era.json','utf8')),gone=era.lateBridges;assert.ok(Object.keys(gone).length>=20);
  for(const [id,why] of Object.entries(gone))assert.ok(typeof why==='string'&&why.length>10,`${id} has a reason`);
- const city=expandCity(JSON.parse(zlib.gunzipSync(fs.readFileSync('public/cities/copenhagen-1760/city.pack')))),walks=expandMobility(JSON.parse(fs.readFileSync('public/cities/copenhagen-1760/mobility.json','utf8'))).walks,n=walks.edges.length;
- const late=dropLateBridges(city,walks,gone);assert.equal(late.length,Object.keys(gone).length,'every id is in the 1760 data');
- assert.ok(late.every(p=>/\(Silta\)/.test(p.kind)&&!/Ajorata/.test(p.kind)),'only footbridges');assert.ok(walks.edges.length<n,'the footways across them go');
+ const city=expandCity(JSON.parse(zlib.gunzipSync(fs.readFileSync('public/cities/copenhagen-1760/city.pack')))),{walks,roads}=expandMobility(JSON.parse(fs.readFileSync('public/cities/copenhagen-1760/mobility.json','utf8'))),n=walks.edges.length,m=roads.edges.length;
+ const late=dropLateBridges(city,walks,gone,roads);assert.equal(late.length,Object.keys(gone).length,'every id is in the 1760 data');
+ assert.ok(late.every(p=>/\(Silta\)/.test(p.kind)),'only bridges');assert.ok(walks.edges.length<n,'the footways across them go');
+ assert.deepEqual(late.filter(p=>/Ajorata/.test(p.kind)).map(p=>p.name),['Nyhavnsbroen'],'one carriage bridge: Nyhavn\'s, 1874');
+ assert.ok(roads.edges.length<m&&!roads.edges.some(e=>e.points.some(([x,z])=>x>950&&x<975&&z<30)&&e.points.some(([x,z])=>x>950&&x<975&&z>50)),'no lane crosses the mouth of Nyhavn');
+ {const adj=new Map();for(const e of roads.edges)for(const [a,b] of [[e.from,e.to],[e.to,e.from]])(adj.get(a)||adj.set(a,[]).get(a)).push(b);const s=roads.edges[0].from,seen=new Set([s]),q=[s];while(q.length)for(const w of adj.get(q.pop()))if(!seen.has(w)){seen.add(w);q.push(w);}
+  assert.equal(seen.size,adj.size,'no stub of a dropped bridge is left as an island of lanes (the Harbour Run started from one and was never planned)');}
  assert.ok(![...city.roads,...city.pavement].some(p=>p.id in gone));
  assert.ok(city.pavement.some(p=>p.name==='Ved Norgesporten')&&city.pavement.some(p=>p.name==='Grønne Bro'),'the citadel\'s Norway Gate and Rosenborg\'s bridge stay');
 });
