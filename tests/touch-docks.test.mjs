@@ -36,3 +36,11 @@ test('a tucked card docks where it will be when it comes out, not by its tab',as
  const docks=createTouchDocks(doc,win);docks.update(1000);assert.equal(radio.style.top,(152+GAP)+'px','tucked: below the minimap already');
  radio.dx=0;docks.update(2000);assert.equal(radio.style.top,(152+GAP)+'px','out: the same place');
 });
+test('a conversation too tall for a landscape phone scrolls in the free gap instead of waiting hidden',()=>{
+ const minimap={left:16,right:128,top:226,bottom:310},steer={left:16,right:170,top:318,bottom:402},menu={left:813,right:899,top:8,bottom:52};
+ const heights=[];const [chat,hud]=stack([{left:16,right:536,height:249,min:120},{left:12,right:372,height:94}],[menu,minimap,steer],8,404,heights);
+ assert.equal(chat,8);assert.equal(heights[0],226-GAP-8,'down to the minimap');assert.equal(hud,null,'the job card waits');
+ const h2=[];assert.deepEqual(stack([{left:16,right:536,height:249}],[menu,minimap,steer],8,404,h2),[null],'without min it still waits');
+ const h3=[];assert.deepEqual(stack([{left:16,right:536,height:249,min:240}],[menu,minimap,steer],8,404,h3),[null],'no gap tall enough');
+ const h4=[];assert.deepEqual(stack([{left:16,right:336,height:300,min:120}],[],8,800,h4),[8]);assert.equal(h4[0],null,'it fits: no cap');
+});
