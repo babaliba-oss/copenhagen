@@ -28,3 +28,19 @@ test('pause, cancelled contacts and orientation changes release only touch-owned
  input.release(9);input.release(11);assert.equal(keys.tilt,0,'late lost-capture events are harmless');
  input.steer(22,NaN);assert.equal(keys.tilt,0);input.clear();
 });
+test('a second finger can tap a button while the first holds a pedal, and it counts once',async()=>{
+ const {secondFingerTaps}=await import('../src/mobile-input.js');
+ const L={};const doc={addEventListener:(t,f)=>{(L[t]??=[]).push(f);},elementFromPoint:()=>run};
+ const fire=(t,e)=>{let stopped=false;for(const f of L[t]||[])if(!stopped)f({...e,stopImmediatePropagation(){stopped=true;},preventDefault(){}});return stopped;};
+ let clicks=0;const run={disabled:false,closest:()=>run,click(){clicks++;}},go={disabled:false,closest:()=>go,click(){}};
+ let t=0;secondFingerTaps(doc,{skip:b=>b===go,now:()=>t});
+ fire('pointerdown',{pointerType:'touch',isPrimary:false,pointerId:2,target:run,clientX:10,clientY:10});fire('pointerup',{pointerId:2,clientX:12,clientY:11});
+ assert.equal(clicks,1,'the second finger tapped Run');
+ t=50;assert.equal(fire('click',{isTrusted:true,target:run}),true,'a browser click right after is dropped');
+ fire('pointerdown',{pointerType:'touch',isPrimary:true,pointerId:1,target:run,clientX:10,clientY:10});fire('pointerup',{pointerId:1,clientX:10,clientY:10});
+ assert.equal(clicks,1,'one finger: the browser clicks, not this');
+ fire('pointerdown',{pointerType:'touch',isPrimary:false,pointerId:3,target:run,clientX:10,clientY:10});fire('pointerup',{pointerId:3,clientX:60,clientY:10});
+ assert.equal(clicks,1,'a slide off the button is not a tap');
+ fire('pointerdown',{pointerType:'touch',isPrimary:false,pointerId:4,target:go,clientX:10,clientY:10});fire('pointerup',{pointerId:4,clientX:10,clientY:10});
+ assert.equal(clicks,1,'pedals are skipped');t=2000;assert.equal(fire('click',{isTrusted:true,target:run}),false,'a later real click goes through');
+});
