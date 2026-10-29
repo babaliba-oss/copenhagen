@@ -1,13 +1,14 @@
 import './mobile-controls.css';
 import {createTouchInput,thumbSteering,secondFingerTaps} from './mobile-input.js';
 
+export const UNSTUCK_LINGER=5000;
 const arrow=(direction)=>`<svg viewBox="0 0 24 24" aria-hidden="true"><path d="${direction==='up'?'M12 19V5m-6 6 6-6 6 6':direction==='down'?'M12 5v14m-6-6 6 6 6-6':direction==='left'?'M19 12H5m6-6-6 6 6 6':'M5 12h14m-6-6 6 6-6 6'}"/></svg>`;
 const menuIcon='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h16M4 16h16"/></svg>';
 
 export function createMobileControls({keys,canPlay=()=>true,onMenuChange=()=>{},actions={},notify=()=>{},doc=document,win=window}){
  const controls=doc.getElementById('touch-controls'),aux=doc.getElementById('touch-aux');
  const input=createTouchInput(keys),captures=new Map(),listeners=new win.AbortController();
- let state={started:false,paused:false,mapOpen:false,busted:false,mode:'car',speed:0},steering='buttons',afterClose=null,backdropPointer=null,neutral=null,motionSeen=false,motionTimer=null,disposed=false;
+ let state={started:false,paused:false,mapOpen:false,busted:false,mode:'car',speed:0},steering='buttons',afterClose=null,backdropPointer=null,neutral=null,motionSeen=false,motionTimer=null,disposed=false,stuckUntil=0;
  const on=(target,type,handler,options={})=>target.addEventListener(type,handler,{...options,signal:listeners.signal});
  const touch=()=>doc.body.classList.contains('touch'),allowed=()=>touch()&&state.started&&!state.paused&&!state.mapOpen&&!state.busted&&!menu.open&&canPlay();
  controls.innerHTML=`<div class="mobile-steering"><div id="touch-steer" class="mobile-steer" role="slider" tabindex="0" aria-label="Steer. Drag left or right; release to straighten." aria-valuemin="-100" aria-valuemax="100" aria-valuenow="0" aria-orientation="horizontal"><span class="mobile-steer-track"></span><span class="mobile-steer-arrow left">${arrow('left')}</span><span class="mobile-steer-arrow right">${arrow('right')}</span><span class="mobile-steer-thumb"><i></i><i></i><i></i></span><span class="mobile-steer-label">Steer</span></div><div class="mobile-steer-buttons" hidden><button type="button" data-key="ArrowLeft" aria-label="Steer left">${arrow('left')}</button><button type="button" data-key="ArrowRight" aria-label="Steer right">${arrow('right')}</button></div><span class="mobile-tilt-hint" hidden>Tilt to steer</span></div><div class="mobile-pedals"><button id="touch-brake" class="mobile-pedal" type="button" data-key="ArrowDown" aria-label="Brake, then reverse">${arrow('down')}<span>Brake<small>Reverse</small></span></button><button id="touch-go" class="mobile-pedal mobile-go" type="button" data-key="ArrowUp" aria-label="Accelerate">${arrow('up')}<span>Go</span></button></div>`;
@@ -72,7 +73,7 @@ export function createMobileControls({keys,canPlay=()=>true,onMenuChange=()=>{},
  }
  function closeMenu(next=null){afterClose=next;release();if(menu.open)menu.close();else{afterClose=null;next?.();}}
  on(menuButton,'click',openMenu);
- on(doc.getElementById('touch-unstuck'),'click',e=>{e.currentTarget.hidden=true;release();actions.reset?.();});
+ on(doc.getElementById('touch-unstuck'),'click',e=>{e.currentTarget.hidden=true;stuckUntil=0;release();actions.reset?.();});
  on(menu.querySelector('.mobile-menu-close'),'click',()=>closeMenu());on(menu.querySelector('.mobile-menu-resume'),'click',()=>closeMenu());
  on(menu,'close',()=>{
   menuButton.setAttribute('aria-expanded','false');onMenuChange(false);
@@ -130,7 +131,8 @@ export function createMobileControls({keys,canPlay=()=>true,onMenuChange=()=>{},
    if((state.busted||!state.started)&&menu.open)closeMenu();
   },
   // wedged against something (main.js, stuck.js): a button beside Menu puts the car back on the road right here
-  setStuck(on){const b=doc.getElementById('touch-unstuck');if(b&&b.hidden===!!on)b.hidden=!on;},
+  // It stays UNSTUCK_LINGER ms after the wedge ends (unless the car drives off or is left): the wedge ends when the finger leaves Go, so the button vanished before a thumb could reach it.
+  setStuck(on){const b=doc.getElementById('touch-unstuck');if(!b)return;const now=win.performance?.now?.()??Date.now();if(on)stuckUntil=now+UNSTUCK_LINGER;const show=!!on||now<stuckUntil&&state.mode==='car'&&Math.abs(state.speed)<2;if(!show)stuckUntil=0;if(b.hidden===show)b.hidden=!show;},
   snapshot(){return {steering,contacts:input.size,turn:keys.tilt||0,menuOpen:menu.open};},
   dispose(){disposed=true;release();win.clearTimeout(motionTimer);if(menu.open)menu.close();listeners.abort();menu.remove();if(minimap&&minimapHome)minimapHome.insertBefore(minimap,minimapNext);doc.body.classList.remove('mobile-controls-ready');},
  };
