@@ -1152,6 +1152,11 @@ for(const id of ['view-btn','look-btn','sound-btn','zoom-in','zoom-out'])$(id).a
 // the station you had. Works with the sound off too (a soundscape made later starts with the choice).
 let musicChoice=(()=>{try{return localStorage.getItem('cph-music')!=='0';}catch{return true;}})(),stationBeforeMute=(()=>{try{return +localStorage.getItem('cph-music-station')||0;}catch{return 0;}})(); // kept over a reload: Music on after one brought the game music back but not the radio
 const musicOn=()=>musicChoice||!!radio?.station;
+// Footfalls for the soundscape (travelRenderer.steps(), taken every frame) and whether the foot is on a lawn or in a wood:
+// the mapped parks (as the trees' ground, above), off the roads and pavements.
+let stepGround=null;
+function soundSteps(){const s=travelRenderer.steps();if(!s.count||!car||!world)return s;if(stepGround?.data!==data)stepGround={data,soft:new SpatialIndex((data?.parks||[]).filter(p=>/Nurmikko|Kenttä|Metsä/.test(p.kind)&&p.rings?.[0]?.length>3))};
+ s.grass=!!stepGround.soft.at(car.x,car.z)&&!world.roads.at(car.x,car.z)&&!world.pavement?.at(car.x,car.z);return s;}
 function setMusic(on=!musicOn()){musicChoice=on;soundscape?.music(on);try{localStorage.setItem('cph-music',on?'1':'0');}catch{}if(radio){if(!on&&radio.station){stationBeforeMute=radio.station;try{localStorage.setItem('cph-music-station',String(stationBeforeMute));}catch{}radio.set(0);storeStation(0);}else if(on&&!radio.station&&stationBeforeMute){radio.set(stationBeforeMute);storeStation(stationBeforeMute);}}return on;}
 // Car radio: L (Shift+L back), the top-bar button, or a click or tap on the now-playing card (on touch screens the only way).
 // Every change, Radio off included, is remembered for the next drive.
@@ -1365,7 +1370,7 @@ function frame(now){
  // Sound never stops the game: an audio error (a browser's Web Audio quirk) is logged once and that frame's sound skipped.
  try{
  radio?.update(dt,{on:radioOn}); // getting in announces the station: the card shows what is on
- if(soundscape)soundscape.update(dt,{enabled:sound&&started&&!paused&&!mapOpen&&!reading&&!(police?.busted&&finale.ended),speed:car?.speed||0,mode:travel?.mode,throttle:keys.has('KeyW')||keys.has('ArrowUp')?1:0,musicOff:!!radio?.playing,rain:WEATHER_UNIFORMS.rain.value});
+ const feet=soundSteps();if(soundscape)soundscape.update(dt,{steps:feet.count,running:feet.running,grass:feet.grass,enabled:sound&&started&&!paused&&!mapOpen&&!reading&&!(police?.busted&&finale.ended),speed:car?.speed||0,mode:travel?.mode,throttle:keys.has('KeyW')||keys.has('ArrowUp')?1:0,musicOff:!!radio?.playing,rain:WEATHER_UNIFORMS.rain.value});
  if(gain){gain.gain.setTargetAtTime(sound&&started&&travel?.mode==='car'&&!paused&&!mapOpen&&!soundscape?.013:0,audioContext.currentTime,.12);oscillator.frequency.setTargetAtTime(42+Math.abs(car?.speed||0)*5,audioContext.currentTime,.1);}
  policeRenderer?.audio(audioContext,sound&&started&&!paused&&!mapOpen&&(!police?.busted||!finale.ended));
  birds?.audio(audioContext,sound&&started&&!paused&&!mapOpen,car,frameMs/1000);

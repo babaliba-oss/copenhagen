@@ -1,5 +1,5 @@
 // Copenhagen soundscape (Web Audio, no files): an engine with gears, tyre roll, a low city bed, the odd
-// bicycle bell, rain that follows the weather, a car horn (B) and generative Danish folk tunes for background music (U toggles it; the car radio, L,
+// bicycle bell, footsteps on foot, rain that follows the weather, a car horn (B) and generative Danish folk tunes for background music (U toggles it; the car radio, L,
 // takes over while it plays). In 1760 the engine becomes hooves on cobbles and the bells stay.
 export function createSoundscape(ac,{era=null}={}){
  const out=ac.createGain();out.gain.value=0;out.connect(ac.destination);
@@ -22,6 +22,14 @@ export function createSoundscape(ac,{era=null}={}){
  rLp.type='lowpass';rLp.frequency.value=420;rG.gain.value=.9;roar.connect(rLp);rLp.connect(rG);rG.connect(rainG);
  let dropT=0;
  const drop=v=>{const t=ac.currentTime,s=ac.createBufferSource(),bp=ac.createBiquadFilter(),g=ac.createGain();s.buffer=whiteBuf;bp.type='bandpass';bp.frequency.value=2500+Math.random()*3500;bp.Q.value=4;g.gain.setValueAtTime(v,t);g.gain.exponentialRampToValueAtTime(.0001,t+.035);s.connect(bp);bp.connect(g);g.connect(rainG);s.start(t,Math.random()*1.9);s.stop(t+.05);s.onended=()=>{s.disconnect();bp.disconnect();g.disconnect();};};
+ // footsteps on foot (player-travel-renderer.js steps(): one per foot coming down in the walk or run): a heel's click
+ // (band-passed white noise, 40 ms) over a low thud; on grass a duller, softer brush; running harder. Each step's nodes
+ // stop and disconnect themselves.
+ const footstep=(grass,running)=>{const t=ac.currentTime,v=(running?1.6:1)*(grass?.45:1)*(.85+Math.random()*.3),s=ac.createBufferSource(),bp=ac.createBiquadFilter(),g=ac.createGain(),th=ac.createBufferSource(),lp=ac.createBiquadFilter(),tg=ac.createGain();
+  s.buffer=whiteBuf;bp.type='bandpass';bp.frequency.value=grass?700+Math.random()*300:1900+Math.random()*700;bp.Q.value=grass?.8:1.6;g.gain.setValueAtTime(.05*v,t);g.gain.exponentialRampToValueAtTime(.0001,t+(grass?.09:.04));
+  th.buffer=noiseBuf;lp.type='lowpass';lp.frequency.value=grass?160:240;tg.gain.setValueAtTime(.12*v,t);tg.gain.exponentialRampToValueAtTime(.0001,t+.07);
+  s.connect(bp);bp.connect(g);g.connect(out);th.connect(lp);lp.connect(tg);tg.connect(out);s.start(t,Math.random()*1.9);th.start(t,Math.random()*1.9);s.stop(t+.1);th.stop(t+.1);
+  s.onended=()=>{s.disconnect();bp.disconnect();g.disconnect();};th.onended=()=>{th.disconnect();lp.disconnect();tg.disconnect();};};
  // Web Audio throws on a negative or non-finite time, and that error stopped the game: every scheduled note starts
  // no earlier than now (currentTime still reads 0 for the first frames while the audio device starts up).
  const when=t=>Number.isFinite(t)?Math.max(t,ac.currentTime):ac.currentTime;
@@ -91,7 +99,7 @@ export function createSoundscape(ac,{era=null}={}){
  }
  let gear=1,bellT=8+Math.random()*15,stepT=0,lastSpeed=0;
  const GEARS=[0,9,17,25,34,99]; // m/s top of each gear
- function update(dt,{enabled,speed=0,mode:m='car',throttle=0,musicOff=false,rain=0}){ // musicOff: the car radio is playing
+ function update(dt,{enabled,speed=0,mode:m='car',throttle=0,musicOff=false,rain=0,steps=0,running=false,grass=false}){ // steps: footfalls since the last update (on foot) // musicOff: the car radio is playing
   mode=m;if(hornG&&mode!=='car')horn(false);const t=ac.currentTime,v=Math.abs(speed);out.gain.setTargetAtTime(enabled?.65:0,t,.15);if(!enabled)return;
   const car=mode==='car'&&era!==1760,coach=mode==='car'&&era===1760;
   if(car){while(gear<5&&v>GEARS[gear])gear++;while(gear>1&&v<GEARS[gear-1]-2)gear--;
@@ -102,6 +110,7 @@ export function createSoundscape(ac,{era=null}={}){
   const r=Number.isFinite(rain)?Math.max(0,Math.min(1,rain)):0,inside=mode==='car'?(era===1760?.5:.35):1; // under a roof: the drops on it, muffled
   rainG.gain.setTargetAtTime(.1*r*inside,t,.25);hLp.frequency.setTargetAtTime(inside<1?1800:6500,t,.2);
   if(r>.05){dropT-=dt*r*(inside<1?5:9);if(dropT<=0){dropT=.5+Math.random();drop((.15+Math.random()*.25)*inside);}}
+  if(mode==='walk')for(let i=0;i<Math.min(2,steps|0);i++)footstep(grass,running); // at most two a frame (a long frame)
   if(coach&&v>.6){stepT-=dt*Math.min(4.5,v*.8);if(stepT<=0){stepT=1;hoof(.12);setTimeout(()=>hoof(.09),110);}}
   bellT-=dt;if(bellT<=0){bellT=10+Math.random()*25;if(era!==1760)bell();} // no bicycles in 1760
   lastSpeed=v;

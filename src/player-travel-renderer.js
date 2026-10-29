@@ -5,18 +5,34 @@ import {groundAt} from './terrain.js';
 import {clone as cloneSkinned} from 'three/addons/utils/SkeletonUtils.js';
 import {rigOf,measure,pose as poseRig,rideSpec,standSpec,POSE_HEIGHT} from './people-poses.js';
 
+// Footfalls (soundscape.js footsteps): the fractions of a gait cycle at which a foot comes down. footStrikes takes each
+// foot's height sampled evenly over one cycle and gives the points where it drops to within `touch` of its lowest;
+// strikesCrossed counts those passed going from fraction `from` by `advance` (negative walking backwards).
+export function footStrikes(feet,touch=.015){
+ const out=[];for(const y of feet){const n=y.length,low=Math.min(...y)+touch;
+  for(let i=0;i<n;i++){const a=y[(i+n-1)%n],b=y[i];if(a>low&&b<=low)out.push((((i-1+(a-low)/(a-b))/n)%1+1)%1);}}
+ return out.sort((a,b)=>a-b);
+}
+export function strikesCrossed(from,advance,strikes){
+ if(!(Math.abs(advance)>0)||!Number.isFinite(from))return 0;const lo=advance>0?from:from+advance,hi=advance>0?from+advance:from;let n=0;
+ for(const s of strikes)for(let k=Math.floor(lo)-1;k<=Math.ceil(hi);k++){const v=s+k;if(advance>0?v>lo&&v<=hi:v>=lo&&v<hi)n++;}
+ return n;
+}
+const TAU=Math.PI*2,PROCEDURAL_STRIKES=[.25,.75]; // person-model.js: a foot's stance starts at gaitPhase pi/2 (left) and 3pi/2 (right)
 export function createPlayerTravelRenderer(scene){
  const group=new THREE.Group();group.name='Player and rideable vehicles';scene.add(group);
  const person=createPersonBatch(1,{name:'Player'});group.add(person.group);
  const look=personLook(2026,{height:1.75,coat:0,skirt:false,shirt:'#d65f39',trousers:'#273b4a',age:'adult',accessory:null,phoneWalk:false,stoop:0,outer:'jacket',scarf:null,hairStyle:'short',bagType:'backpack'}),gait={};
  const models=new Map(),ringGeometry=new THREE.RingGeometry(.7,.75,32),ringMaterial=new THREE.MeshBasicMaterial({color:'#eeaa55',transparent:true,opacity:.7,depthWrite:false,side:THREE.DoubleSide});
+ const step={key:null,at:0,count:0,running:false}; // footfalls since the soundscape last took them (steps())
+ const footfall=(key,at,strikes,running)=>{if(step.key===key)step.count+=strikesCrossed(step.at,((at-step.at+1.5)%1)-.5,strikes);step.key=key;step.at=at;step.running=running;};
  let hand=null; // world position of the right hand, for a carried item (market-shop-renderer.js)
  let rig=null; // the player as a rigged character (skinned-people.js library) once it loads: walking, and riding (posed each frame,
  // people-poses.js); the procedural figure falls and carries
  // paint: [{from:'#47375b',to:'#d65f39',above:.2}] recolours the character's own copy, so the player is not one of the
  // walkers (the crowd uses the same characters): vertex colours equal to `from` (sRGB), above/below a height in the rest pose
  function setRigged(lib,name,paint=[]){
-  if(rig){rig.mixer.stopAllAction();rig.root.traverse(o=>{if(o.isMesh&&o.userData.ownGeometry)o.geometry.dispose();});group.remove(rig.root);rig=null;}
+  step.key=null;if(rig){rig.mixer.stopAllAction();rig.root.traverse(o=>{if(o.isMesh&&o.userData.ownGeometry)o.geometry.dispose();});group.remove(rig.root);rig=null;}
   const model=lib?.models.find(m=>m.name===name)||lib?.models[0];if(!model)return;
   const root=cloneSkinned(model.scene),mixer=new THREE.AnimationMixer(root),actions={};
   if(paint.length)root.traverse(o=>{if(!o.isMesh||!o.geometry.attributes.color)return;o.geometry=o.geometry.clone();o.userData.ownGeometry=true;
@@ -25,7 +41,11 @@ export function createPlayerTravelRenderer(scene){
     for(const r of rules)if(Math.abs(tmp.r-r.f.r)+Math.abs(tmp.g-r.f.g)+Math.abs(tmp.b-r.f.b)<.01&&(r.above===undefined||h>r.above)&&(r.below===undefined||h<r.below)){c.setXYZ(i,r.t.r,r.t.g,r.t.b);break;}}
    c.needsUpdate=true;});
   for(const k of ['Walk','Run','Idle'])if(model.clips[k])actions[k]=mixer.clipAction(model.clips[k]);
-  root.name='Player (rigged)';root.visible=false;group.add(root);rig={root,mixer,actions,state:null,height:model.height,name:model.name};
+  root.name='Player (rigged)';root.visible=false;group.add(root);rig={root,mixer,actions,state:null,height:model.height,name:model.name,strikes:{}};
+  // where the Walk and Run clips put a foot down: each ankle's height over one cycle, 48 samples
+  {const bones=rigOf(root),v=new THREE.Vector3();if(bones)for(const k of ['Walk','Run'])if(actions[k]){mixer.stopAllAction();actions[k].play();const d=actions[k].getClip().duration,feet=[[],[]];
+   for(let i=0;i<48;i++){mixer.setTime(d*i/48);root.updateMatrixWorld(true);feet[0].push(bones.footL.getWorldPosition(v).y);feet[1].push(bones.footR.getWorldPosition(v).y);}
+   rig.strikes[k]=footStrikes(feet);}mixer.stopAllAction();}
   // riding: the Idle pose and the rig's measurements, from which each frame's pose is made
   if(actions.Idle){actions.Idle.play();mixer.setTime(0);root.updateMatrixWorld(true);const bones=rigOf(root);
    if(bones){rig.bones=bones;rig.measure=measure(bones);rig.idle=[];root.traverse(o=>{if(o.isBone)rig.idle.push([o,o.position.clone(),o.quaternion.clone()]);});}mixer.stopAllAction();}
@@ -40,7 +60,7 @@ export function createPlayerTravelRenderer(scene){
   r.position.set(p.x+ox*c+oz*s,actor.groundY+groundAt(p.x,p.z)+off.y*k,p.z-ox*s+oz*c);r.rotation.set(0,h,0);r.scale.setScalar(k);r.updateMatrixWorld(true);
  }
  function play(state){if(rig.state===state)return;const next=rig.actions[state],prev=rig.state&&rig.actions[rig.state];if(!next)return;next.reset().setEffectiveWeight(1).play();if(prev)prev.crossFadeTo(next,.2,false);rig.state=state;}
- return {group,look,hand:()=>hand,setRigged,rigged:()=>rig?.name||null,update(travel,dt,{visible=true,actorVisible=true,hold=null}={}){
+ return {group,look,hand:()=>hand,steps(){const n=step.count;step.count=0;return {count:n,running:step.running};},setRigged,rigged:()=>rig?.name||null,update(travel,dt,{visible=true,actorVisible=true,hold=null}={}){
   group.visible=visible;if(!travel)return;
   const p=travel.viewActor();
   const current=new Set(travel.rides);
@@ -68,11 +88,12 @@ export function createPlayerTravelRenderer(scene){
    else if(rigged){const k=(look.height||1.75)/rig.height,speed=Math.abs(p.speed||0),state=speed>2.5?'Run':speed>.15?'Walk':'Idle';
     rig.root.position.set(p.x,actor.groundY+groundAt(p.x,p.z),p.z);rig.root.rotation.set(0,p.heading+Math.PI,0);rig.root.scale.setScalar(k); // the model faces +Z, the player's heading 0 faces -Z
     play(state);const act=rig.actions[state];if(act)act.timeScale=state==='Walk'?(p.speed<0?-1:1)*Math.min(1.7,Math.max(.55,speed/(1.25*k))):state==='Run'?Math.min(1.6,Math.max(.7,speed/(3.4*k))):1;
-    rig.mixer.update(dt);gait.yaw=undefined;}
-   else advanceGait(actor,gait,dt,look),person.draw(actor,look,gait);
+    rig.mixer.update(dt);gait.yaw=undefined;if(act&&state!=='Idle'&&dt>0)footfall(state,act.time/act.getClip().duration,rig.strikes[state]||[],state==='Run');else step.key=null;}
+   else{advanceGait(actor,gait,dt,look),person.draw(actor,look,gait);if(pose==='walk'&&!p.knockdown&&dt>0&&actor.speed>.15)footfall('procedural',((gait.gaitPhase/TAU)%1+1)%1,PROCEDURAL_STRIKES,actor.running);else step.key=null;}
    if(pose==='walk'&&!p.knockdown&&!rigged){const J=person.joints,j=JOINT.handR,c=Math.cos(p.heading),s=Math.sin(p.heading),y=actor.groundY+groundAt(p.x,p.z);
     hand={x:p.x+J[j]*c+J[j+2]*s,y:y+J[j+1],z:p.z-J[j]*s+J[j+2]*c,heading:p.heading};}
   }else if(rig)rig.root.visible=false;
+  if(!actorVisible||travel.mode!=='walk')step.key=null;
   person.end();
  }};
 }

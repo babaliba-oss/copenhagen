@@ -67,3 +67,18 @@ for(const era of [null,1760])test(`rain follows the weather's rain amount, is qu
  const off=rainContext(),quiet=createSoundscape(off,{era});quiet.music(false);for(let i=0;i<60;i++)off.tick(1/60,quiet,{enabled:true,mode:'walk',rain:0});const n=off.playing();
  for(let i=0;i<600;i++)off.tick(1/60,quiet,{enabled:false,mode:'walk',rain:1});assert.equal(off.playing(),n,'no drops while the sound is off or paused');
 });
+
+test('footsteps: one per footfall on foot only, softer on grass, louder running, none with the sound off; each ends and lets go',()=>{
+ for(const era of [null,1760]){
+  const step=(opts)=>{const ac=rainContext(),sound=createSoundscape(ac,{era});sound.music(false);ac.tick(1/60,sound,{enabled:true,mode:'walk'});
+   let made=0,peak=0;const mk=ac.createBufferSource,mg=ac.createGain;ac.createBufferSource=()=>{made++;return mk();};
+   ac.createGain=()=>{const g=mg();const set=g.gain.setValueAtTime;g.gain.setValueAtTime=(v,t)=>{set(v,t);peak=Math.max(peak,v);};return g;};
+   const random=Math.random;Math.random=()=>.5;try{ac.tick(1/60,sound,{enabled:true,steps:1,...opts});}finally{Math.random=random;}
+   ac.createBufferSource=mk;ac.createGain=mg;const playing=ac.playing();for(let i=0;i<30;i++)ac.tick(1/60,sound,{enabled:true,mode:opts.mode});return {made,peak,ended:playing-ac.playing()};};
+  const hard=step({mode:'walk'}),grass=step({mode:'walk',grass:true}),run=step({mode:'walk',running:true});
+  assert.equal(hard.made,2,'a click and a thud');assert.equal(hard.ended,2,'both stop within half a second');
+  assert.ok(grass.peak<hard.peak*.6,`grass ${grass.peak} vs ${hard.peak}`);assert.ok(run.peak>hard.peak*1.3,`running ${run.peak} vs ${hard.peak}`);
+  for(const mode of ['car','bike','scooter'])assert.equal(step({mode}).made,0,mode);
+  assert.equal(step({mode:'walk',enabled:false}).made,0,'sound off or paused');
+ }
+});
