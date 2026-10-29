@@ -112,6 +112,12 @@ const overlapsAny=(p,list)=>{const al=p.halfLength??2.36;for(let k=0;k<list.leng
 // creeping out of a car that drove into the unit.
 const separates=(from,p,list)=>{const al=p.halfLength??2.36;for(let k=0;k<list.length;k++){const i=list[k],dx=OX[i]-p.x,dz=OZ[i]-p.z,r=al+OL[i]+2;if(dx*dx+dz*dz<r*r&&trafficFootprintsOverlap(p,OBS[i])&&sweptContact(from,p,OBS[i]))return false;}return true;};
 const SEPARATE_SPEED=2; // m/s, forwards or back along its lane
+// Junction boxes as traffic keeps them (lane-model.js stopGap/startGap): 1 for a unit still in the box at the start of its
+// edge, -1 past the stop line at its end, 0 clear of both. A unit standing in one (its officer out on foot, held beside a
+// stopped player, or behind a queue past the junction) held the cars behind it and those crossing 34-45 s: every way past
+// it turned across its nose.
+const boxAt=(g,e,s)=>e.startGap&&s<e.startGap&&g.junctionNode?.[e.from]?1:s>stopLine(e)+.05?-1:0;
+const stopLine=e=>e.junction&&e.stopGap&&!e.inside?e.length-e.stopGap-.5:Infinity; // where a unit's centre stops short of the box at the end of its edge
 
 export class PoliceSimulation{
  constructor(graph,world){
@@ -280,7 +286,7 @@ export class PoliceSimulation{
  }
  // Every unit with the same fields in the same order (the spawn and backup candidates were spread in, with braking and
  // progressPoint added later): step() saw several unit shapes and kept being thrown out of its optimised code ('wrong map').
- newUnit(c,role,backup){return {edge:c.edge,s:c.s,x:c.x,z:c.z,heading:c.heading,ahead:c.ahead??0,route:c.route??0,score:c.score,id:`police-${this.serial++}`,role,speed:0,stuck:0,braking:false,progressPoint:null,backup,closest:Infinity,idle:0,officer:null,footTry:0,pull:false};}
+ newUnit(c,role,backup){return {edge:c.edge,s:c.s,x:c.x,z:c.z,heading:c.heading,ahead:c.ahead??0,route:c.route??0,score:c.score,id:`police-${this.serial++}`,role,speed:0,stuck:0,braking:false,progressPoint:null,backup,closest:Infinity,idle:0,officer:null,footTry:0,pull:false,yieldUntil:0};}
  // Surge backup: one unit pulls up close to a stopped player, out of their
  // view, when the first wave has not reached arrest range (boxed in by traffic).
  backup(player,traffic){
@@ -391,6 +397,33 @@ export class PoliceSimulation{
   const forward=-(player.x-unit.x)*Math.sin(unit.heading)-(player.z-unit.z)*Math.cos(unit.heading);
   return (d<35||forward>d*.5||this.surging)&&this.clearSight(unit,player);
  }
+ // Whether a unit nearing the junction box at the end of its edge stops at the stop line instead of in the box: it has no
+ // way on (it stood at the very end), it is going to stand by the player in the box (its target there, or the player within
+ // 5.5 m of its way through: it stops 5 m short of them) and the stop line is still in arrest reach, or a slow car or unit
+ // (under 3 m/s) stands on its way through the box or the car length beyond it (it stood in the box behind it).
+ holdsShort(unit,ahead,field,line,near,player,reach){
+  if(!ahead)return true;
+  const e=unit.edge,T=field.target,P=this.boxPoint||={x:0,z:0,heading:0},exit=(ahead.startGap||0)+2*2.36+1,far=distance(unit,player)>e.length-unit.s+exit+40;
+  let byPlayer=!far&&T&&(T.edge===e&&T.s>line||T.edge===ahead&&T.s<(ahead.startGap||0)),slow=false;
+  for(let k=0;k<near.length;k++){const a=OBS[near[k]];if(a!==player&&!a.walking&&Math.abs(a.speed||0)<3){slow=true;break;}}
+  if(far&&!slow)return false;
+  for(let i=0,r=e;i<4&&r;i++,r=i===1?ahead:r.inside?this.next(r,field):null){const last=i&&!r.inside;for(let s=i?0:line+2;s<=(last?Math.min(r.length,exit):r.length);s+=2){routePoint(r,s,r.lane,undefined,undefined,P); /* on through the edges inside a signal cluster (all box) to the exit beyond */
+   if(!far&&!byPlayer&&distance(P,player)<5.5)byPlayer=true;
+   if(slow)for(let k=0;k<near.length;k++){const j=near[k],a=OBS[j];if(a===player||a.walking||Math.abs(a.speed||0)>=3||Math.abs(OX[j]-P.x)>6||Math.abs(OZ[j]-P.z)>6)continue;if(trafficFootprintsOverlap(P,a)){slow=2;break;}}
+   if(slow===2)break;}if(slow===2)break;}
+  if(byPlayer)return distance(routePoint(e,line,e.lane,undefined,undefined,P),player)<reach;
+  return slow===2;
+ }
+ // One creep (SEPARATE_SPEED) out of the junction box a standing unit is in, at its present offset from the centre line: on
+ // along its edge out of the box at its start (box 1), or back to the stop line at its end (-1); only where that overlaps
+ // nothing new (separates).
+ leaveBox(unit,box,near,dt,self){const e=unit.edge;return this.creep(unit,box>0?Math.min(e.length,unit.s+SEPARATE_SPEED*dt):Math.max(stopLine(e),unit.s-SEPARATE_SPEED*dt),near,self);}
+ creep(unit,t,near,self){
+  const e=unit.edge;if(!(t!==unit.s))return false;
+  const q=this.boxPoint||={x:0,z:0,heading:0},c=routePoint(e,unit.s,0,undefined,undefined,q),off=(unit.x-c.x)*Math.cos(c.heading)-(unit.z-c.z)*Math.sin(c.heading);routePoint(e,t,off,undefined,undefined,q);
+  if(!safeVehicleSegment(unit,q,this.world)||!separates(unit,q,near))return false;
+  unit.x=q.x;unit.z=q.z;unit.heading=q.heading;unit.s=t;OX[self]=q.x;OZ[self]=q.z;return true;
+ }
  step(dt,player,traffic=[]){
   this.time+=dt;this.player=player;
   for(const [key,t]of this.contacts)if(this.time-t>10)this.contacts.delete(key);
@@ -418,32 +451,40 @@ export class PoliceSimulation{
   for(let i=0;i<n;i++){const a=obstacles[i];if(a.edge===null){OX[i]=NaN;continue;}OX[i]=a.x;OZ[i]=a.z;const l=OL[i]=a.halfLength??2.36,r=Math.max(27.5,l+17);OR[i]=r*r;}
   for(let j=0,base=n-this.units.length;j<this.units.length;j++){const unit=this.units[j],self=base+j; // self: the unit's own slot, kept up to date as it moves
    if(unit.parked)continue;
-   if(unit.officer){unit.speed=0;unit.braking=false;unit.stuck=0;continue;} // its officer is out on foot: the car waits at the kerb
+   if(unit.officer){unit.speed=0;unit.braking=false;unit.stuck=0;const box=boxAt(this.graph,unit.edge,unit.s);if(box){near.length=0;const ux=unit.x,uz=unit.z;for(let i=0;i<n;i++){const dx=OX[i]-ux,dz=OZ[i]-uz;if(dx*dx+dz*dz<OR[i]&&obstacles[i]!==unit)near.push(i);}this.leaveBox(unit,box,near,dt,self);}continue;} // its officer is out on foot: the car waits at the kerb (out of a junction box)
    near.length=0;{const ux=unit.x,uz=unit.z;for(let i=0;i<n;i++){const dx=OX[i]-ux,dz=OZ[i]-uz;if(dx*dx+dz*dz<OR[i]&&obstacles[i]!==unit)near.push(i);}}
-   const field=this.fieldFor(unit);
-   let desired=cornerSpeedLimit(unit.edge,unit.s,cruise,[this.next(unit.edge,field)]);
+   const field=this.fieldFor(unit),ahead=this.next(unit.edge,field);
+   let desired=cornerSpeedLimit(unit.edge,unit.s,cruise,[ahead]);
    const gap=distance(unit,player);if(gap<18)desired=Math.min(desired,Math.max(0,(gap-5)*1.6));if(unit.pull)desired=0; // pulling over to send its officer (FOOT_CHASE)
    // Surge: a unit that has a stopped player within arrest range creeps up to the car and makes the arrest, instead of driving on to the lane target and looping the block.
    if(surge&&gap<SURGE.arrestRange&&Math.abs(player.speed)<1&&this.clearSight(unit,player))desired=Math.min(desired,unit.backup?0:Math.max(0,(gap-10)*.6)); // a backup unit has pulled up: it holds there
    const sh=Math.sin(unit.heading),ch=Math.cos(unit.heading);
-   for(let k=0;k<near.length;k++){const a=obstacles[near[k]],dx=a.x-unit.x,dz=a.z-unit.z;if(dx*dx+dz*dz>676)continue;const forward=-dx*sh-dz*ch,side=Math.abs(dx*ch-dz*sh);if(forward>0&&forward<24&&side<2.3)desired=Math.min(desired,Math.max(0,(forward-6)*1.4));}
+   const pass=unit.stuck>2&&!(this.time<unit.yieldUntil); // see lane, below
+   let room=Infinity,front=null;for(let k=0;k<near.length;k++){const a=obstacles[near[k]],dx=a.x-unit.x,dz=a.z-unit.z;if(dx*dx+dz*dz>676||pass&&a.holdBy===unit)continue;const forward=-dx*sh-dz*ch,side=Math.abs(dx*ch-dz*sh);if(forward>0&&forward<24&&side<2.3){desired=Math.min(desired,Math.max(0,(forward-6)*1.4));if(forward<room){room=forward;front=a;}}}
+   {const line=stopLine(unit.edge),d=line-unit.s;if(d>-.3&&d<30&&this.holdsShort(unit,ahead,field,line,near,player,surge?SURGE.arrestRange:10)){const t=Math.max(0,d);desired=Math.min(desired,Math.sqrt(6*t),t*1.3);}} // stop at the stop line (traffic's comfortable stop: mobility.js stopBefore)
+   if(this.time<unit.yieldUntil)desired=0; // letting by a car that waited on it (below)
    const previousSpeed=unit.speed;
    unit.speed+=Math.max(-18*dt,Math.min(accel*dt,desired-unit.speed));
    unit.braking=unit.speed<previousSpeed-.01;
+   if(front?.holdBy===unit&&(unit.stuck>1||this.time<unit.yieldUntil)){unit.yieldUntil=this.time+2;if(this.creep(unit,Math.max(boxAt(this.graph,unit.edge,0)?unit.edge.startGap:0,unit.s-SEPARATE_SPEED*dt),near,self)){unit.speed=0;continue;}} /* not back into the box it came through */ // the car it waits on is waiting on it (each in the other's way, turning across in a signal cluster: both stood 30 s): it backs off its way and lets it by
+   if(unit.speed<.05&&desired<.5&&room>7&&boxAt(this.graph,unit.edge,unit.s)===1&&this.leaveBox(unit,1,near,dt,self)){unit.speed=0;continue;} // standing in the box it has just come through: on out of it
    let edge=unit.edge,s=unit.s+unit.speed*dt;
    if(edge===field.target?.edge&&unit.s<=field.target.s&&s>field.target.s)s=field.target.s;
    if(s>=edge.length){const next=this.next(edge,field);if(next){s-=edge.length;edge=next;}else{unit.speed=0;unit.stuck+=dt;continue;}}
    let p=routePoint(edge,s,edge.lane,undefined,undefined,P);
+   // A car that is itself waiting on the unit (its step into the unit refused, or following it) and stands in the unit's way: neither could move for good (a unit and a car turning across each other in a junction box stood 20 s, and a unit in a signal cluster with the car it faced and the one behind it both waiting on it, 15-30 s). After 2 s, when it cannot back off (below), the unit drives on anyway, past that car (its own creep out of an overlap and the car's, both allowed, part them).
+   const lane=pass?near.filter(i=>obstacles[i].holdBy!==unit):near;
    // Emergency vehicles may pass a queue only where a full, swept car fits
    // the carriageway. Roundabouts retain their single directed centre line.
-   if(!edge.roundabout&&overlapsAny(p,near)){
-    for(let o=0;o<2;o++){const q=routePoint(edge,s,o?0:edge.lane+2.7,undefined,undefined,Q);if(safeVehicleSegment(unit,q,this.world)&&!overlapsAny(q,near)){p=q;break;}}
+   if(!edge.roundabout&&overlapsAny(p,lane)){
+    for(let o=0;o<2;o++){const q=routePoint(edge,s,o?0:edge.lane+2.7,undefined,undefined,Q);if(safeVehicleSegment(unit,q,this.world)&&!overlapsAny(q,lane)){p=q;break;}}
    }
-   if(!safeVehicleSegment(unit,p,this.world)||overlapsAny(p,near)){
+   if(!safeVehicleSegment(unit,p,this.world)||overlapsAny(p,lane)){
     // Already overlapping something (a traffic car drove into it while it stood): every move was refused and both stood
     // locked together for good. It creeps out instead, forwards or back, in its lane or at the passing offsets.
     if(overlapsAny(unit,near)){let out=null;for(let d=0;d<2&&!out;d++){const t=Math.min(unit.edge.length,Math.max(0,unit.s+(d?-1:1)*SEPARATE_SPEED*dt));if(t===unit.s)continue;for(let o=0;o<3;o++){const q=routePoint(unit.edge,t,o===0?unit.edge.lane:o===1?unit.edge.lane+2.7:0,undefined,undefined,Q);if(safeVehicleSegment(unit,q,this.world)&&separates(unit,q,near)){out=q;break;}}if(out)s=t;}
      if(out){unit.speed=0;unit.x=out.x;unit.z=out.z;unit.heading=out.heading;unit.s=s;OX[self]=out.x;OZ[self]=out.z;continue;}}
+    {const box=boxAt(this.graph,unit.edge,unit.s);if(box)this.leaveBox(unit,box,near,dt,self);} // wedged in a junction box: out of it, on or back to the stop line (where it then holds: holdsShort)
     unit.speed=0;unit.stuck+=dt;if(unit.stuck>2&&!((this.blocked.get(edge.id)||0)>this.time)){this.blocked.set(edge.id,this.time+8);this.repath=Math.min(this.repath,this.time+.5);} /* once per blocked edge: this used to re-plan every frame while a unit sat stuck */continue;
    }
    if(!unit.progressPoint||distance(p,unit.progressPoint)>.5){unit.stuck=0;if(unit.progressPoint){unit.progressPoint.x=p.x;unit.progressPoint.z=p.z;}else unit.progressPoint={x:p.x,z:p.z};}else if(gap>14)unit.stuck+=dt;

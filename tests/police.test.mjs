@@ -7,6 +7,7 @@ import {prepareGraph,routePoint} from '../src/mobility.js';
 import {correctHarbourLanes,vehicleFitsRoad,trafficFootprintsOverlap} from '../src/road-safety.js';
 import {SpatialIndex} from '../src/geo.js';
 import {HARBOUR_START} from '../src/demo-route.js';
+import {annotateJunctions} from '../src/lane-model.js';
 
 const world={roads:{at:()=>true},buildings:{at:()=>false}};
 const graph=()=>prepareGraph({nodes:[[0,100],[0,0],[0,-100],[0,-200]],edges:[{from:0,to:1,lane:0,points:[[0,100],[0,0]]},{from:1,to:2,lane:0,points:[[0,0],[0,-100]]},{from:2,to:3,lane:0,points:[[0,-100],[0,-200]]}]});
@@ -240,6 +241,28 @@ test('a unit taking the kerb-side passing offset does not go into the kerb-parke
   return overlap;};
  assert.ok(run(false)>0,'unlisted, it moves over into them');
  assert.equal(run(true),0,'listed: never inside one');
+});
+// A crossroads at the origin (one-way arms: north up the z axis from the south, on to the north, and west to east), with
+// traffic's junction boxes (lane-model.js stopGap/startGap).
+const crossroads=()=>{const g=prepareGraph({nodes:[[0,100],[0,0],[0,-100],[-100,0],[100,0]],edges:[{from:0,to:1,lane:0,points:[[0,100],[0,0]]},{from:1,to:2,lane:0,points:[[0,0],[0,-100]]},{from:3,to:1,lane:0,points:[[-100,0],[0,0]]},{from:1,to:4,lane:0,points:[[0,0],[100,0]]}]});annotateJunctions(g,[]);return g;};
+test('a unit stops at the stop line, not in the junction box, behind a car standing just past the junction; one standing in the box backs out of it while its officer is out',()=>{
+ const g=crossroads(),e=g.edges[0],line=e.length-e.stopGap,walker={x:6,z:-150,heading:0,speed:0,walking:true,halfLength:.3};
+ const p=new PoliceSimulation(g,world);p.report('pedestrian',1);p.dispatch=100;
+ const q=routePoint(g.edges[1],3,0),stopped={id:1,edge:g.edges[1],x:q.x,z:q.z,heading:q.heading,speed:0,halfLength:2.36,halfWidth:.98};
+ const a=routePoint(e,60,0);p.units=[p.newUnit({edge:e,s:60,...a},'chase',false)];
+ for(let i=0;i<300;i++)p.step(1/30,walker,[stopped]);
+ const u=p.units[0];assert.equal(u.edge,e);assert.ok(u.s<=line+.3&&u.s>line-3,`waits at the stop line (${u.s.toFixed(2)} of ${e.length}, box from ${line.toFixed(2)})`);
+ const b=routePoint(e,98.5,0);u.s=98.5;u.x=b.x;u.z=b.z;u.speed=0;u.officer={x:b.x+1.3,z:b.z,heading:0,speed:0,back:false,path:null,k:0,plan:0,gx:NaN,gz:NaN};
+ for(let i=0;i<90;i++)p.step(1/30,walker,[stopped]);
+ assert.ok(u.officer,'the officer is still out');assert.ok(u.s<=line-.4,`backed out behind the stop line (${u.s.toFixed(2)})`);
+});
+test('a unit backs off from a car standing in its way that is itself waiting on the unit (each held by the other)',()=>{
+ const g=graph(),e=g.edges[1],walker={x:6,z:-180,heading:0,speed:0,walking:true,halfLength:.3},p=new PoliceSimulation(g,world);p.report('pedestrian',1);p.dispatch=100;
+ const a=routePoint(e,40,0);p.units=[p.newUnit({edge:e,s:40,...a},'chase',false)];const u=p.units[0],q=routePoint(e,46,0);
+ const car={id:7,edge:e,s:46,x:q.x,z:q.z,heading:q.heading,speed:0,halfLength:2.36,halfWidth:.98,holdBy:null};
+ for(let i=0;i<60;i++)p.step(1/30,walker,[car]);const at=u.s;
+ car.holdBy=u;for(let i=0;i<150;i++)p.step(1/30,walker,[car]);
+ assert.ok(u.s<at-1,`backed off (${at.toFixed(2)} -> ${u.s.toFixed(2)})`);assert.ok(!trafficFootprintsOverlap(u,car));
 });
 test('a unit does not drive through a car standing in its lane (the player\'s parked car, given in the traffic list): it stops or steers round',()=>{
  const run=listed=>{const p=new PoliceSimulation(graph(),world),walker={x:6,z:-150,heading:0,speed:0,walking:true,halfLength:.3};p.report('pedestrian',1);
