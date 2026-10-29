@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {gunzipSync} from 'node:zlib';
 import {PoliceSimulation,sweptContact,wantedLevel,incidentHeat,escapeTime,CONTACT,ON_FOOT,FOOT_CHASE,closingSpeed,CRASH_MIN_SPEED,RECKLESS,INCIDENT_WINDOW,recklessDriving} from '../src/police.js';
-import {prepareGraph} from '../src/mobility.js';
+import {prepareGraph,routePoint} from '../src/mobility.js';
 import {correctHarbourLanes,vehicleFitsRoad,trafficFootprintsOverlap} from '../src/road-safety.js';
 import {SpatialIndex} from '../src/geo.js';
 import {HARBOUR_START} from '../src/demo-route.js';
@@ -230,6 +230,16 @@ test('a unit whose road route to the player is longer than the route field\'s re
  assert.notEqual(unit.edge,start,'it drove on past the end of its street');assert.ok(unit.z<-40&&unit.speed>5,`on its way round (z ${unit.z.toFixed(0)}, ${unit.speed.toFixed(1)} m/s)`);
  const q=new PoliceSimulation(g,world);q.escalate({level:3});q.plan(car);const a={edge:g.edges[0],role:'chase'},b={edge:g.edges[1],role:'chase'};
  for(const u of [a,b,a,b])assert.ok(q.next(u.edge,q.fieldFor(u)),'each of two units beyond reach keeps a route (the search heads for its own unit)');
+});
+test('a unit taking the kerb-side passing offset does not go into the kerb-parked cars there (main.js gives it those within 8 m)',()=>{
+ const run=listed=>{const p=new PoliceSimulation(graph(),world),walker={x:6,z:-150,heading:0,speed:0,walking:true,halfLength:.3};p.report('pedestrian',1);
+  const e=p.graph.edges[1],stopped={id:1,edge:e,x:0,z:-5,heading:0,speed:0,halfLength:2.36,halfWidth:.98};
+  const kerb=[0,5,10,15].map(s=>{const q=routePoint(e,s,e.lane+2.7);return {x:q.x,z:q.z,heading:q.heading,halfLength:2.15,halfWidth:.9};});
+  p.units=[{id:'unit',edge:e,s:.6,x:0,z:-.6,heading:0,speed:0,stuck:0}];p.dispatch=100;let overlap=0; // a car has pulled in just ahead of it
+  for(let i=0;i<300;i++){const u=p.units[0];p.step(1/30,walker,[stopped,...listed?kerb.filter(k=>u&&Math.hypot(k.x-u.x,k.z-u.z)<8):[]]);if(p.units[0]&&kerb.some(k=>trafficFootprintsOverlap(p.units[0],k)))overlap++;}
+  return overlap;};
+ assert.ok(run(false)>0,'unlisted, it moves over into them');
+ assert.equal(run(true),0,'listed: never inside one');
 });
 test('a unit does not drive through a car standing in its lane (the player\'s parked car, given in the traffic list): it stops or steers round',()=>{
  const run=listed=>{const p=new PoliceSimulation(graph(),world),walker={x:6,z:-150,heading:0,speed:0,walking:true,halfLength:.3};p.report('pedestrian',1);

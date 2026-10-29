@@ -1227,8 +1227,9 @@ function cineObstacles(hero){
 }
 // Lists rebuilt every physics step (people, the vehicles each system avoids): refilled in place instead of new spread
 // arrays every step (a dozen a step, the main source of per-frame garbage on phones). Each call site has its own.
-const SCRATCH={people:[],riders:[],hitCars:[],tram:[],bus:[],ext:[],npc:[],police:[],still:{}};
+const SCRATCH={people:[],riders:[],hitCars:[],tram:[],bus:[],ext:[],npc:[],police:[],kerb:[],still:{}};
 function fillList(out,...lists){out.length=0;for(const l of lists)if(l)for(let i=0;i<l.length;i++)out.push(l[i]);return out;}
+const kerbCarsNearUnits=out=>{out.length=0;if(parkedCars&&police)for(const u of police.units)if(!u.parked)parkedCars.near(u.x,u.z,8,out);return out;}; // the kerb-parked cars within 8 m of each police unit (all a step or a passing offset can reach): units passing a queue on the kerb side drove through them
 function frame(now){
  if(gameIsStopped())return;
  if(!fixedCall){requestAnimationFrame(frame);if(FIXED){fixedNow=now;if(cinematic?.phase==='play')return;}if(started&&pacer.skip(now))return;} /* ?fixed: while a shot plays, only the capture script advances the world */frameNow=now;
@@ -1273,7 +1274,7 @@ function frame(now){
    mobility.externalObstacles=fillList(SCRATCH.ext,impacts.obstacles(),tramSim.obstacles,buses?.obstacles,police.obstacles,parked);mobility.externalBodies=transitBodies();mobility.externalVehicles=police.units;
    mobility.step(step,car);angryDrivers.update(step,mobility.time,car);cyclists.step(step,car);marketLife.update(step,car);universityLife.update(step,car);terminalLife.update(step,car);
    npcScooters.step(step,car,{people,vehicles:fillList(SCRATCH.npc,mobility.cars,tramSim.obstacles,buses?.obstacles,police.obstacles,parked),impacts});
-   if(started)police.step(step,car,fillList(SCRATCH.police,mobility.cars,mobility.people,detailPeople,tramSim.obstacles,buses?.obstacles,parked)); /* parked: the cars and rides the player has left (as trams, buses and traffic get them): units drove through them */
+   if(started)police.step(step,car,fillList(SCRATCH.police,mobility.cars,mobility.people,detailPeople,tramSim.obstacles,buses?.obstacles,parked,kerbCarsNearUnits(SCRATCH.kerb))); /* parked: the cars and rides the player has left (as trams, buses and traffic get them): units drove through them; and the kerb-parked cars by each unit */
    finale.step(step,car,{police,tramSim,knockables,started:started&&driving});
    roadblock?.step(step,car,before,{started:started&&driving,knockables,onBurst:()=>finale.offence('roadblock','Drove into a police roadblock')});
    if(police.busted){setBusted(true);break;}
