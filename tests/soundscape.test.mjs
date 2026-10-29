@@ -54,6 +54,8 @@ function rainContext(){
 }
 
 for(const era of [null,1760])test(`rain follows the weather's rain amount, is quieter inside, and switching it on and off leaves nothing playing (${era||'today'})`,()=>{
+ // the city's random one-off sounds (bells, drops) are timed by Math.random: a fixed sequence keeps the source counts comparable
+ const random=Math.random;let seed=7;Math.random=()=>((seed=(seed*16807)%2147483647)-1)/2147483646;try{
  const level=(mode,rain)=>{const ac=rainContext(),sound=createSoundscape(ac,{era});sound.music(false);for(let i=0;i<60;i++)ac.tick(1/60,sound,{enabled:true,mode,rain});return ac.targets();};
  const dry=level('walk',0),wet=level('walk',1),half=level('walk',.5),inCar=level('car',1);
  const ix=dry.findIndex((v,i)=>wet[i]>v+.01&&half[i]>v);assert.ok(ix>=0,'a gain rises with the rain');
@@ -66,6 +68,7 @@ for(const era of [null,1760])test(`rain follows the weather's rain amount, is qu
  assert.equal(made(),before,`sources playing after 200 weather changes: ${made()} (before ${before})`);
  const off=rainContext(),quiet=createSoundscape(off,{era});quiet.music(false);for(let i=0;i<60;i++)off.tick(1/60,quiet,{enabled:true,mode:'walk',rain:0});const n=off.playing();
  for(let i=0;i<600;i++)off.tick(1/60,quiet,{enabled:false,mode:'walk',rain:1});assert.equal(off.playing(),n,'no drops while the sound is off or paused');
+ }finally{Math.random=random;}
 });
 
 test('footsteps: one per footfall on foot only, softer on grass, louder running, none with the sound off; each ends and lets go',()=>{
