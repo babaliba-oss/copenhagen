@@ -1273,7 +1273,7 @@ function frame(now){
    mobility.externalObstacles=fillList(SCRATCH.ext,impacts.obstacles(),tramSim.obstacles,buses?.obstacles,police.obstacles,parked);mobility.externalBodies=transitBodies();
    mobility.step(step,car);angryDrivers.update(step,mobility.time,car);cyclists.step(step,car);marketLife.update(step,car);universityLife.update(step,car);terminalLife.update(step,car);
    npcScooters.step(step,car,{people,vehicles:fillList(SCRATCH.npc,mobility.cars,tramSim.obstacles,buses?.obstacles,police.obstacles,parked),impacts});
-   if(started)police.step(step,car,fillList(SCRATCH.police,mobility.cars,mobility.people,detailPeople,tramSim.obstacles,buses?.obstacles));
+   if(started)police.step(step,car,fillList(SCRATCH.police,mobility.cars,mobility.people,detailPeople,tramSim.obstacles,buses?.obstacles,parked)); /* parked: the cars and rides the player has left (as trams, buses and traffic get them): units drove through them */
    finale.step(step,car,{police,tramSim,knockables,started:started&&driving});
    roadblock?.step(step,car,before,{started:started&&driving,knockables,onBurst:()=>finale.offence('roadblock','Drove into a police roadblock')});
    if(police.busted){setBusted(true);break;}

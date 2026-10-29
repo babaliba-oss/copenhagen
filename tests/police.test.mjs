@@ -231,3 +231,12 @@ test('a unit whose road route to the player is longer than the route field\'s re
  const q=new PoliceSimulation(g,world);q.escalate({level:3});q.plan(car);const a={edge:g.edges[0],role:'chase'},b={edge:g.edges[1],role:'chase'};
  for(const u of [a,b,a,b])assert.ok(q.next(u.edge,q.fieldFor(u)),'each of two units beyond reach keeps a route (the search heads for its own unit)');
 });
+test('a unit does not drive through a car standing in its lane (the player\'s parked car, given in the traffic list): it stops or steers round',()=>{
+ const run=listed=>{const p=new PoliceSimulation(graph(),world),walker={x:6,z:-150,heading:0,speed:0,walking:true,halfLength:.3};p.report('pedestrian',1);
+  const parked={id:'player-car',x:0,z:-5,heading:0,speed:0,halfLength:2.36,halfWidth:.98,travelMode:'car'};
+  p.units=[{id:'unit',edge:p.graph.edges[0],s:70,x:0,z:30,heading:0,speed:12,stuck:0}];p.dispatch=100;let overlap=0;
+  for(let i=0;i<300;i++){p.step(1/30,walker,listed?[parked]:[]);const u=p.units[0];if(u&&Math.abs(u.x-parked.x)<1.96&&Math.abs(u.z-parked.z)<4.72)overlap++;}
+  return {overlap,unit:p.units[0]};};
+ assert.ok(run(false).overlap>0,'unlisted, the unit drives through it');
+ const {overlap,unit}=run(true);assert.equal(overlap,0,'listed: never inside it');assert.ok(unit.z<-10||unit.z>0,`stopped short or got past (${unit.z.toFixed(1)})`);
+});
