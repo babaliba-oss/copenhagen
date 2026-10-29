@@ -721,9 +721,10 @@ export class Mobility {
   if(a.playerWait>PLAYER_WAIT){a.playerWait=0;const k=this.roomAround(a,plan,player);if(k!==null)a.around={k,until:this.time+12,by:player};else{a.backUntil=this.time+3+BACK_HOLD;a.backQueued=false;}}
   // A police unit standing in the lane (its officer out on foot, stopped by the player, wedged) is not a car in a queue that
   // will move on: the cars behind it stood there 40 s and more. After UNIT_WAIT s the car goes round it as round the player,
-  // unless the unit itself stands at the back of a queue (a stopped car just ahead of it) or nothing leaves room.
+  // unless the unit itself stands at the back of a queue (a stopped car just ahead of it) or nothing leaves room (on its way
+  // or, at a junction, on another way out).
   a.unitWait=holdBy&&holdBy!==player&&!a.around&&a.speed<.5&&Math.abs(holdBy.speed||0)<.1&&this.externalVehicles.includes(holdBy)?a.unitWait+dt:0;
-  if(a.unitWait>UNIT_WAIT){a.unitWait=0;const u=holdBy;if(!this.queuedAhead(u)){const k=this.roomAround(a,plan,u,0,.2);if(k!==null)a.around={k,until:Infinity,by:u};}}
+  if(a.unitWait>UNIT_WAIT){a.unitWait=0;const u=holdBy;if(!this.queuedAhead(u)){let k=this.roomAround(a,plan,u,0,.2);if(k===null&&plan.length)for(const e of this.roads.outgoing[a.edge.to]){if(e===plan[0]||e.to===a.edge.from||this.trap(e,3))continue;k=this.roomAround(a,[e],u,0,.2);if(k!==null){plan.length=0;plan.push(e);break;}} /* one standing at the junction mouth: the way round it and on into the turn crossed its nose; another way out may not */if(k!==null)a.around={k,until:Infinity,by:u};}}
   a.hold=hold;a.holdBy=holdBy;a.atSignal=hold==='signal';
   return desired;
  }
