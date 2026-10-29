@@ -102,7 +102,7 @@ const yieldsTo=(a,b)=>{if(Math.cos(a.heading-b.heading)<.9)return true;const for
 export class Mobility {
  constructor(data,world,{cars=52,people=100,stationCars=0,corridorCars=0,corridor=null,random=Math.random,walkSpawn=200,walkRecycle=330,streetWalking=false}={}){
   this.walkSpawn=walkSpawn;this.walkRecycle=walkRecycle;this.streetWalking=streetWalking; /* 1760: no pavements, people walk in the street (walkable) and give way to coaches (coachYield) */this.spawnBudget=6;this.spawnWork=Infinity;this.fitWork=Infinity; // walkers appear within walkSpawn m of the player and are recycled past walkRecycle
-  this.roads=prepareGraph(data.roads);this.walks=prepareGraph(data.walks);this.signals=data.signals;this.signalControl=annotateJunctions(this.roads,data.signals||[]);annotateCrossings(this.walks,this.signalControl);this.signalAxes=this.signalControl.axes;this.world=world;this.random=random;this.time=0;this.collisions=0;this.externalObstacles=[];this.externalBodies=[];this.trams=null;this.edgeCars=new Map();this.boxCars=new Map();this.approaching=new Map();
+  this.roads=prepareGraph(data.roads);this.walks=prepareGraph(data.walks);this.signals=data.signals;this.signalControl=annotateJunctions(this.roads,data.signals||[]);annotateCrossings(this.walks,this.signalControl);this.signalAxes=this.signalControl.axes;this.world=world;this.random=random;this.time=0;this.collisions=0;this.externalObstacles=[];this.externalBodies=[];this.externalVehicles=[];this.trams=null;this.edgeCars=new Map();this.boxCars=new Map();this.approaching=new Map();
   if(world?.laneWalls)this.walledLanes=markWalledLanes(this.roads.edges,world.laneWalls); // lanes through a wall the model draws on the road (road-walls.json) are routed round
   // What step() and spawn() work out per edge later (fits, conflict zones, walkers' room...) has its field from the start: each first
   // one added gave that edge a new shape mid-game, and the optimised code reading edges was thrown out ('wrong map').
@@ -509,6 +509,7 @@ export class Mobility {
   // The way through the block itself: a stopped car standing in it (waiting at another approach's stop line
   // on a corner the lane cuts) would leave this car stuck half way.
   const still=this._still||(this._still=[]);still.length=0;for(let ci=0;ci<this.cars.length;ci++){const b=this.cars[ci];if(b!==a&&b.edge&&b.speed<3&&b!==a.unjam&&Math.abs(b.x-a.x)<end+8&&Math.abs(b.z-a.z)<end+8)still.push(b);} // reused list: called per car per step near junctions
+  for(let ci=0;ci<this.externalVehicles.length;ci++){const b=this.externalVehicles[ci];if(b.edge&&Math.abs(b.speed||0)<3&&b!==a.unjam&&Math.abs(b.x-a.x)<end+8&&Math.abs(b.z-a.z)<end+8)still.push(b);} // a police unit standing in the block, as a stopped car
   if(still.length)for(let d=Math.max(start,CAR_HALF_LENGTH+1);d<=end+CAR_HALF_LENGTH;d+=2){const p=this.routeAt(a,plan,d);if(!p)break;for(const b of still)if(Math.abs(b.x-p.x)<6&&Math.abs(b.z-p.z)<6&&boxesOverlap(carBox(p),carBox(b))){this.zoneBy=b;return true;}}
   if(this.externalBodies.length){const p=this.routeAt(a,plan,end+CAR_HALF_LENGTH+.5);if(p)for(const body of this.externalBodies){if(Math.abs(body.x-p.x)>20||Math.abs(body.z-p.z)>20||(body.speed||0)>2)continue;if(boxesOverlap(carBox(p),body)){this.zoneBy=body.ref||body;return true;}}}
   return false;
@@ -526,6 +527,11 @@ export class Mobility {
   for(const body of this.externalBodies){if(Math.abs(body.x-p.x)>20||Math.abs(body.z-p.z)>20)continue;if(boxesOverlap(carBox(p),body)&&!boxesOverlap(carBox(a),body)&&!oncomingPasses(p,body)&&(body.ref||body)!==a.unjam)return body.ref||body;}
   return null;
  }
+ // Other cars driving the lanes (police units, main.js externalVehicles): a step into one is refused, as for the player
+ // (sweptContact: moving out of one already overlapping, or along it, is allowed). Not the bodies' oncoming allowance: a
+ // unit overtaking in the oncoming lane, or standing across a junction, was driven into by crossing and oncoming cars
+ // (each then held by the other for good, the car's next step into it and the unit's out through it both refused).
+ vehicleBlocking(a,p){const list=this.externalVehicles;for(let i=0;i<list.length;i++){const v=list[i];if(v.edge===null||v===a.unjam||Math.abs(v.x-p.x)>9||Math.abs(v.z-p.z)>9)continue;if(trafficFootprintsOverlap(p,v)&&sweptContact(a,p,v))return v;}return null;}
  crossingClear(edge,player){
   if(!signalGreen(edge,this.time))return false;
   const middle=routePoint(edge,edge.length/2,0);
@@ -602,7 +608,7 @@ export class Mobility {
   // A step that cannot be taken is undone (undoStep); a car keeps its planned route.
   if(!a.walking){let by=sweptContact(a,p,player)?player:null;
    if(!by)for(let bi=0;bi<nCars;bi++){const b=this.cars[bi];if(b===a||!b.edge)continue;const x=b.x-p.x,z=b.z-p.z,r=(a.halfLength??CAR_HALF_LENGTH)+(b.halfLength??CAR_HALF_LENGTH)+.5;if(x>r||x<-r||z>r||z<-r||!trafficFootprintsOverlap(p,b)||!yieldsTo(a,b))continue;if(this.passes(a,b)){a.passing=b.id;continue;}by=b;break;}
-   by||=this.bodyBlocking(a,p);
+   by||=this.bodyBlocking(a,p)||this.vehicleBlocking(a,p);
    if(!by&&this.streetWalking)by=this.walkerUnder(p,a,traffic); // 1760: a coach stops rather than drive into someone in the street (moving off one is allowed; sliding its flank further over them, as it turns past someone waiting at its side, is not)
    if(by){this.undoStep(a,oldS,oldEdge,oldPrev,by);if(a.stuck>4)this.retire(a,player);return;}}
   // The last half-step out of a crossing is still part of that crossing. Testing
@@ -694,7 +700,7 @@ export class Mobility {
   {const head=this._trafficHead,chain=this._trafficNext,gx=Math.floor(a.x/20),gz=Math.floor(a.z/20);for(let ix=-1;ix<=1;ix++)for(let iz=-1;iz<=1;iz++)for(let ti=head[trafficCell(gx+ix,gz+iz)];ti>=0;ti=chain[ti]){const b=traffic[ti];if(b===a||b.edge===null)continue;const x=b.x-a.x,z=b.z-a.z;if(x>20||x<-20||z>20||z<-20)continue;
    if(b===player&&a.around){const f=x*dx+z*dz;if(f>0&&f<20&&Math.abs(x*dz-z*dx)<(a.halfWidth??1)+(b.halfWidth??1)+.3){desired=0;hold='round';}continue;} // going round the player: sideways first, on once clear of it
    if(b.ref?.parked||b.ref?.standing)continue; // standing buses: checked along the lane actually driven, below. The player on foot (player-travel.js: walking, no edge) counts as someone in the street
-   const forward=x*dx+z*dz,street=b.walking&&!b.edge?.crossing;if(forward<=(street?(a.halfLength??CAR_HALF_LENGTH)-.3:0)||forward>=20||Math.abs(x*dz-z*dx)>=(street?(a.halfWidth??1)+.45:2.1)||this.passes(a,b)||oncomingPasses(a,b))continue;
+   const forward=x*dx+z*dz,street=b.walking&&!b.edge?.crossing;if(forward<=(street?(a.halfLength??CAR_HALF_LENGTH)-.3:0)||forward>=20||Math.abs(x*dz-z*dx)>=(street?(a.halfWidth??1)+.45:2.1)||this.passes(a,b)||oncomingPasses(a,b)&&!(Math.abs(x*dz-z*dx)<(a.halfWidth??1)+(b.halfWidth??.98)&&this.externalVehicles.includes(b)))continue; // a police unit coming the other way in this lane (overtaking): stop for it
    const v=Math.max(0,(forward-(a.halfLength??CAR_HALF_LENGTH)-(street?.5:b.halfLength??CAR_HALF_LENGTH)-1.3)*.85);if(v<desired){desired=v;hold='follow';holdBy=b.ref||b;} // stops ~1.3 m behind (6 m centres for two cars)
   }}
   if(this.standing?.length)for(const d of STANDING_PROBES){if(a.s+d>a.edge.length)break;const q=routePoint(a.edge,a.s+d,a.offset??a.edge.lane);if(this.standingAt(q)){const v=Math.max(0,(d-3.5)*.85);if(v<desired){desired=v;hold='follow';holdBy=null;}break;}}

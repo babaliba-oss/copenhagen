@@ -4,7 +4,7 @@ import {readFileSync} from 'node:fs';
 import {gunzipSync} from 'node:zlib';
 import {PoliceSimulation,sweptContact,wantedLevel,incidentHeat,escapeTime,CONTACT,ON_FOOT,FOOT_CHASE,closingSpeed,CRASH_MIN_SPEED,RECKLESS,INCIDENT_WINDOW,recklessDriving} from '../src/police.js';
 import {prepareGraph} from '../src/mobility.js';
-import {correctHarbourLanes,vehicleFitsRoad} from '../src/road-safety.js';
+import {correctHarbourLanes,vehicleFitsRoad,trafficFootprintsOverlap} from '../src/road-safety.js';
 import {SpatialIndex} from '../src/geo.js';
 import {HARBOUR_START} from '../src/demo-route.js';
 
@@ -239,4 +239,11 @@ test('a unit does not drive through a car standing in its lane (the player\'s pa
   return {overlap,unit:p.units[0]};};
  assert.ok(run(false).overlap>0,'unlisted, the unit drives through it');
  const {overlap,unit}=run(true);assert.equal(overlap,0,'listed: never inside it');assert.ok(unit.z<-10||unit.z>0,`stopped short or got past (${unit.z.toFixed(1)})`);
+});
+test('a unit a traffic car has driven into backs or creeps out of it instead of both standing locked together',()=>{
+ const p=new PoliceSimulation(graph(),world),walker={x:6,z:-150,heading:0,speed:0,walking:true,halfLength:.3};p.report('pedestrian',1);
+ const car={id:7,edge:{},x:0,z:-13,heading:Math.PI/2,speed:0,halfLength:2.36,halfWidth:.98}; // across the unit's nose
+ p.units=[{id:'unit',edge:p.graph.edges[1],s:10,x:0,z:-10,heading:0,speed:0,stuck:0}];p.dispatch=100;assert.ok(trafficFootprintsOverlap(p.units[0],car));
+ let deeper=false;for(let i=0;i<60;i++){const z=p.units[0].z;p.step(1/30,walker,[car]);if(p.units[0].z<z-1e-9)deeper=true;}
+ assert.ok(!trafficFootprintsOverlap(p.units[0],car),`out of it (unit at z ${p.units[0].z.toFixed(2)})`);assert.ok(!deeper,'never further in');
 });

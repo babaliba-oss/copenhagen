@@ -4,6 +4,7 @@ import {readFileSync,existsSync} from 'node:fs';
 import {gunzipSync} from 'node:zlib';
 import {Mobility,prepareGraph,routePoint,signalGreen,SPAWN_WORK,FIT_WARM} from '../src/mobility.js';
 import {SpatialIndex} from '../src/geo.js';
+import {trafficFootprintsOverlap} from '../src/road-safety.js';
 const network=JSON.parse(readFileSync('public/data/mobility.json'));
 const city=JSON.parse(gunzipSync(readFileSync('public/data/city.pack')));
 const world={buildings:new SpatialIndex(city.buildings),roads:new SpatialIndex(city.roads.filter(r=>!/Koroke/.test(r.kind))),pavement:new SpatialIndex(city.pavement),water:city.water};
@@ -83,6 +84,15 @@ test('mobility contact pass permits retreat and prevents an NPC driving into the
  const player={x:0,z:-15.4,heading:0,speed:-2};sim.step(1/60,player);assert.equal(player.speed,-2,'player can reverse out of bumper overlap');
  Object.assign(sim.cars[0],{s:20,x:0,z:-20,speed:20});Object.assign(player,{z:-25,speed:0});
  sim.step(1/30,player);assert.equal(sim.cars[0].z,-20,'NPC cannot advance into player footprint');
+});
+test('traffic does not drive into a police unit (externalVehicles): one overtaking towards it in its lane, or one across a junction',()=>{
+ const graph={nodes:[[0,0],[0,-200]],edges:[{from:0,to:1,points:[[0,0],[0,-200]],lane:0,signal:-1}]};
+ const run=(unit,listed)=>{const sim=new Mobility({roads:structuredClone(graph),walks:{nodes:[],edges:[]},signals:[]},{roads:{at:()=>true},buildings:{at:()=>false}},{cars:1,people:0});
+  Object.assign(sim.cars[0],{edge:sim.roads.edges[0],s:20,x:0,z:-20,heading:0,speed:8});const player={x:0,z:-190,speed:0},u={id:'police-0',edge:{},speed:0,...unit};let overlap=0;
+  for(let i=0;i<120;i++){sim.externalObstacles=[u];sim.externalVehicles=listed?[u]:[];sim.step(1/30,player);if(trafficFootprintsOverlap(sim.cars[0],u))overlap++;}return overlap;};
+ const oncoming={x:1.3,z:-45,heading:Math.PI},across={x:-2.6,z:-45,heading:Math.PI/2};
+ assert.ok(run(oncoming,false)>0,'as an oncoming body the car passes through it');
+ assert.equal(run(oncoming,true),0,'listed: it stops for it');assert.equal(run(across,true),0,'across its way: never inside it');
 });
 test('a car stranded at a dead end with no way back stays beside the player but is recycled further away',()=>{
  // Visible stranded cars used to stay forever, so every car behind them queued forever too.

@@ -108,6 +108,10 @@ function pop(){const cost=heapF[0];popped=heapN[0];const n=--heapSize;if(n){cons
 // within reach (trafficFootprintsOverlap's own first test, with 1.5 m to spare) are tested exactly.
 let OX,OZ,OL,OBS;
 const overlapsAny=(p,list)=>{const al=p.halfLength??2.36;for(let k=0;k<list.length;k++){const i=list[k],dx=OX[i]-p.x,dz=OZ[i]-p.z,r=al+OL[i]+2;if(dx*dx+dz*dz<r*r&&trafficFootprintsOverlap(p,OBS[i]))return true;}return false;};
+// A move from `from` to p that overlaps nothing new and deepens no overlap `from` already has (sweptContact): backing or
+// creeping out of a car that drove into the unit.
+const separates=(from,p,list)=>{const al=p.halfLength??2.36;for(let k=0;k<list.length;k++){const i=list[k],dx=OX[i]-p.x,dz=OZ[i]-p.z,r=al+OL[i]+2;if(dx*dx+dz*dz<r*r&&trafficFootprintsOverlap(p,OBS[i])&&sweptContact(from,p,OBS[i]))return false;}return true;};
+const SEPARATE_SPEED=2; // m/s, forwards or back along its lane
 
 export class PoliceSimulation{
  constructor(graph,world){
@@ -436,6 +440,10 @@ export class PoliceSimulation{
     for(let o=0;o<2;o++){const q=routePoint(edge,s,o?0:edge.lane+2.7,undefined,undefined,Q);if(safeVehicleSegment(unit,q,this.world)&&!overlapsAny(q,near)){p=q;break;}}
    }
    if(!safeVehicleSegment(unit,p,this.world)||overlapsAny(p,near)){
+    // Already overlapping something (a traffic car drove into it while it stood): every move was refused and both stood
+    // locked together for good. It creeps out instead, forwards or back, in its lane or at the passing offsets.
+    if(overlapsAny(unit,near)){let out=null;for(let d=0;d<2&&!out;d++){const t=Math.min(unit.edge.length,Math.max(0,unit.s+(d?-1:1)*SEPARATE_SPEED*dt));if(t===unit.s)continue;for(let o=0;o<3;o++){const q=routePoint(unit.edge,t,o===0?unit.edge.lane:o===1?unit.edge.lane+2.7:0,undefined,undefined,Q);if(safeVehicleSegment(unit,q,this.world)&&separates(unit,q,near)){out=q;break;}}if(out)s=t;}
+     if(out){unit.speed=0;unit.x=out.x;unit.z=out.z;unit.heading=out.heading;unit.s=s;OX[self]=out.x;OZ[self]=out.z;continue;}}
     unit.speed=0;unit.stuck+=dt;if(unit.stuck>2&&!((this.blocked.get(edge.id)||0)>this.time)){this.blocked.set(edge.id,this.time+8);this.repath=Math.min(this.repath,this.time+.5);} /* once per blocked edge: this used to re-plan every frame while a unit sat stuck */continue;
    }
    if(!unit.progressPoint||distance(p,unit.progressPoint)>.5){unit.stuck=0;if(unit.progressPoint){unit.progressPoint.x=p.x;unit.progressPoint.z=p.z;}else unit.progressPoint={x:p.x,z:p.z};}else if(gap>14)unit.stuck+=dt;
