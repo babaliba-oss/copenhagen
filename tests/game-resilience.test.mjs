@@ -49,3 +49,14 @@ test('uncaught errors stop gameplay, optional resource errors do not, and failur
  s.emit(s.win,'keydown',{code:'KeyW'});assert.equal(moves,1);assert.equal(s.reloads(),0);
  let lateStop=0;s.guard.onStop(()=>lateStop++);assert.equal(lateStop,1);s.guard.dispose();
 });
+
+test('leaving the page while it loads records no failure; one still here 5 s later shows',()=>{
+ const s=setup();const timers=[];s.win.setTimeout=(fn,ms)=>{timers.push({fn,ms});return timers.length;};s.win.clearTimeout=id=>{if(timers[id-1])timers[id-1].fn=null;};
+ s.emit(s.win,'beforeunload');
+ s.emit(s.win,'unhandledrejection',{reason:new TypeError('Failed to fetch')}); // the navigation cancelled the downloads
+ assert.equal(s.guard.fail(new TypeError('Failed to fetch'),'startup'),false);assert.equal(s.guard.stopped,false);assert.equal(s.win.worldhoodFailure,undefined);
+ s.emit(s.win,'pageshow');timers.forEach(t=>t.fn?.());assert.equal(s.guard.stopped,false); // back from the back/forward cache: nothing to show
+ s.emit(s.win,'beforeunload');s.guard.fail(new Error('Frame invariant failed'));assert.equal(s.guard.stopped,false);
+ timers.at(-1).fn(); // the navigation never happened (a download link)
+ assert.equal(s.guard.stopped,true);assert.deepEqual(s.win.worldhoodFailure,{kind:'runtime',message:'Frame invariant failed'});s.guard.dispose();
+});

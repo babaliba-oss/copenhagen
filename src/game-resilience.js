@@ -4,10 +4,11 @@ import {createLoadingScreen} from './loading-screen.js';
 // can still show a usable recovery screen. Recovery is always the player's choice.
 export function createGameResilience({win=window,doc=document,screen=createLoadingScreen(doc),reload=()=>win.location.reload(),log=console.error}={}){
  const canvas=doc.getElementById('world'),button=doc.getElementById('start-btn');
- const listeners=[],stopListeners=new Set();let stopped=false,kind=null;
+ const listeners=[],stopListeners=new Set();let stopped=false,kind=null,leaving=false,leaveTimer=null,held=null;
  const listen=(target,type,handler,capture=false)=>{target?.addEventListener(type,handler,capture);listeners.push(()=>target?.removeEventListener(type,handler,capture));};
  const fail=(error,source='runtime')=>{
   if(stopped)return false;
+  if(leaving){held??=[error,source];return false;} // leaving the page (a link, Tab+Enter on the welcome card while it loads): the browser cancels the downloads, which is no failure to show or record
   stopped=true;kind=source;
   const detail=String(error?.message||error||'Unknown error');
   win.worldhoodFailure={kind,message:detail};
@@ -32,6 +33,8 @@ export function createGameResilience({win=window,doc=document,screen=createLoadi
  listen(canvas,'webglcontextrestored',()=>{
   if(kind==='graphics-lost')screen.error('Graphics is available again. Reload to restart the game.',{title:'Ready to restart'});
  });
+ listen(win,'beforeunload',()=>{leaving=true;win.clearTimeout?.(leaveTimer);leaveTimer=win.setTimeout?.(()=>{leaving=false;if(held)fail(...held);held=null;},5000);}); // still here 5 s later (a download, a cancelled navigation): a failure held meanwhile shows after all
+ listen(win,'pageshow',()=>{leaving=false;held=null;win.clearTimeout?.(leaveTimer);}); // back from the back/forward cache: the cancelled downloads were the navigation's
  listen(win,'error',event=>{if(event.error)fail(event.error);}); // Ignore optional image/font resource events.
  listen(win,'unhandledrejection',event=>fail(event.reason));
  // These capture listeners precede gameplay handlers, including the existing
