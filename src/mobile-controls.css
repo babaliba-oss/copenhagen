@@ -105,7 +105,7 @@
 @media(prefers-reduced-motion:reduce){.mobile-steer-thumb{transition:none}}
 /* Touch popups are stacked by touch-docks.js: these only anchor each to its side and slim the ones that ran wide. */
 @media(pointer:coarse){
- body.touch .dock-wait{opacity:0!important;pointer-events:none!important}
+ body.touch .dock-wait,body.touch .dock-wait *{opacity:0!important;pointer-events:none!important} /* the children too: the tucked job card (pointer-events:auto) inside a waiting #cph-hud stayed tappable while invisible, over the chat replies in landscape */
  body.touch #wanted{right:var(--mobile-right,12px);left:auto}
  body.touch #toast.important{right:var(--mobile-right,12px);left:auto;max-width:min(300px,calc(100% - 24px))}
  body.touch #radio-now{right:var(--mobile-right,12px);left:auto;width:auto;max-width:min(240px,calc(100% - 24px));padding:6px 11px;gap:8px;align-items:center}
