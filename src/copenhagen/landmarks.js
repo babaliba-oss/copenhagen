@@ -3,7 +3,7 @@ import {facadeGrain} from '../facade-grain.js';
 import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';
 import {groundAt,waterAt,seaLevel} from '../terrain.js';
 import {onRampartTop,RAMPART_DRAPE} from '../ramparts.js';
-import {OPERA,operaGeometry} from './opera.js';
+import {OPERA,operaGeometry,foyerGlow} from './opera.js';
 
 // Hand-built details the city's LOD2 model cannot carry, placed on its own geometry (positions are local
 // metres in the shared Copenhagen projection; the spire axes are the model's top vertices):
@@ -211,7 +211,7 @@ export function createLandmarks({era=null,mills=[],anchors={},statues={}}={}){ /
   {const x=1465.3,z=-1438.7,w=waterAt(x,z)??seaLevel();add(mermaid(),x,z,{y:(w??groundAt(x,z))-.35,rot:2.2});} // her rock sits in the water (a fixed height left it floating over the harbour)
   if(statues.frederikV)add(statues.frederikV,1076.2,-438.8,{rot:-2.049});else add(rider(4.5),1076.2,-438.8,{rot:.12}); // the scan faces +Z: turned to face the palace square's centre
   add(rider(3.6,'#4d6a59'),191.9,194.8,{rot:-1.2});add(gefion(),1371.2,-729.5,{rot:-.6});
-  {const o=operaGeometry(),{x,z,rot}=OPERA;add(o.opaque,x,z,{y:o.y,rot});const g=add(o.glass,x,z,{y:o.y,rot,material:new THREE.MeshStandardMaterial({color:'#5f7684',roughness:.06,metalness:.55,transparent:true,opacity:.5,depthWrite:false})}),l=add(o.lights,x,z,{y:o.y,rot,material:new THREE.MeshBasicMaterial({color:'#fff3d8'})}),u=add(o.soffit,x,z,{y:o.y,rot,material:new THREE.MeshStandardMaterial({color:'#c3c8cb',emissive:'#6b7075',roughness:.7,metalness:0})});g.castShadow=l.castShadow=l.receiveShadow=u.receiveShadow=false;g.name='Opera glass';} // Operaen (the model's block is hidden: main.js HIDE_TODAY; its footprint becomes the body's: operaFootprint)
+  {const o=operaGeometry(),{x,z,rot}=OPERA;add(o.opaque,x,z,{y:o.y,rot});const g=add(o.glass,x,z,{y:o.y,rot,material:foyerGlow(new THREE.MeshStandardMaterial({color:'#5f7684',roughness:.06,metalness:.55,transparent:true,opacity:.5,depthWrite:false}))}),l=add(o.lights,x,z,{y:o.y,rot,material:new THREE.MeshBasicMaterial({color:'#fff3d8'})}),u=add(o.soffit,x,z,{y:o.y,rot,material:new THREE.MeshStandardMaterial({color:'#c3c8cb',emissive:'#6b7075',roughness:.7,metalness:0})});g.castShadow=l.castShadow=l.receiveShadow=u.receiveShadow=false;g.name='Opera glass';} // Operaen (the model's block is hidden: main.js HIDE_TODAY; its footprint becomes the body's: operaFootprint)
   if(statues.hca)add(statues.hca,-427.1,520.1,{rot:-.725}); // Luckow-Nielsen's seated Andersen at City Hall's west corner, looking out over H.C. Andersens Boulevard
  }
  add(rider(3.2,era===1760?'#b8a46a':'#55715f'),624.6,-57.9,{rot:.6}); // in the middle of Krinsen (the mapped lawn's centroid) // Christian V (1688; gilded lead until 1940s)

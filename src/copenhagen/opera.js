@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';
 import {groundAt} from '../terrain.js';
+import {WEATHER_UNIFORMS} from '../weather.js';
 
 // Operaen (Henning Larsen Architects, 2004) on Dokøen, Holmen, across the harbour from Amalienborg. The municipal model
 // has it as a plain block; drawn by hand instead: the flat roof (about 158 x 90 m) cantilevered 32 m over the arrival
@@ -54,3 +55,10 @@ export function operaGeometry(){
 }
 // The mapped footprint (the whole roof) becomes the body's outline: the collision, camera and walkers' indexes.
 export function operaFootprint(buildings){const b=buildings.find(q=>q.id===OPERA.id);if(!b)return buildings;const r=OPERA_RING.map(([u,v])=>operaWorld(u,v)),xs=r.map(q=>q[0]),zs=r.map(q=>q[1]);b.rings=[r];b.bbox=[Math.min(...xs),Math.min(...zs),Math.max(...xs),Math.max(...zs)];b.height=tower;b.cover=1;return buildings;}
+// After dark the foyer glows: the golden maple shell and the lit floors behind the glass are what the Opera is seen by
+// across the harbour at night. The glass carries that warm light (WEATHER_UNIFORMS.night, 0 by day: no change then).
+export const FOYER_GLOW=[1,.6,.26];
+export function foyerGlow(material,strength=.85){
+ material.onBeforeCompile=sh=>{sh.uniforms.uNight=WEATHER_UNIFORMS.night;sh.fragmentShader=sh.fragmentShader.replace('#include <common>','#include <common>\nuniform float uNight;').replace('#include <emissivemap_fragment>',`#include <emissivemap_fragment>\ntotalEmissiveRadiance+=vec3(${FOYER_GLOW.map(c=>(c*strength).toFixed(3)).join(',')})*uNight;`);};
+ material.customProgramCacheKey=()=>'opera-foyer-glow';material.userData.nightGlow=strength;return material;
+}

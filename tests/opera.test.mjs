@@ -25,3 +25,8 @@ test('the model\'s block is hidden and the mapped outline is the roof the body s
  assert.ok(!at(OPERA.apex-1,0)&&!at(10,0)&&!at(OPERA.front-2,OPERA.side-2)&&!at(60,OPERA.side+2),'the plaza under the overhang and the eaves along the sides are open');
  assert.deepEqual(r,OPERA_RING.map(([u,v])=>operaWorld(u,v)));assert.ok(b.height>=OPERA.top,'sight lines: as tall as the roof');
 });
+test('after dark the foyer glass glows warm (night uniform), and by day it adds nothing', () => {
+ const g=createLandmarks({era:null,anchors:{},mills:[]}).group.getObjectByName('Opera glass'),m=g.material;assert.ok(m.userData.nightGlow>0);
+ const sh={uniforms:{},fragmentShader:'#include <common>\nvoid main(){\n#include <emissivemap_fragment>\n}'};m.onBeforeCompile(sh);
+ assert.match(sh.fragmentShader,/totalEmissiveRadiance\+=vec3\([^)]*\)\*uNight/);assert.equal(sh.uniforms.uNight.value,0,'daylight: no glow');
+});
