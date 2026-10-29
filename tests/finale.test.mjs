@@ -207,6 +207,8 @@ test('run stats accumulate while driving and the arrest summary lists offences, 
  assert.deepEqual(summary.offences,['Crashed into tram 4 to Munkkiniemi','Knocked down a cyclist','Rammed a police car','Crashed into another car','Knocked over 3 bollards, bins and scooters']);
  assert.equal(summary.stats.find(s=>s.label==='Wanted').value,'★★★★☆');assert.equal(summary.stats.find(s=>s.label==='Damage').value,'20 %');
  assert.equal(f.arrest({car,police,knockables}),summary,'arresting twice returns the same summary');
+ {const c=new Finale();c.coach=true;c.incident('police','police-0',8,4);c.incident('vehicle','car-1');c.stats.knocked=2;assert.deepEqual(c.arrest({car,police:{level:2}}).offences,['Rammed a police coach','Crashed into another coach','Knocked over 2 things in the street'],'1760 has no cars');}
+ assert.match(readFileSync(new URL('../src/main.js',import.meta.url),'utf8'),/finale\.coach=city\.era===1760;.*coach mended/,'the 1760 BUSTED note says coach, not car');
  const west=new Finale();west.arrest({car:{x:-797,z:-15},police:{level:4}});assert.equal(west.summary.kicker,'POLICE','the police label works in any city');
  const plain=new Finale();plain.arrest({car:{...HARBOUR_START},police:{level:1}});
  assert.equal(plain.summary.finale,false);assert.deepEqual(plain.summary.offences,['Failed to stop for the police']);assert.equal(plain.summary.kicker,'POLICE');assert.equal(plain.summary.subtitle,'Pursuit over.');

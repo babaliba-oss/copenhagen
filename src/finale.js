@@ -144,8 +144,8 @@ export class Finale{
   this.stats.maxLevel=Math.max(this.stats.maxLevel,level||0);
   if(level>=4)this.triggered=true;
   if(kind==='pedestrian')this.offence(String(id).startsWith('cyclist')?'cyclist':'pedestrian',String(id).startsWith('cyclist')?'Knocked down a cyclist':'Hit a pedestrian');
-  else if(kind==='police')this.offence('police','Rammed a police car');
-  else if(kind==='vehicle'&&id!=='transit'&&!String(id).startsWith('tram:'))this.offence('vehicle','Crashed into another car');
+  else if(kind==='police')this.offence('police',`Rammed a police ${this.coach?'coach':'car'}`); // coach: 1760, no cars (main.js sets it)
+  else if(kind==='vehicle'&&id!=='transit'&&!String(id).startsWith('tram:'))this.offence('vehicle',`Crashed into another ${this.coach?'coach':'car'}`);
   else if(kind==='reckless')this.offence('reckless','Reckless driving');
   else if(kind==='property')this.offence('property','Damaged street furniture');
  }
@@ -156,7 +156,7 @@ export class Finale{
   if(police)this.stats.maxLevel=Math.max(this.stats.maxLevel,police.level);
   const k=knockables?.snapshot?.();if(k)this.stats.knocked=Math.max(this.stats.knocked,k.knocked||0);
   const offences=[...this.offences.values()].map(o=>o.count>1?`${o.text} × ${o.count}`:o.text);
-  if(this.stats.knocked)offences.push(`Knocked over ${plural(this.stats.knocked,'bollard, bin or scooter','bollards, bins and scooters')}`);
+  if(this.stats.knocked)offences.push(`Knocked over ${this.coach?plural(this.stats.knocked,'thing in the street','things in the street'):plural(this.stats.knocked,'bollard, bin or scooter','bollards, bins and scooters')}`);
   if(!offences.length)offences.push('Failed to stop for the police');
   // Plain arcade-style card: where the arrest happened, what was done, the run's numbers.
   this.summary={finale:this.triggered,title:'BUSTED',kicker:'POLICE',
