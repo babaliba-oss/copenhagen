@@ -3,7 +3,7 @@
 #mobile-menu[open]{display:block}
 #touch-controls [hidden],#touch-controls[hidden],#touch-aux[hidden]{display:none!important}
 @media(pointer:coarse){
- body.mobile-controls-ready #app{--mobile-left:max(12px,env(safe-area-inset-left));--mobile-right:max(12px,env(safe-area-inset-right));--mobile-top:max(12px,env(safe-area-inset-top));--mobile-bottom:max(16px,env(safe-area-inset-bottom));--mobile-pad:clamp(116px,36vw,154px);--mobile-pedal:clamp(52px,15vw,66px)}
+ body.mobile-controls-ready{--mobile-left:max(12px,env(safe-area-inset-left));--mobile-right:max(12px,env(safe-area-inset-right));--mobile-top:max(12px,env(safe-area-inset-top));--mobile-bottom:max(16px,env(safe-area-inset-bottom));--mobile-pad:clamp(116px,36vw,154px);--mobile-pedal:clamp(52px,15vw,66px)} /* on body, not #app: #cph-hud (the money pill, the job and saga tabs) and the other game cards are body children and fell back to 12 px, under a sideways notch */
  body.mobile-controls-ready .topbar{padding:var(--mobile-top) var(--mobile-right) 0 var(--mobile-left);gap:12px;pointer-events:none;z-index:24}
  body.mobile-controls-ready .topbar .wordmark{display:flex;gap:7px;padding:4px 11px 4px 4px;min-height:44px;border-radius:8px;background:#f8f5eeee;font-size:21px;letter-spacing:-.025em;pointer-events:auto}
  body.mobile-controls-ready .topbar .wordmark .brand-icon{width:36px;height:36px;background:none;border-radius:0}
@@ -92,7 +92,7 @@
  body.mobile-controls-ready .topbar .wordmark{font-size:19px;padding-right:9px}
 }
 @media(pointer:coarse) and (max-height:500px){
- body.mobile-controls-ready #app{--mobile-top:max(8px,env(safe-area-inset-top));--mobile-bottom:max(10px,env(safe-area-inset-bottom));--mobile-left:max(16px,env(safe-area-inset-left));--mobile-right:max(16px,env(safe-area-inset-right));--mobile-pad:154px;--mobile-pedal:62px}
+ body.mobile-controls-ready{--mobile-top:max(8px,env(safe-area-inset-top));--mobile-bottom:max(10px,env(safe-area-inset-bottom));--mobile-left:max(16px,env(safe-area-inset-left));--mobile-right:max(16px,env(safe-area-inset-right));--mobile-pad:154px;--mobile-pedal:62px}
  body.mobile-controls-ready #app .dashboard{bottom:var(--mobile-bottom)}
  body.mobile-controls-ready #wanted{top:calc(var(--mobile-top) + 52px)}
  body.mobile-controls-ready #toast.important{top:calc(var(--mobile-top) + 99px);max-width:300px}
@@ -148,8 +148,8 @@
  body.touch #cph-hud .cph-money .cph-rank{flex-basis:auto;white-space:nowrap;font-size:8px;letter-spacing:.06em}body.touch #cph-hud .cph-money .cph-rank i{display:none}
  body.touch #cph-hud{grid-template-columns:minmax(0,1fr)}body.touch #cph-hud .cph-money{max-width:calc(100vw - 24px);overflow:hidden}body.touch #cph-hud .cph-money .cph-rank{min-width:0;overflow:hidden;text-overflow:ellipsis} /* a long money line (12,345 kr · nisser 21/22 · pant 340 · Copenhagen legend · streak ×12) ran 7 px off a 360 px screen and widened the job card with it: the rank ends in … instead */
  body.touch .tuckable{pointer-events:auto;touch-action:pan-y;transition:transform .28s ease,opacity .28s ease}body.touch #cph-hud .tuckable{position:relative}
- body.touch .tuck-left.tucked{transform:translateX(calc(-100% - var(--mobile-left,12px) + 22px));opacity:.94}
- body.touch .tuck-right.tucked{transform:translateX(calc(100% + var(--mobile-right,12px) - 22px));opacity:.94}
+ body.touch .tuck-left.tucked{transform:translateX(calc(-100% - var(--mobile-left,12px) + 22px + env(safe-area-inset-left,0px)));opacity:.94}
+ body.touch .tuck-right.tucked{transform:translateX(calc(100% + var(--mobile-right,12px) - 22px - env(safe-area-inset-right,0px)));opacity:.94} /* the tab at the screen edge, or at the notch's inset when held sideways */
  /* the tab says what is tucked, written down its 22 px edge */
  body.touch .tucked::after{content:attr(data-tab);position:absolute;top:50%;writing-mode:vertical-rl;transform:translateY(-50%) rotate(180deg);font:700 9px/1 'DM Sans',sans-serif;letter-spacing:.14em;opacity:.7;pointer-events:none}
  body.touch .tuck-left.tucked::after{right:5px}

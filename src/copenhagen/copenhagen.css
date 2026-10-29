@@ -76,8 +76,8 @@ body.era-1760 #app .speedometer .gear{color:#cdb68a}
 .cph-paper-card kbd{margin-left:6px;font-size:10px}
 
 /* Whole-city map (M) */
-#big-map{width:min(1400px,96vw);height:min(940px,94vh);height:min(940px,calc(var(--app-h,100dvh)*.94));max-width:none;max-height:none;padding:16px 18px 10px;border:0;border-radius:18px;background:#f6f3ea;color:#25292b;display:none;flex-direction:column;gap:10px;box-shadow:0 30px 80px rgba(0,0,0,.35)}
-#big-map[open]{display:flex}
+#big-map{width:min(1400px,96vw,calc(100vw - 2*max(env(safe-area-inset-left,0px),env(safe-area-inset-right,0px)) - 16px));height:min(940px,94vh);height:min(940px,calc(var(--app-h,100dvh)*.94),calc(var(--app-h,100dvh) - 2*max(env(safe-area-inset-top,0px),env(safe-area-inset-bottom,0px)) - 16px));max-width:none;max-height:none;padding:16px 18px 10px;border:0;border-radius:18px;background:#f6f3ea;color:#25292b;display:none;flex-direction:column;gap:10px;box-shadow:0 30px 80px rgba(0,0,0,.35)}
+#big-map[open]{display:flex} /* inside the safe area: on a notched phone held sideways its × and zoom buttons (top right) sat 23 px into the notch's inset */
 #big-map::backdrop{background:rgba(18,24,28,.55);backdrop-filter:blur(3px)}
 #big-map .bm-top{display:flex;align-items:center;gap:18px;flex-wrap:wrap}
 #big-map .bm-top>div:first-child{flex:1;min-width:160px}
@@ -167,7 +167,7 @@ body.busted #radio-now,body.arrest-cinematic #radio-now{visibility:hidden}
 @media(pointer:coarse) and (max-height:500px){body.mobile-controls-ready #radio-now{top:calc(var(--mobile-top) + 52px)}body.mobile-controls-ready #wanted:not([hidden])+#radio-now{top:calc(var(--mobile-top) + 104px)}}
 @media(prefers-reduced-motion:reduce){#radio-now.flash{animation:none}}
 /* Phone landscape: title, legend and buttons on one row so the map keeps the height. */
-@media (max-height:500px){#big-map{width:min(1400px,calc(100vw - 24px));height:calc(var(--app-h,100dvh) - 16px);padding:8px 12px 6px;gap:6px}#big-map .bm-top{flex-wrap:nowrap;gap:10px}#big-map .bm-top>div:first-child{flex:0 0 auto;min-width:0}#big-map .eyebrow{display:none}#big-map h2{font-size:18px}#big-map .bm-legend{display:flex;flex:1;gap:4px 9px;font-size:11px;justify-content:flex-end}#big-map .bm-tools button{height:34px;min-width:34px;padding:0 10px;font-size:13px}#big-map .bm-hint{font-size:11px}}
+@media (max-height:500px){#big-map{width:min(1400px,calc(100vw - 2*max(12px,env(safe-area-inset-left,0px),env(safe-area-inset-right,0px))));height:calc(var(--app-h,100dvh) - 2*max(8px,env(safe-area-inset-top,0px),env(safe-area-inset-bottom,0px)));padding:8px 12px 6px;gap:6px}#big-map .bm-top{flex-wrap:nowrap;gap:10px}#big-map .bm-top>div:first-child{flex:0 0 auto;min-width:0}#big-map .eyebrow{display:none}#big-map h2{font-size:18px}#big-map .bm-legend{display:flex;flex:1;gap:4px 9px;font-size:11px;justify-content:flex-end}#big-map .bm-tools button{height:34px;min-width:34px;padding:0 10px;font-size:13px}#big-map .bm-hint{font-size:11px}}
 body:not(.clean-capture):not(.touch).driving #cph-hud{top:236px;max-height:calc(100vh - 460px);overflow:hidden} /* extra HUD on (H): below the location line and the coordinates box */
 body.era-1760 .bm-route-key{background:#c08a2a!important} /* the 1760 route is drawn amber */
 body.era-1760 .bm-race-key{background:#b5462e!important} /* and its race starts sealing-wax red (game.js), not purple */
