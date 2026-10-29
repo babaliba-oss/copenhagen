@@ -8,7 +8,7 @@ const hypot=(x,z)=>Math.sqrt(x*x+z*z); // not Math.hypot: in optimised code it a
 // Every car and walker is made with all the fields step() and spawn() give it, in one order: they were added as each
 // first came up, in different orders, so the agents had dozens of shapes and step() was thrown back out of its
 // optimised code ('wrong map') every few seconds, running at half speed and twice the garbage until optimised again.
-const newAgent=(id,walking,cruise,side,stationOnly,corridorOnly)=>settleShape({id,stationOnly,corridorOnly,walking,edge:null,s:0,speed:0,cruise,side,dodge:0,yieldSide:undefined,yieldHeld:0,unpocket:false,x:0,z:0,heading:0,playerTaken:undefined,conversation:undefined,knocked:undefined,damage:undefined,plan:[],prevDir:undefined,ox:undefined,oz:undefined,gapBy:null,gapHeld:0,offset:undefined,waiting:0,passing:null,unjam:null,unjamUntil:0,gridlock:0,hold:null,holdBy:null,atSignal:false,deadlocked:false,hiddenFor:0,panicUntil:0,turnAfter:0,turnedAt:undefined,holdUntil:0,retryAt:0,running:false,stuck:0,progressPoint:null,waitFrom:null,kerbUntil:0,playerHeld:0,playerWait:0,around:null,backUntil:0,backQueued:false,spawnTrials:0,halfLength:undefined,halfWidth:undefined,knockdown:undefined,impactCooldown:undefined,pose:undefined,reaction:undefined}); // the last six: the 1760 coach's size (main.js), knock-downs (impacts.js), poses (crowd-reaction.js, people-interaction.js)
+const newAgent=(id,walking,cruise,side,stationOnly,corridorOnly)=>settleShape({id,stationOnly,corridorOnly,walking,edge:null,s:0,speed:0,cruise,side,dodge:0,yieldSide:undefined,yieldHeld:0,unpocket:false,x:0,z:0,heading:0,playerTaken:undefined,conversation:undefined,knocked:undefined,damage:undefined,plan:[],prevDir:undefined,ox:undefined,oz:undefined,gapBy:null,gapHeld:0,offset:undefined,waiting:0,passing:null,unjam:null,unjamUntil:0,gridlock:0,hold:null,holdBy:null,atSignal:false,deadlocked:false,hiddenFor:0,panicUntil:0,turnAfter:0,turnedAt:undefined,holdUntil:0,retryAt:0,running:false,stuck:0,progressPoint:null,waitFrom:null,kerbUntil:0,playerHeld:0,playerWait:0,unitWait:0,around:null,backUntil:0,backQueued:false,spawnTrials:0,halfLength:undefined,halfWidth:undefined,knockdown:undefined,impactCooldown:undefined,pose:undefined,reaction:undefined}); // the last six: the 1760 coach's size (main.js), knock-downs (impacts.js), poses (crowd-reaction.js, people-interaction.js)
 // Each field is given, once, every kind of value it will ever hold, then set back: its first fraction where it started at 0, its first
 // number where it started null or undefined (or the reverse), or its first object of another shape each changed every agent's shape
 // mid-game (field representations: V8 deprecates the map), and all the optimised code that had seen agents was thrown out at once
@@ -88,7 +88,7 @@ export function threatens(person,player,roads){
 }
 // Recycle a car that has made no real progress this long when it is away from the player (last resort).
 const STALLED_AFTER=40;
-const PLAYER_WAIT=6,BACK_HOLD=6; // s a car stands held by the player (in its way, head-on or across its lane) before it goes round or backs off; s it then keeps off
+const PLAYER_WAIT=6,BACK_HOLD=6,UNIT_WAIT=2; // s a car stands held by the player (in its way, head-on or across its lane) before it goes round or backs off; s it then keeps off; s held by a police unit standing in its lane (not in a queue) before it goes round that
 // How far ahead a car plans its route, and so how far it looks for junctions and tram tracks.
 const LOOKAHEAD=45;
 // Spawning: no walker placed with WALK_CROWD.max others already within WALK_CROWD.r metres. The per-edge limit (one per 8 m) let
@@ -341,7 +341,7 @@ export class Mobility {
    if(distance<12||(this.visibilityTest?.(p)&&(a.walking?this.time>3&&!this.resetting&&distance<70:!(a.corridorOnly&&distance>300))))continue; // walkers too: people appeared on the pavement ahead
    if(!a.walking){const dx=p.x-player.x,dz=p.z-player.z,along=-dx*Math.sin(player.heading||0)-dz*Math.cos(player.heading||0),side=Math.abs(dx*Math.cos(player.heading||0)-dz*Math.sin(player.heading||0));if(along>-24&&along<(this.time<3?95:45)&&side<4.5)continue;} // a clear first 95 m when the drive starts
    if(!a.walking&&(this.cars.some(b=>b!==a&&b.edge&&hypot(p.x-b.x,p.z-b.z)<8)||this.externalObstacles.some(o=>o.edge!==null&&hypot(p.x-o.x,p.z-o.z)<8)))continue; // nor on a police unit, bus or tram (they blocked each other until one retired)
-   a.x=p.x;a.z=p.z;a.heading=p.heading;a.offset=undefined;a.prevDir=undefined;a.speed=edgeCruise(a.edge,a.cruise);a.waiting=0;a.passing=null;a.unjam=null;a.gridlock=0;a.hold=null;a.holdBy=null;a.around=null;a.backUntil=0;a.backQueued=false;a.playerWait=0;a.deadlocked=false;a.hiddenFor=0;a.panicUntil=0;a.running=false;a.stuck=0;a.progressPoint={x:p.x,z:p.z};a.spawnTrials=0;return;
+   a.x=p.x;a.z=p.z;a.heading=p.heading;a.offset=undefined;a.prevDir=undefined;a.speed=edgeCruise(a.edge,a.cruise);a.waiting=0;a.passing=null;a.unjam=null;a.gridlock=0;a.hold=null;a.holdBy=null;a.around=null;a.backUntil=0;a.backQueued=false;a.playerWait=0;a.unitWait=0;a.deadlocked=false;a.hiddenFor=0;a.panicUntil=0;a.running=false;a.stuck=0;a.progressPoint={x:p.x,z:p.z};a.spawnTrials=0;return;
   }
   a.edge=null;a.speed=0;a.spawnTrials=0;
  }
@@ -434,11 +434,15 @@ export class Mobility {
  }
  // Room to go round the player standing in a car's way: a sideways shift from the lane (the other lane first, then the spare
  // width on the right) that keeps the car on the carriageway and clear of the player from where it stands to past it. null: none.
- roomAround(a,plan,player){
-  const pb=carBox(player,.35),len=hypot(player.x-a.x,player.z-a.z)+(a.halfLength??CAR_HALF_LENGTH)+(player.halfLength??CAR_HALF_LENGTH)+2;
+ // A standing police unit is checked only until level with its front, with a thinner margin (pad 0, margin .2): most stand
+ // at a junction mouth, and the 2 m beyond, on the route's turn, ruled out nearly every way round one.
+ roomAround(a,plan,player,pad=2,margin=.35){
+  const pb=carBox(player,margin),len=hypot(player.x-a.x,player.z-a.z)+(a.halfLength??CAR_HALF_LENGTH)+(player.halfLength??CAR_HALF_LENGTH)+pad;
   for(const k of [-2,-2.4,-2.8,-3.4,1.3,2,2.4]){let ok=true;for(let t=0;t<=len&&ok;t+=1.5){let d=a.s+t,q=null;for(let i=-1;i<plan.length;i++){const e=i<0?a.edge:plan[i];if(d<=e.length){q=sized(routePoint(e,d,e.lane+k),a);break;}d-=e.length;}ok=!!q&&vehicleFitsRoad(q,this.world)&&!boxesOverlap(carBox(q),pb);}if(ok)return k;}
   return null;
  }
+ // A stopped car just ahead of `u` in its lane, the same way: `u` waits in a queue (another unit, or someone on foot it has stopped for, is gone round in turn).
+ queuedAhead(u){const fx=-Math.sin(u.heading),fz=-Math.cos(u.heading),hl=u.halfLength??CAR_HALF_LENGTH;for(const b of this.cars){if(!b.edge||Math.abs(b.speed||0)>=.5||Math.abs(b.x-u.x)>14||Math.abs(b.z-u.z)>14)continue;const x=b.x-u.x,z=b.z-u.z,f=x*fx+z*fz;if(f>0&&f<hl+(b.halfLength??CAR_HALF_LENGTH)+4&&Math.abs(x*fz-z*fx)<2.1&&Math.cos(b.heading-u.heading)>.5)return true;}return false;}
  passes(a,b){return !!a.unjam&&(b===a.unjam||b.ref===a.unjam)||this.cars[b.id]===b&&a.passing===b.id;}
  // A stopped car whose chain of "waiting for" links (through cars, trams and buses) leads back to itself:
  // a junction standoff, or a queue that has wrapped round a block. The loop is broken by the lowest-id car
@@ -509,7 +513,7 @@ export class Mobility {
   // The way through the block itself: a stopped car standing in it (waiting at another approach's stop line
   // on a corner the lane cuts) would leave this car stuck half way.
   const still=this._still||(this._still=[]);still.length=0;for(let ci=0;ci<this.cars.length;ci++){const b=this.cars[ci];if(b!==a&&b.edge&&b.speed<3&&b!==a.unjam&&Math.abs(b.x-a.x)<end+8&&Math.abs(b.z-a.z)<end+8)still.push(b);} // reused list: called per car per step near junctions
-  for(let ci=0;ci<this.externalVehicles.length;ci++){const b=this.externalVehicles[ci];if(b.edge&&Math.abs(b.speed||0)<3&&b!==a.unjam&&Math.abs(b.x-a.x)<end+8&&Math.abs(b.z-a.z)<end+8)still.push(b);} // a police unit standing in the block, as a stopped car
+  for(let ci=0;ci<this.externalVehicles.length;ci++){const b=this.externalVehicles[ci];if(b.edge&&Math.abs(b.speed||0)<3&&b!==a.unjam&&b!==a.around?.by&&Math.abs(b.x-a.x)<end+8&&Math.abs(b.z-a.z)<end+8)still.push(b);} // a police unit standing in the block, as a stopped car (not one this car is going round: its way at the passing offset clears it)
   if(still.length)for(let d=Math.max(start,CAR_HALF_LENGTH+1);d<=end+CAR_HALF_LENGTH;d+=2){const p=this.routeAt(a,plan,d);if(!p)break;for(const b of still)if(Math.abs(b.x-p.x)<6&&Math.abs(b.z-p.z)<6&&boxesOverlap(carBox(p),carBox(b))){this.zoneBy=b;return true;}}
   if(this.externalBodies.length){const p=this.routeAt(a,plan,end+CAR_HALF_LENGTH+.5);if(p)for(const body of this.externalBodies){if(Math.abs(body.x-p.x)>20||Math.abs(body.z-p.z)>20||(body.speed||0)>2)continue;if(boxesOverlap(carBox(p),body)){this.zoneBy=body.ref||body;return true;}}}
   return false;
@@ -698,7 +702,7 @@ export class Mobility {
   if(zone<desired){desired=zone;hold=this.zoneWhy;holdBy=this.zoneBy;}
   if(a.passing!=null&&!(this.cars[a.passing]?.edge&&trafficFootprintsOverlap(a,this.cars[a.passing])))a.passing=null;
   {const head=this._trafficHead,chain=this._trafficNext,gx=Math.floor(a.x/20),gz=Math.floor(a.z/20);for(let ix=-1;ix<=1;ix++)for(let iz=-1;iz<=1;iz++)for(let ti=head[trafficCell(gx+ix,gz+iz)];ti>=0;ti=chain[ti]){const b=traffic[ti];if(b===a||b.edge===null)continue;const x=b.x-a.x,z=b.z-a.z;if(x>20||x<-20||z>20||z<-20)continue;
-   if(b===player&&a.around){const f=x*dx+z*dz;if(f>0&&f<20&&Math.abs(x*dz-z*dx)<(a.halfWidth??1)+(b.halfWidth??1)+.3){desired=0;hold='round';}continue;} // going round the player: sideways first, on once clear of it
+   if(a.around&&b===a.around.by){const f=x*dx+z*dz;if(f>0&&f<20&&Math.abs(x*dz-z*dx)<(a.halfWidth??1)+(b.halfWidth??1)+.3){desired=0;hold='round';}continue;} // going round the player (or a standing police unit): sideways first, on once clear of it
    if(b.ref?.parked||b.ref?.standing)continue; // standing buses: checked along the lane actually driven, below. The player on foot (player-travel.js: walking, no edge) counts as someone in the street
    const forward=x*dx+z*dz,street=b.walking&&!b.edge?.crossing;if(forward<=(street?(a.halfLength??CAR_HALF_LENGTH)-.3:0)||forward>=20||Math.abs(x*dz-z*dx)>=(street?(a.halfWidth??1)+.45:2.1)||this.passes(a,b)||oncomingPasses(a,b)&&!(Math.abs(x*dz-z*dx)<(a.halfWidth??1)+(b.halfWidth??.98)&&this.externalVehicles.includes(b)))continue; // a police unit coming the other way in this lane (overtaking): stop for it
    const v=Math.max(0,(forward-(a.halfLength??CAR_HALF_LENGTH)-(street?.5:b.halfLength??CAR_HALF_LENGTH)-1.3)*.85);if(v<desired){desired=v;hold='follow';holdBy=b.ref||b;} // stops ~1.3 m behind (6 m centres for two cars)
@@ -709,12 +713,17 @@ export class Mobility {
   // PLAYER_WAIT s held by the player the car goes round where the street leaves room (roomAround), else backs off a few
   // metres (the cars queued behind it first, if they must) and keeps off while the player stands there. Once past (or after
   // 12 s) it keeps to its lane again; backing off ends once the player is out of its way.
-  if(a.around&&(this.time>a.around.until||(player.x-a.x)*dx+(player.z-a.z)*dz<-((a.halfLength??CAR_HALF_LENGTH)+(player.halfLength??CAR_HALF_LENGTH))))a.around=null;
+  if(a.around&&(this.time>a.around.until||a.around.by.edge===null||a.around.by!==player&&Math.abs(a.around.by.speed||0)>1||(a.around.by.x-a.x)*dx+(a.around.by.z-a.z)*dz<-((a.halfLength??CAR_HALF_LENGTH)+(a.around.by.halfLength??CAR_HALF_LENGTH))))a.around=null;
   if(a.around)desired=Math.min(desired,3);
   else if(this.time<(a.backUntil||0)){if(holdBy!==player&&!(a.backQueued&&holdBy&&this.time<(holdBy.backUntil||0)))a.backUntil=0;else{ /* while the player (or the car it backs for) is still in its way */desired=Math.min(desired,0);hold='back';holdBy=player;
    if(this.time<a.backUntil-BACK_HOLD){const hl=a.halfLength??CAR_HALF_LENGTH,b=this.edgeCars.get(a.edge)?.find(b=>b!==a&&b.s<a.s&&a.s-b.s<hl+(b.halfLength??CAR_HALF_LENGTH)+2.5);if(a.backQueued||hypot(player.x-a.x,player.z-a.z)<=hl+(player.halfLength??CAR_HALF_LENGTH)+4.5){if(a.s>2*hl+2&&!b)desired=-1.2;else if(b&&!(this.time<b.backUntil)){b.backUntil=a.backUntil;b.backQueued=true;}}}}} /* 4.5 m clear of the player is room enough; the car behind backs for the one ahead */
   a.playerWait=(holdBy===player&&Math.cos((player.heading||0)-a.heading)<.5||a.hold==='contact'&&a.holdBy===player)&&a.speed<.5?(a.playerWait||0)+dt:0; // not behind the player waiting its turn the same way (at a red light): only one it faces or that stands across it, or backs into it
-  if(a.playerWait>PLAYER_WAIT){a.playerWait=0;const k=this.roomAround(a,plan,player);if(k!==null)a.around={k,until:this.time+12};else{a.backUntil=this.time+3+BACK_HOLD;a.backQueued=false;}}
+  if(a.playerWait>PLAYER_WAIT){a.playerWait=0;const k=this.roomAround(a,plan,player);if(k!==null)a.around={k,until:this.time+12,by:player};else{a.backUntil=this.time+3+BACK_HOLD;a.backQueued=false;}}
+  // A police unit standing in the lane (its officer out on foot, stopped by the player, wedged) is not a car in a queue that
+  // will move on: the cars behind it stood there 40 s and more. After UNIT_WAIT s the car goes round it as round the player,
+  // unless the unit itself stands at the back of a queue (a stopped car just ahead of it) or nothing leaves room.
+  a.unitWait=holdBy&&holdBy!==player&&!a.around&&a.speed<.5&&Math.abs(holdBy.speed||0)<.1&&this.externalVehicles.includes(holdBy)?a.unitWait+dt:0;
+  if(a.unitWait>UNIT_WAIT){a.unitWait=0;const u=holdBy;if(!this.queuedAhead(u)){const k=this.roomAround(a,plan,u,0,.2);if(k!==null)a.around={k,until:Infinity,by:u};}}
   a.hold=hold;a.holdBy=holdBy;a.atSignal=hold==='signal';
   return desired;
  }

@@ -94,6 +94,17 @@ test('traffic does not drive into a police unit (externalVehicles): one overtaki
  assert.ok(run(oncoming,false)>0,'as an oncoming body the car passes through it');
  assert.equal(run(oncoming,true),0,'listed: it stops for it');assert.equal(run(across,true),0,'across its way: never inside it');
 });
+test('a car held behind a police unit standing in its lane (its officer out on foot) goes round it within a few seconds, but not round one waiting in a queue',()=>{
+ // A unit whose officer is out skips the police step and stands where it stopped: the cars behind it queued 40 s and more.
+ const graph={nodes:[[0,0],[0,-200]],edges:[{from:0,to:1,points:[[0,0],[0,-200]],lane:0,signal:-1}]};
+ const run=queued=>{const sim=new Mobility({roads:structuredClone(graph),walks:{nodes:[],edges:[]},signals:[]},{roads:{at:()=>true},buildings:{at:()=>false}},{cars:2,people:0});
+  const [a,b]=sim.cars;Object.assign(a,{edge:sim.roads.edges[0],s:20,x:0,z:-20,heading:0,speed:8});
+  if(queued)Object.assign(b,{edge:sim.roads.edges[0],s:52,x:0,z:-52,heading:0,speed:0,cruise:0});else b.edge=null;
+  const player={x:30,z:-190,speed:0},u={id:'police-0',edge:sim.roads.edges[0],s:45,x:0,z:-45,heading:0,speed:0,officer:{}};let held=0,overlap=0;
+  for(let i=0;i<30*16;i++){sim.externalObstacles=[u];sim.externalVehicles=[u];if(!queued)b.edge=null;sim.step(1/30,player);if(a.speed<.1&&a.holdBy===u)held++;if(trafficFootprintsOverlap(a,u))overlap++;}return {a,held:held/30,overlap};};
+ const free=run(false);assert.ok(free.a.z<-52,'past the unit: '+free.a.z.toFixed(1));assert.ok(free.held<4,'held '+free.held.toFixed(1)+' s');assert.equal(free.overlap,0,'never inside it');
+ const queue=run(true);assert.ok(queue.a.z>-40,'still behind the unit at the back of a queue: '+queue.a.z.toFixed(1));
+});
 test('a car stranded at a dead end with no way back stays beside the player but is recycled further away',()=>{
  // Visible stranded cars used to stay forever, so every car behind them queued forever too.
  const graph={nodes:[[0,0],[0,-200]],edges:[{from:0,to:1,points:[[0,0],[0,-200]],lane:0,signal:-1}]};
