@@ -21,6 +21,7 @@ const OBSTACLES=['.topbar .wordmark','#touch-aux','#travel-controls','#touch-con
 export function createTouchDocks(doc=document,win=window){
  let last=0;const styled=new Set(); // elements this pass has moved: put back when they leave it (the toast turns ordinary, touch ends)
  const restore=el=>{el.style.top='';el.style.bottom='';el.classList.remove('dock-wait');styled.delete(el);};
+ const slide=el=>{const t=el.classList.contains('tuckable')&&win.getComputedStyle(el).transform;if(!t||t==='none')return 0;const m=/^matrix\(([^)]+)\)/.exec(t);return m?+m[1].split(',')[4]||0:0;}; // the x of a tuck's translateX
  const shown=el=>el&&!el.hidden&&el.getClientRects().length>0&&el.offsetHeight>0&&win.getComputedStyle(el).visibility!=='hidden'; // fixed elements have no offsetParent
  return {
   update(now=performance.now()){
@@ -29,12 +30,13 @@ export function createTouchDocks(doc=document,win=window){
    const els=SELECTORS.map(s=>doc.querySelector(s)).filter(shown);
    for(const el of [...styled])if(!els.includes(el))restore(el);for(const el of els)styled.add(el);
    for(const el of els){el.style.top='';el.style.bottom='auto';} // measure from the CSS anchor, not last frame's top
-   const rects=els.map(el=>el.getBoundingClientRect());
+   // Measured without their sideways slide: a tucked card (touch-tuck.js) is mostly off screen, so it docked by its tab and then came out over the minimap (the radio card: 64 px tucked, over the map, then 276 px out; the next tap on its tab opened the map).
+   const rects=els.map(el=>{const r=el.getBoundingClientRect(),dx=slide(el);return {left:r.left-dx,right:r.right-dx,height:r.height};});
    const fixed=OBSTACLES.map(s=>doc.querySelector(s)).filter(shown).map(el=>el.getBoundingClientRect()).filter(r=>r.width>0&&r.height>0);
    // The free band starts at the top row's top (the safe area), and the top-row buttons (Menu) are obstacles like the
    // controls: with no wordmark on phones, the left column rises to the top instead of starting under the Menu row.
    const row=fixed.filter(r=>r.top<80),top=row.length?Math.max(8,Math.min(...row.map(r=>r.top))):8;
-   const tops=stack(rects.map(r=>({left:r.left,right:r.right,height:r.height})),fixed,top,win.innerHeight-8);
+   const tops=stack(rects,fixed,top,win.innerHeight-8);
    els.forEach((el,i)=>{const offset=win.getComputedStyle(el).position==='fixed'||!el.offsetParent?0:el.offsetParent.getBoundingClientRect().top;
     if(tops[i]===null){el.classList.add('dock-wait');return;}
     el.classList.remove('dock-wait');el.style.top=`${Math.round(tops[i]-offset)}px`;});

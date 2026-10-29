@@ -27,3 +27,12 @@ test('the phone minimap is an obstacle: the stars go below it, not over it',asyn
  const win={innerHeight:900,getComputedStyle:()=>({visibility:'visible'})};
  createTouchDocks(doc,win).update(1000);assert.equal(wanted.style.top,(152+GAP)+'px');
 });
+test('a tucked card docks where it will be when it comes out, not by its tab',async()=>{
+ const {createTouchDocks}=await import('../src/touch-docks.js');
+ const mk=(r,cls=[],dx=0)=>{const c=new Set(cls);const el={dx,hidden:false,style:{top:'',bottom:''},offsetHeight:r.bottom-r.top,classList:{add:x=>c.add(x),remove:x=>c.delete(x),contains:x=>c.has(x)},getClientRects:()=>[1],getBoundingClientRect:()=>({...r,left:r.left+el.dx,right:r.right+el.dx,width:r.right-r.left,height:r.bottom-r.top})};return el;};
+ const minimap=mk({left:262,right:374,top:68,bottom:152}),radio=mk({left:160,right:400,top:64,bottom:114},['tuckable','tucked'],230),body=mk({left:0,right:0,top:0,bottom:0},['touch']);
+ const doc={body,querySelector:s=>({'#app>.minimap-card':minimap,'#radio-now':radio})[s]||null};
+ const win={innerHeight:900,getComputedStyle:el=>({visibility:'visible',position:'fixed',transform:el.dx?`matrix(1, 0, 0, 1, ${el.dx}, 0)`:'none'})};
+ const docks=createTouchDocks(doc,win);docks.update(1000);assert.equal(radio.style.top,(152+GAP)+'px','tucked: below the minimap already');
+ radio.dx=0;docks.update(2000);assert.equal(radio.style.top,(152+GAP)+'px','out: the same place');
+});
