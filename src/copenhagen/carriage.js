@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';
 import {gaitMaterial,gaitDepthMaterial,horseGeometry,wheelGeometry,stepMotion,withAttributes} from './gait.js';
 import {MeshoptSimplifier} from 'meshoptimizer';
+import {WEATHER_UNIFORMS} from '../weather.js';
 let simplifier=null;MeshoptSimplifier.ready.then(()=>{simplifier=MeshoptSimplifier;}).catch(()=>{});
 
 // A two-horse town coach for Copenhagen 1760, swapped in for the player's car (same physics, forward is -Z).
@@ -77,16 +78,46 @@ export function farCoachGeometry(g,ratio=.25){
   const [cut]=simplifier.simplify(idx,pos,3,Math.max(3,Math.floor(grp.count*ratio/3)*3),.02,[]);out.addGroup(index.length,cut.length,grp.materialIndex);for(const v of cut)index.push(v);}
  out.setIndex(index);out.computeBoundingSphere();return out;
 }
+// Coach lanterns: where the brougham's cab starts behind the box seat (extras.box), its vertices above the seat's height
+// plus 0.45 m (the cab's front face, under the roof), and how wide the cab is there; a lantern on each front corner,
+// 8 cm out from the side, at 74% of the coach's height. Without the brougham, the procedural coach's own lantern posts.
+export function lanternSpots(geometry,box){
+ const p=geometry?.attributes?.position;if(!p||!box)return [[-.78,1.95,-.25],[.78,1.95,-.25]];
+ let top=-Infinity,front=Infinity,side=0;for(let i=0;i<p.count;i++)top=Math.max(top,p.getY(i));
+ for(let i=0;i<p.count;i++)if(p.getY(i)>box[1]+.45&&p.getZ(i)>box[2])front=Math.min(front,p.getZ(i));
+ for(let i=0;i<p.count;i++){const y=p.getY(i),z=p.getZ(i);if(y>top*.55&&y<top*.85&&z>=front&&z<front+.4)side=Math.max(side,Math.abs(p.getX(i)));}
+ return [-1,1].map(k=>[k*(side+.08),top*.74,front+.1]);
+}
+// Two lanterns at `spots` (the coach's frame): a black lamp body with a brass cap and a glass that glows warm after dark
+// (weather.js night, as the car's headlights), and a faint warm pool on the road around the front of the coach (vertex
+// colours fading out, added: no texture, no scene light). update() lights them; a candle's flicker in the pool.
+function coachLanterns(spots){
+ const g=new THREE.Group();g.name='Coach lanterns';
+ const body=mergeGeometries(spots.flatMap(([x,y,z])=>[box(.13,.03,.13,x,y-.075,z,'#1b1714'),paint(new THREE.ConeGeometry(.095,.08,4).rotateY(Math.PI/4).translate(x,y+.1,z),'#1b1714'),cyl(.02,.02,.05,x,y+.16,z,'#a8843e',6),box(.03,.03,.1,x-Math.sign(x)*.06,y,z,'#1b1714')]));
+ const lamps=new THREE.Mesh(body,new THREE.MeshStandardMaterial({vertexColors:true,roughness:.5,metalness:.4}));lamps.name='Coach lantern bodies';
+ const glassMat=new THREE.MeshStandardMaterial({color:'#d9cfae',roughness:.15,metalness:0,emissive:'#ffb45a',emissiveIntensity:0});
+ const glass=new THREE.Mesh(mergeGeometries(spots.map(([x,y,z])=>new THREE.BoxGeometry(.1,.12,.1).translate(x,y,z))),glassMat);glass.name='Coach lantern glass';
+ const disc=new THREE.CircleGeometry(1,28).rotateX(-Math.PI/2),n=disc.attributes.position.count,col=new Float32Array(n*3),warm=new THREE.Color('#ffa04a');
+ for(let i=0;i<n;i++){const r=Math.hypot(disc.attributes.position.getX(i),disc.attributes.position.getZ(i)),k=Math.max(0,1-r)**1.5;col.set([warm.r*k,warm.g*k,warm.b*k],i*3);}
+ disc.setAttribute('color',new THREE.BufferAttribute(col,3));
+ const front=Math.min(...spots.map(s=>s[2])),poolMat=new THREE.MeshBasicMaterial({vertexColors:true,transparent:true,opacity:0,depthWrite:false,blending:THREE.AdditiveBlending,polygonOffset:true,polygonOffsetFactor:-4});
+ const pool=new THREE.Mesh(disc,poolMat);pool.name='Coach lantern light';pool.scale.set(Math.abs(spots[0][0])+1.6,1,2.6);pool.position.set(0,.22,front-1.2);pool.renderOrder=2;
+ for(const m of [lamps,glass,pool])m.castShadow=false;g.add(lamps,glass,pool);
+ let t=0;
+ g.userData.update=dt=>{const night=Math.max(0,Math.min(1,(WEATHER_UNIFORMS.night.value-.5)*4));pool.visible=night>0;t+=dt||0;
+  const flicker=.92+.05*Math.sin(t*13.1)+.03*Math.sin(t*31.7+1.3);glassMat.emissiveIntensity=2.4*night*flicker;poolMat.opacity=.34*night*flicker;};
+ g.userData.update(0);return g;
+}
 function gaitMesh({geometry,materials},count){
  const motion=new THREE.InstancedBufferAttribute(new Float32Array(count*3),3);motion.setUsage(THREE.DynamicDrawUsage);geometry.setAttribute('motion',motion);
  const mesh=new THREE.InstancedMesh(geometry,materials,count);
  mesh.customDepthMaterial=gaitDepthMaterial();mesh.castShadow=true;mesh.frustumCulled=false;return {mesh,motion};
 }
-export function createCarriage(){
+export function createCarriage({lanterns=true}={}){ // lanterns: the player's coach lights two after dark (coachLanterns)
  const group=new THREE.Group();group.name='Coach and horses';
- const gait=gaitCoach();
+ const gait=gaitCoach(),lamps=lanterns?coachLanterns(gait&&BROUGHAM?lanternSpots(BROUGHAM.geometry,BROUGHAM.extras.box||[0,1.34,-.35]):lanternSpots(null)):null;if(lamps)group.add(lamps);
  if(gait){const {mesh,motion}=gaitMesh(gait,1),m={phase:0,amp:0,roll:0};mesh.setMatrixAt(0,new THREE.Matrix4());mesh.name='Coach and pair';group.add(mesh);
-  group.userData.update=(speed,dt)=>{stepMotion(m,speed,dt);motion.setXYZ(0,m.phase,m.amp,m.roll);motion.needsUpdate=true;};
+  group.userData.update=(speed,dt)=>{stepMotion(m,speed,dt);motion.setXYZ(0,m.phase,m.amp,m.roll);motion.needsUpdate=true;lamps?.userData.update(dt);};
   return group;}
  const mat=new THREE.MeshStandardMaterial({vertexColors:true,roughness:.55,metalness:.12});
  const lacquer='#1f3a2c',gilt='#c19a45',dark='#16120e';
@@ -114,7 +145,7 @@ export function createCarriage(){
   at.forEach(([lx,lz],k)=>legs.push({batch,k,x:lx,z:lz}));}
  const swing=(phase,amp)=>{legs.forEach((l,i)=>l.batch.setMatrixAt(l.k,pose.makeRotationX(Math.sin(phase+(i%2?Math.PI:0)+(i>3?.6:0))*amp).setPosition(l.x,1.05,l.z)));for(const b of batches)b.instanceMatrix.needsUpdate=true;};
  swing(0,0);let phase=0;
- group.userData.update=(speed,dt)=>{const v=Math.min(Math.abs(speed),14);phase+=dt*v*1.4;swing(phase,Math.min(.55,v*.08));stepMotion(roll,speed,dt);body.motion.setXYZ(0,0,0,roll.roll);body.motion.needsUpdate=true;}; // the wheels roll as the loaded coach's do, capped at ROLL_SPEED (gait.js)
+ group.userData.update=(speed,dt)=>{const v=Math.min(Math.abs(speed),14);phase+=dt*v*1.4;swing(phase,Math.min(.55,v*.08));stepMotion(roll,speed,dt);body.motion.setXYZ(0,0,0,roll.roll);body.motion.needsUpdate=true;lamps?.userData.update(dt);}; // the wheels roll as the loaded coach's do, capped at ROLL_SPEED (gait.js)
  return group;
 }
 
@@ -141,7 +172,7 @@ export function createCarriageTraffic(actors){
     m4.compose(v.set(x,Math.max(groundAt(x,z),(fr+bk)/2),z),q.setFromEuler(EU.set(Math.atan2(fr-bk,2*PITCH_REACH),h,0)),one).multiply(ahead);
     if(f&&d>COACH_NEAR){f.mesh.setMatrixAt(nf,m4);f.motion.setXYZ(nf,s.phase,s.amp,s.roll);nf++;}else{mesh.setMatrixAt(n,m4);motion.setXYZ(n,s.phase,s.amp,s.roll);n++;}});
    mesh.count=n;mesh.instanceMatrix.needsUpdate=true;motion.needsUpdate=true;if(f){f.mesh.count=nf;f.mesh.instanceMatrix.needsUpdate=true;f.motion.needsUpdate=true;}}};}
- const c=createCarriage(),bodyGeo=c.getObjectByName('Coach body').geometry.clone();bodyGeo.deleteAttribute('motion'); // the coach body with its turning wheels (createCarriage); placed 1.2 m ahead per coach, as the gait coaches are
+ const c=createCarriage({lanterns:false}),bodyGeo=c.getObjectByName('Coach body').geometry.clone();bodyGeo.deleteAttribute('motion'); // the coach body with its turning wheels (createCarriage); placed 1.2 m ahead per coach, as the gait coaches are
  const shared=new Set();c.traverse(o=>{if(o.isMesh){shared.add(o.geometry);shared.add(o.material);}});shared.forEach(x=>x.dispose());
  const material=new THREE.MeshStandardMaterial({vertexColors:true,roughness:.55,metalness:.12}),count=Math.max(1,actors.length);
  const {mesh,motion}=gaitMesh({geometry:bodyGeo,materials:gaitMaterial(new THREE.MeshStandardMaterial({vertexColors:true,roughness:.55,metalness:.12}))},count);mesh.name='Coaches';const ahead=new THREE.Matrix4().makeTranslation(0,0,1.2),body=new THREE.Matrix4(),rolls=Array.from({length:count},(_,i)=>({phase:0,amp:0,roll:i*3.3}));
