@@ -265,7 +265,7 @@ export class PoliceSimulation{
   if(!this.target)return;
   const candidates=[],role=this.units.length%2?'intercept':'chase',surge=this.surging,[near,far]=surge?SURGE.spawn:[65,150];
   traffic=traffic.filter(a=>a.edge!==null&&distance(a,player)<far+12); // only these can be within 12 m of a spot (was every car and walker for every spot)
-  for(const k of this.nearEdges(player.x,player.z,far+12)){const edge=this.graph.edges[k];if(!Number.isFinite(this.costs[edge.to])&&edge!==this.target.edge)continue;
+  for(const k of this.nearEdges(player.x,player.z,far+12)){const edge=this.graph.edges[k];if(!Number.isFinite(this.costs[edge.to])&&edge!==this.target.edge||edge.inside)continue; /* not inside a signal cluster (all junction box): one that appeared there stood in it behind a car at the red light out, and held the cars behind it 15 s */
    const s=edge.length*.5,p=routePoint(edge,s,edge.lane,undefined,undefined,this.spawnPoint||={x:0,z:0,heading:0}),d=distance(p,player); /* copied into the candidate below */
    if(d<near||d>far||(this.blocked.get(edge.id)||0)>this.time)continue;
    // Surge: score by driving distance to the player, not as the crow flies, so the unit really arrives in seconds.
@@ -292,7 +292,7 @@ export class PoliceSimulation{
  backup(player,traffic){
   const [near,far]=SURGE.backupSpawn,candidates=[];
   traffic=traffic.filter(a=>a.edge!==null&&distance(a,player)<far+9);
-  for(const k of this.nearEdges(player.x,player.z,far+12)){const edge=this.graph.edges[k];
+  for(const k of this.nearEdges(player.x,player.z,far+12)){const edge=this.graph.edges[k];if(edge.inside)continue;
    if(edge.points.every(q=>Math.hypot(q[0]-player.x,q[1]-player.z)>far+edge.length))continue;
    for(let s=4;s<=edge.length-4;s+=6){
     const p=routePoint(edge,s,edge.lane,undefined,undefined,this.spawnPoint||={x:0,z:0,heading:0}),d=distance(p,player);if(d<near||d>far)continue;
@@ -460,7 +460,13 @@ export class PoliceSimulation{
    if(surge&&gap<SURGE.arrestRange&&Math.abs(player.speed)<1&&this.clearSight(unit,player))desired=Math.min(desired,unit.backup?0:Math.max(0,(gap-10)*.6)); // a backup unit has pulled up: it holds there
    const sh=Math.sin(unit.heading),ch=Math.cos(unit.heading);
    const pass=unit.stuck>2&&!(this.time<unit.yieldUntil); // see lane, below
-   let room=Infinity,front=null;for(let k=0;k<near.length;k++){const a=obstacles[near[k]],dx=a.x-unit.x,dz=a.z-unit.z;if(dx*dx+dz*dz>676||pass&&a.holdBy===unit)continue;const forward=-dx*sh-dz*ch,side=Math.abs(dx*ch-dz*sh);if(forward>0&&forward<24&&side<2.3){desired=Math.min(desired,Math.max(0,(forward-6)*1.4));if(forward<room){room=forward;front=a;}}}
+   // What is ahead on its way: a car straight on from its nose counts only if it is also on the lane it drives (where the way
+   // turns, a unit turning out of a junction box stood 15-20 s for a car waiting at another approach's stop line, across the box
+   // from it, and held the cars behind it).
+   let room=Infinity,front=null,off;for(let k=0;k<near.length;k++){const a=obstacles[near[k]],dx=a.x-unit.x,dz=a.z-unit.z,d2=dx*dx+dz*dz;if(d2>676||pass&&a.holdBy===unit)continue;const forward=-dx*sh-dz*ch;if(forward<=0||forward>=24)continue;
+    let side=Math.abs(dx*ch-dz*sh);const d=unit.s+Math.sqrt(d2),e=unit.edge;if(near[k]<base&&a!==player&&side<2.3&&d<=e.length+(ahead?ahead.length:0)){ /* the player and the other units: straight on, as before (how close it follows them) */const W=this.wayPoint||={x:0,z:0,heading:0}; /* at its present offset from the centre line (a passing offset, or its lane) */if(off===undefined){routePoint(e,unit.s,0,undefined,undefined,W);off=(unit.x-W.x)*Math.cos(W.heading)-(unit.z-W.z)*Math.sin(W.heading);}
+     if(d<=e.length)routePoint(e,d,off,undefined,undefined,W);else routePoint(ahead,d-e.length,off-e.lane+ahead.lane,undefined,undefined,W);side=Math.abs((a.x-W.x)*Math.cos(W.heading)-(a.z-W.z)*Math.sin(W.heading));}
+    if(side<2.3){desired=Math.min(desired,Math.max(0,(forward-6)*1.4));if(forward<room){room=forward;front=a;}}}
    {const line=stopLine(unit.edge),d=line-unit.s;if(d>-.3&&d<30&&this.holdsShort(unit,ahead,field,line,near,player,surge?SURGE.arrestRange:10)){const t=Math.max(0,d);desired=Math.min(desired,Math.sqrt(6*t),t*1.3);}} // stop at the stop line (traffic's comfortable stop: mobility.js stopBefore)
    if(this.time<unit.yieldUntil)desired=0; // letting by a car that waited on it (below)
    const previousSpeed=unit.speed;
@@ -472,14 +478,14 @@ export class PoliceSimulation{
    if(edge===field.target?.edge&&unit.s<=field.target.s&&s>field.target.s)s=field.target.s;
    if(s>=edge.length){const next=this.next(edge,field);if(next){s-=edge.length;edge=next;}else{unit.speed=0;unit.stuck+=dt;continue;}}
    let p=routePoint(edge,s,edge.lane,undefined,undefined,P);
-   // A car that is itself waiting on the unit (its step into the unit refused, or following it) and stands in the unit's way: neither could move for good (a unit and a car turning across each other in a junction box stood 20 s, and a unit in a signal cluster with the car it faced and the one behind it both waiting on it, 15-30 s). After 2 s, when it cannot back off (below), the unit drives on anyway, past that car (its own creep out of an overlap and the car's, both allowed, part them).
-   const lane=pass?near.filter(i=>obstacles[i].holdBy!==unit):near;
+   // A car that is itself waiting on the unit (its step into the unit refused, or following it) and stands in the unit's way: neither could move for good (a unit and a car turning across each other in a junction box stood 20 s, and a unit in a signal cluster with the car it faced and the one behind it both waiting on it, 15-30 s). After 2 s, when it cannot back off (below), the unit drives on past that car where its lane or a passing offset is clear of it, or in a move that deepens no overlap (separates): driving on through it overlapped the two (17-28 unit-steps a seed). Where neither is left, the car backs off for it (mobility.js, a car held by a stuck unit).
+   const lane=pass?near.filter(i=>obstacles[i].holdBy!==unit):near,waited=lane.length<near.length||!pass&&near.some(i=>obstacles[i].holdBy===unit); // a car waits on it: keep to a nearer offset it has taken past that car
    // Emergency vehicles may pass a queue only where a full, swept car fits
    // the carriageway. Roundabouts retain their single directed centre line.
-   if(!edge.roundabout&&overlapsAny(p,lane)){
-    for(let o=0;o<2;o++){const q=routePoint(edge,s,o?0:edge.lane+2.7,undefined,undefined,Q);if(safeVehicleSegment(unit,q,this.world)&&!overlapsAny(q,lane)){p=q;break;}}
+   if(!edge.roundabout&&overlapsAny(p,near)){
+    for(let o=0,m=waited?4:2;o<m;o++){const q=routePoint(edge,s,o===0?edge.lane+2.7:o===1?0:edge.lane+(o===2?1.35:.7),undefined,undefined,Q);if(safeVehicleSegment(unit,q,this.world)&&!overlapsAny(q,near)){p=q;break;}} /* past a car waiting on it, nearer offsets too (a narrow street's kerb-side one is off the carriageway) */
    }
-   if(!safeVehicleSegment(unit,p,this.world)||overlapsAny(p,lane)){
+   if(!safeVehicleSegment(unit,p,this.world)||overlapsAny(p,lane)||pass&&!separates(unit,p,near)){
     // Already overlapping something (a traffic car drove into it while it stood): every move was refused and both stood
     // locked together for good. It creeps out instead, forwards or back, in its lane or at the passing offsets.
     if(overlapsAny(unit,near)){let out=null;for(let d=0;d<2&&!out;d++){const t=Math.min(unit.edge.length,Math.max(0,unit.s+(d?-1:1)*SEPARATE_SPEED*dt));if(t===unit.s)continue;for(let o=0;o<3;o++){const q=routePoint(unit.edge,t,o===0?unit.edge.lane:o===1?unit.edge.lane+2.7:0,undefined,undefined,Q);if(safeVehicleSegment(unit,q,this.world)&&separates(unit,q,near)){out=q;break;}}if(out)s=t;}

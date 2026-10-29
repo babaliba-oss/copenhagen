@@ -256,6 +256,36 @@ test('a unit stops at the stop line, not in the junction box, behind a car stand
  for(let i=0;i<90;i++)p.step(1/30,walker,[stopped]);
  assert.ok(u.officer,'the officer is still out');assert.ok(u.s<=line-.4,`backed out behind the stop line (${u.s.toFixed(2)})`);
 });
+test('a unit turning at a junction is not held by a car standing straight on from its nose, off its way (at another approach\'s stop line, or on past the junction)',()=>{
+ // The room ahead was measured straight on from the unit's nose: one turning out of a junction box stood 15-20 s for a car waiting across the box from it, and held the cars behind it.
+ const g=crossroads(),e=g.edges[0],walker={x:90,z:-6,heading:0,speed:0,walking:true,halfLength:.3},p=new PoliceSimulation(g,world);p.report('pedestrian',1);p.dispatch=100;
+ const q=routePoint(g.edges[1],4,0),stopped={id:1,edge:g.edges[1],x:q.x,z:q.z,heading:q.heading,speed:0,halfLength:2.36,halfWidth:.98};
+ const a=routePoint(e,70,0);p.units=[p.newUnit({edge:e,s:70,...a},'chase',false)];let overlap=0;
+ for(let i=0;i<240;i++){p.step(1/30,walker,[stopped]);if(trafficFootprintsOverlap(p.units[0],stopped))overlap++;}
+ const u=p.units[0];assert.equal(u.edge,g.edges[3],'turned east');assert.ok(u.x>15,`on its way (${u.x.toFixed(1)})`);assert.equal(overlap,0);
+});
+test('a unit stuck beside a car that waits on it does not drive on through it where no passing offset is clear',()=>{
+ // After 2 s held by a car that is itself waiting on it, the unit drove on through that car (17-28 unit-steps overlapping a seed).
+ const g=graph(),e=g.edges[1],walker={x:6,z:-180,heading:0,speed:0,walking:true,halfLength:.3},p=new PoliceSimulation(g,world);p.report('pedestrian',1);p.dispatch=100;
+ const a=routePoint(e,40,0);p.units=[p.newUnit({edge:e,s:40,...a},'chase',false)];const u=p.units[0],q=routePoint(e,46.5,-2.4),k=routePoint(e,46.5,2.7);
+ const car={id:7,edge:e,s:46.5,x:q.x,z:q.z,heading:q.heading+.7,speed:0,halfLength:2.36,halfWidth:.98,holdBy:u},kerb={id:8,x:k.x,z:k.z,heading:k.heading,speed:0,halfLength:2.15,halfWidth:.9}; // its nose across the lane; the passing offset taken by a car at the kerb
+ let overlap=0;for(let i=0;i<300;i++){p.step(1/30,walker,[car,kerb]);if(trafficFootprintsOverlap(u,car)||trafficFootprintsOverlap(u,kerb))overlap++;}
+ assert.equal(overlap,0,'never inside either');
+});
+test('a unit stuck beside a car that waits on it, on a narrow street, passes it at a nearer offset clear of it',()=>{
+ // The kerb-side passing offset (lane + 2.7 m) is off a narrow carriageway: the unit stood, or drove through the car.
+ const g=prepareGraph({nodes:[[0,0],[0,-200]],edges:[{from:0,to:1,lane:.35,points:[[0,0],[0,-200]]}]}),e=g.edges[0],walker={x:6,z:-190,heading:0,speed:0,walking:true,halfLength:.3};
+ const p=new PoliceSimulation(g,{roads:{at:x=>Math.abs(x)<2.8},buildings:{at:()=>false},trafficForbidden:{at:()=>false}});p.report('pedestrian',1);p.dispatch=100;
+ const a=routePoint(e,40),q=routePoint(e,47,-2.05);p.units=[p.newUnit({edge:e,s:40,...a},'chase',false)];const u=p.units[0];
+ const car={id:7,edge:e,s:47,x:q.x,z:q.z,heading:q.heading+.6,speed:0,halfLength:2.36,halfWidth:.98,holdBy:u}; // beside its lane, its nose turned across it
+ let overlap=0;for(let i=0;i<300;i++){p.step(1/30,walker,[car]);if(trafficFootprintsOverlap(u,car))overlap++;}
+ assert.equal(overlap,0,'never inside it');assert.ok(u.z<-52,`got past (${u.z.toFixed(1)})`);
+});
+test('a unit is never sent in on an edge inside a signal cluster (all junction box)',()=>{
+ // One that appeared there stood in the cluster behind a car at the red light out of it and held the cars behind it 15-30 s.
+ const spawn=inside=>{const g=crossroads();if(inside>=0)g.edges[inside].inside=true;const p=new PoliceSimulation(g,world),pl={x:0,z:-60,heading:0,speed:0};p.report('pedestrian',1);p.plan(pl);p.spawn(pl,[]);return g.edges.indexOf(p.units[0]?.edge);};
+ const first=spawn(-1);assert.ok(first>=0);assert.notEqual(spawn(first),first,'another way in');
+});
 test('a unit backs off from a car standing in its way that is itself waiting on the unit (each held by the other)',()=>{
  const g=graph(),e=g.edges[1],walker={x:6,z:-180,heading:0,speed:0,walking:true,halfLength:.3},p=new PoliceSimulation(g,world);p.report('pedestrian',1);p.dispatch=100;
  const a=routePoint(e,40,0);p.units=[p.newUnit({edge:e,s:40,...a},'chase',false)];const u=p.units[0],q=routePoint(e,46,0);
