@@ -1365,7 +1365,7 @@ function frame(now){
  // Sound never stops the game: an audio error (a browser's Web Audio quirk) is logged once and that frame's sound skipped.
  try{
  radio?.update(dt,{on:radioOn}); // getting in announces the station: the card shows what is on
- if(soundscape)soundscape.update(dt,{enabled:sound&&started&&!paused&&!mapOpen&&!reading&&!(police?.busted&&finale.ended),speed:car?.speed||0,mode:travel?.mode,throttle:keys.has('KeyW')||keys.has('ArrowUp')?1:0,musicOff:!!radio?.playing});
+ if(soundscape)soundscape.update(dt,{enabled:sound&&started&&!paused&&!mapOpen&&!reading&&!(police?.busted&&finale.ended),speed:car?.speed||0,mode:travel?.mode,throttle:keys.has('KeyW')||keys.has('ArrowUp')?1:0,musicOff:!!radio?.playing,rain:WEATHER_UNIFORMS.rain.value});
  if(gain){gain.gain.setTargetAtTime(sound&&started&&travel?.mode==='car'&&!paused&&!mapOpen&&!soundscape?.013:0,audioContext.currentTime,.12);oscillator.frequency.setTargetAtTime(42+Math.abs(car?.speed||0)*5,audioContext.currentTime,.1);}
  policeRenderer?.audio(audioContext,sound&&started&&!paused&&!mapOpen&&(!police?.busted||!finale.ended));
  birds?.audio(audioContext,sound&&started&&!paused&&!mapOpen,car,frameMs/1000);

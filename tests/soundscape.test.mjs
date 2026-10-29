@@ -39,3 +39,31 @@ test('the horn (B) is the car\'s: none on a coach in 1760, on foot or on a bike,
  sound.update(1/60,{enabled:true,mode:'car'});ac.createGain=()=>{const g=make();g.gain.setTargetAtTime=()=>{released++;};return g;};sound.horn(true);ac.createGain=make;
  sound.update(1/60,{enabled:true,mode:'walk'});assert.equal(released,1,'stepping out with B held fades the horn');
 });
+
+// Rain: a context that keeps every gain's last target and counts the sources still playing (a looped bed, or a one-shot
+// not yet past its stop time), firing onended as its clock passes the stop.
+function rainContext(){
+ const ac=fakeContext(),gains=[],playing=new Set(),ending=[];
+ const make={gain:ac.createGain,src:ac.createBufferSource,osc:ac.createOscillator};
+ ac.createGain=()=>{const g=make.gain();const p=g.gain,set=p.setTargetAtTime;p.setTargetAtTime=(v,t,k)=>{set(v,t,k);p.target=v;};gains.push(g);return g;};
+ const source=s=>{const start=s.start,stop=s.stop;s.start=(t=0,...a)=>{start(t,...a);playing.add(s);};s.stop=(t=0)=>{stop(t);ending.push([t,s]);};return s;};
+ ac.createBufferSource=()=>source(make.src());ac.createOscillator=()=>source(make.osc());
+ ac.tick=(dt,sound,opts)=>{ac.currentTime+=dt;for(let i=ending.length-1;i>=0;i--)if(ending[i][0]<=ac.currentTime){const s=ending[i][1];ending.splice(i,1);playing.delete(s);s.onended?.();}sound.update(dt,opts);};
+ ac.playing=()=>playing.size;ac.targets=()=>gains.map(g=>g.gain.target??g.gain.value);
+ return ac;
+}
+
+for(const era of [null,1760])test(`rain follows the weather's rain amount, is quieter inside, and switching it on and off leaves nothing playing (${era||'today'})`,()=>{
+ const level=(mode,rain)=>{const ac=rainContext(),sound=createSoundscape(ac,{era});sound.music(false);for(let i=0;i<60;i++)ac.tick(1/60,sound,{enabled:true,mode,rain});return ac.targets();};
+ const dry=level('walk',0),wet=level('walk',1),half=level('walk',.5),inCar=level('car',1);
+ const ix=dry.findIndex((v,i)=>wet[i]>v+.01&&half[i]>v);assert.ok(ix>=0,'a gain rises with the rain');
+ assert.equal(dry[ix],0,'silent when dry');assert.ok(Math.abs(half[ix]-wet[ix]/2)<1e-9,'in proportion to the rain amount (weather.js smooths the transition)');
+ assert.ok(inCar[ix]<wet[ix]*.6&&inCar[ix]>0,`quieter inside (${inCar[ix].toFixed(3)} vs ${wet[ix].toFixed(3)})`);
+ const ac=rainContext(),sound=createSoundscape(ac,{era});sound.music(false);
+ const made=()=>ac.playing();for(let i=0;i<120;i++)ac.tick(1/60,sound,{enabled:true,mode:'walk',rain:0});const before=made();
+ for(let k=0;k<200;k++)for(let i=0;i<30;i++)ac.tick(1/60,sound,{enabled:true,mode:k%3?'walk':'car',rain:k%2});
+ for(let i=0;i<120;i++)ac.tick(1/60,sound,{enabled:true,mode:'walk',rain:0});
+ assert.equal(made(),before,`sources playing after 200 weather changes: ${made()} (before ${before})`);
+ const off=rainContext(),quiet=createSoundscape(off,{era});quiet.music(false);for(let i=0;i<60;i++)off.tick(1/60,quiet,{enabled:true,mode:'walk',rain:0});const n=off.playing();
+ for(let i=0;i<600;i++)off.tick(1/60,quiet,{enabled:false,mode:'walk',rain:1});assert.equal(off.playing(),n,'no drops while the sound is off or paused');
+});

@@ -1,5 +1,5 @@
 // Copenhagen soundscape (Web Audio, no files): an engine with gears, tyre roll, a low city bed, the odd
-// bicycle bell, a car horn (B) and generative Danish folk tunes for background music (U toggles it; the car radio, L,
+// bicycle bell, rain that follows the weather, a car horn (B) and generative Danish folk tunes for background music (U toggles it; the car radio, L,
 // takes over while it plays). In 1760 the engine becomes hooves on cobbles and the bells stay.
 export function createSoundscape(ac,{era=null}={}){
  const out=ac.createGain();out.gain.value=0;out.connect(ac.destination);
@@ -13,6 +13,15 @@ export function createSoundscape(ac,{era=null}={}){
  const tyre=loop(noiseBuf),tBp=ac.createBiquadFilter(),tG=ac.createGain();tBp.type='bandpass';tBp.frequency.value=700;tBp.Q.value=.6;tG.gain.value=0;tyre.connect(tBp);tBp.connect(tG);tG.connect(out);
  // city bed
  const bed=loop(noiseBuf),bLp=ac.createBiquadFilter(),bG=ac.createGain();bLp.type='lowpass';bLp.frequency.value=era===1760?260:380;bG.gain.value=era===1760?.05:.07;bed.connect(bLp);bLp.connect(bG);bG.connect(out);
+ // rain (weather.js's smoothed rain, 0..1, passed as `rain`): white noise through a band (the hiss of drops on stone)
+ // and the brown noise low-passed (the roar of a downpour), on one gain that follows the rain, plus the odd near drop.
+ // The nodes are made once here: changing the weather only moves gains. Inside a car (or the 1760 coach) it is muffled.
+ const whiteBuf=(()=>{const b=ac.createBuffer(1,ac.sampleRate*2,ac.sampleRate),d=b.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=Math.random()*2-1;return b;})();
+ const rainG=ac.createGain(),hiss=loop(whiteBuf),hHp=ac.createBiquadFilter(),hLp=ac.createBiquadFilter(),hG=ac.createGain(),roar=loop(noiseBuf),rLp=ac.createBiquadFilter(),rG=ac.createGain();rainG.gain.value=0;rainG.connect(out);
+ hHp.type='highpass';hHp.frequency.value=900;hLp.type='lowpass';hLp.frequency.value=6500;hG.gain.value=.5;hiss.connect(hHp);hHp.connect(hLp);hLp.connect(hG);hG.connect(rainG);
+ rLp.type='lowpass';rLp.frequency.value=420;rG.gain.value=.9;roar.connect(rLp);rLp.connect(rG);rG.connect(rainG);
+ let dropT=0;
+ const drop=v=>{const t=ac.currentTime,s=ac.createBufferSource(),bp=ac.createBiquadFilter(),g=ac.createGain();s.buffer=whiteBuf;bp.type='bandpass';bp.frequency.value=2500+Math.random()*3500;bp.Q.value=4;g.gain.setValueAtTime(v,t);g.gain.exponentialRampToValueAtTime(.0001,t+.035);s.connect(bp);bp.connect(g);g.connect(rainG);s.start(t,Math.random()*1.9);s.stop(t+.05);s.onended=()=>{s.disconnect();bp.disconnect();g.disconnect();};};
  // Web Audio throws on a negative or non-finite time, and that error stopped the game: every scheduled note starts
  // no earlier than now (currentTime still reads 0 for the first frames while the audio device starts up).
  const when=t=>Number.isFinite(t)?Math.max(t,ac.currentTime):ac.currentTime;
@@ -82,7 +91,7 @@ export function createSoundscape(ac,{era=null}={}){
  }
  let gear=1,bellT=8+Math.random()*15,stepT=0,lastSpeed=0;
  const GEARS=[0,9,17,25,34,99]; // m/s top of each gear
- function update(dt,{enabled,speed=0,mode:m='car',throttle=0,musicOff=false}){ // musicOff: the car radio is playing
+ function update(dt,{enabled,speed=0,mode:m='car',throttle=0,musicOff=false,rain=0}){ // musicOff: the car radio is playing
   mode=m;if(hornG&&mode!=='car')horn(false);const t=ac.currentTime,v=Math.abs(speed);out.gain.setTargetAtTime(enabled?.65:0,t,.15);if(!enabled)return;
   const car=mode==='car'&&era!==1760,coach=mode==='car'&&era===1760;
   if(car){while(gear<5&&v>GEARS[gear])gear++;while(gear>1&&v<GEARS[gear-1]-2)gear--;
@@ -90,6 +99,9 @@ export function createSoundscape(ac,{era=null}={}){
    e1.frequency.setTargetAtTime(f,t,.06);e2.frequency.setTargetAtTime(f*1.01,t,.06);eLp.frequency.setTargetAtTime(220+rpm*480+throttle*380,t,.08);eG.gain.setTargetAtTime(.014+throttle*.022+rpm*.012,t,.12);} // engine: audible under the music, still a hum rather than a buzz
   else eG.gain.setTargetAtTime(0,t,.1);
   tG.gain.setTargetAtTime(mode==='car'?Math.min(.03,v*.0018):mode==='bike'?Math.min(.012,v*.002):0,t,.1);tBp.frequency.setTargetAtTime(500+v*30,t,.2);
+  const r=Number.isFinite(rain)?Math.max(0,Math.min(1,rain)):0,inside=mode==='car'?(era===1760?.5:.35):1; // under a roof: the drops on it, muffled
+  rainG.gain.setTargetAtTime(.1*r*inside,t,.25);hLp.frequency.setTargetAtTime(inside<1?1800:6500,t,.2);
+  if(r>.05){dropT-=dt*r*(inside<1?5:9);if(dropT<=0){dropT=.5+Math.random();drop((.15+Math.random()*.25)*inside);}}
   if(coach&&v>.6){stepT-=dt*Math.min(4.5,v*.8);if(stepT<=0){stepT=1;hoof(.12);setTimeout(()=>hoof(.09),110);}}
   bellT-=dt;if(bellT<=0){bellT=10+Math.random()*25;if(era!==1760)bell();} // no bicycles in 1760
   lastSpeed=v;
