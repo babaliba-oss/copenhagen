@@ -105,6 +105,25 @@ test('a car held behind a police unit standing in its lane (its officer out on f
  const free=run(false);assert.ok(free.a.z<-52,'past the unit: '+free.a.z.toFixed(1));assert.ok(free.held<4,'held '+free.held.toFixed(1)+' s');assert.equal(free.overlap,0,'never inside it');
  const queue=run(true);assert.ok(queue.a.z>-40,'still behind the unit at the back of a queue: '+queue.a.z.toFixed(1));
 });
+test('a car held behind a police unit at the back of a queue that does not move (a car behind the player\'s car left in the lane) goes round the lot',()=>{
+ // The unit stood behind a car stopped for good behind the player's car, out of sight of the player so it sent no officer: the cars behind it waited 45 s.
+ const graph={nodes:[[0,0],[0,-200]],edges:[{from:0,to:1,points:[[0,0],[0,-200]],lane:0,signal:-1}]};
+ const sim=new Mobility({roads:structuredClone(graph),walks:{nodes:[],edges:[]},signals:[]},{roads:{at:()=>true},buildings:{at:()=>false}},{cars:2,people:0});
+ const [a,b]=sim.cars,e=sim.roads.edges[0];Object.assign(a,{edge:e,s:20,x:0,z:-20,heading:0,speed:8});Object.assign(b,{edge:e,s:52,x:0,z:-52,heading:0,speed:0});
+ const left={id:'player-car',x:0,z:-58.5,heading:0,speed:0,halfLength:2.36,halfWidth:.98},player={x:30,z:-190,speed:0},u={id:'police-0',edge:e,s:45,x:0,z:-45,heading:0,speed:0,officer:{}};let overlap=0;
+ for(let i=0;i<30*20;i++){sim.externalObstacles=[u,left];sim.externalVehicles=[u];sim.step(1/30,player);for(const o of [u,b,left])if(trafficFootprintsOverlap(a,o))overlap++;}
+ assert.ok(b.z>-57,'the car ahead still stands behind the left car: '+b.z.toFixed(1));assert.ok(a.z<-62,'past the unit, the car and the left car: '+a.z.toFixed(1));assert.equal(overlap,0,'never inside any of them');
+});
+test('a car waiting on a police unit stuck in its way, with no room round it, backs off a few metres to let it by',()=>{
+ // A unit turning out of a junction across the nose of a car waiting at the box stood 40 s: it may not drive through the car, and nothing else moved.
+ const graph={nodes:[[0,0],[0,-200]],edges:[{from:0,to:1,points:[[0,0],[0,-200]],lane:0,signal:-1}]};
+ const run=stuck=>{const sim=new Mobility({roads:structuredClone(graph),walks:{nodes:[],edges:[]},signals:[]},{roads:{at:x=>Math.abs(x)<1.2},buildings:{at:()=>false}},{cars:1,people:0}); // a lane with no room to pass
+  const [a]=sim.cars,e=sim.roads.edges[0];Object.assign(a,{edge:e,s:40,x:0,z:-40,heading:0,speed:0});
+  const player={x:30,z:-190,speed:0},u={id:'police-0',edge:e,s:46,x:0,z:-46,heading:Math.PI,speed:0,stuck};let overlap=0;
+  for(let i=0;i<30*6;i++){sim.externalObstacles=[u];sim.externalVehicles=[u];sim.step(1/30,player);if(trafficFootprintsOverlap(a,u))overlap++;}return {z:a.z,overlap};};
+ const r=run(5);assert.ok(r.z>-38,'backed off: '+r.z.toFixed(1));assert.equal(r.overlap,0);
+ assert.ok(run(0).z<-39,'not for a unit that is only waiting');
+});
 test('a car stranded at a dead end with no way back stays beside the player but is recycled further away',()=>{
  // Visible stranded cars used to stay forever, so every car behind them queued forever too.
  const graph={nodes:[[0,0],[0,-200]],edges:[{from:0,to:1,points:[[0,0],[0,-200]],lane:0,signal:-1}]};
