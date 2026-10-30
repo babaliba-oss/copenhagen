@@ -110,3 +110,15 @@ test('sea mirrors the sky dome uniforms (horizon, mid, zenith, sun) when present
  assert.ok(Math.abs(u.uSunDir.value.length()-1)<1e-6);assert.equal(applySkyUniforms(u,{material:{uniforms:{}}}),false);
  assert.match(m.fragmentShader,/uSkyMid/);assert.match(m.fragmentShader,/pow\(sun,80\.\)/);
 });
+
+test('on foot on a portrait phone the camera stands back and higher, so the walker no longer fills the middle of the view; landscape is unchanged',async()=>{
+ const {travelCameraPose}=await import('../src/player-travel-renderer.js');
+ const actor={x:0,z:0,heading:0},shape=aspect=>{const p=travelCameraPose(actor,0,150,0,null,aspect),cam=new THREE.PerspectiveCamera(DRIVE_FOV.min,aspect||16/9,.1,1000);cam.position.set(...p.position);cam.lookAt(...p.target);cam.updateMatrixWorld();
+  const ndc=(x,y)=>new THREE.Vector3(x,y,0).project(cam),head=ndc(0,1.75),feet=ndc(0,0),side=ndc(.3,1);return {top:(1-head.y)/2,bottom:(1-feet.y)/2,width:side.x,pose:p};};
+ assert.deepEqual(shape(16/9).pose,shape(0).pose,'landscape: the same pose as before');assert.deepEqual(shape(1).pose,shape(0).pose);
+ const before=shape(16/9),wide=(()=>{const p=travelCameraPose(actor,0,150,0,null,0),cam=new THREE.PerspectiveCamera(DRIVE_FOV.min,412/915,.1,1000);cam.position.set(...p.position);cam.lookAt(...p.target);cam.updateMatrixWorld();return new THREE.Vector3(.3,1,0).project(cam).x;})(),phone=shape(412/915);
+ assert.ok(wide>.22,`Pixel 7 upright with the old pose: the walker ${(wide*100).toFixed(0)}% of the screen's width`);
+ assert.ok(phone.width<wide*.8,`now ${(phone.width*100).toFixed(0)}% of the width`);
+ assert.ok(phone.top-before.top>.05,`head lower on the screen (${(phone.top*100).toFixed(0)}% down, landscape ${(before.top*100).toFixed(0)}%)`);
+ assert.ok(phone.bottom<.85,`feet above the touch controls (${(phone.bottom*100).toFixed(0)}% down)`);
+});

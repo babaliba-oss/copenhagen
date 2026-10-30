@@ -98,9 +98,14 @@ export function createPlayerTravelRenderer(scene){
  }};
 }
 
-export function travelCameraPose(actor,heading,zoom=150,look=0,buildings=null){
- let distance=2.7+Math.max(36,Math.min(240,zoom))/90;
+// On a portrait phone (aspect under 1) the view is about 28 degrees across, and at 4.4 m behind the walker their body
+// filled the lower middle of the screen over the street ahead (Pixel 7 upright: a quarter of the width, from just under
+// the horizon to three quarters down). There the camera stands further back and higher and looks further ahead, up to
+// 40% further, 0.6 m higher and 4 m ahead at aspect 0.5 and below; landscape and desktop are unchanged.
+export function travelCameraPose(actor,heading,zoom=150,look=0,buildings=null,aspect=0){
+ const tall=aspect>0&&aspect<1?Math.min(1,(1-aspect)/.5):0;
+ let distance=(2.7+Math.max(36,Math.min(240,zoom))/90)*(1+.4*tall);
  for(let d=.4;buildings&&d<=distance;d+=.2){if(buildings.at(actor.x+Math.sin(heading)*d,actor.z+Math.cos(heading)*d)){distance=Math.max(.35,d-.3);break;}}
  const y=actor.deckY??groundAt(actor.x,actor.z),px=actor.x+Math.sin(heading)*distance,pz=actor.z+Math.cos(heading)*distance;
- return {position:[px,Math.max(y,groundAt(px,pz))+2.5,pz],target:[actor.x-Math.sin(heading+look)*2,y+1.2,actor.z-Math.cos(heading+look)*2]};
+ const ahead=2+2*tall;return {position:[px,Math.max(y,groundAt(px,pz))+2.5+.6*tall,pz],target:[actor.x-Math.sin(heading+look)*ahead,y+1.2,actor.z-Math.cos(heading+look)*ahead]};
 }
