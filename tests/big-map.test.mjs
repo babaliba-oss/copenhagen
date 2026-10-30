@@ -39,3 +39,13 @@ test('city map: the view never runs past the drawn base map, opened near its edg
  for(let i=0;i<8;i++)key('Minus');inside('zoomed right out');
  key('Equal');inside('zoomed in again');dlg.querySelector('[data-fit]').on.click[0]();inside('Whole city');
 });
+test('city map: with a job on it opens with the player and the job target both in view, 60 px in from the edges',async()=>{
+ const {dlg}=stubDom(),{createBigMap}=await import('../src/copenhagen/big-map.js');let target=[200,-700];
+ const map=createBigMap({base:()=>({width:10}),view:()=>({cx:0,cz:0,size:5000}),landmarks:()=>[],player:()=>({x:300,z:0,heading:0}),targets:()=>[{p:[1200,1200],color:'#9b5de5',small:true},{p:target,color:'#46c2b0',job:true}],route:()=>null,onTravel(){},radius:()=>2000});
+ const onScreen=(x,z)=>{const [cx,cz]=map.centre,s=map.scale;return [400+(x-cx)*s,300+(z-cz)*s];};
+ const framed=what=>{for(const [x,z] of [[300,0],target]){const [px,py]=onScreen(x,z);assert.ok(px>=60-1e-6&&px<=740+1e-6&&py>=60-1e-6&&py<=540+1e-6,`${what}: ${x},${z} at ${px|0},${py|0} px`);}};
+ map.open('Copenhagen',()=>{});const near=map.scale;framed('Marmorkirken from Nyhavn');
+ dlg.close();target=[300,-200];map.open('Copenhagen',()=>{});framed('a target close by');assert.equal(map.scale,near,'zoom left as it was when both fit');
+ dlg.close();target=[-1400,-1600];map.open('Copenhagen',()=>{});framed('a target across the city');assert.ok(map.scale<near,'zoomed out to fit');
+ const [cx,cz]=map.centre,s=map.scale;assert.ok(Math.abs(cx)+400/s<=2500+1e-6&&Math.abs(cz)+300/s<=2500+1e-6,'still on the base map');
+});

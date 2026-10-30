@@ -76,7 +76,12 @@ export function createBigMap({base,view,landmarks,player,targets,route,onTravel,
   if(e.code==='KeyM'||e.code==='Escape'){e.preventDefault();e.stopPropagation();close();}else if(e.code==='Equal'||e.code==='NumpadAdd')setZoom(zoom*1.4);else if(e.code==='Minus'||e.code==='NumpadSubtract')setZoom(zoom/1.4);});
  dlg.addEventListener('cancel',e=>{e.preventDefault();close();});
  let onClose=null;
- function open(title,closed){resetPointers();hover=null;byKey=false;onClose=closed;dlg.querySelector('#bm-title').textContent=title;dlg.showModal();cv.focus({preventScroll:true});size();const p=player();zoom=2.2;cx=p?.x||0;cz=p?.z||0;clamp();cancelAnimationFrame(raf);loop();} // focus on the map: the keys pick places from the start
+ function open(title,closed){resetPointers();hover=null;byKey=false;onClose=closed;dlg.querySelector('#bm-title').textContent=title;dlg.showModal();cv.focus({preventScroll:true});size();const p=player();zoom=2.2;cx=p?.x||0;cz=p?.z||0;frameJob(p);clamp();cancelAnimationFrame(raf);loop();} // focus on the map: the keys pick places from the start
+ // With a job on, open on the player and the job's target together, 60 px in from the edges (centred on the player
+ // alone, the drop-off at Marmorkirken sat half off the top edge from Nyhavn); zoom out only as far as that needs.
+ function frameJob(p){const t=targets().find(t=>t.job);if(!p||!t)return;const [tx,tz]=t.p,m=60*Math.min(2,devicePixelRatio||1),f=fitScale();
+  cx=(p.x+tx)/2;cz=(p.z+tz)/2;const dx=Math.abs(tx-p.x)/2,dz=Math.abs(tz-p.z)/2;
+  zoom=Math.max(1,Math.min(zoom,dx?(cv.width/2-m)/dx/f:Infinity,dz?(cv.height/2-m)/dz/f:Infinity));}
  function close(){if(!dlg.open)return;resetPointers();dlg.close();cancelAnimationFrame(raf);onClose?.();}
  addEventListener('resize',()=>{if(dlg.open){size();clamp();}});
  return {open,close,get open_(){return dlg.open;},get selected(){return hover;},get centre(){return [cx,cz];},get scale(){return S();},element:dlg};
