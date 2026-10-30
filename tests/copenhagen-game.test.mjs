@@ -127,6 +127,14 @@ test('the time bonus is a modest share of a job\'s pay in both eras: 3 a second 
   // a delivery with the whole clock left: today 145 s pay 435 on a 260 job; in 1760 it was 543 on a 192 job (Kastellet 945 on 144), now about half
  }
 });
+test('Nyhavn to the Opera: on foot the GPS line goes over Inderhavnsbroen, by car round over Knippelsbro',()=>{
+ store.clear();const {g,at,line,job}=play('copenhagen'),k=JOBS.findIndex(j=>j.b[2]==='Operaen');
+ for(let i=0;i<=k;i++){at([5000,5000],'car',90);at(job());assert.equal(g.debug().state,'b',`job ${i+1} picked up`);if(i<k)at(job(),'car',1);}
+ const A=g.debug().player,deck=p=>p[0]>1160&&p[0]<1260&&p[1]>150&&p[1]<195; /* Inderhavnsbroen's middle, over the harbour */
+ at(A,'car',1,.001);const car=line(),carOver=g.route().some(deck);at(A,'walk',1,.001);const foot=line(),footOver=g.route().some(deck);
+ assert.ok(footOver&&foot<1800,`on foot ${foot|0} m${footOver?'':', not over the bridge'}`);assert.ok(!carOver&&car>2500,`by car ${car|0} m`);
+ // the footways off the bridge's Christianshavn end ran through a 2013 model block on today's open plaza (Grønlandske Handels Plads), and the line went round by Knippelsbro: 2.8 km
+});
 test('job 1 is a short first delivery in both eras, and its clock leaves time for the car\'s own line',()=>{
  for(const id of ['copenhagen','copenhagen-1760']){store.clear();const {g,at,line,job}=play(id);
   at([5000,5000],'car',90);assert.equal(g.timed(),null,'nothing on the clock yet');const A=job();at(A);assert.equal(g.debug().state,'b',`${id}: picked up`);assert.equal(g.timed(),'delivery','the era switch warns about this one');at(A,'car',1,.001);
