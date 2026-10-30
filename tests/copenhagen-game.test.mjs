@@ -120,6 +120,13 @@ test('every delivery clock covers the GPS line the player follows, by car (or co
    at(B,'car',1);assert.equal(g.debug().state,'a',`${id} job ${i+1} delivered`);}}
  // Wienerbrød (job 2): a 3.6 km line round the one-way streets had 311 s from a shorter road route (42 km/h).
 });
+test('the time bonus is a modest share of a job\'s pay in both eras: 3 a second left today, 1.5 in 1760',()=>{
+ for(const [id,rate] of [['copenhagen',3],['copenhagen-1760',1.5]]){store.clear();const {g,at,job,banner}=play(id),list=id==='copenhagen'?JOBS:JOBS_1760,key='cph-game-v1'+(id==='copenhagen'?'':'-1760'),money=()=>JSON.parse(store.get(key)||'{}').money||0;
+  at([5000,5000],'car',90);const A=job();at(A);const clock=Number(banner().match(/in (\d+) s/)[1]),B=job(),before=money();at(B,'car',1);assert.equal(g.debug().state,'a',`${id}: delivered`);
+  const bonus=money()-before-list[0].pay;assert.ok(Math.abs(bonus-clock*rate)<=rate,`${id}: ${bonus} for ${clock} s left`);
+  // a delivery with the whole clock left: today 145 s pay 435 on a 260 job; in 1760 it was 543 on a 192 job (Kastellet 945 on 144), now about half
+ }
+});
 test('job 1 is a short first delivery in both eras, and its clock leaves time for the car\'s own line',()=>{
  for(const id of ['copenhagen','copenhagen-1760']){store.clear();const {g,at,line,job}=play(id);
   at([5000,5000],'car',90);assert.equal(g.timed(),null,'nothing on the clock yet');const A=job();at(A);assert.equal(g.debug().state,'b',`${id}: picked up`);assert.equal(g.timed(),'delivery','the era switch warns about this one');at(A,'car',1,.001);
