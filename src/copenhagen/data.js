@@ -77,7 +77,7 @@ export const SAGAS = [
     steps: [
       { at: [55.67560, 12.57790], name: 'The first X', clue: 1, r: 16, card: ['Slotsholmen · 1167', 'Bishop Absalon built a castle here in 1167, on a little island next to a fishing village called Havn. That is where Copenhagen starts. The ruins are still down there, under Christiansborg. Wedged between two stones: the second piece of the map.'] },
       { at: [55.67300, 12.59360], name: 'The second X', clue: 1, r: 16, card: ['Christianshavn · 1617', 'Christian IV had a new town built here on the shallows, canals and all, the Dutch way. Folded into the map is a note: Holger Danske rode with Charlemagne in the old French songs, and the Danes kept him anyway. Andersen wrote a tale about him in 1845. The third piece points north.'] },
-      { at: [55.69340, 12.59440], name: 'The last X', clue: 1, r: 18, card: ['Norgesporten, Kastellet', 'The north gate. Look north: 45 km up the coast is Kronborg, and in its cellars Holger Danske sleeps, his beard grown into the stone table. He wakes when Denmark is in danger. In the Second World War a resistance group took his name. The treasure? The map was the treasure. Also, 700.'] }] },
+      { at: [55.69340, 12.59440], name: 'The last X', clue: 1, r: 18, card: ['Norgesporten, Kastellet', 'The north gate. Look north: 45 km up the coast is Kronborg, and in its cellars Holger Danske sleeps, his beard grown into the stone table. He wakes when Denmark is in danger. In the Second World War a resistance group took his name. The treasure? The map was the treasure. Also, the purse.'] }] },
 ];
 
 // Characters who stand at fixed places and give sagas. `script` selects their dialogue in characters.js; `label1760` replaces the label in 1760.

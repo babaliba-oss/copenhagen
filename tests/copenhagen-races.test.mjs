@@ -31,3 +31,7 @@ test('today: Gefion\'s Plough can be done in its time by car or by bike along it
   for(let n=0;n<q.steps.length;n++){at(here,mode==='car'?'walk':'car',1,.001);at(here,mode,1,.001);total+=line();here=g.minimapTargets().filter(m=>m.color==='#e0313e')[0].p;at(here,mode,2,.001);for(let i=0;i<3;i++)g.key('Enter');}
   assert.ok(total/q.limit<most,`${mode}: ${total|0} m in ${q.limit} s`);store.delete('cph-game-v1');}
 });
+test('sagas pay half in 1760, where jobs pay about half as much',()=>{
+ for(const [id,pay] of [['copenhagen',700],['copenhagen-1760',350]]){const {g}=play(id);
+  assert.match(g.api.sagaIntro('holger').choices[0].label,new RegExp(`Accept · ${pay} `));store.delete('cph-game-v1');}
+});
