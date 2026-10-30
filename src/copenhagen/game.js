@@ -376,7 +376,7 @@ export function createCopenhagenGame({scene,city,mobilityData,cityData,toast,sou
    if(d<bd-.5){bd=d;best=i;bp=[px,pz];}run+=Math.sqrt(L2);}
   return best>0||bp&&best===0?[bp,...pts.slice(best+1)]:pts;}
 
- let hudClock=1,viewCam=null;const VIEW=new THREE.Vector3();const setHtml=(el,h)=>{if(el&&el.__h!==h){el.__h=h;el.innerHTML=h;
+ let hudClock=1,viewCam=null,storyShown=false;const VIEW=new THREE.Vector3();const setHtml=(el,h)=>{if(el&&el.__h!==h){el.__h=h;el.innerHTML=h;
    // Desktop: a card shows its story for 10 s when its heading changes, then only the heading and the next step (CSS .settled).
    const t=el.querySelector('h3')?.textContent||'';if(t!==el.__t){el.__t=t;el.classList.remove('settled');clearTimeout(el.__settle);el.__settle=setTimeout(()=>el.classList.add('settled'),10000);}}};
  function updateHud(){
@@ -417,7 +417,7 @@ export function createCopenhagenGame({scene,city,mobilityData,cityData,toast,sou
  function update(dt,actor,travelMode,{running=true,cinematic=false,view=null}={}){ // cinematic: ?cinematic drives by, it collects nothing // view: the camera (its direction: the postcard button)
   viewCam=view;
   filming=cinematic;
-  player=actor;started=running;if(!actor)return;
+  player=actor;if(running&&!storyShown){storyShown=true;for(const id of ['cph-job','cph-saga']){const el=$(id);if(el){el.classList.remove('settled');clearTimeout(el.__settle);el.__settle=setTimeout(()=>el.classList.add('settled'),10000);}}} /* the cards' 10 s story ran out behind the start card: job 1's tip (Inderhavnsbroen) was never seen */started=running;if(!actor)return;
   // (The morning paper no longer opens by itself at the start: players found the pop-up confusing. paper() still shows it.)
   {save.nisser??=[];const {m,q,v,one,zero}=NT,now=performance.now()/1000;
    for(const n of nisser){const got=save.nisser.includes(n.i);if(!got&&running&&!cinematic&&Math.hypot(n.p[0]-actor.x,n.p[1]-actor.z)<2.6){save.nisser.push(n.i);save.money+=ERA==='h'?24:150;persist();banner('Nisse found!',`${save.nisser.length} of ${nisser.length} · +${ERA==='h'?24:150} ${UNIT}`,'pass');}

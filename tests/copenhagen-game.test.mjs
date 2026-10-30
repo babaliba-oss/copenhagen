@@ -103,3 +103,11 @@ test('keyboard: the postcard hint says which way to turn, and N facing away says
  step(look(-(card[1]-me.z),card[0]-me.x));assert.match(hint.innerHTML,/^Turn (left|right) for/);
  step(look(card[0]-me.x,card[1]-me.z));assert.match(hint.innerHTML,/^Press <kbd>N<\/kbd> for a postcard of <b>Nyhavn<\/b>/);
 });
+test('desktop: job 1\'s story shows for 10 s from the start of play, not from the welcome card',async()=>{
+ const {mock}=await import('node:test');mock.timers.enable({apis:['setTimeout']});
+ try{store.clear();const {g}=play('copenhagen'),el=document.getElementById('cph-job'),cls=new Set();el.classList={add:c=>cls.add(c),remove:c=>cls.delete(c),contains:c=>cls.has(c),toggle(){}};el.__t=null;
+  const me={x:5000,z:5000,speed:0,heading:0},step=running=>g.update(1/30,me,'car',{running});
+  step(false);mock.timers.tick(60000);step(false);assert.equal(cls.has('settled'),true,'a minute on the welcome card: settled');
+  step(true);assert.equal(cls.has('settled'),false,'play starts: the story is back');mock.timers.tick(9000);step(true);assert.equal(cls.has('settled'),false);mock.timers.tick(1500);assert.equal(cls.has('settled'),true,'and settles 10 s later');
+ }finally{mock.timers.reset();}
+});
