@@ -111,6 +111,10 @@ function kerbRoom(u,world,graph){
 // edge it came from (and on back while that one leads nowhere else). At a street that narrows to less than a car 6 m in
 // (a traffic island), the player beyond it and out of reach on foot, the first unit stood wedged at the narrowing to the
 // end of the chase (17-26 s), and the next ones drove in after it before its 8 s block applied.
+// A unit stuck where its lane line runs the body more than kerbStep's 0.5 m over the kerb, with room a little to one side
+// (the lane cuts a tight corner: the narrow street by the wall at 950,437), steps NUDGES m off its lane instead and keeps
+// that offset 1.5 s, through the corner. It stood there to the end of the chase (13-17 s).
+const NUDGES=[-.25,.25];
 const BACK_OUT=3,BACK_AFTER=ON_FOOT.after+1; // s it first stands there: time to send its officer to a stopped player within reach on foot (ON_FOOT, FOOT_CHASE)
 // Officer positions are kept on the unit (unit.officer): {x,z,heading,speed,back,path,k,...}; the renderer draws them there.
 const newOfficer=(x,z,heading)=>({x,z,heading,speed:0,back:false,path:null,k:0,plan:0,gx:NaN,gz:NaN});
@@ -174,7 +178,7 @@ const stopLine=e=>e.junction&&e.stopGap&&!e.inside?e.length-e.stopGap-.5:Infinit
 
 export class PoliceSimulation{
  constructor(graph,world){
-  this.graph=graph;this.world=world;this.incoming=Array.from({length:graph.nodes.length},()=>[]);this.unfit=new Set();
+  this.graph=graph;this.world=world;this.incoming=Array.from({length:graph.nodes.length},()=>[]);this.unfit=new Set(graph.edges.filter(e=>e.walled).map(e=>e.id)); // lanes through a wall the model draws on the road (markWalledLanes): traffic routes round them and so do units
   graph.edges.forEach(e=>this.incoming[e.to].push(e));this.reset();this.sampleGrid(); /* while the map loads: the first call took 25-40 ms in the frame the first unit was called */
  }
  // Extension edges retain their IDs; wanted state and units are left intact.
@@ -340,7 +344,7 @@ export class PoliceSimulation{
  }
  // Every unit with the same fields in the same order (the spawn and backup candidates were spread in, with braking and
  // progressPoint added later): step() saw several unit shapes and kept being thrown out of its optimised code ('wrong map').
- newUnit(c,role,backup){return {edge:c.edge,s:c.s,x:c.x,z:c.z,heading:c.heading,ahead:c.ahead??0,route:c.route??0,score:c.score,id:`police-${this.serial++}`,role,speed:0,stuck:0,braking:false,progressPoint:null,backup,closest:Infinity,idle:0,officer:null,footTry:0,pull:false,yieldUntil:0,narrow:false,roundUntil:0,prev:null,reverse:false,kerbTo:undefined,kerbAt:false};}
+ newUnit(c,role,backup){return {edge:c.edge,s:c.s,x:c.x,z:c.z,heading:c.heading,ahead:c.ahead??0,route:c.route??0,score:c.score,id:`police-${this.serial++}`,role,speed:0,stuck:0,braking:false,progressPoint:null,backup,closest:Infinity,idle:0,officer:null,footTry:0,pull:false,yieldUntil:0,narrow:false,roundUntil:0,prev:null,reverse:false,kerbTo:undefined,kerbAt:false,nudge:0,nudgeUntil:0};}
  // Surge backup: one unit pulls up close to a stopped player, out of their
  // view, when the first wave has not reached arrest range (boxed in by traffic).
  backup(player,traffic){
@@ -587,7 +591,7 @@ export class PoliceSimulation{
    let edge=unit.edge,s=unit.s+unit.speed*dt;
    if(edge===field.target?.edge&&unit.s<=field.target.s&&s>field.target.s)s=field.target.s;
    if(s>=edge.length){const next=this.next(edge,field);if(next){s-=edge.length;edge=next;}else{unit.speed=0;unit.stuck+=dt;continue;}}
-   let p=routePoint(edge,s,edge.lane,undefined,undefined,P);
+   let p=routePoint(edge,s,edge.lane+(this.time<unit.nudgeUntil?unit.nudge:0),undefined,undefined,P); // its lane, or the small offset it took round a corner (NUDGES)
    // A car that is itself waiting on the unit (its step into the unit refused, or following it) and stands in the unit's way: neither could move for good (a unit and a car turning across each other in a junction box stood 20 s, and a unit in a signal cluster with the car it faced and the one behind it both waiting on it, 15-30 s). After 2 s, when it cannot back off (below), the unit drives on past that car where its lane or a passing offset is clear of it, or in a move that deepens no overlap (separates): driving on through it overlapped the two (17-28 unit-steps a seed). Where neither is left, the car backs off for it (mobility.js, a car held by a stuck unit).
    const lane=pass?near.filter(i=>obstacles[i].holdBy!==unit):near,waited=lane.length<near.length||!pass&&near.some(i=>obstacles[i].holdBy===unit); // a car waits on it: keep to a nearer offset it has taken past that car
    // Emergency vehicles may pass a queue only where a full, swept car fits
@@ -596,6 +600,8 @@ export class PoliceSimulation{
     for(let o=0,m=waited?5:3;o<m;o++){if(o===2&&!(this.time<unit.roundUntil))continue;const off=o===0?edge.lane+2.7:o===1?0:o===2?edge.lane-2.4:edge.lane+(o===3?1.35:.7),q=routePoint(edge,s,off,undefined,undefined,Q);if(safeVehicleSegment(unit,q,this.world)&&insetOnRoad(q,this.world)&&!overlapsAny(q,near)&&(boxAt(this.graph,edge,s)!==1||this.offsetHolds(edge,s,off,edge===unit.edge?ahead:undefined,field))){p=q;break;}} /* lane - 2.4, while it goes round a unit whose officer is out (roundUntil): the far side of a one-way street, where traffic goes round it (PASS_SHIFTS, mobility.js roomAround; the centre line is next to its lane there, and a unit stood 17 s behind one whose officer was out while the cars went round it); past a car waiting on it, nearer offsets too (a narrow street's kerb-side one is off the carriageway); in a junction start box only where it stays on the road beyond the box (offsetHolds); and with the drawn body at most 0.5 m over the kerb (insetOnRoad: safeVehicleSegment samples a smaller car, and at a diagonal crossing a unit stood 0.75 m over it) */
    }
    let fits=safeVehicleSegment(unit,p,this.world);if(!fits&&(unit.stuck>.5||this.time<unit.kerbUntil)&&!overlapsAny(p,lane)&&kerbStep(unit,p,this.world)){fits=true;unit.kerbUntil=this.time+1.5;} // stuck on a bend, its corner over the kerb (kerbStep): on, and through the rest of the bend without stopping again
+   if(!fits&&unit.stuck>.5&&!overlapsAny(p,lane))for(const o of NUDGES){const q=routePoint(edge,s,edge.lane+o,undefined,undefined,Q);if((safeVehicleSegment(unit,q,this.world)||kerbStep(unit,q,this.world))&&!overlapsAny(q,lane)){p=q;fits=true;unit.nudge=o;unit.nudgeUntil=this.time+1.5;unit.kerbUntil=this.time+1.5;break;}} // its lane cuts the kerb further over than kerbStep allows: a little nearer the centre line or the kerb (NUDGES) for the next 1.5 s
+   else if(!fits)unit.nudgeUntil=0;
    if(!fits||overlapsAny(p,lane)||pass&&!separates(unit,p,near)){
     // Already overlapping something (a traffic car drove into it while it stood): every move was refused and both stood
     // locked together for good. It creeps out instead, forwards or back, in its lane or at the passing offsets.

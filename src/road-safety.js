@@ -26,7 +26,7 @@ export function safeVehicleSegment(a,b,world){
 // Lanes through a drawn wall (list: 0.6 m strips {rings: [A+, B+, B-, A-]}, scripts/road-walls.mjs) are not driven: the
 // edge is marked as not fitting (Mobility.fits, routed round like a lane off the carriageway); vehicleFitsRoad's footprint
 // every 2 m steps over so thin a strip. A lane (its offset polyline) within REACH of a strip's middle line runs a car's
-// body through it. Returns the edges marked.
+// body through it. Marked edges also get walled=true (police routes round them too: PoliceSimulation.unfit). Returns the edges marked.
 export function markWalledLanes(edges,list,REACH=.9+.3){
  const C=16,grid=new Map(),cell=(x,z)=>Math.floor(x/C)*65536+Math.floor(z/C);
  for(const w of list){const r=w.rings[0],s=[(r[0][0]+r[3][0])/2,(r[0][1]+r[3][1])/2,(r[1][0]+r[2][0])/2,(r[1][1]+r[2][1])/2];
@@ -38,7 +38,7 @@ export function markWalledLanes(edges,list,REACH=.9+.3){
  for(const e of edges){if(e.fits===false)continue;const lane=e.lane||0;let hit=false;
   for(let i=1;i<e.points.length&&!hit;i++){const a=e.points[i-1],b=e.points[i],L=hypot(b[0]-a[0],b[1]-a[1])||1,ox=-(b[1]-a[1])/L*lane,oz=(b[0]-a[0])/L*lane,ax=a[0]+ox,az=a[1]+oz,bx=b[0]+ox,bz=b[1]+oz;
    for(let x=Math.floor((Math.min(ax,bx))/C);x<=Math.floor((Math.max(ax,bx))/C)&&!hit;x++)for(let z=Math.floor((Math.min(az,bz))/C);z<=Math.floor((Math.max(az,bz))/C)&&!hit;z++){const l=grid.get(x*65536+z);if(l)for(const s of l)if(near(ax,az,bx,bz,s)){hit=true;break;}}}
-  if(hit){e.fits=false;n++;}}
+  if(hit){e.fits=false;e.walled=true;n++;}}
  return n;
 }
 // Separating-axis test for the conservative vehicle footprints. This covers

@@ -319,7 +319,8 @@ test('a stuck unit whose car corner would clip the kerb takes the step while its
   for(let i=0;i<30*8;i++){p.step(1/30,walker,[]);if(u.edge===e /* the footprint the strict test reads (road-safety.js), the drawn body's side */&&[[.9,2.15],[.9,-2.15],[.98,0]].some(([lx,lz])=>w.buildings.at(u.x+lx*Math.cos(u.heading)+lz*Math.sin(u.heading),u.z-lx*Math.sin(u.heading)+lz*Math.cos(u.heading))))inHouse=true;}
   assert.ok(!inHouse,'body never in the house');return u.z;};
  assert.ok(run(.7,false)<-60,'0.3 m over the kerb: on past it');
- assert.ok(run(.7,true)>-45,'a house there: it stops short');assert.ok(run(.3,false)>-45,'0.7 m over: it stops short');
+ assert.ok(run(.7,true)>-45,'a house there: it stops short');assert.ok(run(0,false)>-45,'1 m over (0.73 m a nudge off its lane): it stops short');
+ assert.ok(run(.3,false)<-60,'0.7 m over in its lane, 0.43 m a nudge (NUDGES) nearer the centre line: on past it');
 });
 test('a unit turning out of a junction past a car crossing its nose does not take a passing offset in the wide start box that runs off the street beyond it',()=>{
  // In the box the passing offset (lane + 2.7 m) is on the road; a few metres on, on a narrow street, it is not. The unit
@@ -444,4 +445,27 @@ test('a car backing off for a stuck unit beside it keeps backing off until the u
  for(let i=0;i<60;i++){sim.externalObstacles=[u];sim.externalVehicles=[u];sim.step(1/30,player);}
  assert.ok(car.s<39,`it backed off (s ${car.s.toFixed(2)})`);
  u.stuck=0;Object.assign(u,{s:120,...routePoint(e,120,2.4)});for(let i=0;i<30;i++){sim.externalObstacles=[u];sim.externalVehicles=[u];sim.step(1/30,player);}assert.notEqual(car.hold,'back','and stops once the unit has moved on');assert.ok(car.speed>0,'on its way again');
+});
+test('units route round a lane through a wall the model draws on the road, as traffic does',()=>{
+ // The x = 0 street is shut at z = -50 by a wall across it (road-walls.json, markWalledLanes); the way round is by x = 60.
+ const nodes=[[0,100],[0,0],[0,-100],[60,0],[60,-100],[0,-200]],e=(a,b)=>({from:a,to:b,lane:0,signal:-1,points:[nodes[a],nodes[b]]});
+ const w={roads:{at:()=>true},buildings:{at:(x,z)=>Math.abs(x)<4&&Math.abs(z+50)<.3},trafficForbidden:{at:()=>false},laneWalls:[{rings:[[[-4,-49.7],[4,-49.7],[4,-50.3],[-4,-50.3]]]}]};
+ const sim=new Mobility({roads:{nodes,edges:[e(0,1),e(1,2),e(2,5),e(1,3),e(3,4),e(4,2)]},walks:{nodes:[],edges:[]},signals:[]},w,{cars:0,people:0}),g=sim.roads,walled=g.edges[1];
+ assert.equal(walled.walled,true,'markWalledLanes marks it');
+ const p=new PoliceSimulation(g,w);p.relaxed=true;p.escalate({level:2});p.dispatch=1e9;assert.ok(p.unfit.has(walled.id),'unfit for police from the start');
+ const me={x:0,z:-150,heading:0,speed:3},a=p.newUnit({edge:g.edges[0],s:60,...routePoint(g.edges[0],60)},'chase',false);p.units=[a];
+ let inWalled=false,round=false,maxStuck=0;
+ for(let t=0;t<30;t+=1/30){p.step(1/30,me);inWalled||=a.edge===walled;round||=a.edge===g.edges[4];maxStuck=Math.max(maxStuck,a.stuck);}
+ assert.ok(!inWalled,'never sent into the walled street');assert.ok(round,'it went round by x = 60');assert.ok(maxStuck<2,`stood stuck ${maxStuck.toFixed(1)} s`);
+});
+test('a unit whose lane cuts the kerb further over than kerbStep allows takes a small offset there instead of standing',()=>{
+ // A 200 m street; for z -40..-60 its kerb comes in to 0.4 m right of the lane (x = 0): the body's inset (0.48 m) leaves the
+ // road, a car still fits nearer the centre line (the narrow street by the wall at 950,437: a unit stood there to the end).
+ const w={roads:{at:(x,z)=>x>-3&&(z<-60||z>-40?x<3:x<.4)&&z<1&&z>-201},buildings:{at:()=>false},trafficForbidden:{at:()=>false}};
+ const g=prepareGraph({nodes:[[0,0],[0,-200]],edges:[{from:0,to:1,lane:0,signal:-1,points:[[0,0],[0,-200]]}]});
+ const p=new PoliceSimulation(g,w);p.relaxed=true;p.escalate({level:2});p.dispatch=1e9;
+ const me={x:0,z:-190,heading:0,speed:3},a=p.newUnit({edge:g.edges[0],s:10,...routePoint(g.edges[0],10)},'chase',false);p.units=[a];
+ let maxStuck=0,maxOff=0;
+ for(let t=0;t<20&&a.z>-80;t+=1/30){p.step(1/30,me);maxStuck=Math.max(maxStuck,a.stuck);maxOff=Math.max(maxOff,Math.abs(a.x));}
+ assert.ok(a.z<=-80,`it got through (at z ${a.z.toFixed(1)})`);assert.ok(maxStuck<2,`stood stuck ${maxStuck.toFixed(1)} s`);assert.ok(maxOff<=.3,`at most a nudge off its lane (${maxOff.toFixed(2)} m)`);
 });

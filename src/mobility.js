@@ -20,7 +20,7 @@ function settleShape(a){
   if(typeof v==='number')a[k]=.5;else if(MIXED.has(k)){a[k]=.5;a[k]=null;}else{a[k]={};a[k]=[];a[k]='';a[k]=null;}a[k]=v;}
  return a;
 }
-const ROAD_EDGE_FIELDS=['_gi','fits','zones','bounds'],WALK_EDGE_FIELDS=['_gi','_room','_roomOf'],edgeFields=(e,keys)=>{for(const k of keys)if(!(k in e))e[k]=undefined;};
+const ROAD_EDGE_FIELDS=['_gi','fits','walled','zones','bounds'],WALK_EDGE_FIELDS=['_gi','_room','_roomOf'],edgeFields=(e,keys)=>{for(const k of keys)if(!(k in e))e[k]=undefined;};
 const STANDING_PROBES=[3,6,10,15]; // metres ahead checked for a standing bus
 const NEXT_ONE=[null],NO_EDGES=[],REACH_P={x:0,z:0,heading:0}; // the next planned edge, passed to cornerSpeedLimit without a fresh array per car
 // Walker grid cells (mobility step): a 1024-slot hash of 1.5 m cells; collisions only cost a distance test.
