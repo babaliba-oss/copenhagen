@@ -94,6 +94,12 @@ test('touch: a Postcard button shows while an album view not yet taken is in fra
  const css=fs.readFileSync('src/copenhagen/copenhagen.css','utf8');assert.match(css,/#cph-postcard\{display:none\}\nbody\.touch\.driving:not\(\.busted\) #cph-postcard:not\(\[hidden\]\)\{[^}]*min-height:44px[^}]*right:var\(--mobile-right|#cph-postcard\{display:none\}\nbody\.touch\.driving:not\(\.busted\) #cph-postcard:not\(\[hidden\]\)\{[^}]*right:var\(--mobile-right[^}]*min-height:44px/,'touch only, 44 px, inside the safe area');
  assert.match(fs.readFileSync('src/main.js','utf8'),/closest\?\.\('#cph-card-hint,#cph-postcard'\)/,'its click takes the photo');
 });
+test('touch: the journal shows the postcard album (Menu > Journal says "Sagas & postcards"), with a tap hint, not N',()=>{
+ store.clear();const was=body.classList.contains;body.classList.contains=c=>c==='touch';let g;try{({g}=play('copenhagen'));}finally{body.classList.contains=was;}
+ const j=ids.get('cph-journal');j.contains=()=>true;g.key('KeyJ');
+ assert.match(j.innerHTML,/<h2 class="cph-album-h">Postcards · 0\/13<\/h2>/);assert.match(j.innerHTML,/<div class="cph-album">.*Nyhavn/s);assert.match(j.innerHTML,/tap Postcard/);assert.doesNotMatch(j.innerHTML,/press N|cph-keyboard-only/);
+ assert.doesNotMatch(fs.readFileSync('src/mobile-controls.css','utf8'),/cph-keyboard-only\{display:none/,'the album was hidden on phones');
+});
 test('desktop: no Postcard button',()=>{store.clear();const {g}=play('copenhagen'),me={x:902,z:37,speed:0,heading:0};for(let i=0;i<8;i++)g.update(1/30,me,'car',{running:true,view:{getWorldDirection:v=>v.set(47,0,-26)}});assert.equal(ids.get('cph-postcard').hidden,true);});
 test('keyboard: the postcard hint says which way to turn, and N facing away says where the view is',()=>{
  store.clear();const {g}=play('copenhagen'),hint=ids.get('cph-card-hint'),me={x:902,z:37,speed:0,heading:0},card=[949.6,11.4]; /* the Nyhavn start: the view is 54 m behind the car */
