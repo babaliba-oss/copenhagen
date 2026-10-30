@@ -257,10 +257,12 @@ export function createCopenhagenGame({scene,city,mobilityData,cityData,toast,sou
   for(const c of postcards){if(fresh&&save.cards[c.id])continue;const dx=c.p[0]-player.x,dz=c.p[1]-player.z,d=Math.hypot(dx,dz);if(d<20||d>280)continue;
    const cos=(dx*dir[0]+dz*dir[1])/(d*Math.hypot(dir[0],dir[1])||1);if(cos<Math.cos(38*Math.PI/180))continue;if(d<bd){bd=d;best=c;}}
   return best;}
+ // Which way to turn for a view (dir: the camera's): '' in frame, else 'left' / 'right' / 'behind you' / 'too close'.
+ function turnTo(c,dir){const dx=c.p[0]-player.x,dz=c.p[1]-player.z,d=Math.hypot(dx,dz),cos=(dx*dir[0]+dz*dir[1])/(d*Math.hypot(dir[0],dir[1])||1);if(d<20)return 'too close';if(cos>=Math.cos(38*Math.PI/180))return '';if(cos<-.6)return 'behind you';return dir[0]*dz-dir[1]*dx<0?'left':'right';} /* x east, z south: a negative cross is to the left */
  function photo({dir,snap}){
   if(!player)return false;const best=framed(dir);
   flash();
-  if(!best){banner('Nice photo','No postcard view here · face a landmark nearby','pick');return true;}
+  if(!best){const near=postcards.filter(c=>!save.cards[c.id]&&dist(c.p,[player.x,player.z])<280).sort((a,b)=>dist(a.p,[player.x,player.z])-dist(b.p,[player.x,player.z]))[0],w=near&&turnTo(near,dir);banner('Nice photo',near&&w?`Not a postcard yet · ${esc(near.title)} is ${w==='too close'?'too close: back off a bit':w==='behind you'?'behind you':'to your '+w}`:'No postcard view here · face a landmark nearby','pick');return true;} /* the start hint said 'Face Nyhavn' with Nyhavn's view 54 m behind the car: N only said 'no postcard view here' */
   if(save.cards[best.id]){banner(best.title,'Already in your album','pick');return true;}
   let img=null;try{img=snap();}catch{}
   save.cards[best.id]={img,t:Date.now()};const pay=ERA==='h'?18:150;save.money+=pay;persist();
@@ -386,8 +388,8 @@ export function createCopenhagenGame({scene,city,mobilityData,cityData,toast,sou
   setHtml($('cph-job'),`<p class="cph-kick">Job ${save.job%jobs.length+1}/${jobs.length}</p><h3>${esc(j.t)}</h3><p>${esc(j.d)}</p><p class="cph-go">${state==='a'?'Pick up at':'Deliver to'} <b>${esc(state==='a'?j.aName:j.bName)}</b> · ${d>1000?(d/1000).toFixed(1)+' km':Math.round(d/10)*10+' m'}${state==='b'?` · <span class="${timer<15?'cph-low':''}">${Math.max(0,timer).toFixed(0)} s</span>`:''}</p>`);
   }
   {let near=null,nd=Infinity;for(const c of postcards){if(save.cards[c.id])continue;const d=dist(c.p,[player.x,player.z]);if(d<200&&d<nd){nd=d;near=c;}}
-   {const c=TOUCH&&started&&!race&&viewCam?framed((viewCam.getWorldDirection(VIEW),[VIEW.x,VIEW.z]),true):null;snapBtn.hidden=!c;if(c)snapBtn.setAttribute('aria-label',`Take a postcard of ${c.title}`);} /* touch: a button while an unphotographed view is in frame (the hint is hidden on phones) */
-   const h=$('cph-card-hint');if(h){h.hidden=!near;if(near)setHtml(h,document.body.classList.contains('touch')?`<span aria-hidden="true">📷</span><span class="cph-sr">Take a postcard of ${esc(near.title)}</span>`:`Face <b>${esc(near.title)}</b>, press <kbd>N</kbd> for a postcard`);}} /* the key before the tail: the one-line hint (copenhagen.css) cut "…face it and press N" before the N for 7 of the 13 views at 1280 px (The Little Mermaid: 381 px in 340) */
+   const vdir=viewCam?(viewCam.getWorldDirection(VIEW),[VIEW.x,VIEW.z]):null;{const c=TOUCH&&started&&!race&&vdir?framed(vdir,true):null;snapBtn.hidden=!c;if(c)snapBtn.setAttribute('aria-label',`Take a postcard of ${c.title}`);} /* touch: a button while an unphotographed view is in frame (the hint is hidden on phones) */
+   const h=$('cph-card-hint');if(h){h.hidden=!near;if(near)setHtml(h,document.body.classList.contains('touch')?`<span aria-hidden="true">📷</span><span class="cph-sr">Take a postcard of ${esc(near.title)}</span>`:(w=>w?`${w==='too close'?'Back up':'Turn '+(w==='behind you'?'around':w)} for <b>${esc(near.title)}</b>, then <kbd>N</kbd>`:`Press <kbd>N</kbd> for a postcard of <b>${esc(near.title)}</b>`)(vdir?turnTo(near,vdir):''));}} /* the key before the tail: the one-line hint (copenhagen.css) cut "…face it and press N" before the N for 7 of the 13 views at 1280 px (The Little Mermaid: 381 px in 340) */
   const sg=$('cph-saga');if(!save.active){sg.hidden=true;return;}sg.hidden=false;
   const q=byId[save.active.id],f=frontier();
   setHtml(sg,`<p class="cph-kick">${TOUCH?`Saga${q.steps.some(s=>s.clue)?' · tap for the map':''}`:`Saga · <kbd>J</kbd> journal${q.steps.some(s=>s.clue)?' · <kbd>K</kbd> map':''}`}</p><h3>${esc(q.title)}</h3><ol>${q.steps.map((s,k)=>{const dn=save.active.done.includes(k),c=f.includes(k),dd=dist(s.p,[player.x,player.z]);return `<li class="${dn?'d':c?'c':''}">${esc(s.name)}${c?` <span>${s.clue?warmth(dd):dd>1000?(dd/1000).toFixed(1)+' km':Math.round(dd/10)*10+' m'}</span>`:''}</li>`;}).join('')}</ol>${q.limit?`<p class="cph-timer ${save.active.t<30?'cph-low':''}">${Math.max(0,save.active.t).toFixed(0)} s</p>`:''}`);

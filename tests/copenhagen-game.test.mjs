@@ -95,3 +95,11 @@ test('touch: a Postcard button shows while an album view not yet taken is in fra
  assert.match(fs.readFileSync('src/main.js','utf8'),/closest\?\.\('#cph-card-hint,#cph-postcard'\)/,'its click takes the photo');
 });
 test('desktop: no Postcard button',()=>{store.clear();const {g}=play('copenhagen'),me={x:902,z:37,speed:0,heading:0};for(let i=0;i<8;i++)g.update(1/30,me,'car',{running:true,view:{getWorldDirection:v=>v.set(47,0,-26)}});assert.equal(ids.get('cph-postcard').hidden,true);});
+test('keyboard: the postcard hint says which way to turn, and N facing away says where the view is',()=>{
+ store.clear();const {g}=play('copenhagen'),hint=ids.get('cph-card-hint'),me={x:902,z:37,speed:0,heading:0},card=[949.6,11.4]; /* the Nyhavn start: the view is 54 m behind the car */
+ const look=(dx,dz)=>({getWorldDirection:v=>v.set(dx,0,dz)}),step=view=>{for(let i=0;i<8;i++)g.update(1/30,me,'car',{running:true,view});};
+ step(look(me.x-card[0],me.z-card[1]));assert.equal(hint.hidden,false);assert.match(hint.innerHTML,/^Turn around for <b>Nyhavn<\/b>, then <kbd>N<\/kbd>/);
+ g.photo({dir:[me.x-card[0],me.z-card[1]],snap:()=>null});assert.match(ids.get('cph-banner').innerHTML,/Nyhavn is behind you/);
+ step(look(-(card[1]-me.z),card[0]-me.x));assert.match(hint.innerHTML,/^Turn (left|right) for/);
+ step(look(card[0]-me.x,card[1]-me.z));assert.match(hint.innerHTML,/^Press <kbd>N<\/kbd> for a postcard of <b>Nyhavn<\/b>/);
+});
