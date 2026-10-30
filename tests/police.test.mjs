@@ -310,3 +310,14 @@ test('a unit a traffic car has driven into backs or creeps out of it instead of 
  let deeper=false;for(let i=0;i<60;i++){const z=p.units[0].z;p.step(1/30,walker,[car]);if(p.units[0].z<z-1e-9)deeper=true;}
  assert.ok(!trafficFootprintsOverlap(p.units[0],car),`out of it (unit at z ${p.units[0].z.toFixed(2)})`);assert.ok(!deeper,'never further in');
 });
+test('a stuck unit whose car corner would clip the kerb takes the step while its centre stays on the road, never into a house or far over the kerb',()=>{
+ // A kerb bite into a narrow carriageway (on a bend in the city: safeVehicleSegment refused the next 0.3-1 m while 3 m on
+ // was fine, and the unit stood there 30-45 s, holding the cars behind it until it was retired).
+ const run=(edge,house)=>{const bite=(x,z)=>z<-43&&z>-50&&x>edge,w={roads:{at:(x,z)=>Math.abs(x)<2&&!bite(x,z)},buildings:{at:(x,z)=>house&&bite(x,z)},trafficForbidden:{at:()=>false}};
+  const g=graph(),e=g.edges[1],p=new PoliceSimulation(g,w),walker={x:6,z:-180,heading:0,speed:0,walking:true,halfLength:.3};p.report('pedestrian',1);p.dispatch=100;
+  p.units=[p.newUnit({edge:e,s:30,...routePoint(e,30,0)},'chase',false)];const u=p.units[0];let inHouse=false;
+  for(let i=0;i<30*8;i++){p.step(1/30,walker,[]);if(u.edge===e /* the footprint the strict test reads (road-safety.js), the drawn body's side */&&[[.9,2.15],[.9,-2.15],[.98,0]].some(([lx,lz])=>w.buildings.at(u.x+lx*Math.cos(u.heading)+lz*Math.sin(u.heading),u.z-lx*Math.sin(u.heading)+lz*Math.cos(u.heading))))inHouse=true;}
+  assert.ok(!inHouse,'body never in the house');return u.z;};
+ assert.ok(run(.7,false)<-60,'0.3 m over the kerb: on past it');
+ assert.ok(run(.7,true)>-45,'a house there: it stops short');assert.ok(run(.3,false)>-45,'0.7 m over: it stops short');
+});

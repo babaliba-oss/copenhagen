@@ -112,6 +112,20 @@ const overlapsAny=(p,list)=>{const al=p.halfLength??2.36;for(let k=0;k<list.leng
 // creeping out of a car that drove into the unit.
 const separates=(from,p,list)=>{const al=p.halfLength??2.36;for(let k=0;k<list.length;k++){const i=list[k],dx=OX[i]-p.x,dz=OZ[i]-p.z,r=al+OL[i]+2;if(dx*dx+dz*dz<r*r&&trafficFootprintsOverlap(p,OBS[i])&&sweptContact(from,p,OBS[i]))return false;}return true;};
 const SEPARATE_SPEED=2; // m/s, forwards or back along its lane
+// A stuck unit's step on a bend whose car corner clips the kerb (safeVehicleSegment refuses it, 3 m on is fine: it stood
+// there 30-45 s, holding the cars behind it). As traffic's kerbCorner (mobility.js): taken where the centre stays on the
+// carriageway (not a traffic island), the body's sides are at most 0.5 m over the kerb (KERB_INSET, 0.48 m out from its
+// centre line, on the road: a unit standing on such a bend already showed that much), and the drawn body (0.98 x 2.36 m, corners and mid sides), swept over the step
+// at most 0.5 m apart, meets no building or street obstacle and no water (unless a road or paving covers it).
+const KERB_BODY=[.98,2.36,-.98,2.36,.98,-2.36,-.98,-2.36,.98,0,-.98,0,0,2.36,0,-2.36],KERB_INSET=[.48,2.36,-.48,2.36,.48,-2.36,-.48,-2.36,.48,0,-.48,0,0,1.86,0,-1.86];
+export function kerbStep(a,b,world){
+ if(!world.roads.at(b.x,b.z)||world.trafficForbidden?.at(b.x,b.z))return false;
+ {const s=Math.sin(b.heading),c=Math.cos(b.heading);for(let k=0;k<KERB_INSET.length;k+=2){const lx=KERB_INSET[k],lz=KERB_INSET[k+1];if(!world.roads.at(b.x+lx*c+lz*s,b.z-lx*s+lz*c))return false;}}
+ const B=world.buildings,W=world.water,turn=Math.atan2(Math.sin(b.heading-a.heading),Math.cos(b.heading-a.heading)),n=Math.max(1,Math.ceil(distance(a,b)/.5),Math.ceil(Math.abs(turn)/.15));
+ for(let i=1;i<=n;i++){const t=i/n,x0=a.x+(b.x-a.x)*t,z0=a.z+(b.z-a.z)*t,h=a.heading+turn*t,s=Math.sin(h),c=Math.cos(h);
+  for(let k=0;k<KERB_BODY.length;k+=2){const lx=KERB_BODY[k],lz=KERB_BODY[k+1],x=x0+lx*c+lz*s,z=z0-lx*s+lz*c;if(B.at(x,z)||W?.length&&!world.roads.at(x,z)&&!world.pavement?.at(x,z)&&inWaterPolygons(W,x,z))return false;}}
+ return true;
+}
 // Junction boxes as traffic keeps them (lane-model.js stopGap/startGap): 1 for a unit still in the box at the start of its
 // edge, -1 past the stop line at its end, 0 clear of both. A unit standing in one (its officer out on foot, held beside a
 // stopped player, or behind a queue past the junction) held the cars behind it and those crossing 34-45 s: every way past
@@ -485,7 +499,8 @@ export class PoliceSimulation{
    if(!edge.roundabout&&overlapsAny(p,near)){
     for(let o=0,m=waited?4:2;o<m;o++){const q=routePoint(edge,s,o===0?edge.lane+2.7:o===1?0:edge.lane+(o===2?1.35:.7),undefined,undefined,Q);if(safeVehicleSegment(unit,q,this.world)&&!overlapsAny(q,near)){p=q;break;}} /* past a car waiting on it, nearer offsets too (a narrow street's kerb-side one is off the carriageway) */
    }
-   if(!safeVehicleSegment(unit,p,this.world)||overlapsAny(p,lane)||pass&&!separates(unit,p,near)){
+   let fits=safeVehicleSegment(unit,p,this.world);if(!fits&&(unit.stuck>.5||this.time<unit.kerbUntil)&&!overlapsAny(p,lane)&&kerbStep(unit,p,this.world)){fits=true;unit.kerbUntil=this.time+1.5;} // stuck on a bend, its corner over the kerb (kerbStep): on, and through the rest of the bend without stopping again
+   if(!fits||overlapsAny(p,lane)||pass&&!separates(unit,p,near)){
     // Already overlapping something (a traffic car drove into it while it stood): every move was refused and both stood
     // locked together for good. It creeps out instead, forwards or back, in its lane or at the passing offsets.
     if(overlapsAny(unit,near)){let out=null;for(let d=0;d<2&&!out;d++){const t=Math.min(unit.edge.length,Math.max(0,unit.s+(d?-1:1)*SEPARATE_SPEED*dt));if(t===unit.s)continue;for(let o=0;o<3;o++){const q=routePoint(unit.edge,t,o===0?unit.edge.lane:o===1?unit.edge.lane+2.7:0,undefined,undefined,Q);if(safeVehicleSegment(unit,q,this.world)&&separates(unit,q,near)){out=q;break;}}if(out)s=t;}
