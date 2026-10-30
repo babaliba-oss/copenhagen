@@ -11,8 +11,8 @@ globalThis.addEventListener=globalThis.removeEventListener=()=>{};globalThis.fet
 const THREE=await import('three'),{expandCity}=await import('../src/city-pack.js'),{expandMobility}=await import('../src/mobility-pack.js'),{SpatialIndex,inWaterPolygons}=await import('../src/geo.js');
 const {createCopenhagenGame}=await import('../src/copenhagen/game.js'),{JOBS,JOBS_1760,SAGAS}=await import('../src/copenhagen/data.js');
 const cities=JSON.parse(fs.readFileSync('public/cities/index.json','utf8')).cities;
-function play(id){
- let c=fs.readFileSync(`public/cities/${id}/city.pack`);if(c[0]===0x1f)c=gunzipSync(c);const data=expandCity(JSON.parse(c)),houses=new SpatialIndex(data.buildings);
+function play(id,prep=()=>{}){
+ let c=fs.readFileSync(`public/cities/${id}/city.pack`);if(c[0]===0x1f)c=gunzipSync(c);const data=expandCity(JSON.parse(c)),houses=new SpatialIndex(data.buildings);prep(data);
  const g=createCopenhagenGame({scene:new THREE.Scene(),city:cities.find(x=>x.id===id),mobilityData:expandMobility(JSON.parse(fs.readFileSync(`public/cities/${id}/mobility.json`,'utf8'))),cityData:data,toast(){},soundOn:()=>false,blocked:(x,z)=>!!houses.at(x,z),routeSlice:Infinity}); // routeSlice: each new line at once (in the game a new line's groundwork is spread over frames)
  const me={x:0,z:0,speed:0,heading:0},banner=()=>ids.get('cph-banner')?.innerHTML.replace(/<[^>]+>/g,'')||'';
  const at=([x,z],mode='car',steps=2,dt=1/30)=>{me.x=x;me.z=z;for(let i=0;i<steps;i++)g.update(dt,me,mode,{running:true});};
@@ -73,4 +73,13 @@ test('no job or saga line, in either era, by car or on foot, runs over open wate
    for(let k=0;k<q.steps.length;k++){at(here,'walk',1,.001);const P=g.route(),red=g.minimapTargets().filter(t=>t.color==='#e0313e').map(t=>t.p);if(!P||!red.some(p=>Math.hypot(p[0]-P.at(-1)[0],p[1]-P.at(-1)[1])<1))break; /* a map step: no line */
     check(`${q.id} step ${k}`,here);here=P.at(-1);at(here,'car',3,.001);for(let n=0;n<4;n++)g.key('Escape');}}
   assert.deepEqual(bad,[],id);} /* was: Tobacco to the Kastel and the nisse at Kastellet 43 m over the moat (no footway inside), Gefion's furrow 57 m by car from Kastellet's gate, the walk from the Opera 26 m over the canal; by car to the Opera 77 m straight over Holmen's lawns into the trees, from Rundetårn 100 m through Trinitatis churchyard, to Havnebadet 32 m short over the lawn */
+});
+test('1760: no market stall stands where a coach coming in to a race\'s start meets it first',async()=>{
+ const {stallSkip,RACE_CLEAR}=await import('../src/copenhagen/stalls.js'),{g}=play('copenhagen-1760',d=>{for(const l of d.landmarks)if(l.name==='Højbro Plads')l.name='Højbro';}); /* main.js renames the 1760 starts */
+ const starts=g.raceStarts(),mob=expandMobility(JSON.parse(fs.readFileSync('public/cities/copenhagen-1760/mobility.json','utf8'))),stalls=JSON.parse(fs.readFileSync('public/cities/copenhagen-1760/stalls.json','utf8')).stalls;
+ assert.equal(starts.length,3,'all three races planned');
+ const skip=stallSkip(mob.roads.edges,starts),near=s=>starts.some(p=>Math.hypot(p[0]-s[0],p[1]-s[1])<RACE_CLEAR);
+ assert.ok(stalls.filter(s=>!stallSkip(mob.roads.edges)(s[0],s[1])).some(near),'a stall stood by a start (the Coachman\'s Dash, Kongens Nytorv: 10 m south-east)');
+ assert.deepEqual(stalls.filter(s=>!skip(s[0],s[1])&&near(s)),[]);
+ const kept=stalls.filter(s=>!skip(s[0],s[1])).length,before=stalls.filter(s=>!stallSkip(mob.roads.edges)(s[0],s[1])).length;assert.ok(kept>=before-3&&kept>30,`the markets keep their stalls (${kept} of ${before})`);
 });

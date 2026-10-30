@@ -8,6 +8,14 @@ import {rangeInstances} from '../instance-range.js';
 // produce towards +Z, where the customer stands) drawn instead, where it loads.
 const paint=(g,hex)=>{const n=g.index?g.toNonIndexed():g;if(n!==g)g.dispose();for(const k of Object.keys(n.attributes))if(k!=='position'&&k!=='normal')n.deleteAttribute(k);const c=new THREE.Color(hex),a=new Float32Array(n.attributes.position.count*3);for(let i=0;i<a.length;i+=3)a.set([c.r,c.g,c.b],i);n.setAttribute('color',new THREE.BufferAttribute(a,3));return n;};
 const box=(w,h,d,x,y,z,hex)=>paint(new THREE.BoxGeometry(w,h,d).translate(x,y,z),hex);
+// Where no stall stands (createStalls' skip): within 4.6 m of the road graph's lane lines (on a 20 m grid), where coaches drive
+// (lane offset 1.6 + coach half width 1 + stall half size 1.3 + a little), or within RACE_CLEAR of a race's start: the start
+// fires 7 m from the coach's centre, and a stall 10 m south-east of the Coachman's Dash's on Kongens Nytorv met the coach's
+// nose first (7 m + the coach's 3.3 m front + the stall's 1.8 m half diagonal): coming in over the square from that side it never started.
+export const RACE_CLEAR=12.2;
+export function stallSkip(edges,starts=[]){const lanes=new Map(),C=20;
+ for(const e of edges)for(let k=1;k<e.points.length;k++){const [ax,az]=e.points[k-1],[bx,bz]=e.points[k],L=Math.hypot(bx-ax,bz-az);for(let t=0;t<=L;t+=3){const x=ax+(bx-ax)*t/Math.max(L,1e-6),z=az+(bz-az)*t/Math.max(L,1e-6),key=Math.floor(x/C)+','+Math.floor(z/C);(lanes.get(key)||lanes.set(key,[]).get(key)).push([x,z]);}}
+ return (x,z)=>{for(const p of starts)if(Math.hypot(p[0]-x,p[1]-z)<RACE_CLEAR)return true;for(let i=-1;i<=1;i++)for(let j=-1;j<=1;j++)for(const [px,pz] of lanes.get((Math.floor(x/C)+i)+','+(Math.floor(z/C)+j))||[])if(Math.hypot(px-x,pz-z)<4.6)return true;return false;};}
 // skip(x,z): leave out a stall there (main.js: one standing on a traffic lane across a square, where coaches drive).
 export function createStalls(data,{skip=()=>false,model=null}={}){
  const group=new THREE.Group();group.name='Market stalls';const list=(data?.stalls||[]).filter(([x,z])=>!skip(x,z));if(!list.length)return {group,obstacles:[],people:[]};
