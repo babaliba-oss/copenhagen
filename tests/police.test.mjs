@@ -404,3 +404,44 @@ test('a car going round a unit parked with its officer out goes on round the nex
  for(let i=0;i<30*20&&car.edge&&car.z>-64;i++){sim.externalObstacles=us;sim.externalVehicles=us;sim.step(1/30,player);for(const u of us)if(trafficFootprintsOverlap(car,u))overlap++;held=car.speed<.1?held+1/30:0;heldMax=Math.max(heldMax,held);}
  assert.ok(car.z<-64,`past both (car at z ${car.z.toFixed(1)})`);assert.equal(overlap,0,'never into either');assert.ok(heldMax<6,`held ${heldMax.toFixed(1)} s`);
 });
+test('foot chase: with the most officers out, a unit queued behind traffic near the player sends its officer instead of waiting in the queue',()=>{
+ // One lane, no way past the car stopped ahead of unit a; the player on foot 28 m from a. Two officers are already out, both
+ // over 100 m off by the footway: a used to wait there (17-23 s in the chase sim) until they had run over.
+ const run=car=>{const {g,p,a,b}=parkedStreet(2.2,[3,10]),me={x:12,z:-75,heading:0,speed:0,walking:true,travelMode:'walk'};
+  const c=p.newUnit({edge:g.edges[3],s:30,...routePoint(g.edges[3],30)},'chase',false);p.units.push(c);
+  for(const [u,z] of [[b,-200],[c,-195]])u.officer={x:10,z,heading:0,speed:0,back:false,path:null,k:0,plan:0,gx:NaN,gz:NaN};
+  if(car)car.edge=g.edges[1];let t=0;for(;t<10&&!a.officer;t+=1/30)p.step(1/30,me,car?[car]:[]);return {a,t};};
+ const queued=run({id:7,edge:'set',s:58,x:0,z:-58,heading:0,speed:0,halfLength:2.36,halfWidth:.98,holdBy:null});
+ assert.ok(queued.a.officer,`a's officer got out (${FOOT_CHASE.max} already out)`);assert.ok(queued.t<6,`after ${queued.t.toFixed(1)} s`);
+ const free=run(null);assert.ok(!free.a.officer||free.a.stuck<=2,'not a unit that is not held in a queue');
+});
+test('a unit behind one whose officer is out in a one-way street goes round it on the far side, where the traffic goes',()=>{
+ // Lane 0.35 m right of the centre line; the street runs from 3.55 m left of it to 1.85 m right: no room on the kerb side
+ // (lane + 2.7 m) and the centre line is next to the lane, only lane - 2.4 m (where traffic goes round, PASS_SHIFTS) passes it.
+ const g=prepareGraph({nodes:[[0,100],[0,0],[0,-100],[0,-200]],edges:[{from:0,to:1,lane:.35,points:[[0,100],[0,0]]},{from:1,to:2,lane:.35,points:[[0,0],[0,-100]]},{from:2,to:3,lane:.35,points:[[0,-100],[0,-200]]}]});
+ const w={roads:{at:(x,z)=>x>-3.55&&x<1.85&&z<103&&z>-203},buildings:{at:()=>false},trafficForbidden:{at:()=>false}};
+ const p=new PoliceSimulation(g,w);p.setWalks({nodes:[[8,-100],[8,-200]],edges:[{from:0,to:1,points:[[8,-100],[8,-200]]},{from:1,to:0,points:[[8,-200],[8,-100]]}]});p.relaxed=true;p.escalate({level:2});p.dispatch=1e9;
+ const e=g.edges[1],a=p.newUnit({edge:e,s:50,...routePoint(e,50)},'chase',false),b=p.newUnit({edge:e,s:30,...routePoint(e,30)},'chase',false);p.units=[a,b];b.footTry=Infinity;
+ a.officer={x:6,z:-50,heading:0,speed:0,back:false,path:null,k:0,plan:0,gx:NaN,gz:NaN};
+ const me={x:8,z:-190,heading:0,speed:0,walking:true,travelMode:'walk'};let overlap=0,off=0,past=false;
+ for(let t=0;t<15&&!p.busted&&!past;t+=1/30){p.step(1/30,me);if(trafficFootprintsOverlap(b,a))overlap++;if(!vehicleFitsRoad(b,w))off++;past=b.edge!==e||b.s>a.s+5;}
+ assert.ok(past,`b got past a (b at ${b.s.toFixed(1)}, a at ${a.s.toFixed(1)})`);assert.equal(overlap,0,'never through a');assert.equal(off,0,'on the road');
+});
+// One-lane-wide street (x = 0, z 0 to -200) wide enough to go round a car (4.4 m each side of the centre line).
+const unitStreet=()=>{const w={roads:{at:(x,z)=>Math.abs(x)<4.4&&z<1&&z>-201},buildings:{at:()=>false},trafficForbidden:{at:()=>false}};
+ const sim=new Mobility({roads:{nodes:[[0,0],[0,-200]],edges:[{from:0,to:1,points:[[0,0],[0,-200]],lane:0,signal:-1}]},walks:{nodes:[],edges:[]},signals:[]},w,{cars:1,people:0});return {sim,e:sim.roads.edges[0],car:sim.cars[0]};};
+test('a car held by a stuck unit that keeps setting off and being stopped (never quite standing) still goes round it',()=>{
+ // Its every step refused, the unit was set going again each frame (0.3-1 m/s), so the car facing it never counted it as standing (20 s).
+ const {sim,e,car}=unitStreet(),u={id:'police-0',edge:e,s:45,...routePoint(e,45),speed:0,stuck:3},player={x:30,z:-190,speed:0};
+ Object.assign(car,{edge:e,s:20,x:0,z:-20,heading:0,speed:8});let i=0;
+ for(;i<30*15&&car.edge&&car.z>-52;i++){u.speed=i%4*.33;sim.externalObstacles=[u];sim.externalVehicles=[u];sim.step(1/30,player);assert.ok(!trafficFootprintsOverlap(car,u),'never into the unit');}
+ assert.ok(car.z<-52,`past it (car at z ${car.z.toFixed(1)})`);
+});
+test('a car backing off for a stuck unit beside it keeps backing off until the unit moves',()=>{
+ // A unit stuck beside the car (not ahead, so not what holds it): the back-off it was set ended the next step.
+ const {sim,e,car}=unitStreet(),u={id:'police-0',edge:e,s:42,...routePoint(e,42,2.4),speed:0,stuck:3},player={x:30,z:-190,speed:0};
+ Object.assign(car,{edge:e,s:40,...routePoint(e,40,e.lane),speed:0,hold:'back',holdBy:u,backUntil:sim.time+9,backBy:u,backQueued:false});
+ for(let i=0;i<60;i++){sim.externalObstacles=[u];sim.externalVehicles=[u];sim.step(1/30,player);}
+ assert.ok(car.s<39,`it backed off (s ${car.s.toFixed(2)})`);
+ u.stuck=0;Object.assign(u,{s:120,...routePoint(e,120,2.4)});for(let i=0;i<30;i++){sim.externalObstacles=[u];sim.externalVehicles=[u];sim.step(1/30,player);}assert.notEqual(car.hold,'back','and stops once the unit has moved on');assert.ok(car.speed>0,'on its way again');
+});

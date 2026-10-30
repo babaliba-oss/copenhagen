@@ -84,7 +84,11 @@ const FOOT_CELL=20;
 // street before it. A unit sent down it came up behind the parked one, could not pass and had no officer of its own to
 // send (FOOT_CHASE.max): it stood there 16-52 s, to the end of the chase. (Not closed outright: a street with no way round
 // is still driven, and on the target's own street the only way to the target is past it.)
-const PARKED_DETOUR=300,SWAP=40,SWAP_LONG=150;
+// With FOOT_CHASE.max officers out, a unit within FOOT_NEAR m of the player that has stood stuck QUEUED s behind a traffic
+// car (queued in a one-lane street) sends its officer all the same: it waited in the queue 17-23 s, 20 m from the player,
+// while the officers out ran over from further off. Not one held by another unit or the player's car (the drive-out arrests
+// went 6 -> 18 of 30 at 3 stars).
+const PARKED_DETOUR=300,SWAP=40,SWAP_LONG=150,FOOT_NEAR=30,QUEUED=2;
 function narrowAt(u,world){const e=u.edge,P={x:0,z:0,heading:0};for(const o of [e.lane+2.7,0]){if(Math.abs(o-e.lane)<2.1)continue;routePoint(e,u.s,o,undefined,undefined,P);if(vehicleFitsRoad(P,world))return false;}return true;}
 // Before its officer gets out, a unit standing where a car behind it finds no way round pulls in towards the kerb
 // (KERB_PULL m/s sideways, at most 2.5 m off its lane, the nearer side first) where that leaves one: a sideways shift traffic
@@ -143,6 +147,8 @@ const overlapsAny=(p,list)=>{const al=p.halfLength??2.36;for(let k=0;k<list.leng
 // creeping out of a car that drove into the unit.
 const separates=(from,p,list)=>{const al=p.halfLength??2.36;for(let k=0;k<list.length;k++){const i=list[k],dx=OX[i]-p.x,dz=OZ[i]-p.z,r=al+OL[i]+2;if(dx*dx+dz*dz<r*r&&trafficFootprintsOverlap(p,OBS[i])&&sweptContact(from,p,OBS[i]))return false;}return true;};
 const SEPARATE_SPEED=2; // m/s, forwards or back along its lane
+// s a unit stands stuck yielding to a car that waits on it, unable to back off for it (creep refused), before it drives on past that car instead: the car, facing it at the mouth of a one-way street, could not back off either and the two stood 15 s
+const YIELD_GIVE=4;
 const OFFSET_AHEAD=6; // m a passing offset must stay on the road ahead (offsetHolds)
 // A stuck unit's step on a bend whose car corner clips the kerb (safeVehicleSegment refuses it, 3 m on is fine: it stood
 // there 30-45 s, holding the cars behind it). As traffic's kerbCorner (mobility.js): taken where the centre stays on the
@@ -150,9 +156,10 @@ const OFFSET_AHEAD=6; // m a passing offset must stay on the road ahead (offsetH
 // centre line, on the road: a unit standing on such a bend already showed that much), and the drawn body (0.98 x 2.36 m, corners and mid sides), swept over the step
 // at most 0.5 m apart, meets no building or street obstacle and no water (unless a road or paving covers it).
 const KERB_BODY=[.98,2.36,-.98,2.36,.98,-2.36,-.98,-2.36,.98,0,-.98,0,0,2.36,0,-2.36],KERB_INSET=[.48,2.36,-.48,2.36,.48,-2.36,-.48,-2.36,.48,0,-.48,0,0,1.86,0,-1.86];
+const insetOnRoad=(b,world)=>{const s=Math.sin(b.heading),c=Math.cos(b.heading);for(let k=0;k<KERB_INSET.length;k+=2){const lx=KERB_INSET[k],lz=KERB_INSET[k+1];if(!world.roads.at(b.x+lx*c+lz*s,b.z-lx*s+lz*c))return false;}return true;}; // the drawn body at most 0.5 m over the kerb
 export function kerbStep(a,b,world){
  if(!world.roads.at(b.x,b.z)||world.trafficForbidden?.at(b.x,b.z))return false;
- {const s=Math.sin(b.heading),c=Math.cos(b.heading);for(let k=0;k<KERB_INSET.length;k+=2){const lx=KERB_INSET[k],lz=KERB_INSET[k+1];if(!world.roads.at(b.x+lx*c+lz*s,b.z-lx*s+lz*c))return false;}}
+ if(!insetOnRoad(b,world))return false;
  const B=world.buildings,W=world.water,turn=Math.atan2(Math.sin(b.heading-a.heading),Math.cos(b.heading-a.heading)),n=Math.max(1,Math.ceil(distance(a,b)/.5),Math.ceil(Math.abs(turn)/.15));
  for(let i=1;i<=n;i++){const t=i/n,x0=a.x+(b.x-a.x)*t,z0=a.z+(b.z-a.z)*t,h=a.heading+turn*t,s=Math.sin(h),c=Math.cos(h);
   for(let k=0;k<KERB_BODY.length;k+=2){const lx=KERB_BODY[k],lz=KERB_BODY[k+1],x=x0+lx*c+lz*s,z=z0-lx*s+lz*c;if(B.at(x,z)||W?.length&&!world.roads.at(x,z)&&!world.pavement?.at(x,z)&&inWaterPolygons(W,x,z))return false;}}
@@ -480,7 +487,7 @@ export class PoliceSimulation{
  creep(unit,t,near,self){
   const e=unit.edge;if(!(t!==unit.s))return false;
   const q=this.boxPoint||={x:0,z:0,heading:0},c=routePoint(e,unit.s,0,undefined,undefined,q),off=(unit.x-c.x)*Math.cos(c.heading)-(unit.z-c.z)*Math.sin(c.heading);routePoint(e,t,off,undefined,undefined,q);
-  if(!safeVehicleSegment(unit,q,this.world)||!separates(unit,q,near))return false;
+  if(!safeVehicleSegment(unit,q,this.world)||!separates(unit,q,near)||overlapsAny(q,near)&&!overlapsAny(unit,near)||!insetOnRoad(q,this.world)&&insetOnRoad(unit,this.world))return false; // into no new overlap (separates let a unit creeping back out of a junction box reverse into a car edging round it), nor further over the kerb than the drawn body's 0.5 m (insetOnRoad) unless already so
   unit.x=q.x;unit.z=q.z;unit.heading=q.heading;unit.s=t;OX[self]=q.x;OZ[self]=q.z;return true;
  }
  // One step sideways towards unit.kerbTo (kerbRoom), at its present place along its edge; kerbAt once there, or as far as it
@@ -565,16 +572,17 @@ export class PoliceSimulation{
    // road, below; where none is, the step is refused and it stands). It used to keep its following distance behind it, its
    // step never reached the parked unit, and no passing offset was ever tried: it stood there 16 s and more.
    const round=unit.stuck>2||this.time<unit.roundUntil;
-   let room=Infinity,front=null,off;for(let k=0;k<near.length;k++){const a=obstacles[near[k]],dx=a.x-unit.x,dz=a.z-unit.z,d2=dx*dx+dz*dz;if(d2>676||pass&&a.holdBy===unit)continue;if(round&&a.officer&&near[k]>=base){if(unit.stuck>2)unit.roundUntil=this.time+3;continue;}const forward=-dx*sh-dz*ch;if(forward<=0||forward>=24)continue;
+   let room=Infinity,front=null,fk=-1,off;for(let k=0;k<near.length;k++){const a=obstacles[near[k]],dx=a.x-unit.x,dz=a.z-unit.z,d2=dx*dx+dz*dz;if(d2>676||pass&&a.holdBy===unit)continue;if(round&&a.officer&&near[k]>=base){if(unit.stuck>2)unit.roundUntil=this.time+3;continue;}const forward=-dx*sh-dz*ch;if(forward<=0||forward>=24)continue;
     let side=Math.abs(dx*ch-dz*sh);const d=unit.s+Math.sqrt(d2),e=unit.edge;if(near[k]<base&&a!==player&&side<2.3&&d<=e.length+(ahead?ahead.length:0)){ /* the player and the other units: straight on, as before (how close it follows them) */const W=this.wayPoint||={x:0,z:0,heading:0}; /* at its present offset from the centre line (a passing offset, or its lane) */if(off===undefined){routePoint(e,unit.s,0,undefined,undefined,W);off=(unit.x-W.x)*Math.cos(W.heading)-(unit.z-W.z)*Math.sin(W.heading);}
      if(d<=e.length)routePoint(e,d,off,undefined,undefined,W);else routePoint(ahead,d-e.length,off-e.lane+ahead.lane,undefined,undefined,W);side=Math.abs((a.x-W.x)*Math.cos(W.heading)-(a.z-W.z)*Math.sin(W.heading));}
-    if(side<2.3){desired=Math.min(desired,Math.max(0,(forward-6)*1.4));if(forward<room){room=forward;front=a;}}}
+    if(side<2.3){desired=Math.min(desired,Math.max(0,(forward-6)*1.4));if(forward<room){room=forward;front=a;fk=near[k];}}}
+   unit.queued=fk>0&&fk<base; // behind a traffic car (not the player, slot 0, nor another unit): FOOT_NEAR
    {const line=stopLine(unit.edge),d=line-unit.s;if(d>-.3&&d<30&&this.holdsShort(unit,ahead,field,line,near,player,surge?SURGE.arrestRange:10)){const t=Math.max(0,d);desired=Math.min(desired,Math.sqrt(6*t),t*1.3);}} // stop at the stop line (traffic's comfortable stop: mobility.js stopBefore)
    if(this.time<unit.yieldUntil)desired=0; // letting by a car that waited on it (below)
    const previousSpeed=unit.speed;
    unit.speed+=Math.max(-18*dt,Math.min(accel*dt,desired-unit.speed));
    unit.braking=unit.speed<previousSpeed-.01;
-   if(front?.holdBy===unit&&(unit.stuck>1||this.time<unit.yieldUntil)){unit.yieldUntil=this.time+2;if(this.creep(unit,Math.max(boxAt(this.graph,unit.edge,0)?unit.edge.startGap:0,unit.s-SEPARATE_SPEED*dt),near,self)){unit.speed=0;continue;}} /* not back into the box it came through */ // the car it waits on is waiting on it (each in the other's way, turning across in a signal cluster: both stood 30 s): it backs off its way and lets it by
+   if(front?.holdBy===unit&&(unit.stuck>1||this.time<unit.yieldUntil)){unit.yieldUntil=this.time+2;if(this.creep(unit,Math.max(boxAt(this.graph,unit.edge,0)?unit.edge.startGap:0,unit.s-SEPARATE_SPEED*dt),near,self)){unit.speed=0;continue;}if(unit.stuck>YIELD_GIVE)unit.yieldUntil=0;} /* not back into the box it came through; where it cannot back off, after YIELD_GIVE s it goes on past that car (pass, below) */ // the car it waits on is waiting on it (each in the other's way, turning across in a signal cluster: both stood 30 s): it backs off its way and lets it by
    if(unit.speed<.05&&desired<.5&&room>7&&boxAt(this.graph,unit.edge,unit.s)===1&&this.leaveBox(unit,1,near,dt,self)){unit.speed=0;continue;} // standing in the box it has just come through: on out of it
    let edge=unit.edge,s=unit.s+unit.speed*dt;
    if(edge===field.target?.edge&&unit.s<=field.target.s&&s>field.target.s)s=field.target.s;
@@ -585,7 +593,7 @@ export class PoliceSimulation{
    // Emergency vehicles may pass a queue only where a full, swept car fits
    // the carriageway. Roundabouts retain their single directed centre line.
    if(!edge.roundabout&&overlapsAny(p,near)){
-    for(let o=0,m=waited?4:2;o<m;o++){const off=o===0?edge.lane+2.7:o===1?0:edge.lane+(o===2?1.35:.7),q=routePoint(edge,s,off,undefined,undefined,Q);if(safeVehicleSegment(unit,q,this.world)&&!overlapsAny(q,near)&&(boxAt(this.graph,edge,s)!==1||this.offsetHolds(edge,s,off,edge===unit.edge?ahead:undefined,field))){p=q;break;}} /* past a car waiting on it, nearer offsets too (a narrow street's kerb-side one is off the carriageway); in a junction start box only where it stays on the road beyond the box (offsetHolds) */
+    for(let o=0,m=waited?5:3;o<m;o++){if(o===2&&!(this.time<unit.roundUntil))continue;const off=o===0?edge.lane+2.7:o===1?0:o===2?edge.lane-2.4:edge.lane+(o===3?1.35:.7),q=routePoint(edge,s,off,undefined,undefined,Q);if(safeVehicleSegment(unit,q,this.world)&&insetOnRoad(q,this.world)&&!overlapsAny(q,near)&&(boxAt(this.graph,edge,s)!==1||this.offsetHolds(edge,s,off,edge===unit.edge?ahead:undefined,field))){p=q;break;}} /* lane - 2.4, while it goes round a unit whose officer is out (roundUntil): the far side of a one-way street, where traffic goes round it (PASS_SHIFTS, mobility.js roomAround; the centre line is next to its lane there, and a unit stood 17 s behind one whose officer was out while the cars went round it); past a car waiting on it, nearer offsets too (a narrow street's kerb-side one is off the carriageway); in a junction start box only where it stays on the road beyond the box (offsetHolds); and with the drawn body at most 0.5 m over the kerb (insetOnRoad: safeVehicleSegment samples a smaller car, and at a diagonal crossing a unit stood 0.75 m over it) */
    }
    let fits=safeVehicleSegment(unit,p,this.world);if(!fits&&(unit.stuck>.5||this.time<unit.kerbUntil)&&!overlapsAny(p,lane)&&kerbStep(unit,p,this.world)){fits=true;unit.kerbUntil=this.time+1.5;} // stuck on a bend, its corner over the kerb (kerbStep): on, and through the rest of the bend without stopping again
    if(!fits||overlapsAny(p,lane)||pass&&!separates(unit,p,near)){
@@ -622,7 +630,7 @@ export class PoliceSimulation{
    // when that one is on a long way round (over SWAP_LONG m to go) and SWAP m more than this one's way over: the first
    // units to park are not the nearest by footway (two 78-97 m off ran 370-410 m round the houses, no arrest in 60 s, while
    // a unit 13 m from the player, in sight of them, had to watch). The called-back officer walks back to their car.
-   let swap=null;if(out>=FOOT_CHASE.max){for(const v of this.units){const w=v.officer;if(w&&!w.back){const l=this.officerLeft(w);if(l>SWAP_LONG&&l>SWAP+d&&l>(swap?.left??0))swap={v,left:l};}}if(!swap){u.pull=false;continue;}}
+   let swap=null;if(out>=FOOT_CHASE.max&&!(d<FOOT_NEAR&&u.stuck>QUEUED&&u.queued)){for(const v of this.units){const w=v.officer;if(w&&!w.back){const l=this.officerLeft(w);if(l>SWAP_LONG&&l>SWAP+d&&l>(swap?.left??0))swap={v,left:l};}}if(!swap){u.pull=false;continue;}}
    if(Math.abs(u.speed)>.5&&u.stuck<.5){u.pull=offRoad;continue;}
    if(typeof u.kerbTo==='number'&&!u.kerbAt){u.pull=true;continue;} // pulling in to the kerb first (kerbRoom); it gets out once there
    const door=doorPoint(u),from=this.footFree(u,door)?door:{x:u.x,z:u.z},goal=this.seen?player:this.lastSeen||player,path=this.footPath(from,goal);
