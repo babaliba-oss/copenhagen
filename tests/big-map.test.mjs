@@ -26,8 +26,16 @@ test('city map: the arrow keys and Tab pick a named place, Enter travels there, 
  key('Enter');assert.deepEqual(went,['Nyhavn']);assert.equal(dlg.open,false,'Enter travels and closes the map');
  map.open('Copenhagen',()=>{});assert.equal(map.selected,null,'a fresh pick each time it opens');key('Enter');assert.deepEqual(went,['Nyhavn'],'Enter with nothing picked does nothing');
  key('Escape');assert.equal(dlg.open,false,'Esc closes');
- map.open('Copenhagen',()=>{});/* Nyhavn on screen: fit scale min(800,600)/(1500*2.15) px a metre, zoom 2.2, centred on the player */
- const s=600/(1500*2.15)*2.2,px=400+(300-10)*s,py=300+(0-10)*s,ev={pointerId:1,clientX:px,clientY:py};
+ map.open('Copenhagen',()=>{});/* Nyhavn on screen: zoom 2.2, centred on the player */
+ const s=map.scale,px=400+(300-10)*s,py=300+(0-10)*s,ev={pointerId:1,clientX:px,clientY:py};
  for(const t of ['pointerdown','pointerup'])for(const f of canvas.on[t])f(ev);
  assert.deepEqual(went,['Nyhavn','Nyhavn'],'a click on a place still travels there');
+});
+test('city map: the view never runs past the drawn base map, opened near its edge, zoomed out or on Whole city',async()=>{
+ const {key,dlg}=stubDom(),{createBigMap}=await import('../src/copenhagen/big-map.js');
+ const map=createBigMap({base:()=>({width:10}),view:()=>({cx:0,cz:0,size:3000}),landmarks:()=>[],player:()=>({x:1300,z:-1200,heading:0}),targets:()=>[],route:()=>null,onTravel(){},radius:()=>1400});
+ const inside=what=>{const [cx,cz]=map.centre,s=map.scale;assert.ok(cx+400/s<=1500+1e-6&&cx-400/s>=-1500-1e-6&&cz+300/s<=1500+1e-6&&cz-300/s>=-1500-1e-6,`${what}: view ${(cx-400/s)|0}..${(cx+400/s)|0} x ${(cz-300/s)|0}..${(cz+300/s)|0} m`);};
+ map.open('Copenhagen',()=>{});inside('opened by the east edge');
+ for(let i=0;i<8;i++)key('Minus');inside('zoomed right out');
+ key('Equal');inside('zoomed in again');dlg.querySelector('[data-fit]').on.click[0]();inside('Whole city');
 });

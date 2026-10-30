@@ -12,7 +12,9 @@ export function createBigMap({base,view,landmarks,player,targets,route,onTravel,
  cv.tabIndex=-1;cv.addEventListener('pointerdown',()=>cv.focus({preventScroll:true})); // a click kept focus on the body, outside the dialog, so M and +/- stopped reaching its key handler
  let zoom=1,cx=0,cz=0,hover=null,drag=null,raf=0,byKey=false; // hover: the place highlighted, under the pointer or picked with the keys (byKey)
  const size=()=>{const r=cv.getBoundingClientRect(),d=Math.min(2,devicePixelRatio||1);cv.width=Math.max(10,r.width*d);cv.height=Math.max(10,r.height*d);};
- const fitScale=()=>Math.min(cv.width,cv.height)/(radius()*2.15); // px per metre with the whole playable city in view
+ // px per metre with the whole playable city in view, but never so far out that the view is wider or taller than the drawn
+ // base map (a wide window showed blank strips beside it)
+ const fitScale=()=>Math.max(Math.min(cv.width,cv.height)/(radius()*2.15),Math.max(cv.width,cv.height)/view().size);
  const S=()=>fitScale()*zoom;
  const toScreen=(x,z)=>[cv.width/2+(x-cx)*S(),cv.height/2+(z-cz)*S()];
  const toWorld=(px,py)=>[cx+(px-cv.width/2)/S(),cz+(py-cv.height/2)/S()];
@@ -41,7 +43,8 @@ export function createBigMap({base,view,landmarks,player,targets,route,onTravel,
  const pick=(px,py)=>{let best=null,d=18*Math.min(2,devicePixelRatio||1);for(const l of landmarks()){const [x,y]=toScreen(l.x,l.z),e=Math.hypot(x-px,y-py);if(e<d){d=e;best=l;}}return best;};
  const local=e=>{const r=cv.getBoundingClientRect(),d=cv.width/r.width;return [(e.clientX-r.left)*d,(e.clientY-r.top)*d];};
  const setZoom=(z,at)=>{const [wx,wz]=at?toWorld(...at):[cx,cz];zoom=Math.max(1,Math.min(10,z));if(at){const [nx,nz]=toWorld(...at);cx+=wx-nx;cz+=wz-nz;}clamp();};
- const clamp=()=>{const R=radius()*1.1;cx=Math.max(-R,Math.min(R,cx));cz=Math.max(-R,Math.min(R,cz));};
+ // Keep the view on the base map: opened at Nyhavn (1 km east of the middle) its right side ran 700 m past the base's edge, blank.
+ const clamp=()=>{const v=view(),s=S(),hx=Math.max(0,v.size/2-cv.width/2/s),hz=Math.max(0,v.size/2-cv.height/2/s);cx=Math.max(v.cx-hx,Math.min(v.cx+hx,cx));cz=Math.max(v.cz-hz,Math.min(v.cz+hz,cz));};
  // Two fingers: pinch to zoom about their midpoint (and pan with it); the drag below is for one.
  const fingers=new Map();let pinch=null;
  const spread=()=>{const [a,b]=[...fingers.values()];return {d:Math.hypot(a[0]-b[0],a[1]-b[1]),mid:[(a[0]+b[0])/2,(a[1]+b[1])/2]};};
@@ -58,7 +61,7 @@ export function createBigMap({base,view,landmarks,player,targets,route,onTravel,
  cv.addEventListener('pointerup',e=>{const wasPinch=fingers.size>1||pinch;lift(e);const d=drag;drag=null;if(wasPinch)return;if(d&&!d.moved){const l=pick(...local(e));if(l){close();onTravel(l);}}});
  cv.addEventListener('wheel',e=>{e.preventDefault();setZoom(zoom*(e.deltaY<0?1.2:1/1.2),local(e));},{passive:false});
  dlg.querySelectorAll('[data-z]').forEach(b=>b.addEventListener('click',()=>setZoom(zoom*+b.dataset.z)));
- dlg.querySelector('[data-fit]').addEventListener('click',()=>{zoom=1;cx=cz=0;});
+ dlg.querySelector('[data-fit]').addEventListener('click',()=>{zoom=1;cx=cz=0;clamp();});
  dlg.querySelector('.close-btn').addEventListener('click',()=>close());
  // Keys: an arrow picks the nearest place that way from the highlighted one (the one nearest the middle of the view first),
  // Tab the next by name (Shift+Tab back; on a button Tab moves between the buttons as usual), Enter travels there. The
@@ -75,6 +78,6 @@ export function createBigMap({base,view,landmarks,player,targets,route,onTravel,
  let onClose=null;
  function open(title,closed){resetPointers();hover=null;byKey=false;onClose=closed;dlg.querySelector('#bm-title').textContent=title;dlg.showModal();cv.focus({preventScroll:true});size();const p=player();zoom=2.2;cx=p?.x||0;cz=p?.z||0;clamp();cancelAnimationFrame(raf);loop();} // focus on the map: the keys pick places from the start
  function close(){if(!dlg.open)return;resetPointers();dlg.close();cancelAnimationFrame(raf);onClose?.();}
- addEventListener('resize',()=>{if(dlg.open)size();});
- return {open,close,get open_(){return dlg.open;},get selected(){return hover;},element:dlg};
+ addEventListener('resize',()=>{if(dlg.open){size();clamp();}});
+ return {open,close,get open_(){return dlg.open;},get selected(){return hover;},get centre(){return [cx,cz];},get scale(){return S();},element:dlg};
 }

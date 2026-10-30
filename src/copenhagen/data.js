@@ -3,12 +3,13 @@
 // projection. Ported from Grand Theft Ladcykel (github.com/babaliba-oss/grand-theft-ladcykel).
 
 export const JOBS = [
-  { t: 'Smørrebrød for the Opera', d: 'The tenor wants rye bread with herring before curtain. Inderhavnsbroen is the fast way.', a: [55.67990, 12.58955, 'Nyhavn'], b: [55.68186, 12.60204, 'Operaen'], pay: 380 }, // at the stage door, on the road behind the house: the old spot was on Holmen's lawns, 77 m from any road
+  { t: 'Cake for the choir', d: 'The choir at Marmorkirken has rehearsal and no cake. It is close: look for the green dome.', a: [55.67990, 12.58955, 'Nyhavn'], b: [55.68485, 12.59005, 'Marmorkirken'], pay: 260 }, // job 1 is short (about 700 m by car): the Opera, 3 km round by road, was too much for a first go
   { t: 'Wienerbrød for the Guard', d: 'A cinnamon snail for the Royal Guard. Hand it over, no eye contact.', a: [55.68092, 12.57712, 'Bakery on Købmagergade'], b: [55.68373, 12.59238, 'Amalienborg'], pay: 320 },
   { t: 'Tivoli tickets', d: 'Two tickets for a guy in Christiania. Leave the car outside.', a: [55.67464, 12.56718, 'Tivoli main gate'], b: [55.67360, 12.59900, 'Christiania'], pay: 560 },
   { t: 'Moving day', d: 'A friend is moving flats across the harbour. Take a bike, the bridges are faster.', a: [55.67397, 12.59138, 'Christianshavn'], b: [55.68540, 12.57780, 'Kongens Have'], pay: 480 },
   { t: 'Flag cake', d: 'Birthday cake with little Dannebrog flags. Do not tip it.', a: [55.68590, 12.57640, 'Rosenborg'], b: [55.67280, 12.59380, 'Vor Frelsers Kirke'], pay: 430 },
   { t: 'Rød pølse, express', d: 'A tourist at Nyhavn is hungry and a bit disappointed by the prices.', a: [55.67595, 12.56870, 'Rådhuspladsen'], b: [55.67980, 12.58996, 'Nyhavn'], pay: 360 },
+  { t: 'Smørrebrød for the Opera', d: 'The tenor wants rye bread with herring before curtain. Inderhavnsbroen is for bikes and feet only, so by car it is the long way round over Knippelsbro.', a: [55.67990, 12.58955, 'Nyhavn'], b: [55.68186, 12.60204, 'Operaen'], pay: 380 }, // at the stage door, on the road behind the house: the old spot was on Holmen's lawns, 77 m from any road
   { t: 'Library returns', d: 'Three overdue books for the Black Diamond. The fine is already embarrassing.', a: [55.68126, 12.57580, 'Rundetårn'], b: [55.67340, 12.58210, 'Den Sorte Diamant'], pay: 340 },
   { t: 'Ice lollies for the lifeguards', d: 'A cool box for the lifeguards at Havnebadet. They melt, so take Langebro.', a: [55.67340, 12.58210, 'Den Sorte Diamant'], b: [55.66486, 12.57416, 'Havnebadet Islands Brygge'], pay: 410 }, // on the street by the park: the quay's spot was on the lawn, 44 m from the road
   { t: 'Flowers for Strøget', d: 'A bucket of tulips for a shop on Amagertorv. Mind the pedestrians.', a: [55.67961, 12.56626, 'Ørstedsparken'], b: [55.67870, 12.57920, 'Amagertorv'], pay: 300 },

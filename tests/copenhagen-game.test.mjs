@@ -26,7 +26,7 @@ test('today: a job picked up where the last was delivered waits, and each delive
   const B=job();at(A,'car',1,.001);at(A,'walk',1,.25); /* the GPS line on foot from the pick-up (a change of mode draws it again) */
   const clock=Number(ids.get('cph-job').innerHTML.match(/(\d+) s</)[1]);assert.ok(line()/clock<7,`job ${i}: ${line()|0} m in ${clock} s is beyond a bike`);
   at(B,'car',1);assert.equal(g.debug().state,'a',`job ${i} delivered`);}
- assert.match(banner(),/Delivered!/);at(job(),'car',30);assert.match(banner(),/Delivered!/,'"Delivered!" stays up');assert.equal(g.debug().state,'a');
+ assert.match(banner(),/Delivered!|Promoted:/);at(job(),'car',30);assert.match(banner(),/Delivered!|Promoted:/,'"Delivered!" stays up'); /* the 9th delivery is also a promotion */assert.equal(g.debug().state,'a');
  at(job(),'car',60);assert.equal(g.debug().state,'b','the next job is picked up after the pause');
 });
 test('1760: Fire Watch can be done by coach, and the coach line ignores today\'s one-way streets',()=>{
@@ -46,7 +46,7 @@ test('arriving on a race start by the map or a reset does not start the race; dr
  at([start[0]+60,start[1]],'car',2);at(start,'car',2);assert.ok(g.debug().race,'started after driving off and back');
 });
 test('today: the Opera\'s GPS line ends on its own side of the canal, by car and on foot',()=>{
- store.delete('cph-game-v1'); /* the first test's deliveries moved the save on */const {g,at,job,data}=play('copenhagen'),roads=new SpatialIndex(data.roads),pave=new SpatialIndex(data.pavement||[]);assert.equal(JOBS[0].b[2],'Operaen');
+ store.set('cph-game-v1',JSON.stringify({job:JOBS.findIndex(j=>j.b[2]==='Operaen')})); /* straight to the Opera job */const {g,at,job,data}=play('copenhagen'),roads=new SpatialIndex(data.roads),pave=new SpatialIndex(data.pavement||[]);
  const wet=P=>{let w=0;for(let i=1;i<P.length;i++){const a=P[i-1],b=P[i],L=Math.hypot(b[0]-a[0],b[1]-a[1]),n=Math.ceil(L);for(let j=0;j<n;j++){const x=a[0]+(b[0]-a[0])*(j+.5)/n,z=a[1]+(b[1]-a[1])*(j+.5)/n;if(inWaterPolygons(data.water,x,z)&&!roads.at(x,z)&&!pave.at(x,z))w+=L/n;}}return w;};
  at([5000,5000],'car',90);const A=job();at(A);assert.equal(g.debug().state,'b');
  for(const m of ['car','walk']){at(A,m,1,.001);const w=wet(g.route());assert.ok(w<3,`${m}: ${w|0} m of the line over open water`);} /* was 67 m straight over the canal from Papirøen */
@@ -110,4 +110,11 @@ test('desktop: job 1\'s story shows for 10 s from the start of play, not from th
   step(false);mock.timers.tick(60000);step(false);assert.equal(cls.has('settled'),true,'a minute on the welcome card: settled');
   step(true);assert.equal(cls.has('settled'),false,'play starts: the story is back');mock.timers.tick(9000);step(true);assert.equal(cls.has('settled'),false);mock.timers.tick(1500);assert.equal(cls.has('settled'),true,'and settles 10 s later');
  }finally{mock.timers.reset();}
+});
+test('job 1 is a short first delivery in both eras, and its clock leaves time for the car\'s own line',()=>{
+ for(const id of ['copenhagen','copenhagen-1760']){store.clear();const {g,at,line,job}=play(id);
+  at([5000,5000],'car',90);assert.equal(g.timed(),null,'nothing on the clock yet');const A=job();at(A);assert.equal(g.debug().state,'b',`${id}: picked up`);assert.equal(g.timed(),'delivery','the era switch warns about this one');at(A,'car',1,.001);
+  const clock=Number(ids.get('cph-job').innerHTML.match(/(\d+) s</)[1]),m=line();
+  assert.ok(m>200&&m<1200,`${id}: job 1 is ${m|0} m by car`);assert.ok(m/clock<6,`${id}: ${m|0} m in ${clock} s`);}
+ assert.doesNotMatch(JOBS.map(j=>j.d).join(' '),/Inderhavnsbroen is the fast way/,'a footbridge: the car\'s line goes round');
 });
