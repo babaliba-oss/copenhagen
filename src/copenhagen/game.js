@@ -163,7 +163,8 @@ export function createCopenhagenGame({scene,city,mobilityData,cityData,toast,sou
  const lore=document.createElement('div');lore.id='cph-lore';lore.hidden=true;lore.innerHTML=`<div class="cph-lore-card" role="dialog"><div class="cph-kick" id="cph-lore-kick"></div><h2 id="cph-lore-title"></h2><p id="cph-lore-text"></p><button id="cph-lore-go">Continue <kbd>Enter</kbd></button></div>`;
  const journal=document.createElement('div');journal.id='cph-journal';journal.hidden=true;
  const tmap=document.createElement('div');tmap.id='cph-tmap';tmap.hidden=true;tmap.innerHTML=`<div class="cph-tmap-wrap"><div id="cph-tmap-canvas"></div><p>Just the map. The saga card tells you if you’re getting warmer.</p><button id="cph-tmap-close">Put the map away <kbd>K</kbd></button></div>`;
- document.body.append(hud,lore,journal,tmap);
+ const snapBtn=document.createElement('button');snapBtn.id='cph-postcard';snapBtn.type='button';snapBtn.hidden=true;snapBtn.innerHTML='<span aria-hidden="true">📷</span> Postcard'; /* touch: what N does, shown while an album view is in frame (main.js takes the click, touch-docks.js places it) */
+ document.body.append(hud,lore,journal,tmap,snapBtn);
  const $=id=>document.getElementById(id);
 
  // ---- pant: empty cans by benches, bins, shelters and hot-dog stands, 1 kr each (pant.js); today only ----
@@ -251,10 +252,13 @@ export function createCopenhagenGame({scene,city,mobilityData,cityData,toast,sou
  save.cards??={};
  let cardHint=null;
  // Called by main.js on N: dir = camera forward (x,z); snap() returns a small JPEG data URL of the view.
+ // The postcard view in frame from here, looking along dir (the camera's): 20-280 m away, within about the camera's horizontal half-view.
+ function framed(dir,fresh=false){if(!player)return null;let best=null,bd=Infinity;
+  for(const c of postcards){if(fresh&&save.cards[c.id])continue;const dx=c.p[0]-player.x,dz=c.p[1]-player.z,d=Math.hypot(dx,dz);if(d<20||d>280)continue;
+   const cos=(dx*dir[0]+dz*dir[1])/(d*Math.hypot(dir[0],dir[1])||1);if(cos<Math.cos(38*Math.PI/180))continue;if(d<bd){bd=d;best=c;}}
+  return best;}
  function photo({dir,snap}){
-  if(!player)return false;let best=null,bd=Infinity;
-  for(const c of postcards){const dx=c.p[0]-player.x,dz=c.p[1]-player.z,d=Math.hypot(dx,dz);if(d<20||d>280)continue;
-   const cos=(dx*dir[0]+dz*dir[1])/(d*Math.hypot(dir[0],dir[1])||1);if(cos<Math.cos(38*Math.PI/180))continue; /* in frame: about the camera's horizontal half-view */if(d<bd){bd=d;best=c;}}
+  if(!player)return false;const best=framed(dir);
   flash();
   if(!best){banner('Nice photo','No postcard view here · face a landmark nearby','pick');return true;}
   if(save.cards[best.id]){banner(best.title,'Already in your album','pick');return true;}
@@ -370,7 +374,7 @@ export function createCopenhagenGame({scene,city,mobilityData,cityData,toast,sou
    if(d<bd-.5){bd=d;best=i;bp=[px,pz];}run+=Math.sqrt(L2);}
   return best>0||bp&&best===0?[bp,...pts.slice(best+1)]:pts;}
 
- let hudClock=1;const setHtml=(el,h)=>{if(el&&el.__h!==h){el.__h=h;el.innerHTML=h;
+ let hudClock=1,viewCam=null;const VIEW=new THREE.Vector3();const setHtml=(el,h)=>{if(el&&el.__h!==h){el.__h=h;el.innerHTML=h;
    // Desktop: a card shows its story for 10 s when its heading changes, then only the heading and the next step (CSS .settled).
    const t=el.querySelector('h3')?.textContent||'';if(t!==el.__t){el.__t=t;el.classList.remove('settled');clearTimeout(el.__settle);el.__settle=setTimeout(()=>el.classList.add('settled'),10000);}}};
  function updateHud(){
@@ -382,6 +386,7 @@ export function createCopenhagenGame({scene,city,mobilityData,cityData,toast,sou
   setHtml($('cph-job'),`<p class="cph-kick">Job ${save.job%jobs.length+1}/${jobs.length}</p><h3>${esc(j.t)}</h3><p>${esc(j.d)}</p><p class="cph-go">${state==='a'?'Pick up at':'Deliver to'} <b>${esc(state==='a'?j.aName:j.bName)}</b> · ${d>1000?(d/1000).toFixed(1)+' km':Math.round(d/10)*10+' m'}${state==='b'?` · <span class="${timer<15?'cph-low':''}">${Math.max(0,timer).toFixed(0)} s</span>`:''}</p>`);
   }
   {let near=null,nd=Infinity;for(const c of postcards){if(save.cards[c.id])continue;const d=dist(c.p,[player.x,player.z]);if(d<200&&d<nd){nd=d;near=c;}}
+   {const c=TOUCH&&started&&!race&&viewCam?framed((viewCam.getWorldDirection(VIEW),[VIEW.x,VIEW.z]),true):null;snapBtn.hidden=!c;if(c)snapBtn.setAttribute('aria-label',`Take a postcard of ${c.title}`);} /* touch: a button while an unphotographed view is in frame (the hint is hidden on phones) */
    const h=$('cph-card-hint');if(h){h.hidden=!near;if(near)setHtml(h,document.body.classList.contains('touch')?`<span aria-hidden="true">📷</span><span class="cph-sr">Take a postcard of ${esc(near.title)}</span>`:`Face <b>${esc(near.title)}</b>, press <kbd>N</kbd> for a postcard`);}} /* the key before the tail: the one-line hint (copenhagen.css) cut "…face it and press N" before the N for 7 of the 13 views at 1280 px (The Little Mermaid: 381 px in 340) */
   const sg=$('cph-saga');if(!save.active){sg.hidden=true;return;}sg.hidden=false;
   const q=byId[save.active.id],f=frontier();
@@ -407,7 +412,8 @@ export function createCopenhagenGame({scene,city,mobilityData,cityData,toast,sou
   document.body.append(el);const close=()=>{el.remove();removeEventListener('keydown',onKey,true);};const onKey=e=>{if(['Escape','Enter','Space'].includes(e.code)){e.preventDefault();e.stopPropagation();close();}};
   el.querySelector('button').onclick=close;addEventListener('keydown',onKey,true);setTimeout(()=>{if(el.isConnected)close();},14000);
  }
- function update(dt,actor,travelMode,{running=true,cinematic=false}={}){ // cinematic: ?cinematic drives by, it collects nothing
+ function update(dt,actor,travelMode,{running=true,cinematic=false,view=null}={}){ // cinematic: ?cinematic drives by, it collects nothing // view: the camera (its direction: the postcard button)
+  viewCam=view;
   filming=cinematic;
   player=actor;started=running;if(!actor)return;
   // (The morning paper no longer opens by itself at the start: players found the pop-up confusing. paper() still shows it.)

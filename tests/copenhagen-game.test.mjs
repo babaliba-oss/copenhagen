@@ -2,7 +2,7 @@
 // for the HUD, the player moved from spot to spot, update() stepped by hand.
 import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs';import {gunzipSync} from 'node:zlib';import {register} from 'node:module';
 register('data:text/javascript,'+encodeURIComponent("export async function load(u,c,n){return u.endsWith('.css')?{format:'module',source:'',shortCircuit:true}:n(u,c);}"));
-class El{constructor(){this.hidden=false;this.innerHTML='';this.style={};this.dataset={};this.classList={add(){},remove(){},contains:()=>false,toggle(){}};}append(){}replaceChildren(){}remove(){}querySelector(){return null;}querySelectorAll(){return [];}getContext(){return new Proxy({},{get:()=>()=>({addColorStop(){}})});}get offsetWidth(){return 0;}}
+class El{constructor(){this.hidden=false;this.innerHTML='';this.style={};this.dataset={};this.attrs={};this.classList={add(){},remove(){},contains:()=>false,toggle(){}};}setAttribute(k,v){this.attrs[k]=v;}append(){}replaceChildren(){}remove(){}querySelector(){return null;}querySelectorAll(){return [];}getContext(){return new Proxy({},{get:()=>()=>({addColorStop(){}})});}get offsetWidth(){return 0;}}
 const ids=new Map(),body=new El(),store=new Map();
 globalThis.document={body,createElement:()=>{const e=new El();body.last=e;return e;},getElementById:id=>{if(!ids.has(id))ids.set(id,new El());return ids.get(id);},querySelector:()=>null,querySelectorAll:()=>[]};
 Object.defineProperty(body,'append',{value:(...els)=>{for(const e of els)if(e.id)ids.set(e.id,e);}});
@@ -83,3 +83,15 @@ test('1760: no market stall stands where a coach coming in to a race\'s start me
  assert.deepEqual(stalls.filter(s=>!skip(s[0],s[1])&&near(s)),[]);
  const kept=stalls.filter(s=>!skip(s[0],s[1])).length,before=stalls.filter(s=>!stallSkip(mob.roads.edges)(s[0],s[1])).length;assert.ok(kept>=before-3&&kept>30,`the markets keep their stalls (${kept} of ${before})`);
 });
+test('touch: a Postcard button shows while an album view not yet taken is in frame, and does what N does',()=>{
+ store.clear();const was=body.classList.contains;body.classList.contains=c=>c==='touch';let p;try{p=play('copenhagen');}finally{body.classList.contains=was;}
+ const {g}=p,btn=ids.get('cph-postcard'),me={x:902,z:37,speed:0,heading:0},card=[949.6,11.4]; /* Nyhavn's view (55.6799, 12.5911) */
+ const look=(dx,dz)=>({getWorldDirection:v=>v.set(dx,0,dz)}),step=view=>{for(let i=0;i<8;i++)g.update(1/30,me,'car',{running:true,view});};
+ step(look(card[0]-me.x,card[1]-me.z));assert.equal(btn.hidden,false,'faced from 54 m');assert.match(btn.attrs['aria-label'],/Nyhavn/);
+ step(look(me.x-card[0],me.z-card[1]));assert.equal(btn.hidden,true,'turned away');
+ step(look(card[0]-me.x,card[1]-me.z));assert.equal(btn.hidden,false);
+ g.photo({dir:[card[0]-me.x,card[1]-me.z],snap:()=>null});step(look(card[0]-me.x,card[1]-me.z));assert.equal(btn.hidden,true,'taken: no button for it');
+ const css=fs.readFileSync('src/copenhagen/copenhagen.css','utf8');assert.match(css,/#cph-postcard\{display:none\}\nbody\.touch\.driving:not\(\.busted\) #cph-postcard:not\(\[hidden\]\)\{[^}]*min-height:44px[^}]*right:var\(--mobile-right|#cph-postcard\{display:none\}\nbody\.touch\.driving:not\(\.busted\) #cph-postcard:not\(\[hidden\]\)\{[^}]*right:var\(--mobile-right[^}]*min-height:44px/,'touch only, 44 px, inside the safe area');
+ assert.match(fs.readFileSync('src/main.js','utf8'),/closest\?\.\('#cph-card-hint,#cph-postcard'\)/,'its click takes the photo');
+});
+test('desktop: no Postcard button',()=>{store.clear();const {g}=play('copenhagen'),me={x:902,z:37,speed:0,heading:0};for(let i=0;i<8;i++)g.update(1/30,me,'car',{running:true,view:{getWorldDirection:v=>v.set(47,0,-26)}});assert.equal(ids.get('cph-postcard').hidden,true);});

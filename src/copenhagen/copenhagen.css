@@ -113,6 +113,8 @@ body.era-1760 #app .speedometer .gear{color:#cdb68a}
 /* Postcards */
 .cph-card-hint{justify-self:start;max-width:100%;padding:5px 10px;border-radius:8px;background:rgba(20,22,24,.72);color:#f6f1e4;font:600 12px Manrope,sans-serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis} /* one line: wrapped to two, it pushed the job card down onto the minimap in a short window */
 .cph-card-hint kbd{font:700 10px Manrope,sans-serif;padding:1px 5px;border-radius:4px;background:#f6f1e4;color:#222}
+#cph-postcard{display:none}
+body.touch.driving:not(.busted) #cph-postcard:not([hidden]){display:flex;align-items:center;gap:6px;position:fixed;top:calc(var(--mobile-top,12px) + 60px);right:var(--mobile-right,12px);z-index:30;min-width:44px;min-height:44px;padding:0 10px;border-radius:9px;background:#f8f5eeee;color:#30312e;border:1px solid #fff9;font:600 12px 'DM Sans',sans-serif;touch-action:manipulation;cursor:pointer} /* phones: N's button, in the right-hand column (touch-docks.js stacks it under Menu and clear of the rest); desktop has N and the hint */
 #cph-flash{position:fixed;inset:0;background:#fff;opacity:0;pointer-events:none;z-index:75}
 #cph-flash.on{animation:cph-flash .5s ease-out}
 @keyframes cph-flash{0%{opacity:.85}100%{opacity:0}}

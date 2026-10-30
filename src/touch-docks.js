@@ -27,7 +27,7 @@ export function stack(items,fixed,top,bottom,heights=[]){
  });
  return out;
 }
-const SELECTORS=['#wanted','#toast.important.visible','#people-interaction','#cph-hud','#market-prompt','#market-card','#radio-now','.edge-invite'];
+const SELECTORS=['#wanted','#toast.important.visible','#people-interaction','#cph-hud','#cph-postcard','#market-prompt','#market-card','#radio-now','.edge-invite'];
 const SHRINK=['#people-interaction','#market-card']; // a conversation or a stall's card that does not fit (landscape, a long line) scrolls in the room there is, instead of waiting hidden while it is open
 const OBSTACLES=['.topbar .wordmark','#touch-aux','#travel-controls','#touch-controls','.dashboard','#app>.minimap-card']; // the phone minimap has its own corner (under Menu upright, above the steering sideways): the stars and the radio card were drawn over it
 export function createTouchDocks(doc=document,win=window){
