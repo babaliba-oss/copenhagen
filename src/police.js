@@ -2,6 +2,7 @@ import {routePoint} from './mobility.js';
 import {safeVehicleSegment,vehicleFitsRoad,trafficFootprintsOverlap} from './road-safety.js';
 import {cornerSpeedLimit} from './traffic-driving.js';
 import {inWaterPolygons} from './geo.js';
+import {boxesOverlap,carBox} from './lane-model.js';
 
 export const wantedLevel=heat=>heat>=24?5:heat>=16?4:heat>=10?3:heat>=6?2:heat>=3?1:0;
 const distance=(a,b)=>Math.hypot(a.x-b.x,a.z-b.z);
@@ -83,8 +84,30 @@ const FOOT_CELL=20;
 // street before it. A unit sent down it came up behind the parked one, could not pass and had no officer of its own to
 // send (FOOT_CHASE.max): it stood there 16-52 s, to the end of the chase. (Not closed outright: a street with no way round
 // is still driven, and on the target's own street the only way to the target is past it.)
-const PARKED_DETOUR=300;
+const PARKED_DETOUR=300,SWAP=40,SWAP_LONG=150;
 function narrowAt(u,world){const e=u.edge,P={x:0,z:0,heading:0};for(const o of [e.lane+2.7,0]){if(Math.abs(o-e.lane)<2.1)continue;routePoint(e,u.s,o,undefined,undefined,P);if(vehicleFitsRoad(P,world))return false;}return true;}
+// Before its officer gets out, a unit standing where a car behind it finds no way round pulls in towards the kerb
+// (KERB_PULL m/s sideways, at most 2.5 m off its lane, the nearer side first) where that leaves one: a sideways shift traffic
+// goes round a standing unit by (mobility.js roomAround, PASS_SHIFTS from the lane), on the road from PASS_REACH m behind
+// it to PASS_AHEAD m past its centre (roomAround looks a car length on from level with it, on into a way out near a
+// junction), and clear of it by the 0.3 m a car going round keeps beside it (carDesired) and a little to spare. Stopped in
+// the middle of a one-way street 7 m between the kerbs it left room for neither, and the cars that came up behind it
+// waited as long as the chase on foot lasted (23-37 s).
+const KERB_PULL=1.4,PASS_SHIFTS=[-2,-2.4,-2.8,-3.4,1.3,2,2.4],PASS_REACH=7.5,PASS_AHEAD=6;
+function kerbRoom(u,world,graph){
+ const e=u.edge,P={x:0,z:0,heading:0},exits=graph.outgoing[e.to].filter(o=>o.to!==e.from),ways=exits.length?exits:[null];
+ const at=(s,k,x)=>s<=e.length||!x?routePoint(e,Math.max(0,Math.min(e.length,s)),e.lane+k,undefined,undefined,P):routePoint(x,Math.min(x.length,s-e.length),x.lane+k,undefined,undefined,P); // on into a way out (the car's own turn, or another: roomAround)
+ for(let d=0;d<=2.5;d+=.25)for(const side of d?[1,-1]:[1]){const o=side*d;if(!vehicleFitsRoad(at(u.s,o),world))continue;const box=carBox(P,.35);
+  for(const k of PASS_SHIFTS)for(const x of ways){let ok=true;for(let t=-PASS_REACH;t<=PASS_AHEAD&&ok;t+=1.5){const q=at(u.s+t,k,x);ok=vehicleFitsRoad(q,world)&&!boxesOverlap(carBox(q),box);}if(ok)return d?e.lane+o:null;}}
+ return null;
+}
+// A unit's step along its lane refused by the road itself for half a second, where no car fits across the street
+// (roadRefuses: not by anything standing in it): the edge is marked unfit for police (routed round, never a target or a
+// spawn point) and, unless its officer has got out by then (BACK_AFTER), the unit backs out of it at BACK_OUT m/s onto the
+// edge it came from (and on back while that one leads nowhere else). At a street that narrows to less than a car 6 m in
+// (a traffic island), the player beyond it and out of reach on foot, the first unit stood wedged at the narrowing to the
+// end of the chase (17-26 s), and the next ones drove in after it before its 8 s block applied.
+const BACK_OUT=3,BACK_AFTER=ON_FOOT.after+1; // s it first stands there: time to send its officer to a stopped player within reach on foot (ON_FOOT, FOOT_CHASE)
 // Officer positions are kept on the unit (unit.officer): {x,z,heading,speed,back,path,k,...}; the renderer draws them there.
 const newOfficer=(x,z,heading)=>({x,z,heading,speed:0,back:false,path:null,k:0,plan:0,gx:NaN,gz:NaN});
 const doorPoint=u=>{const s=Math.sin(u.heading||0),c=Math.cos(u.heading||0);return {x:u.x-c*FOOT_CHASE.door,z:u.z+s*FOOT_CHASE.door};};
@@ -144,7 +167,7 @@ const stopLine=e=>e.junction&&e.stopGap&&!e.inside?e.length-e.stopGap-.5:Infinit
 
 export class PoliceSimulation{
  constructor(graph,world){
-  this.graph=graph;this.world=world;this.incoming=Array.from({length:graph.nodes.length},()=>[]);
+  this.graph=graph;this.world=world;this.incoming=Array.from({length:graph.nodes.length},()=>[]);this.unfit=new Set();
   graph.edges.forEach(e=>this.incoming[e.to].push(e));this.reset();this.sampleGrid(); /* while the map loads: the first call took 25-40 ms in the frame the first unit was called */
  }
  // Extension edges retain their IDs; wanted state and units are left intact.
@@ -245,7 +268,7 @@ export class PoliceSimulation{
   // Sample points sit in a 40 m grid (built once): search rings outwards instead of every edge in the city (44k edges in Copenhagen took ~90 ms, twice every 2 s at high wanted levels).
   const grid=this.sampleGrid(),{X,Z,H,S,E}=grid,c=this.samplePoint||={x:0,z:0,heading:0},gx=Math.floor(player.x/40),gz=Math.floor(player.z/40);
   for(let r=0;r<=40&&(r-1)*40<nearest;r++)for(let i=gx-r;i<=gx+r;i++)for(let j=gz-r;j<=gz+r;j++){if(Math.max(Math.abs(i-gx),Math.abs(j-gz))!==r)continue;
-   const cell=this.gridCell(grid,i,j);if(cell)for(const k of cell){const d=Math.hypot(X[k]-player.x,Z[k]-player.z);if(d<nearest){c.x=X[k];c.z=Z[k];c.heading=H[k];if(vehicleFitsRoad(c,this.world)){nearest=d;target={edge:this.graph.edges[E[k]],s:S[k]};}}}
+   const cell=this.gridCell(grid,i,j);if(cell)for(const k of cell){if(this.unfit.size&&this.unfit.has(this.graph.edges[E[k]].id))continue;const d=Math.hypot(X[k]-player.x,Z[k]-player.z);if(d<nearest){c.x=X[k];c.z=Z[k];c.heading=H[k];if(vehicleFitsRoad(c,this.world)){nearest=d;target={edge:this.graph.edges[E[k]],s:S[k]};}}}
   }
   // Long harbour edges can be hundreds of metres: the coarse graph search
   // alone stops a patrol 10–15 m short of the actual car. Refine its stop point.
@@ -257,7 +280,7 @@ export class PoliceSimulation{
   const {edge,s}=target;costs[edge.from]=s;heapSize=0;
   if(goal<0){push(s,edge.from);
    while(heapSize){const cost=pop(),node=popped;if(cost!==costs[node])continue;if(cost>reach)break;
-    for(const e of this.incoming[node]){if((this.blocked.get(e.id)||0)>this.time)continue;const next=cost+e.length+((this.parkedOn.get(e.id)||0)>this.time?PARKED_DETOUR:0);if(next<costs[e.from]){costs[e.from]=next;push(next,e.from);}}
+    for(const e of this.incoming[node]){if((this.blocked.get(e.id)||0)>this.time||this.unfit.has(e.id))continue;const next=cost+e.length+((this.parkedOn.get(e.id)||0)>this.time?PARKED_DETOUR:0);if(next<costs[e.from]){costs[e.from]=next;push(next,e.from);}}
    }
    return field;
   }
@@ -267,7 +290,7 @@ export class PoliceSimulation{
   // goal's best route are exact, so a unit following the field still drives down its shortest route.
   const N=this.graph.nodes,[gx,gz]=N[goal],h=v=>Math.hypot(N[v][0]-gx,N[v][1]-gz);push(s+h(edge.from),edge.from);
   while(heapSize){const f=pop(),node=popped,cost=costs[node];if(f!==cost+h(node))continue;if(node===goal)break;
-   for(const e of this.incoming[node]){if((this.blocked.get(e.id)||0)>this.time)continue;const next=cost+e.length+((this.parkedOn.get(e.id)||0)>this.time?PARKED_DETOUR:0);if(next<=reach&&next<costs[e.from]){costs[e.from]=next;push(next+h(e.from),e.from);}}
+   for(const e of this.incoming[node]){if((this.blocked.get(e.id)||0)>this.time||this.unfit.has(e.id))continue;const next=cost+e.length+((this.parkedOn.get(e.id)||0)>this.time?PARKED_DETOUR:0);if(next<=reach&&next<costs[e.from]){costs[e.from]=next;push(next+h(e.from),e.from);}}
   }
   return field;
  }
@@ -288,12 +311,13 @@ export class PoliceSimulation{
   if(!this.target)return;
   const candidates=[],role=this.units.length%2?'intercept':'chase',surge=this.surging,[near,far]=surge?SURGE.spawn:[65,150];
   traffic=traffic.filter(a=>a.edge!==null&&distance(a,player)<far+12); // only these can be within 12 m of a spot (was every car and walker for every spot)
-  for(const k of this.nearEdges(player.x,player.z,far+12)){const edge=this.graph.edges[k];if(!Number.isFinite(this.costs[edge.to])&&edge!==this.target.edge||edge.inside)continue; /* not inside a signal cluster (all junction box): one that appeared there stood in it behind a car at the red light out, and held the cars behind it 15 s */
+  for(const k of this.nearEdges(player.x,player.z,far+12)){const edge=this.graph.edges[k];if(!Number.isFinite(this.costs[edge.to])&&edge!==this.target.edge||edge.inside||this.unfit.has(edge.id))continue; /* not inside a signal cluster (all junction box): one that appeared there stood in it behind a car at the red light out, and held the cars behind it 15 s */
    const s=edge.length*.5,p=routePoint(edge,s,edge.lane,undefined,undefined,this.spawnPoint||={x:0,z:0,heading:0}),d=distance(p,player); /* copied into the candidate below */
    if(d<near||d>far||(this.blocked.get(edge.id)||0)>this.time||this.parkedOn.size&&[edge,this.next(edge)].some(e=>e&&(this.parkedOn.get(e.id)||0)>this.time))continue; /* not on, nor just before, a street a parked unit closes (PARKED_DETOUR) */
    // Surge: score by driving distance to the player, not as the crow flies, so the unit really arrives in seconds.
    const route=edge===this.target.edge?Math.max(0,this.target.s-s):edge.length-s+this.costs[edge.to];
    if(!vehicleFitsRoad(p,this.world)||traffic.some(a=>distance(p,a)<12)||this.units.some(a=>a.edge!==null&&distance(p,a)<12))continue;
+   {const nx=s+3>edge.length&&this.next(edge),q=s+3<=edge.length?routePoint(edge,s+3,edge.lane,undefined,undefined,this.aheadPoint||={x:0,z:0,heading:0}):nx?routePoint(nx,Math.min(nx.length,s+3-edge.length),nx.lane,undefined,undefined,this.aheadPoint||={x:0,z:0,heading:0}):null;if(q&&!safeVehicleSegment(p,q,this.world))continue;} // and it can drive off from there: one sent out on a 1.6 m stub of a narrow street, its route a U-turn onto the twin, stood there 28 s
    const ahead=-(p.x-player.x)*Math.sin(player.heading)-(p.z-player.z)*Math.cos(player.heading);
    // Chase cars arrive from behind; every second unit tries to head the player off.
    candidates.push({edge,s,...p,ahead,route,score:(surge?Math.min(route,far*2):d)+((ahead>0)!==(role==='intercept')?50:0)});
@@ -309,13 +333,13 @@ export class PoliceSimulation{
  }
  // Every unit with the same fields in the same order (the spawn and backup candidates were spread in, with braking and
  // progressPoint added later): step() saw several unit shapes and kept being thrown out of its optimised code ('wrong map').
- newUnit(c,role,backup){return {edge:c.edge,s:c.s,x:c.x,z:c.z,heading:c.heading,ahead:c.ahead??0,route:c.route??0,score:c.score,id:`police-${this.serial++}`,role,speed:0,stuck:0,braking:false,progressPoint:null,backup,closest:Infinity,idle:0,officer:null,footTry:0,pull:false,yieldUntil:0,narrow:false,roundUntil:0};}
+ newUnit(c,role,backup){return {edge:c.edge,s:c.s,x:c.x,z:c.z,heading:c.heading,ahead:c.ahead??0,route:c.route??0,score:c.score,id:`police-${this.serial++}`,role,speed:0,stuck:0,braking:false,progressPoint:null,backup,closest:Infinity,idle:0,officer:null,footTry:0,pull:false,yieldUntil:0,narrow:false,roundUntil:0,prev:null,reverse:false,kerbTo:undefined,kerbAt:false};}
  // Surge backup: one unit pulls up close to a stopped player, out of their
  // view, when the first wave has not reached arrest range (boxed in by traffic).
  backup(player,traffic){
   const [near,far]=SURGE.backupSpawn,candidates=[];
   traffic=traffic.filter(a=>a.edge!==null&&distance(a,player)<far+9);
-  for(const k of this.nearEdges(player.x,player.z,far+12)){const edge=this.graph.edges[k];if(edge.inside)continue;
+  for(const k of this.nearEdges(player.x,player.z,far+12)){const edge=this.graph.edges[k];if(edge.inside||this.unfit.has(edge.id))continue;
    if(edge.points.every(q=>Math.hypot(q[0]-player.x,q[1]-player.z)>far+edge.length))continue;
    for(let s=4;s<=edge.length-4;s+=6){
     const p=routePoint(edge,s,edge.lane,undefined,undefined,this.spawnPoint||={x:0,z:0,heading:0}),d=distance(p,player);if(d<near||d>far)continue;
@@ -331,7 +355,7 @@ export class PoliceSimulation{
   const {target,costs}=field;if(!costs)return undefined;
   let best,bestCost=Infinity;
   for(const e of this.graph.outgoing[edge.to]){
-   if((this.blocked.get(e.id)||0)>this.time)continue;
+   if((this.blocked.get(e.id)||0)>this.time||this.unfit.has(e.id))continue;
    const cost=e===target?.edge?target.s:e.length+costs[e.to]+((this.parkedOn.get(e.id)||0)>this.time?PARKED_DETOUR:0);
    if((e===target?.edge||Number.isFinite(costs[e.to]))&&cost<bestCost){best=e;bestCost=cost;}
   }
@@ -459,6 +483,41 @@ export class PoliceSimulation{
   if(!safeVehicleSegment(unit,q,this.world)||!separates(unit,q,near))return false;
   unit.x=q.x;unit.z=q.z;unit.heading=q.heading;unit.s=t;OX[self]=q.x;OZ[self]=q.z;return true;
  }
+ // One step sideways towards unit.kerbTo (kerbRoom), at its present place along its edge; kerbAt once there, or as far as it
+ // gets (not off the road, nor into a kerb-parked car).
+ toKerb(unit,near,dt,self){
+  const e=unit.edge,q=this.boxPoint||={x:0,z:0,heading:0},c=routePoint(e,unit.s,0,undefined,undefined,q),off=(unit.x-c.x)*Math.cos(c.heading)-(unit.z-c.z)*Math.sin(c.heading),d=unit.kerbTo-off;
+  if(Math.abs(d)<.01){unit.kerbAt=true;return;}
+  routePoint(e,unit.s,off+Math.sign(d)*Math.min(Math.abs(d),KERB_PULL*dt),undefined,undefined,q);
+  if(!safeVehicleSegment(unit,q,this.world)||overlapsAny(q,near)){unit.kerbAt=true;return;}
+  unit.x=q.x;unit.z=q.z;unit.heading=q.heading;OX[self]=q.x;OZ[self]=q.z;
+ }
+ // A unit in its lane whose step along it (to s on edge) the road refuses (see BACK_OUT): the swept step, and a kerb step,
+ // over the kerb or into a house, an island or the water, with nothing standing there. Only from its lane: a unit at a
+ // passing offset or pulled in to the kerb is not refused by the lane itself.
+ roadRefuses(unit,edge,s,near){
+  const A=this.refuseFrom||={x:0,z:0,heading:0},B=this.refuseTo||={x:0,z:0,heading:0};routePoint(unit.edge,unit.s,unit.edge.lane,undefined,undefined,A);
+  if(distance(unit,A)>.3)return false;routePoint(edge,s,edge.lane,undefined,undefined,B);
+  if(safeVehicleSegment(A,B,this.world)||kerbStep(A,B,this.world)||overlapsAny(B,near))return false;
+  const t=Math.min(edge.length,s+1);for(let o=-3;o<=3;o+=.5){routePoint(edge,t,o,undefined,undefined,B);if(vehicleFitsRoad(B,this.world))return false;} // and no car fits across the street a metre on (a narrow street where only the centre line fits is still driven, over the kerb)
+  return true;
+ }
+ // Backing out of an unfit edge (BACK_OUT): back along it, then onto the end of the edge it came from (or, for one sent out on
+ // it, the edge into its start most nearly in line with it), where it takes another way on. False when the move is refused.
+ backOut(unit,near,dt,self){
+  const e=unit.edge,w=this.world,q=this.boxPoint||={x:0,z:0,heading:0},ok=q=>(safeVehicleSegment(unit,q,w)||kerbStep(unit,q,w))&&separates(unit,q,near); // as it drove in (over the kerb on a bend: kerbStep)
+  if(unit.s>.01){const c=routePoint(e,unit.s,0,undefined,undefined,q),off=(unit.x-c.x)*Math.cos(c.heading)-(unit.z-c.z)*Math.sin(c.heading),t=Math.max(0,unit.s-BACK_OUT*dt);routePoint(e,t,off,undefined,undefined,q);
+   if(!ok(q))return false;unit.x=q.x;unit.z=q.z;unit.heading=q.heading;unit.s=t;OX[self]=q.x;OZ[self]=q.z;return true;}
+  let prev=unit.prev?.to===e.from&&unit.prev.from!==e.to?unit.prev:null;
+  if(!prev){const a=e.points[0],b=e.points[1],l=Math.hypot(b[0]-a[0],b[1]-a[1])||1;let best=-Infinity;for(const r of this.incoming[e.from]){if(r.from===e.to||r.inside)continue;const n=r.points.length,c=r.points[n-2],d=r.points[n-1],m=Math.hypot(d[0]-c[0],d[1]-c[1])||1,dot=((d[0]-c[0])*(b[0]-a[0])+(d[1]-c[1])*(b[1]-a[1]))/(m*l);if(dot>best){best=dot;prev=r;}}}
+  if(!prev||this.unfit.has(prev.id)){unit.reverse=false;return false;}
+  routePoint(prev,prev.length,prev.lane,undefined,undefined,q);if(!ok(q))return false;
+  unit.x=q.x;unit.z=q.z;unit.heading=q.heading;unit.edge=prev;unit.s=prev.length;unit.prev=null;OX[self]=q.x;OZ[self]=q.z;
+  unit.reverse=!this.graph.outgoing[prev.to].some(o=>o!==e&&o.to!==prev.from&&!this.unfit.has(o.id)); // on back along that one too while its end has no other way on (a narrow street drawn as a chain of 1-2 m edges)
+  return true;
+ }
+ // Metres of footway an officer on their way still has to go (to the end of their path).
+ officerLeft(o){const P=o.path;if(!P||o.k>=P.length)return 0;let l=Math.hypot(P[o.k]-o.x,P[o.k+1]-o.z);for(let i=o.k+2;i<P.length;i+=2)l+=Math.hypot(P[i]-P[i-2],P[i+1]-P[i-1]);return l;}
  step(dt,player,traffic=[]){
   this.time+=dt;this.player=player;
   for(const [key,t]of this.contacts)if(this.time-t>10)this.contacts.delete(key);
@@ -488,6 +547,9 @@ export class PoliceSimulation{
    if(unit.parked)continue;
    if(unit.officer){unit.speed=0;unit.braking=false;unit.stuck=0;if(unit.narrow)this.parkedOn.set(unit.edge.id,this.time+1);const box=boxAt(this.graph,unit.edge,unit.s);if(box){near.length=0;const ux=unit.x,uz=unit.z;for(let i=0;i<n;i++){const dx=OX[i]-ux,dz=OZ[i]-uz;if(dx*dx+dz*dz<OR[i]&&obstacles[i]!==unit)near.push(i);}this.leaveBox(unit,box,near,dt,self);}continue;} // its officer is out on foot: the car waits at the kerb (out of a junction box)
    near.length=0;{const ux=unit.x,uz=unit.z;for(let i=0;i<n;i++){const dx=OX[i]-ux,dz=OZ[i]-uz;if(dx*dx+dz*dz<OR[i]&&obstacles[i]!==unit)near.push(i);}}
+   if(unit.kerbTo!==undefined&&!unit.pull){unit.kerbTo=undefined;unit.kerbAt=false;} // no longer pulling over: on from its lane
+   else if(typeof unit.kerbTo==='number'){unit.speed=0;unit.braking=false;if(!unit.kerbAt)this.toKerb(unit,near,dt,self);continue;} // pulling in to the kerb (kerbRoom), then waiting there for its officer to get out
+   if(unit.reverse){unit.speed=0;unit.braking=false;if(this.backOut(unit,near,dt,self))unit.stuck=0;else unit.stuck+=dt;continue;} // backing out of an unfit edge (BACK_OUT)
    const field=this.fieldFor(unit),ahead=this.next(unit.edge,field);
    let desired=cornerSpeedLimit(unit.edge,unit.s,cruise,[ahead]);
    const gap=distance(unit,player);if(gap<18)desired=Math.min(desired,Math.max(0,(gap-5)*1.6));if(unit.pull)desired=0; // pulling over to send its officer (FOOT_CHASE)
@@ -532,10 +594,11 @@ export class PoliceSimulation{
     if(overlapsAny(unit,near)){let out=null;for(let d=0;d<2&&!out;d++){const t=Math.min(unit.edge.length,Math.max(0,unit.s+(d?-1:1)*SEPARATE_SPEED*dt));if(t===unit.s)continue;for(let o=0;o<3;o++){const q=routePoint(unit.edge,t,o===0?unit.edge.lane:o===1?unit.edge.lane+2.7:0,undefined,undefined,Q);if(safeVehicleSegment(unit,q,this.world)&&separates(unit,q,near)){out=q;break;}}if(out)s=t;}
      if(out){unit.speed=0;unit.x=out.x;unit.z=out.z;unit.heading=out.heading;unit.s=s;OX[self]=out.x;OZ[self]=out.z;continue;}}
     {const box=boxAt(this.graph,unit.edge,unit.s);if(box)this.leaveBox(unit,box,near,dt,self);} // wedged in a junction box: out of it, on or back to the stop line (where it then holds: holdsShort)
+    if(unit.stuck>.5&&this.roadRefuses(unit,edge,s,near)){if(!this.unfit.has(edge.id)){this.unfit.add(edge.id);this.repath=Math.min(this.repath,this.time);}if(edge===unit.edge&&unit.stuck>BACK_AFTER)unit.reverse=true;} // refused by the road itself: no unit is sent this way again, and this one backs out (BACK_OUT)
     unit.speed=0;unit.stuck+=dt;if(unit.stuck>2&&!((this.blocked.get(edge.id)||0)>this.time)){this.blocked.set(edge.id,this.time+8);this.repath=Math.min(this.repath,this.time+.5);} /* once per blocked edge: this used to re-plan every frame while a unit sat stuck */continue;
    }
    if(!unit.progressPoint||distance(p,unit.progressPoint)>.5){unit.stuck=0;if(unit.progressPoint){unit.progressPoint.x=p.x;unit.progressPoint.z=p.z;}else unit.progressPoint={x:p.x,z:p.z};}else if(gap>14)unit.stuck+=dt;
-   unit.x=p.x;unit.z=p.z;unit.heading=p.heading;unit.edge=edge;unit.s=s;OX[self]=p.x;OZ[self]=p.z;
+   if(edge!==unit.edge)unit.prev=unit.edge;unit.x=p.x;unit.z=p.z;unit.heading=p.heading;unit.edge=edge;unit.s=s;OX[self]=p.x;OZ[self]=p.z;
   }
   // Never teleport a visible stuck car. Retire units only well away from player (not while its officer is out chasing on foot: FOOT_CHASE.leash calls them back).
   this.units=this.units.filter(u=>u.parked||u.officer&&!u.officer.back||distance(u,player)<450&&!(u.stuck>8&&distance(u,player)>85));
@@ -554,10 +617,19 @@ export class PoliceSimulation{
    // A unit that has got no closer for a while (parked at the kerb, wedged, or driving round the block) stops, and sends its
    // officer when one can get there on foot. Off the roads it pulls over where it is.
    if((u.idle+=dt)<=(offRoad?FOOT_CHASE.after:ON_FOOT.after)||this.time<u.footTry)continue;
-   if(out>=FOOT_CHASE.max||!offRoad&&(d<arrestRange||!this.clearSight(u,player))){u.pull=false;continue;} // on a road (ON_FOOT): only for a player it can see and not already arrest
+   if(!offRoad&&(d<arrestRange||!this.clearSight(u,player))){u.pull=false;continue;} // on a road (ON_FOOT): only for a player it can see and not already arrest
+   // With FOOT_CHASE.max officers out, one standing here gets out instead of the one with the furthest still to go on foot,
+   // when that one is on a long way round (over SWAP_LONG m to go) and SWAP m more than this one's way over: the first
+   // units to park are not the nearest by footway (two 78-97 m off ran 370-410 m round the houses, no arrest in 60 s, while
+   // a unit 13 m from the player, in sight of them, had to watch). The called-back officer walks back to their car.
+   let swap=null;if(out>=FOOT_CHASE.max){for(const v of this.units){const w=v.officer;if(w&&!w.back){const l=this.officerLeft(w);if(l>SWAP_LONG&&l>SWAP+d&&l>(swap?.left??0))swap={v,left:l};}}if(!swap){u.pull=false;continue;}}
    if(Math.abs(u.speed)>.5&&u.stuck<.5){u.pull=offRoad;continue;}
+   if(typeof u.kerbTo==='number'&&!u.kerbAt){u.pull=true;continue;} // pulling in to the kerb first (kerbRoom); it gets out once there
    const door=doorPoint(u),from=this.footFree(u,door)?door:{x:u.x,z:u.z},goal=this.seen?player:this.lastSeen||player,path=this.footPath(from,goal);
    if(!path){u.footTry=this.time+1;u.pull=false;continue;}
+   if(swap){let l=Math.hypot(path[0]-from.x,path[1]-from.z);for(let i=2;i<path.length;i+=2)l+=Math.hypot(path[i]-path[i-2],path[i+1]-path[i-1]);if(l+SWAP>swap.left){u.footTry=this.time+3;u.pull=false;continue;}}
+   if(u.kerbTo===undefined){u.kerbTo=boxAt(this.graph,u.edge,u.s)?null:kerbRoom(u,this.world,this.graph);if(typeof u.kerbTo==='number'){u.pull=true;continue;}}
+   if(swap){const w=swap.v.officer;w.back=true;w.plan=0;out--;} // called back to their car
    u.narrow=u.edge!==this.target?.edge&&narrowAt(u,this.world);if(u.narrow)this.repath=Math.min(this.repath,this.time);
    const officer=u.officer=newOfficer(from.x,from.z,u.heading);officer.path=path;officer.plan=this.time+FOOT_CHASE.repath;officer.gx=goal.x;officer.gz=goal.z;out++;
    {let l=Math.hypot(path[0]-from.x,path[1]-from.z);for(let i=2;i<path.length;i+=2)l+=Math.hypot(path[i]-path[i-2],path[i+1]-path[i-1]);this.footBy=Math.max(this.footBy,this.time+l/FOOT_CHASE.run+CONTACT.slack);} // the officer's fair chance to get there (as CONTACT): no escape on the clock while they run over

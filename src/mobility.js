@@ -441,6 +441,16 @@ export class Mobility {
   for(const k of [-2,-2.4,-2.8,-3.4,1.3,2,2.4]){let ok=true;for(let t=0;t<=len&&ok;t+=1.5){let d=a.s+t,q=null;for(let i=-1;i<plan.length;i++){const e=i<0?a.edge:plan[i];if(d<=e.length){q=sized(routePoint(e,d,e.lane+k),a);break;}d-=e.length;}ok=!!q&&vehicleFitsRoad(q,this.world);if(ok){const qb=carBox(q);for(const pb of boxes)if(boxesOverlap(qb,pb)){ok=false;break;}}}if(ok)return k;}
   return null;
  }
+ // Past a standing police unit it went round, another standing in its lane a few metres on (two parked with their officers
+ // out, 10 m apart): it goes on round that one at the shift that leaves room, instead of easing back into its lane first. It
+ // stopped nose to its tail, and its sideways start round it from there put the two 2 cm into each other. Null: none.
+ nextRound(a,plan,last,dx,dz){
+  const hl=a.halfLength??CAR_HALF_LENGTH;
+  for(const u of this.externalVehicles){if(u===last||!u.edge||Math.abs(u.speed||0)>=.1)continue;const x=u.x-a.x,z=u.z-a.z,f=x*dx+z*dz;if(f<=0||f>hl+(u.halfLength??CAR_HALF_LENGTH)+8)continue;
+   const c=routePoint(a.edge,a.s,a.edge.lane),lat=Math.abs((u.x-c.x)*Math.cos(c.heading)-(u.z-c.z)*Math.sin(c.heading));if(lat>=2.1)continue;
+   const k=this.roomAround(a,plan,u,0,.2,null);return k===null?null:{k,until:Infinity,by:u,also:null};}
+  return null;
+ }
  // A stopped car just ahead of `u` in its lane, the same way: `u` waits in a queue (another unit, or someone on foot it has stopped for, is gone round in turn).
  queuedAhead(u){const fx=-Math.sin(u.heading),fz=-Math.cos(u.heading),hl=u.halfLength??CAR_HALF_LENGTH;for(const b of this.cars){if(!b.edge||Math.abs(b.speed||0)>=.5||Math.abs(b.x-u.x)>14||Math.abs(b.z-u.z)>14)continue;const x=b.x-u.x,z=b.z-u.z,f=x*fx+z*fz;if(f>0&&f<hl+(b.halfLength??CAR_HALF_LENGTH)+4&&Math.abs(x*fz-z*fx)<2.1&&Math.cos(b.heading-u.heading)>.5)return b;}return null;}
  // The queue a unit stands at the back of (queuedAhead) when it is not one that moves: the car ahead of the unit, and those it
@@ -722,7 +732,7 @@ export class Mobility {
   // PLAYER_WAIT s held by the player the car goes round where the street leaves room (roomAround), else backs off a few
   // metres (the cars queued behind it first, if they must) and keeps off while the player stands there. Once past (or after
   // 12 s) it keeps to its lane again; backing off ends once the player is out of its way.
-  if(a.around){const last=a.around.also?.at(-1)||a.around.by;if(this.time>a.around.until||a.around.by.edge===null||a.around.by!==player&&Math.abs(a.around.by.speed||0)>1||last!==player&&Math.abs(last.speed||0)>1||(last.x-a.x)*dx+(last.z-a.z)*dz<-((a.halfLength??CAR_HALF_LENGTH)+(last.halfLength??CAR_HALF_LENGTH)))a.around=null;} // once past the last of what it goes round, or when that moves on
+  if(a.around){const last=a.around.also?.at(-1)||a.around.by;if(this.time>a.around.until||a.around.by.edge===null||a.around.by!==player&&Math.abs(a.around.by.speed||0)>1||last!==player&&Math.abs(last.speed||0)>1||(last.x-a.x)*dx+(last.z-a.z)*dz<-((a.halfLength??CAR_HALF_LENGTH)+(last.halfLength??CAR_HALF_LENGTH)))a.around=last!==player?this.nextRound(a,plan,last,dx,dz):null;} // once past the last of what it goes round, or when that moves on (on round another unit standing just ahead)
   if(a.around)desired=Math.min(desired,3);
   else if(this.time<(a.backUntil||0)){const by=a.backBy||player;if(holdBy!==by&&!(a.hold==='contact'&&a.holdBy===by)&&!(a.backQueued&&holdBy&&this.time<(holdBy.backUntil||0)))a.backUntil=0;else{ /* while the player or a stuck unit (or the car it backs for) is still in its way */desired=Math.min(desired,0);hold='back';holdBy=by;
    if(this.time<a.backUntil-BACK_HOLD){const hl=a.halfLength??CAR_HALF_LENGTH,b=this.edgeCars.get(a.edge)?.find(b=>b!==a&&b.s<a.s&&a.s-b.s<hl+(b.halfLength??CAR_HALF_LENGTH)+2.5);if(a.backQueued||hypot(by.x-a.x,by.z-a.z)<=hl+(by.halfLength??CAR_HALF_LENGTH)+4.5){if(a.s>(a.backBy?hl+1:2*hl+2)&&!b)desired=-1.2;else if(b&&!(this.time<b.backUntil)){b.backUntil=a.backUntil;b.backQueued=true;b.backBy=a.backBy;}}}}} /* 4.5 m clear of the player is room enough; the car behind backs for the one ahead */
