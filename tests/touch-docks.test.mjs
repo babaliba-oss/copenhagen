@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {stack,GAP} from '../src/touch-docks.js';
+import {readFileSync} from 'node:fs';
 test('popups stack without overlapping, keep their side, and wait when there is no room',()=>{
  const controls={left:0,right:400,top:560,bottom:650},getOut={left:150,right:240,top:480,bottom:530};
  const wanted={left:250,right:380,height:45},hud={left:12,right:292,height:200},radio={left:150,right:380,height:40},invite={left:100,right:300,height:220};
@@ -43,4 +44,15 @@ test('a conversation too tall for a landscape phone scrolls in the free gap inst
  const h2=[];assert.deepEqual(stack([{left:16,right:536,height:249}],[menu,minimap,steer],8,404,h2),[null],'without min it still waits');
  const h3=[];assert.deepEqual(stack([{left:16,right:536,height:249,min:240}],[menu,minimap,steer],8,404,h3),[null],'no gap tall enough');
  const h4=[];assert.deepEqual(stack([{left:16,right:336,height:300,min:120}],[],8,800,h4),[8]);assert.equal(h4[0],null,'it fits: no cap');
+});
+test('phone landscape: Say hello goes under Menu, so the money, job and saga keep their place above the minimap',()=>{
+ /* measured at 915x412: Menu 813-899 x 8-52, minimap 16-128 x 226-310, controls from 310; the HUD 360 x 168, the prompt 110 x 44 */
+ const fixed=[{left:813,right:899,top:8,bottom:52},{left:16,right:128,top:226,bottom:310},{left:16,right:899,top:310,bottom:402}],hud={left:16,right:376,height:168};
+ assert.deepEqual(stack([{left:16,right:126,height:44},hud],fixed,8,404),[8,null],'over the HUD in the left column, the HUD waited: 158 px left of the 168 it needs');
+ assert.deepEqual(stack([{left:789,right:899,height:44},hud],fixed,8,404),[60,8],'in the right-hand column, both are shown');
+ const css=readFileSync(new URL('../src/mobile-controls.css',import.meta.url),'utf8');
+ assert.match(css,/max-height:500px\)\{[^@]*#people-interaction:not\(:has\(#people-chat:not\(\[hidden\]\)\)\)\{left:auto;right:/,'landscape anchors the prompt right');
+ /* 740x360: minimap from 174, so 158 px for the HUD (the cards' padding: 168 -> 154) */
+ assert.equal(stack([{...hud,height:168}],[{left:16,right:128,top:174,bottom:258}],8,352)[0],null);assert.equal(stack([{...hud,height:154}],[{left:16,right:128,top:174,bottom:258}],8,352)[0],8);
+ assert.match(css,/max-height:380px\)\{body\.touch #cph-hud\{gap:4px\}body\.touch #cph-hud \.cph-card\{padding:3px 10px\}/);
 });
