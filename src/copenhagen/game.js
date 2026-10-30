@@ -139,11 +139,12 @@ export function createCopenhagenGame({scene,city,mobilityData,cityData,toast,sou
  const jobs=(ERA==='h'?JOBS_1760:JOBS).map(j=>({...j,A:ll(j.a),B:ll(j.b),aName:j.a[2],bName:j.b[2]}));
  // Sagas told in both eras: in 1760 nothing from later (GPS, Andersen's 1845 tale, the war).
  const period=t=>ERA!=='h'||typeof t!=='string'?t:t.replace('No beams, no GPS. Just the map.','No signposts. Just the map.').replace(' Andersen wrote a tale about him in 1845.','').replace(' In the Second World War a resistance group took his name.','');
- const sagas=SAGAS.filter(s=>inEra(s.era)).map(s=>({...s,intro:period(s.intro),steps:s.steps.map(st=>({...st,card:st.card?.map(period),p:ll(st.at)}))}));
+ const TOUCH=typeof document!=='undefined'&&document.body.classList.contains('touch'); // phones: card hints without keys (Menu has Journal and Quit race)
+ // phones: the saga's own words lead with the tap, not K (the way the journal says "tap Postcard")
+ const touchWords=t=>!TOUCH||typeof t!=='string'?t:t.replace('Press K (or tap the saga card) to look at it.','Tap the saga card to look at it.').replace('Press K, or tap the saga card, to look again.','Tap the saga card to look again.');
+ const sagas=SAGAS.filter(s=>inEra(s.era)).map(s=>({...s,intro:touchWords(period(s.intro)),go:touchWords(s.go),steps:s.steps.map(st=>({...st,card:st.card?.map(period),p:ll(st.at)}))}));
  const byId=Object.fromEntries(sagas.map(s=>[s.id,s]));
  const people=cast.map(c=>{const [x,z]=c.local||ll(c.at); /* local: a hand-placed spot in game metres */return {id:`cph-${c.id}`,script:c.id,x,z,heading:0,pose:'chat',walking:false,talkable:true,shirt:c.look.coat,coat:.7,...(c.look.height?{height:c.look.height}:{})};});
-
- const TOUCH=typeof document!=='undefined'&&document.body.classList.contains('touch'); // phones: card hints without keys (Menu has Journal and Quit race)
  // ---- save ----
  let save={money:0,job:0,done:{},lore:[],active:null,nisser:[]};
  const KEY=SAVE_KEY+(ERA==='h'?'-1760':'');try{save={...save,...JSON.parse(localStorage.getItem(KEY)||'{}')};}catch{}

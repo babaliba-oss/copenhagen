@@ -100,6 +100,14 @@ test('touch: the journal shows the postcard album (Menu > Journal says "Sagas & 
  assert.match(j.innerHTML,/<h2 class="cph-album-h">Postcards · 0\/13<\/h2>/);assert.match(j.innerHTML,/<div class="cph-album">.*Nyhavn/s);assert.match(j.innerHTML,/tap Postcard/);assert.doesNotMatch(j.innerHTML,/press N|cph-keyboard-only/);
  assert.doesNotMatch(fs.readFileSync('src/mobile-controls.css','utf8'),/cph-keyboard-only\{display:none/,'the album was hidden on phones');
 });
+test('touch: the Holger Danske saga says "Tap the saga card", not "Press K"; desktop keeps the key',()=>{
+ for(const id of ['copenhagen','copenhagen-1760']){
+  store.clear();const was=body.classList.contains;body.classList.contains=c=>c==='touch';let g;try{({g}=play(id));}finally{body.classList.contains=was;}
+  assert.match(g.api.sagaIntro('holger').response,/Tap the saga card to look at it\.$/);assert.match(g.api.sagaAccept('holger').response,/Tap the saga card to look again\.$/);
+  for(const t of [g.api.sagaIntro('holger').response,g.api.sagaAccept('holger').response])assert.doesNotMatch(t,/Press K/);
+  store.clear();({g}=play(id));assert.match(g.api.sagaIntro('holger').response,/Press K \(or tap the saga card\) to look at it\./,'desktop unchanged');assert.match(g.api.sagaAccept('holger').response,/Press K, or tap the saga card, to look again\./);
+ }
+});
 test('desktop: no Postcard button',()=>{store.clear();const {g}=play('copenhagen'),me={x:902,z:37,speed:0,heading:0};for(let i=0;i<8;i++)g.update(1/30,me,'car',{running:true,view:{getWorldDirection:v=>v.set(47,0,-26)}});assert.equal(ids.get('cph-postcard').hidden,true);});
 test('keyboard: the postcard hint says which way to turn, and N facing away says where the view is',()=>{
  store.clear();const {g}=play('copenhagen'),hint=ids.get('cph-card-hint'),me={x:902,z:37,speed:0,heading:0},card=[949.6,11.4]; /* the Nyhavn start: the view is 54 m behind the car */
