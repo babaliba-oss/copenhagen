@@ -321,3 +321,17 @@ test('a stuck unit whose car corner would clip the kerb takes the step while its
  assert.ok(run(.7,false)<-60,'0.3 m over the kerb: on past it');
  assert.ok(run(.7,true)>-45,'a house there: it stops short');assert.ok(run(.3,false)>-45,'0.7 m over: it stops short');
 });
+test('a unit turning out of a junction past a car crossing its nose does not take a passing offset in the wide start box that runs off the street beyond it',()=>{
+ // In the box the passing offset (lane + 2.7 m) is on the road; a few metres on, on a narrow street, it is not. The unit
+ // stood there 15 s with its lane blocked by the crossing car, each waiting on the other. On a wide street it still passes.
+ const run=half=>{const g=prepareGraph({nodes:[[0,100],[0,0],[0,-100],[-100,0],[100,0]],edges:[{from:0,to:1,lane:1.625,points:[[0,100],[0,0]]},{from:1,to:2,lane:1.625,points:[[0,0],[0,-100]]},{from:3,to:1,lane:1.625,points:[[-100,0],[0,0]]},{from:1,to:4,lane:1.625,points:[[0,0],[100,0]]}]});annotateJunctions(g,[]);
+  const w={roads:{at:(x,z)=>Math.abs(x)<7&&Math.abs(z)<7||Math.abs(x)<3.3||Math.abs(z)<half},buildings:{at:()=>false},trafficForbidden:{at:()=>false}},e=g.edges[0],east=g.edges[3];
+  const p=new PoliceSimulation(g,w),walker={x:90,z:-8,heading:0,speed:0,walking:true,halfLength:.3};p.report('pedestrian',1);p.dispatch=100;
+  const car={id:7,edge:g.edges[1],s:0,x:4.5,z:-.8,heading:0,speed:4,halfLength:2.36,halfWidth:.98,holdBy:null}; // across the box, on its way through (speed as read)
+  p.units=[p.newUnit({edge:e,s:80,...routePoint(e,80)},'chase',false)];const u=p.units[0];let wide=0,overlap=0,off=0;
+  for(let i=0;i<30*6;i++){p.step(1/30,walker,[car]);if(trafficFootprintsOverlap(u,car))overlap++;if(!vehicleFitsRoad(u,w))off++;
+   if(u.edge===east&&u.s<east.startGap){const c=routePoint(east,u.s,0);wide=Math.max(wide,(u.x-c.x)*Math.cos(c.heading)-(u.z-c.z)*Math.sin(c.heading)-east.lane);}}
+  assert.equal(overlap,0);assert.equal(off,0);return {wide,x:u.edge===east?u.x:-1};};
+ const narrow=run(3.3);assert.ok(narrow.wide<.5,`keeps to its lane in the box (${narrow.wide.toFixed(2)} m out)`);
+ const open=run(6.5);assert.ok(open.wide>2,'a wide street: takes the passing offset');assert.ok(open.x>20,`and gets past (${open.x.toFixed(1)})`);
+});

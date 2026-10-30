@@ -112,6 +112,7 @@ const overlapsAny=(p,list)=>{const al=p.halfLength??2.36;for(let k=0;k<list.leng
 // creeping out of a car that drove into the unit.
 const separates=(from,p,list)=>{const al=p.halfLength??2.36;for(let k=0;k<list.length;k++){const i=list[k],dx=OX[i]-p.x,dz=OZ[i]-p.z,r=al+OL[i]+2;if(dx*dx+dz*dz<r*r&&trafficFootprintsOverlap(p,OBS[i])&&sweptContact(from,p,OBS[i]))return false;}return true;};
 const SEPARATE_SPEED=2; // m/s, forwards or back along its lane
+const OFFSET_AHEAD=6; // m a passing offset must stay on the road ahead (offsetHolds)
 // A stuck unit's step on a bend whose car corner clips the kerb (safeVehicleSegment refuses it, 3 m on is fine: it stood
 // there 30-45 s, holding the cars behind it). As traffic's kerbCorner (mobility.js): taken where the centre stays on the
 // carriageway (not a traffic island), the body's sides are at most 0.5 m over the kerb (KERB_INSET, 0.48 m out from its
@@ -432,6 +433,18 @@ export class PoliceSimulation{
  // along its edge out of the box at its start (box 1), or back to the stop line at its end (-1); only where that overlaps
  // nothing new (separates).
  leaveBox(unit,box,near,dt,self){const e=unit.edge;return this.creep(unit,box>0?Math.min(e.length,unit.s+SEPARATE_SPEED*dt):Math.max(stopLine(e),unit.s-SEPARATE_SPEED*dt),near,self);}
+ // Whether a passing offset stays on the carriageway for OFFSET_AHEAD m on from s (on into the next edge at the same offset
+ // from the centre line). A unit turning out of a junction past a car crossing its nose took the passing offset in the wide
+ // start box, where it ran off the road 1 m on, and stood there with that car boxed in beside it, each waiting on the other
+ // (15 s; 40 s with a car that set off round it). Tested in a start box only: at a junction mouth the offset is a step past
+ // a car before the turn (tested there too, units held cars 8 s more). Kept from it, a unit beside a car entering the same
+ // street waits until that car backs off for it (mobility.js UNIT_WAIT).
+ offsetHolds(edge,s,off,ahead,field){
+  const P=this.holdPoint||={x:0,z:0,heading:0};
+  for(let d=2;d<=OFFSET_AHEAD;d+=2){const t=s+d;if(t<=edge.length)routePoint(edge,t,off,undefined,undefined,P);else{const nx=ahead!==undefined?ahead:this.next(edge,field);if(!nx)return true;routePoint(nx,Math.min(nx.length,t-edge.length),off-edge.lane+nx.lane,undefined,undefined,P);}
+   if(!vehicleFitsRoad(P,this.world))return false;}
+  return true;
+ }
  creep(unit,t,near,self){
   const e=unit.edge;if(!(t!==unit.s))return false;
   const q=this.boxPoint||={x:0,z:0,heading:0},c=routePoint(e,unit.s,0,undefined,undefined,q),off=(unit.x-c.x)*Math.cos(c.heading)-(unit.z-c.z)*Math.sin(c.heading);routePoint(e,t,off,undefined,undefined,q);
@@ -497,7 +510,7 @@ export class PoliceSimulation{
    // Emergency vehicles may pass a queue only where a full, swept car fits
    // the carriageway. Roundabouts retain their single directed centre line.
    if(!edge.roundabout&&overlapsAny(p,near)){
-    for(let o=0,m=waited?4:2;o<m;o++){const q=routePoint(edge,s,o===0?edge.lane+2.7:o===1?0:edge.lane+(o===2?1.35:.7),undefined,undefined,Q);if(safeVehicleSegment(unit,q,this.world)&&!overlapsAny(q,near)){p=q;break;}} /* past a car waiting on it, nearer offsets too (a narrow street's kerb-side one is off the carriageway) */
+    for(let o=0,m=waited?4:2;o<m;o++){const off=o===0?edge.lane+2.7:o===1?0:edge.lane+(o===2?1.35:.7),q=routePoint(edge,s,off,undefined,undefined,Q);if(safeVehicleSegment(unit,q,this.world)&&!overlapsAny(q,near)&&(boxAt(this.graph,edge,s)!==1||this.offsetHolds(edge,s,off,edge===unit.edge?ahead:undefined,field))){p=q;break;}} /* past a car waiting on it, nearer offsets too (a narrow street's kerb-side one is off the carriageway); in a junction start box only where it stays on the road beyond the box (offsetHolds) */
    }
    let fits=safeVehicleSegment(unit,p,this.world);if(!fits&&(unit.stuck>.5||this.time<unit.kerbUntil)&&!overlapsAny(p,lane)&&kerbStep(unit,p,this.world)){fits=true;unit.kerbUntil=this.time+1.5;} // stuck on a bend, its corner over the kerb (kerbStep): on, and through the rest of the bend without stopping again
    if(!fits||overlapsAny(p,lane)||pass&&!separates(unit,p,near)){
