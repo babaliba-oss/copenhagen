@@ -108,7 +108,7 @@ export class PeopleInteraction {
   this.enabled=true;
   // Authored crowd groups can reuse display IDs; the live actor is the identity.
   const memory=this.memories.get(person)||{visits:0,topics:[]};this.memories.set(person,memory);
-  const character=characterFor(person),dialogue=beginDialogue(person,memory,this.cityContext());
+  const character=characterFor(person,this.cityContext()),dialogue=beginDialogue(person,memory,this.cityContext());
   const saved=SAVED_FIELDS.map(key=>({key,owned:Object.hasOwn(person,key),value:person[key]}));
   this.session={person,saved,memory,character,idle:0,history:[],...dialogue};
   person.conversation=true;person.pose='chat';person.speed=0;
@@ -142,7 +142,7 @@ export class PeopleInteraction {
   return true;
  }
  snapshot(){
-  const p=this.session?.person||this.nearby,c=p?this.session?.character||characterFor(p):null;
+  const p=this.session?.person||this.nearby,c=p?this.session?.character||characterFor(p,this.cityContext()):null;
   return {active:!!this.session,nearby:!!this.nearby,person:p?{id:p.id,label:c.label,name:c.name,description:c.description,vendor:!!p.vendor,x:p.x,z:p.z}:null,
    response:this.session?.response||'',choices:this.session?.choices||[],previousChoice:this.session?.history.at(-1)?.you||'',turn:this.turn,
    voice:this.voice.snapshot(),timeLeft:this.session?Math.max(0,CONVERSATION_TIMEOUT-this.session.idle):0};

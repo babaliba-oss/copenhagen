@@ -5,17 +5,20 @@ import {isAuthored,authoredCharacter,authoredBegin,authoredNext} from './copenha
 
 const hash=value=>{let n=2166136261;for(const c of String(value??''))n=Math.imul(n^c.charCodeAt(0),16777619)>>>0;return n;};
 const NAMES=['Robin','Ari','Alex','Sam','Kai','Mika','Noor','Jules','Sasha','Charlie','Elli','Lee'];
+// Copenhagen 1760 (context.era): period Danish names instead of today's.
+const NAMES_1760=['Mette','Karen','Anne','Maren','Johanne','Kirsten','Jens','Hans','Niels','Peder','Søren','Christen','Rasmus','Anders'];
 const PROFILES=[
  {id:'observer',description:'Notices the little things',about:'I like drawing buildings. I go out meaning to sketch one doorway, then come back with a page full of windows.',notice:'Start with the upper floors. Everyone looks at the shop windows, but the rooflines give a street its own rhythm.',favourite:'A corner that looks different when you turn around. I sometimes sketch the same spot from both sides; it never feels like the same drawing.'},
  {id:'wanderer',description:'Always trying another route',about:'I collect walks, if that makes sense. No scores or record times — just a different way home whenever I can.',notice:'Look down a side street before you pass it. I like finding a little stretch I have not walked before.',favourite:'The moment I recognise a street from the other end. Suddenly two little pieces of the city join up in my head.'},
  {id:'maker',description:'Curious about how things work',about:'I fix old bikes for fun. A short ride to test a repair has a habit of becoming my whole afternoon.',notice:'Look at how a street fits together: a crossing, a bike rack, a bench. Small things can make a place easy to spend time in.',favourite:'Somewhere I can stop, put the bike aside and watch people go about their day. The ride there is only half of it.'},
  {id:'social',description:'Happy to stop for a chat',about:'Honestly? A walk and a conversation like this. I usually leave without much of a plan and see who I run into.',notice:'Slow down for a moment. I like watching the city carry on around me instead of always hurrying through it.',favourite:'A place I can return to and notice something new. Sometimes it is the same corner, just a different sort of day.'},
 ];
-export function characterFor(person){
+export function characterFor(person,context={}){
  if(isAuthored(person))return authoredCharacter(person); // a city's named characters (src/copenhagen/characters.js)
  const n=hash(person?.id??person?.stall??`${person?.x}:${person?.z}`),profile=PROFILES[n%PROFILES.length];
  const menu=menuFor(person);
- return {name:NAMES[Math.floor(n/7)%NAMES.length],profile,label:menu?menu.name:'Passerby',description:menu?'Market seller':profile.description,voiceSeed:n};
+ const names=context?.era===1760?NAMES_1760:NAMES;
+ return {name:names[Math.floor(n/7)%names.length],profile,label:menu?menu.name:'Passerby',description:menu?'Market seller':profile.description,voiceSeed:n};
 }
 const choice=(id,label)=>({id,label});
 const BYE=choice('bye','See you around');
@@ -52,7 +55,7 @@ const itemDetail=item=>Object.hasOwn(DETAILS,item.id)?DETAILS[item.id]:`${item.n
 
 function beginToday(person,memory,context={}){
  if(isAuthored(person))return authoredBegin(person,memory,context);
- const c=characterFor(person),menu=menuFor(person);memory.visits=(memory.visits||0)+1;memory.topics??=[];
+ const c=characterFor(person,context),menu=menuFor(person);memory.visits=(memory.visits||0)+1;memory.topics??=[];
  if(menu){
   const remembered=memory.item&&menu.items.find(it=>it.id===memory.item);
   const first=menu.id==='icecream'?`Hi! I’m ${c.name}. Fancy a pehmis? That’s soft-serve ice cream. Keep an eye on your cone — nearby gulls can get very interested.`:`Hi! I’m ${c.name}. Have a look at the ${menu.name.toLowerCase()}. Looking for anything in particular, or just having a wander?`;
@@ -64,7 +67,7 @@ function beginToday(person,memory,context={}){
 
 function nextToday(id,person,memory,context={}){
  if(isAuthored(person))return authoredNext(id,person,memory,context);
- const c=characterFor(person),menu=menuFor(person),repeat=memory.topics.includes(id);
+ const c=characterFor(person,context),menu=menuFor(person),repeat=memory.topics.includes(id);
  if(!repeat)memory.topics.push(id);
  if(menu){
   const preferred=menu.items.find(it=>it.id===memory.item)||menu.items[0];

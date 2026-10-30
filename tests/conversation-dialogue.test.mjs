@@ -138,3 +138,11 @@ test('Copenhagen 1760: a passer-by does not ask if you are looking around "Copen
  assert.match(beginDialogue(p,{},{cityName:'Copenhagen 1760',era:1760}).response,/Taking a look around town\?/);
  assert.match(beginDialogue(p,{},{cityName:'Copenhagen',era:2026}).response,/Taking a look around Copenhagen\?/);
 });
+
+test('Copenhagen 1760: passers-by have period Danish names, today keeps its seeded names',async()=>{
+ const {characterFor}=await import('../src/conversation-dialogue.js'),modern=new Set(['Robin','Ari','Alex','Sam','Kai','Mika','Noor','Jules','Sasha','Charlie','Elli','Lee']);
+ for(let i=0;i<30;i++){const p={id:`person-${i}`,x:0,z:0},now=characterFor(p).name;
+  assert.ok(modern.has(now));assert.equal(characterFor(p,{era:2026}).name,now,'same seeded name today');
+  const old=characterFor(p,{era:1760}).name;assert.ok(!modern.has(old),`${old} is not a modern name`);assert.equal(characterFor(p,{era:1760}).name,old,'stable in 1760');}
+ assert.deepEqual([0,1,2,3,4,5].map(i=>characterFor({id:`person-${i}`}).name),['Mika','Lee','Kai','Charlie','Sam','Sasha'],'today’s names as before');
+});
