@@ -421,7 +421,7 @@ export function createCopenhagenGame({scene,city,mobilityData,cityData,toast,sou
    for(const n of nisser){const got=save.nisser.includes(n.i);if(!got&&running&&!cinematic&&Math.hypot(n.p[0]-actor.x,n.p[1]-actor.z)<2.6){save.nisser.push(n.i);save.money+=ERA==='h'?24:150;persist();banner('Nisse found!',`${save.nisser.length} of ${nisser.length} · +${ERA==='h'?24:150} ${UNIT}`,'pass');}
     nisseMesh.setMatrixAt(n.i,m.compose(v.set(n.p[0],groundAt(n.p[0],n.p[1])+.05+Math.abs(Math.sin(now*2+n.i))*.12,n.p[1]),q.setFromAxisAngle(THREE.Object3D.DEFAULT_UP,now*.8+n.i),save.nisser.includes(n.i)?zero:one));}
    nisseMesh.instanceMatrix.needsUpdate=true;}
-  if(pant){const n=pant.update(dt,actor,{collect:running&&!cinematic});if(n){const before=save.pant||0;save.pant=before+n;save.money+=n*PANT_KR;persist();clink();
+  if(pant){const n=pant.update(dt,actor,{collect:running&&!cinematic});if(n){const before=save.pant||0;save.pant=before+n;save.money+=n*PANT_KR;persist();clink();if(!before)toast(`Empty can: +${PANT_KR} kr pant, the bottle deposit. You find them by benches and bins.`); /* the first one: 'pant 1' by the money meant nothing to a newcomer */
     const t=PANT_TITLES.find(([k])=>before<k&&save.pant>=k);if(t)banner(t[1],`${save.pant} cans · ${fmtKr(save.pant*PANT_KR)} ${UNIT} in pant`,'pass');}}
   if(travelMode!==mode){mode=travelMode;routeFor=null;}
   const here=[actor.x,actor.z];

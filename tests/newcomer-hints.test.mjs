@@ -4,3 +4,5 @@ const main=fs.readFileSync(new URL('../src/main.js',import.meta.url),'utf8'),gam
 test('the start hint on a keyboard says how to drive and where to go, and stays up long enough to be read',()=>{
  const s=main.slice(main.indexOf('function start()'));const t=s.slice(s.indexOf('toast('),s.indexOf('$(\'world\').focus()'));
  assert.match(t,/WASD or arrow keys to drive/);assert.match(t,/line to the beam: your first job/);const ms=+/ms:(\d+)/.exec(t)?.[1];assert.ok(ms>=8000,'shown '+ms+' ms');
+ assert.match(main,/function toast\(message,\{important=false,ms=0\}=\{\}\)/);assert.match(main,/ms\|\|\(important\?5000:2800\)/);});
+test('the first can of pant says what pant is',()=>{assert.match(game,/if\(!before\)toast\(`Empty can: \+\$\{PANT_KR\} kr pant/);});
