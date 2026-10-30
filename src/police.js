@@ -463,11 +463,12 @@ export class PoliceSimulation{
   if(!ahead)return true;
   const e=unit.edge,T=field.target,P=this.boxPoint||={x:0,z:0,heading:0},exit=(ahead.startGap||0)+2*2.36+1,far=distance(unit,player)>e.length-unit.s+exit+40;
   let byPlayer=!far&&T&&(T.edge===e&&T.s>line||T.edge===ahead&&T.s<(ahead.startGap||0)),slow=false;
-  for(let k=0;k<near.length;k++){const a=OBS[near[k]];if(a!==player&&!a.walking&&Math.abs(a.speed||0)<3){slow=true;break;}}
+  const round=unit.stuck>2||this.time<unit.roundUntil; // not counted as slow: the player, walkers and, once it goes round one (as in step), a unit whose officer is out: one stood 22 s at the stop line, to the end of the chase, for one parked beyond the box
+  for(let k=0;k<near.length;k++){const a=OBS[near[k]];if(a!==player&&!a.walking&&!(round&&a.officer)&&Math.abs(a.speed||0)<3){slow=true;break;}}
   if(far&&!slow)return false;
   for(let i=0,r=e;i<4&&r;i++,r=i===1?ahead:r.inside?this.next(r,field):null){const last=i&&!r.inside;for(let s=i?0:line+2;s<=(last?Math.min(r.length,exit):r.length);s+=2){routePoint(r,s,r.lane,undefined,undefined,P); /* on through the edges inside a signal cluster (all box) to the exit beyond */
    if(!far&&!byPlayer&&distance(P,player)<5.5)byPlayer=true;
-   if(slow)for(let k=0;k<near.length;k++){const j=near[k],a=OBS[j];if(a===player||a.walking||Math.abs(a.speed||0)>=3||Math.abs(OX[j]-P.x)>6||Math.abs(OZ[j]-P.z)>6)continue;if(trafficFootprintsOverlap(P,a)){slow=2;break;}}
+   if(slow)for(let k=0;k<near.length;k++){const j=near[k],a=OBS[j];if(a===player||a.walking||round&&a.officer||Math.abs(a.speed||0)>=3||Math.abs(OX[j]-P.x)>6||Math.abs(OZ[j]-P.z)>6)continue;if(trafficFootprintsOverlap(P,a)){slow=2;break;}}
    if(slow===2)break;}if(slow===2)break;}
   if(byPlayer)return distance(routePoint(e,line,e.lane,undefined,undefined,P),player)<reach;
   return slow===2;

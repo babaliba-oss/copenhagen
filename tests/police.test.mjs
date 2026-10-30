@@ -256,6 +256,15 @@ test('a unit stops at the stop line, not in the junction box, behind a car stand
  for(let i=0;i<90;i++)p.step(1/30,walker,[stopped]);
  assert.ok(u.officer,'the officer is still out');assert.ok(u.s<=line-.4,`backed out behind the stop line (${u.s.toFixed(2)})`);
 });
+test('a unit held at the stop line by a unit whose officer is out just past the junction goes on round it, instead of standing there to the end of the chase',()=>{
+ // Seed 11 scenario 14 of the chase sim: the stop line held it for a standing unit beyond the box (holdsShort), so it never drove up to go round it as it does along a street; it stood 22 s.
+ const g=crossroads(),e=g.edges[0],on=g.edges[1],walker={x:6,z:-150,heading:0,speed:0,walking:true,halfLength:.3};
+ const p=new PoliceSimulation(g,world);p.report('pedestrian',1);p.dispatch=100;
+ const at=(on.startGap||0)+2,q=routePoint(on,at,on.lane),a=p.newUnit({edge:on,s:at,...q},'chase',false);a.officer={x:q.x+1.3,z:q.z,heading:0,speed:0,back:false,path:null,k:0,plan:0,gx:NaN,gz:NaN};
+ const b=p.newUnit({edge:e,s:60,...routePoint(e,60,e.lane)},'chase',false);b.footTry=Infinity;p.units=[a,b];
+ let overlap=0,past=false;for(let t=0;t<15&&!past;t+=1/30){p.step(1/30,walker);if(trafficFootprintsOverlap(a,b))overlap++;past=b.edge===on&&b.s>a.s+6;}
+ assert.ok(a.officer,'a\'s officer is still out');assert.ok(past,`b got past a (b on ${b.edge===on?'its street':'the approach'} at ${b.s.toFixed(1)}, stuck ${b.stuck.toFixed(1)} s)`);assert.equal(overlap,0,'never through a');
+});
 test('a unit turning at a junction is not held by a car standing straight on from its nose, off its way (at another approach\'s stop line, or on past the junction)',()=>{
  // The room ahead was measured straight on from the unit's nose: one turning out of a junction box stood 15-20 s for a car waiting across the box from it, and held the cars behind it.
  const g=crossroads(),e=g.edges[0],walker={x:90,z:-6,heading:0,speed:0,walking:true,halfLength:.3},p=new PoliceSimulation(g,world);p.report('pedestrian',1);p.dispatch=100;
