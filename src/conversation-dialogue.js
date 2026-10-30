@@ -119,7 +119,7 @@ function nextToday(id,person,memory,context={}){
 // Copenhagen 1760 (context.era): the passers-by talk about carts and coaches, not bikes and scooters.
 const PERIOD=[['I fix old bikes for fun. A short ride to test a repair','I mend cart wheels for fun. A short drive to test a repair'],['a crossing, a bike rack, a bench','a crossing, a pump, a bench'],
  ['put the bike aside','leave the cart'],['The ride there is only half of it.','Getting there is only half of it.'],['tinkering with a bike','mending a cart wheel'],['How was the ride?','How was the drive?'],
- ['I’ll take a bike','I’ll take the coach'],['Walk up to a parked bike or scooter and use the ride action. You can get off again','Your coach waits where you stepped down: board it and drive on. You can step down again']];
+ ['I’ll take a bike','I’ll take the coach'],['Taking a look around Copenhagen 1760?','Taking a look around town?'] /* the city's name carries the year: a passer-by in 1760 asked if you were looking around "Copenhagen 1760" */,['Walk up to a parked bike or scooter and use the ride action. You can get off again','Your coach waits where you stepped down: board it and drive on. You can step down again']];
 const period=(t,context)=>{if(!t||context?.era!==1760)return t;const fix=x=>PERIOD.reduce((s,[a,b])=>s.split(a).join(b),x);return {...t,response:fix(t.response),choices:t.choices?.map(c=>({...c,label:fix(c.label)}))};};
 export function beginDialogue(person,memory,context={}){return period(beginToday(person,memory,context),context);}
 export function nextDialogue(id,person,memory,context={}){return period(nextToday(id,person,memory,context),context);}

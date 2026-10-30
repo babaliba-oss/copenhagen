@@ -132,3 +132,9 @@ test('speaking face lifecycle follows audio and safely restores all actor fields
  chat.update(17,p,[npc]);assert.equal(npc.speaking,false,'text-only speaking does not continue forever');assert.equal(chat.snapshot().active,true);chat.close();
  assert.equal(Object.hasOwn(npc,'expression'),false);assert.equal(Object.hasOwn(npc,'speaking'),false);assert.equal(Object.hasOwn(npc,'mouthOpen'),false);chat.dispose();
 });
+
+test('Copenhagen 1760: a passer-by does not ask if you are looking around "Copenhagen 1760"',async()=>{
+ const {beginDialogue}=await import('../src/conversation-dialogue.js'),p={id:'passer-1760',x:0,z:0};
+ assert.match(beginDialogue(p,{},{cityName:'Copenhagen 1760',era:1760}).response,/Taking a look around town\?/);
+ assert.match(beginDialogue(p,{},{cityName:'Copenhagen',era:2026}).response,/Taking a look around Copenhagen\?/);
+});
