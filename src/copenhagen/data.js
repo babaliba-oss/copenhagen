@@ -35,8 +35,8 @@ export const SAGAS = [
       { at: [55.68000, 12.59156], name: 'Nyhavn 67', card: ['Nyhavn 67 · 1848–65', 'Now he\'s famous. He lives here for seventeen years, two rooms looking out over the masts. Kings invite him to dinner. He still worries every review will be the one that ruins him.'] },
       { at: [55.67957, 12.59058], name: 'Nyhavn 18', card: ['Nyhavn 18 · 1871–75', 'His last address on the canal. By now the tales are read in dozens of languages. He dies in August 1875, at a friend\'s villa called Rolighed. The whole city turns out for the funeral.'] },
       { at: [55.69292, 12.59920], name: 'Den Lille Havfrue', card: ['Den Lille Havfrue · 1913', 'Carl Jacobsen of Carlsberg saw a ballet of The Little Mermaid and paid for a statue. Edvard Eriksen made her. The ballerina Ellen Price posed for the head, his wife Eline for the rest. You leave the paper swan at her feet. Ugly ducklings, it turns out, do fine.'] }] },
-  { id: 'gefion', era: 'm', title: 'Gefion\'s Plough', giver: 'aksel', pay: 500, limit: 240,
-    intro: 'Think you can plough like Gefion? Ride the furrow: Kastellet, Marmorkirken, Amalienborg and back to me. Four minutes. Her oxen had a day and a night. You have wheels.',
+  { id: 'gefion', era: 'm', title: 'Gefion\'s Plough', giver: 'aksel', pay: 500, limit: 390, // the GPS lines: 3.6 km by car (one-way streets round Frederiksstaden), 2.4 km by bike; at 240 s that was 54 and 37 km/h
+    intro: 'Think you can plough like Gefion? Ride the furrow: Kastellet, Marmorkirken, Amalienborg and back to me. Six and a half minutes. Her oxen had a day and a night. You have wheels.',
     go: 'Go! Kastellet first. Pull, oxen!',
     steps: [
       { at: [55.68867, 12.59342], name: 'Kastellet gate', toast: ['First furrow', 'The oxen strain. Marmorkirken next.'] },

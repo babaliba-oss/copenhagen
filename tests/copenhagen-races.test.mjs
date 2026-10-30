@@ -24,3 +24,10 @@ test('in a race the big map frames the player and the next checkpoint, in both e
   const start=g.raceStarts()[0];at([start[0]+60,start[1]],'car',2);at(start,'car',2);assert.ok(g.debug().race,'race started');
   const t=g.minimapTargets().filter(t=>t.job);assert.equal(t.length,1);assert.deepEqual(t[0].p,g.minimapTargets()[0].p,'the next checkpoint is what the big map frames');g.key('KeyX');}
 });
+test('today: Gefion\'s Plough can be done in its time by car or by bike along its GPS lines',()=>{
+ const {g,at,line}=play('copenhagen'),q=SAGAS.find(s=>s.id==='gefion');assert.match(q.intro,/Six and a half minutes/);
+ for(const [mode,most] of [['car',11],['walk',6.5]]){ /* the bike's top speed is 7 m/s; walk: the bike's line */
+  g.api.sagaAccept('gefion');let from=g.people.find(x=>x.script==='aksel'),here=[from.x,from.z],total=0;
+  for(let n=0;n<q.steps.length;n++){at(here,mode==='car'?'walk':'car',1,.001);at(here,mode,1,.001);total+=line();here=g.minimapTargets().filter(m=>m.color==='#e0313e')[0].p;at(here,mode,2,.001);for(let i=0;i<3;i++)g.key('Enter');}
+  assert.ok(total/q.limit<most,`${mode}: ${total|0} m in ${q.limit} s`);store.delete('cph-game-v1');}
+});
