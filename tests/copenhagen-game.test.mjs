@@ -111,6 +111,15 @@ test('desktop: job 1\'s story shows for 10 s from the start of play, not from th
   step(true);assert.equal(cls.has('settled'),false,'play starts: the story is back');mock.timers.tick(9000);step(true);assert.equal(cls.has('settled'),false);mock.timers.tick(1500);assert.equal(cls.has('settled'),true,'and settles 10 s later');
  }finally{mock.timers.reset();}
 });
+test('every delivery clock covers the GPS line the player follows, by car (or coach) and on foot, at a city pace',()=>{
+ for(const id of ['copenhagen','copenhagen-1760']){store.clear();const {g,at,line,job,banner}=play(id),n=(id==='copenhagen'?JOBS:JOBS_1760).length,v=id==='copenhagen'?7:6;
+  for(let i=0;i<n;i++){at([5000,5000],'car',90);const A=job();at(A);assert.equal(g.debug().state,'b',`${id} job ${i+1} picked up`);
+   const clock=Number(banner().match(/in (\d+) s/)[1]),B=job();at(A,'car',1,.001);const car=line();at(A,'walk',1,.001);const foot=line();
+   assert.ok(clock>=car/v+24,`${id} job ${i+1}: ${car|0} m GPS line by ${v===7?'car':'coach'} in ${clock} s`);assert.ok(clock>=foot/6+24,`${id} job ${i+1}: ${foot|0} m on foot in ${clock} s`);
+   assert.ok(car/clock*3.6<26,`${id} job ${i+1}: ${(car/clock*3.6).toFixed(0)} km/h average through the city`);
+   at(B,'car',1);assert.equal(g.debug().state,'a',`${id} job ${i+1} delivered`);}}
+ // Wienerbrød (job 2): a 3.6 km line round the one-way streets had 311 s from a shorter road route (42 km/h).
+});
 test('job 1 is a short first delivery in both eras, and its clock leaves time for the car\'s own line',()=>{
  for(const id of ['copenhagen','copenhagen-1760']){store.clear();const {g,at,line,job}=play(id);
   at([5000,5000],'car',90);assert.equal(g.timed(),null,'nothing on the clock yet');const A=job();at(A);assert.equal(g.debug().state,'b',`${id}: picked up`);assert.equal(g.timed(),'delivery','the era switch warns about this one');at(A,'car',1,.001);
