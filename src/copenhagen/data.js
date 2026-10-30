@@ -4,7 +4,7 @@
 
 export const JOBS = [
   { t: 'Cake for the choir', d: 'The choir at Marmorkirken has rehearsal and no cake. It is close: look for the green dome.', a: [55.67990, 12.58955, 'Nyhavn'], b: [55.68485, 12.59005, 'Marmorkirken'], pay: 260 }, // job 1 is short (about 700 m by car): the Opera, 3 km round by road, was too much for a first go
-  { t: 'Wienerbrød for the Guard', d: 'A cinnamon snail for the Royal Guard. Hand it over, no eye contact.', a: [55.68092, 12.57712, 'Bakery on Købmagergade'], b: [55.68373, 12.59238, 'Amalienborg'], pay: 320 },
+  { t: 'Wienerbrød for the Guard', d: 'A cinnamon snail for the Royal Guard. Hand it over, no eye contact.', a: [55.68099, 12.57989, 'Bakery on Pilestræde'], b: [55.68432, 12.59170, 'Amalienborg'], pay: 320 }, // both ends on a street: from the bakery on Købmagergade (no road) the car's line to it ran 2.9 km round Nørreport from Marmorkirken, 920 m off, and on to the palace 3.6 km, up Amaliegade to the colonnade and back to walk round the block; the drop-off is now where Frederiksgade meets the palace square
   { t: 'Tivoli tickets', d: 'Two tickets for a guy in Christiania. Leave the car outside.', a: [55.67464, 12.56718, 'Tivoli main gate'], b: [55.67360, 12.59900, 'Christiania'], pay: 560 },
   { t: 'Moving day', d: 'A friend is moving flats across the harbour. Take a bike, the bridges are faster.', a: [55.67397, 12.59138, 'Christianshavn'], b: [55.68540, 12.57780, 'Kongens Have'], pay: 480 },
   { t: 'Flag cake', d: 'Birthday cake with little Dannebrog flags. Do not tip it.', a: [55.68590, 12.57640, 'Rosenborg'], b: [55.67280, 12.59380, 'Vor Frelsers Kirke'], pay: 430 },
