@@ -1104,7 +1104,7 @@ window.addEventListener('keydown',e=>{
  if(e.repeat){if(started&&!paused&&!mapOpen&&!police?.busted&&/^(Key[WASD]|Arrow|Space|Shift)/.test(e.code))keys.add(e.code);return;} // a key still held after unpausing (its first press was dropped) drives again on its repeat
  if(police?.busted){if(finale.ended&&e.code==='Tab')return;e.preventDefault();if(!finale.ended)return;if(e.code==='Enter'||e.code==='Escape')continueDriving();else if(e.code==='KeyR')restart();return;} // BUSTED screen: Enter/Esc continue, R restarts; Tab moves between its two buttons (the HUD is inert)
  if(!started){if(!ready)return;if(e.code==='Enter'){e.preventDefault();start();return;}if(e.code==='KeyY'&&city?.id?.startsWith('copenhagen')){e.preventDefault();eraJump();return;} /* the welcome card says Press Y */if(!['KeyW','KeyA','KeyS','KeyD','ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.code))return;}
- if(e.code==='Escape'&&cph?.blocking?.()&&cph.key(e.code)){e.preventDefault();return;}
+ if(e.code==='Escape'&&cph?.blocking?.()&&cph.key(e.code)){e.preventDefault();if(paused&&started)setPaused(false);return;} // paused on top of the journal (the tab was hidden with it open): one Esc closes both, not one each
  if(e.code==='Escape'){if(marketShop?.close()){refreshMarketUI();return;}if(peopleInteraction?.close())return;if(!mapOpen)setPaused(!paused);return;}
  if(mapOpen)return;
  if(paused&&!['KeyG','KeyP','KeyH','KeyV'].includes(e.code))return; // paused: no recover, era jump, map or camera underneath the pause card
