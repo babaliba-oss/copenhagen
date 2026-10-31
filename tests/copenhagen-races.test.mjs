@@ -40,6 +40,7 @@ test('1760: Fire Watch turns the sky to night while it runs, and back when it en
  at([w.x,w.z],'walk',1,.001);assert.deepEqual(calls,[]);
  g.api.sagaAccept('fire');at([w.x,w.z],'walk',1,.001);assert.deepEqual(calls,[true]);
  at([w.x,w.z],'walk',3,200);assert.equal(g.timed(),null);assert.match(g.api.sagaIntro('fire').response,/lantern/i,'the saga can be asked again: it failed');assert.deepEqual(calls,[true,false]);store.delete('cph-game-v1');
+});
 test('today: the bike\'s GPS line over Cykelslangen is drawn on the deck, not under it in the harbour',async()=>{
  const {findRaisedDecks}=await import('../src/quay.js'),{setRaisedDecks,raisedDeckAt}=await import('../src/terrain.js'),{default:proj4}=await import('proj4');
  const city=cities.find(x=>x.id==='copenhagen'),proj=proj4('EPSG:4326',city.projection),job=JOBS[0],scene=new THREE.Scene();let deck;
