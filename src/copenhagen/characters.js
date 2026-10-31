@@ -57,12 +57,12 @@ const SCRIPTS={
   ramp:()=>turn('So instruments could go up by horse and cart. A Russian tsar is said to have ridden up on horseback in 1716.',[BYE]),
  },
  hca:{ // easter egg: the tall gentleman in the black coat on the Nyhavn quay
-  hello:m=>turn(m.visits>1?'You again! Have you come to apologise for the review?':'Ah, a reader! Hans Christian Andersen, at your service. I wrote my first fairy tales right here, at number 20. Later I lived at 67, and at 18. I move a lot. Landladies.',[choice('mermaid','The Little Mermaid?'),choice('duckling','Was the ugly duckling you?'),choice('autograph','Can I have an autograph?'),BYE]),
+  hello:m=>turn(m.critic?'You again! Have you come to apologise for the review?':'Ah, a reader! Hans Christian Andersen, at your service. I wrote my first fairy tales right here, at number 20. Later I lived at 67, and at 18. I move a lot. Landladies.',[choice('mermaid','The Little Mermaid?'),choice('duckling','Was the ugly duckling you?'),choice('autograph','Can I have an autograph?'),BYE]),
   mermaid:()=>turn('She sits out at Langelinie. Tourists say she is small. She is life-size. Mermaids are not tall. Also, in my version nobody is happy at the end. Remember that.',[choice('autograph','Can I have an autograph?'),BYE]),
   duckling:()=>turn('A poor boy from Odense with big feet and a big nose, laughed at by the whole yard, who turns out to be a swan? I cannot imagine where I got the idea.',[choice('autograph','Can I have an autograph?'),BYE]),
   autograph:()=>turn('An autograph! Of course, of course. Just tell me first: you are not by any chance a critic? You have the look. That little notebook. That face.',[choice('critic','Well... I did write one review'),choice('fan','No, a big fan!'),BYE]),
   fan:()=>turn('Then here. H.C. Andersen, with a little paper cut-out of a swan. I cut them out at dinner parties. People find it charming. Mostly.',[BYE]),
-  critic:()=>turn('A CRITIC! The one who called The Little Mermaid "too sad for children"?! Stand still. I have a FAIRY TALE for you. It is very long and nobody is happy at the end.',[choice('run','Run!')],'angry'),
+  critic:m=>{m.critic=true;return turn('A CRITIC! The one who called The Little Mermaid "too sad for children"?! Stand still. I have a FAIRY TALE for you. It is very long and nobody is happy at the end.',[choice('run','Run!')],'angry');}, // only a critic is asked for an apology next time: any second visit was, a fan's too
   run:(m,person)=>{if(person){person.chaseLeft=25;person.chaseUntil=1;person.caught=false;person.gaveUp=false;}return {close:true,message:'Run!'};},
  },
  mette:{

@@ -146,3 +146,11 @@ test('Copenhagen 1760: passers-by have period Danish names, today keeps its seed
   const old=characterFor(p,{era:1760}).name;assert.ok(!modern.has(old),`${old} is not a modern name`);assert.equal(characterFor(p,{era:1760}).name,old,'stable in 1760');}
  assert.deepEqual([0,1,2,3,4,5].map(i=>characterFor({id:`person-${i}`}).name),['Mika','Lee','Kai','Charlie','Sam','Sasha'],'today’s names as before');
 });
+
+test('Copenhagen: H.C. Andersen wants an apology for the review only from the one who wrote it',async()=>{
+ const {authoredBegin,authoredNext}=await import('../src/copenhagen/characters.js');
+ const p={script:'hca'},fan={};authoredBegin(p,fan);authoredNext('autograph',p,fan);authoredNext('fan',p,fan);
+ assert.doesNotMatch(authoredBegin(p,fan).response,/review/,'a fan, back again');
+ const critic={};authoredBegin(p,critic);authoredNext('autograph',p,critic);authoredNext('critic',p,critic);
+ assert.match(authoredBegin(p,critic).response,/apologise for the review/);
+});
