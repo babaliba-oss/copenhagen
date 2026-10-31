@@ -7,7 +7,7 @@ import * as THREE from 'three';
 import {loadOneMesh} from './gait.js';
 import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';
 import proj4 from 'proj4';
-import {groundAt} from '../terrain.js';
+import {groundAt,raisedDecks,raisedDeckAt,rideDeck} from '../terrain.js';
 import {SpatialIndex,bounds,inWaterPolygons} from '../geo.js';
 import {JOBS,JOBS_1760,SAGAS,CHARACTERS} from './data.js';
 import {connectCharacters} from './characters.js';
@@ -103,12 +103,17 @@ function createRouteLine(scene,{historic=false}={}){
   // overlaps showed as darker wedges through the transparent ribbon.
   const P=[],C=[];for(let i=0;i<pts.length;i++){if(P.length&&dist(pts[i],P.at(-1))<.4){if(i===pts.length-1&&P.length>1){P[P.length-1]=pts[i];C[C.length-1]=cum[i];}continue;}P.push(pts[i]);C.push(cum[i]);}
   if(P.length<2){pts=null;out.points=null;return;}
+  // A raised deck (Cykelslangen): the bike's line runs along it, but was drawn at groundAt, in the harbour and on the footway
+  // under it. Where the line comes onto a deck at its ends (rideDeck, as the bike does), it follows the deck, every 3 m.
+  if(raisedDecks().length){const Q=[],QC=[];for(let i=0;i<P.length;i++){if(i){const a=P[i-1],b=P[i],L=dist(a,b),k=raisedDeckAt(a[0],a[1])!==null||raisedDeckAt(b[0],b[1])!==null?Math.ceil(L/3):1;for(let s=1;s<k;s++){Q.push([a[0]+(b[0]-a[0])*s/k,a[1]+(b[1]-a[1])*s/k]);QC.push(C[i-1]+(C[i]-C[i-1])*s/k);}}Q.push(P[i]);QC.push(C[i]);}
+   P.length=C.length=0;P.push(...Q);C.push(...QC);}
+  const Y=[],body={x:0,z:0,deckY:null};for(const [x,z] of P){body.x=x;body.z=z;Y.push((rideDeck(body)??groundAt(x,z))+.22);}
   const pos=[],rd=[],side=[];
   for(let i=0;i<P.length;i++){const a=P[Math.max(0,i-1)],b=P[i],c=P[Math.min(P.length-1,i+1)];
    const n1=i>0?[-(b[1]-a[1]),b[0]-a[0]]:null,n2=i<P.length-1?[-(c[1]-b[1]),c[0]-b[0]]:null,norm=v=>{const l=Math.hypot(v[0],v[1])||1;return [v[0]/l,v[1]/l];};
    const u1=n1&&norm(n1),u2=n2&&norm(n2),sharp=u1&&u2&&u1[0]*u2[0]+u1[1]*u2[1]<-.2,m=sharp?u2:norm(u1&&u2?[u1[0]+u2[0],u1[1]+u2[1]]:(u1||u2)),k=u1&&u2&&!sharp?Math.min(2,1/Math.max(.5,m[0]*u1[0]+m[1]*u1[1])):1;
    side.push([m[0]*.5*k,m[1]*.5*k]);} // a hairpin (over ~100 degrees) gets a plain butt joint, not a mitre that folds the strip
-  for(let i=0;i<P.length-1;i++){const [ax,az]=P[i],[bx,bz]=P[i+1],[nax,naz]=side[i],[nbx,nbz]=side[i+1],ya=groundAt(ax,az)+.22,yb=groundAt(bx,bz)+.22;
+  for(let i=0;i<P.length-1;i++){const [ax,az]=P[i],[bx,bz]=P[i+1],[nax,naz]=side[i],[nbx,nbz]=side[i+1],ya=Y[i],yb=Y[i+1];
    pos.push(ax+nax,ya,az+naz,bx+nbx,yb,bz+nbz,bx-nbx,yb,bz-nbz,ax+nax,ya,az+naz,bx-nbx,yb,bz-nbz,ax-nax,ya,az-naz);rd.push(C[i],C[i+1],C[i+1],C[i],C[i+1],C[i]);}
   const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));g.setAttribute('rd',new THREE.Float32BufferAttribute(rd,1));
   mesh=new THREE.Mesh(g,mat);mesh.renderOrder=3;mesh.frustumCulled=false;mesh.layers.set(1);scene.add(mesh);};
