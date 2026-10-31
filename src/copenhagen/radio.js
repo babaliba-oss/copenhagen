@@ -32,8 +32,10 @@ export function createRadio({stations=[],banner=null,initial=RADIO_OFF,clock=()=
  const list=stations.filter(s=>s.tracks?.length).map(s=>({...s,offset:random()*3600}));
  const player=audio||(typeof Audio!=='undefined'?new Audio():null);
  if(player){player.preload='auto';player.volume=0;}
- let loadAt=0,sounded=false,station=Math.max(0,Math.min(list.length,initial|0)),active=false,track=null,failures=0,silentUntil=0,volume=0,target=0,pendingSeek=0,tuned=null;
+ let loadAt=0,sounded=false,station=Math.max(0,Math.min(list.length,initial|0)),active=false,track=null,failures=0,silentUntil=0,silentFor=null,volume=0,target=0,pendingSeek=0,tuned=null;
  const current=()=>station>0?list[station-1]:null;
+ // 'No signal' is the station that failed: one host down silenced every station for 45 s (L to the next one said No signal too).
+ const muted=s=>s===silentFor&&clock()<silentUntil;
  function show(text,sub=''){banner?.(text,sub);}
  function load(index,offset){
   const s=current();if(!s||!player)return;
@@ -43,7 +45,7 @@ export function createRadio({stations=[],banner=null,initial=RADIO_OFF,clock=()=
  }
  // Always followed by announce(), which also says "No signal" while the station cannot be reached.
  function tune(){const s=current();if(!s){track=null;tuned=null;player?.pause?.();return;}
-  if(clock()<silentUntil)return;
+  if(muted(s))return;
   const pos=stationPosition(s,clock());if(pos)load(pos.index,pos.offset);}
  const credit=tr=>`${tr.title}${tr.artist?' · '+tr.artist:''}${tr.licence&&!/public domain/i.test(tr.licence)?` (${tr.licence})`:''}`; // CC BY needs the credit on screen
  function nextTrack(){if(!track)return;const s=track.station,i=(track.index+1)%s.tracks.length;load(i,0);if(active)show(s.name,credit(s.tracks[i]));}
@@ -54,11 +56,11 @@ export function createRadio({stations=[],banner=null,initial=RADIO_OFF,clock=()=
   player.addEventListener?.('error',()=>fail());
  }
  function fail(){{if(!track)return;failures++;
-   if(failures>=3){silentUntil=clock()+45;failures=0;show(track.station.name,'No signal');track=null;player.pause?.();return;}
+   if(failures>=3){silentUntil=clock()+45;silentFor=track.station;failures=0;show(track.station.name,'No signal');track=null;player.pause?.();return;}
    setTimeout(()=>{if(track&&active)nextTrack();},800);}}
  // The station and what is on: the track loaded (it moves on after a failed one), else where the broadcast is.
  function announce(){const s=current();if(!s){show('Radio off');return;}
-  if(clock()<silentUntil){show(s.name,'No signal');return;}
+  if(muted(s)){show(s.name,'No signal');return;}
   const tr=track?.station===s?s.tracks[track.index]:s.tracks[stationPosition(s,clock())?.index];show(s.name,tr?credit(tr):s.genre||'');}
  return {
   get station(){return station;},

@@ -77,3 +77,12 @@ test('a short buffer mid-song does not skip the track; a host with no data for 2
  r2.update(.1,{on:true});const s0=dead.src;for(let i=0;i<22;i++){t+=1;r2.update(1,{on:true});}
  assert.ok(!r2.playing);
 });
+
+test('no signal on one station does not silence the others',()=>{
+ let t=0;const audio=fakeAudio(),shown=[];
+ const radio=createRadio({stations,audio,clock:()=>t,random:()=>0,banner:(a,b)=>shown.push([a,b])});
+ radio.next();radio.update(.1,{on:true});audio.fire('error');audio.fire('error');audio.fire('error');
+ assert.deepEqual(shown.at(-1),['Radio Folk','No signal']);
+ t=5;radio.next();assert.equal(audio.src,'c.mp3','the next station tunes in');assert.deepEqual(shown.at(-1),['Jazz','C']);
+ radio.next();radio.next();assert.deepEqual(shown.at(-1),['Radio Folk','No signal'],'the one that failed still has none');
+});
