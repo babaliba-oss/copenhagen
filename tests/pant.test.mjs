@@ -31,3 +31,12 @@ test('no collecting while collect is off (the cinematic drives past)', () => {
  let got=0;for(let a=0;a<6.3;a+=.2)for(const r of [0,1,2])got+=p.update(.01,{x:Math.cos(a)*r,z:Math.sin(a)*r},{collect:false});
  assert.equal(got,0);
 });
+
+test('cans picked up stay gone after a reload until their respawn time is up', () => {
+ const items=[{k:'hotdog-stand',x:0,z:0,yaw:0}],taken={};let t=1000;const now=()=>t;
+ const p=createPant({items,taken,now});p.update(.3,{x:0,z:0});
+ let got=0;for(const r of [0,.5,1,1.5,2,2.5,3])for(let a=0;a<6.3;a+=.2)got+=p.update(.01,{x:Math.cos(a)*r,z:Math.sin(a)*r});
+ assert.equal(got,2);assert.equal(Object.keys(taken).length,2);
+ t+=60;const q=createPant({items,taken,now});q.update(.3,{x:0,z:0});assert.equal(q.group.children[0].count,0,'a minute later: still gone');
+ t+=PANT_RESPAWN;const r=createPant({items,taken,now});r.update(.3,{x:0,z:0});assert.equal(r.group.children[0].count,2,'back after the respawn time');assert.equal(Object.keys(taken).length,0);
+});

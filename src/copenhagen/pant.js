@@ -12,7 +12,7 @@ export const PANT_KR=1,PANT_REACH=1.9,PANT_RESPAWN=300; // kr a can (the A depos
 const SCALE=1.5; // a third bigger than a 33 cl can, so they can be spotted from a bike
 const hash=(x,z,k)=>{const s=Math.sin(x*12.9898+z*78.233+k*37.719)*43758.5453;return s-Math.floor(s);};
 
-export function createPant({items=[],clear=()=>true,geometry=null,capacity=160,range=90}={}){
+export function createPant({items=[],clear=()=>true,geometry=null,capacity=160,range=90,taken={},now=()=>Date.now()/1000}={}){ // taken: can -> when it was picked up (s since 1970), kept in the save so a reload does not put every can back
  const cans=[];
  for(const it of items){const S=SPOTS[it.k];if(!S||hash(it.x,it.z,1)>S.p)continue;
   for(let j=0;j<(S.n||1);j++){const h=k=>hash(it.x,it.z,k+j*7),yaw=it.yaw||0,d=S.r[0]+h(2)*(S.r[1]-S.r[0]);
@@ -20,6 +20,9 @@ export function createPant({items=[],clear=()=>true,geometry=null,capacity=160,r
    const x=it.x+Math.sin(a)*d+Math.cos(a)*u,z=it.z+Math.cos(a)*d-Math.sin(a)*u;
    if(!clear(x,z))continue;
    cans.push({x,z,drop:it.drop||0 /* by a bench or bin off the paving: on the ground drawn there, as the item (main.js) */,yaw:h(4)*Math.PI*2,lying:h(5)<.75,tint:new THREE.Color(TINTS[Math.floor(h(6)*TINTS.length)]),taken:-1e9});}}
+ const canKey=c=>`${Math.round(c.x*10)}|${Math.round(c.z*10)}`,t0=now();
+ for(const k in taken)if(!(t0-taken[k]<PANT_RESPAWN))delete taken[k]; // back already
+ for(const c of cans){const t=taken[canKey(c)];if(t)c.taken=t-t0;} // the clock starts at 0 now
  // a coarse grid for the near query
  const CELL=60,grid=new Map(),key=(i,j)=>i*100003+j;
  cans.forEach((c,i)=>{const k=key(Math.floor(c.x/CELL),Math.floor(c.z/CELL));if(!grid.has(k))grid.set(k,[]);grid.get(k).push(i);});
@@ -36,7 +39,7 @@ export function createPant({items=[],clear=()=>true,geometry=null,capacity=160,r
   clock+=dt;acc+=dt;let got=0;if(!player)return 0;
   // glint: a slow shimmer so a can catches the eye
   material.emissiveIntensity=.06+.22*Math.max(0,Math.sin(clock*2.4))**6;
-  if(collect)for(const i of near){const c=cans[i];if(clock-c.taken<PANT_RESPAWN)continue;if(Math.hypot(c.x-player.x,c.z-player.z)<PANT_REACH){c.taken=clock;got++;acc=1;}}
+  if(collect)for(const i of near){const c=cans[i];if(clock-c.taken<PANT_RESPAWN)continue;if(Math.hypot(c.x-player.x,c.z-player.z)<PANT_REACH){c.taken=clock;taken[canKey(c)]=now();got++;acc=1;}}
   if(acc<.25)return got;acc=0;
   near.length=0;const i0=Math.floor((player.x-range)/CELL),i1=Math.floor((player.x+range)/CELL),j0=Math.floor((player.z-range)/CELL),j1=Math.floor((player.z+range)/CELL);
   for(let i=i0;i<=i1;i++)for(let j=j0;j<=j1;j++){const l=grid.get(key(i,j));if(l)for(const k of l){const c=cans[k];if(clock-c.taken>=PANT_RESPAWN&&Math.hypot(c.x-player.x,c.z-player.z)<range)near.push(k);}}

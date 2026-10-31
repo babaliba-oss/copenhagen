@@ -11,9 +11,9 @@ globalThis.addEventListener=globalThis.removeEventListener=()=>{};globalThis.fet
 const THREE=await import('three'),{expandCity}=await import('../src/city-pack.js'),{expandMobility}=await import('../src/mobility-pack.js'),{SpatialIndex,inWaterPolygons}=await import('../src/geo.js');
 const {createCopenhagenGame}=await import('../src/copenhagen/game.js'),{JOBS,JOBS_1760,SAGAS}=await import('../src/copenhagen/data.js');
 const cities=JSON.parse(fs.readFileSync('public/cities/index.json','utf8')).cities;
-function play(id,prep=()=>{}){
+function play(id,prep=()=>{},extra={}){
  let c=fs.readFileSync(`public/cities/${id}/city.pack`);if(c[0]===0x1f)c=gunzipSync(c);const data=expandCity(JSON.parse(c)),houses=new SpatialIndex(data.buildings);prep(data);
- const g=createCopenhagenGame({scene:new THREE.Scene(),city:cities.find(x=>x.id===id),mobilityData:expandMobility(JSON.parse(fs.readFileSync(`public/cities/${id}/mobility.json`,'utf8'))),cityData:data,toast(){},soundOn:()=>false,blocked:(x,z)=>!!houses.at(x,z),routeSlice:Infinity}); // routeSlice: each new line at once (in the game a new line's groundwork is spread over frames)
+ const g=createCopenhagenGame({scene:new THREE.Scene(),city:cities.find(x=>x.id===id),mobilityData:expandMobility(JSON.parse(fs.readFileSync(`public/cities/${id}/mobility.json`,'utf8'))),cityData:data,toast(){},soundOn:()=>false,blocked:(x,z)=>!!houses.at(x,z),routeSlice:Infinity,...extra}); // routeSlice: each new line at once (in the game a new line's groundwork is spread over frames)
  const me={x:0,z:0,speed:0,heading:0},banner=()=>ids.get('cph-banner')?.innerHTML.replace(/<[^>]+>/g,'')||'';
  const at=([x,z],mode='car',steps=2,dt=1/30)=>{me.x=x;me.z=z;for(let i=0;i<steps;i++)g.update(dt,me,mode,{running:true});};
  const line=()=>(g.route()||[]).reduce((s,p,i,a)=>i?s+Math.hypot(p[0]-a[i-1][0],p[1]-a[i-1][1]):0,0);
@@ -34,4 +34,10 @@ test('today: Gefion\'s Plough can be done in its time by car or by bike along it
 test('sagas pay half in 1760, where jobs pay about half as much',()=>{
  for(const [id,pay] of [['copenhagen',700],['copenhagen-1760',350]]){const {g}=play(id);
   assert.match(g.api.sagaIntro('holger').choices[0].label,new RegExp(`Accept · ${pay} `));store.delete('cph-game-v1');}
+});
+test('1760: Fire Watch turns the sky to night while it runs, and back when it ends',()=>{
+ const calls=[],{g,at}=play('copenhagen-1760',()=>{},{night:on=>calls.push(on)}),w=g.people.find(x=>x.script==='watchman');
+ at([w.x,w.z],'walk',1,.001);assert.deepEqual(calls,[]);
+ g.api.sagaAccept('fire');at([w.x,w.z],'walk',1,.001);assert.deepEqual(calls,[true]);
+ at([w.x,w.z],'walk',3,200);assert.equal(g.timed(),null);assert.match(g.api.sagaIntro('fire').response,/lantern/i,'the saga can be asked again: it failed');assert.deepEqual(calls,[true,false]);store.delete('cph-game-v1');
 });

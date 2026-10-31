@@ -130,7 +130,8 @@ function beam(scene,color,h=80){
  g.add(col,ring);g.visible=false;scene.add(g);return g;
 }
 
-export function createCopenhagenGame({scene,city,mobilityData,cityData,toast,soundOn=()=>true,audio=null,blocked=null,routeSlice=2}){ // routeSlice: ms a frame for a new GPS line's groundwork (prepare) // blocked(x,z): a solid house there (the GPS line's last stretch)
+export function createCopenhagenGame({scene,city,mobilityData,cityData,toast,soundOn=()=>true,audio=null,blocked=null,routeSlice=2,night=null}){ // night(on): a saga flagged night (Fire Watch) turns the sky to night while it runs and back after
+ let nightOn=false; // routeSlice: ms a frame for a new GPS line's groundwork (prepare) // blocked(x,z): a solid house there (the GPS line's last stretch)
  const proj=proj4('EPSG:4326',city.projection);
  const ll=([lat,lon])=>{const [x,y]=proj.forward([lon,lat]);return [x,-y];};
  const ERA=city.era===1760?'h':'m';
@@ -151,7 +152,7 @@ export function createCopenhagenGame({scene,city,mobilityData,cityData,toast,sou
  { // an old or hand-edited save: wrong types here threw inside update() on every frame
   const obj=v=>!!v&&typeof v==='object'&&!Array.isArray(v);
   for(const k of ['money','job','delivered','streak','pant'])if(save[k]!==undefined&&!Number.isFinite(save[k]))save[k]=0;save.job=Math.max(0,Math.floor(save.job||0)); // a fractional or negative job index threw every frame
-  for(const k of ['done','cards','best'])if(k in save&&!obj(save[k]))save[k]=k==='done'?{}:undefined;
+  for(const k of ['done','cards','best','pantTaken'])if(k in save&&!obj(save[k]))save[k]=k==='done'?{}:undefined;
   for(const k of ['lore','nisser'])if(!Array.isArray(save[k]))save[k]=[];
   if(save.active&&(!obj(save.active)||!Array.isArray(save.active.done)))save.active=null;
  }
@@ -175,7 +176,7 @@ export function createCopenhagenGame({scene,city,mobilityData,cityData,toast,sou
  // where people sit with a beer: the Nyhavn quays, Dronning Louises Bro, Islands Brygge, Ofelia Plads, Kongens Have
  const PANT_HOTSPOTS=[[55.68003,12.58930],[55.67998,12.59130],[55.67955,12.59010],[55.68628,12.56400],[55.66505,12.57600],[55.68100,12.59600],[55.68545,12.57960]];
  function setFurniture(items,{clear,geometry}={}){if(ERA==='h'||pant||!items?.length)return;
-  pant=createPant({items:[...items,...PANT_HOTSPOTS.map(p=>{const [x,z]=ll(p);return {k:'hotspot',x,z};})],clear,geometry});scene.add(pant.group);}
+  if(!save.pantTaken)save.pantTaken={};pant=createPant({items:[...items,...PANT_HOTSPOTS.map(p=>{const [x,z]=ll(p);return {k:'hotspot',x,z};})],clear,geometry,taken:save.pantTaken});scene.add(pant.group);}
  function clink(){if(!soundOn())return;try{const ac=audioContext();const t0=ac.currentTime; // an aluminium can: a short bright clink
   for(const [f,v] of [[2350,.05],[3520,.03],[5180,.018]]){const o=ac.createOscillator(),g=ac.createGain();o.type='sine';o.frequency.value=f;g.gain.setValueAtTime(v,t0);g.gain.exponentialRampToValueAtTime(.0001,t0+.2);o.connect(g).connect(ac.destination);o.start(t0);o.stop(t0+.22);}}catch{}}
  // ---- big moments: GTA-style banner with a short chime ----
@@ -417,7 +418,7 @@ export function createCopenhagenGame({scene,city,mobilityData,cityData,toast,sou
   document.body.append(el);const close=()=>{el.remove();removeEventListener('keydown',onKey,true);};const onKey=e=>{if(['Escape','Enter','Space'].includes(e.code)){e.preventDefault();e.stopPropagation();close();}};
   el.querySelector('button').onclick=close;addEventListener('keydown',onKey,true);setTimeout(()=>{if(el.isConnected)close();},14000);
  }
- function update(dt,actor,travelMode,{running=true,cinematic=false,view=null}={}){ // cinematic: ?cinematic drives by, it collects nothing // view: the camera (its direction: the postcard button)
+ function update(dt,actor,travelMode,{running=true,cinematic=false,view=null}={}){const wantNight=!!(save.active&&byId[save.active.id]?.night);if(wantNight!==nightOn){nightOn=wantNight;night?.(wantNight);} // cinematic: ?cinematic drives by, it collects nothing // view: the camera (its direction: the postcard button)
   viewCam=view;
   filming=cinematic;
   player=actor;if(running&&!storyShown){storyShown=true;for(const id of ['cph-job','cph-saga']){const el=$(id);if(el){el.classList.remove('settled');clearTimeout(el.__settle);el.__settle=setTimeout(()=>el.classList.add('settled'),10000);}}} /* the cards' 10 s story ran out behind the start card: job 1's tip was never seen */started=running;if(!actor)return;
