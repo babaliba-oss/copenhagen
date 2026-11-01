@@ -135,6 +135,9 @@ function beam(scene,color,h=80){
  g.add(col,ring);g.visible=false;scene.add(g);return g;
 }
 
+// The harbour baths and bathing zones (Københavns Kommune, k101 svoemmehaller_mv and badestation, CC BY 4.0): on a warm
+// day the decks and quays are full, and the cans with them (pant hotspots below).
+export const HARBOUR_BATHS=[['Islands Brygge Havnebad',55.66862,12.57779],['Fisketorvet Havnebad',55.66298,12.56393],['Kalvebod Bølge Badezone',55.66928,12.57561],['Halfdansgade Badezone',55.6659,12.57436],['Havnegade Badezone',55.67799,12.59249],['Søndre Refshalebassin Badezone',55.68993,12.60957],['La Banchina Badezone',55.68937,12.61087],['Halvandet Badezone',55.69527,12.609]]; // the eight on the map (Havnevigen and Sandkaj lie beyond its edge), each at the register point or the nearest quay beside it with room for the cans (Kalvebod Bølge floats: 46 m)
 export function createCopenhagenGame({scene,city,mobilityData,cityData,toast,soundOn=()=>true,audio=null,blocked=null,routeSlice=2,night=null}){ // night(on): a saga flagged night (Fire Watch) turns the sky to night while it runs and back after
  let nightOn=false; // routeSlice: ms a frame for a new GPS line's groundwork (prepare) // blocked(x,z): a solid house there (the GPS line's last stretch)
  const proj=proj4('EPSG:4326',city.projection);
@@ -179,7 +182,7 @@ export function createCopenhagenGame({scene,city,mobilityData,cityData,toast,sou
  let pant=null;
  const PANT_TITLES=[[10,'Pantsamler'],[50,'Pantjæger'],[150,'Pantkonge'],[400,'Pantlegende']];
  // where people sit with a beer: the Nyhavn quays, Dronning Louises Bro, Islands Brygge, Ofelia Plads, Kongens Have
- const PANT_HOTSPOTS=[[55.68003,12.58930],[55.67998,12.59130],[55.67955,12.59010],[55.68628,12.56400],[55.66505,12.57600],[55.68100,12.59600],[55.68545,12.57960]];
+ const PANT_HOTSPOTS=[[55.68003,12.58930],[55.67998,12.59130],[55.67955,12.59010],[55.68628,12.56400],[55.66505,12.57600],[55.68100,12.59600],[55.68545,12.57960],...HARBOUR_BATHS.map(b=>b.slice(1))];
  function setFurniture(items,{clear,geometry}={}){if(ERA==='h'||pant||!items?.length)return;
   if(!save.pantTaken)save.pantTaken={};pant=createPant({items:[...items,...PANT_HOTSPOTS.map(p=>{const [x,z]=ll(p);return {k:'hotspot',x,z};})],clear,geometry,taken:save.pantTaken});scene.add(pant.group);}
  function clink(){if(!soundOn())return;try{const ac=audioContext();const t0=ac.currentTime; // an aluminium can: a short bright clink
@@ -255,7 +258,10 @@ export function createCopenhagenGame({scene,city,mobilityData,cityData,toast,sou
    ['borsen','Børsen',55.6758,12.5833,'Four dragons twist their tails into the spire.'],['vorfrelsers','Vor Frelsers Kirke',55.6727,12.5940,'400 steps, the last ones outside.'],
    ['tivoli','Tivoli',55.6737,12.5681,'The garden that inspired a certain theme park.'],['operaen','Operaen',55.6818,12.6008,'The opera house across the harbour.'],
    ['raadhuset','Rådhuset',55.6757,12.5700,'The city hall and its clock tower.'],['gefion','Gefion Fountain',55.6870,12.5990,'The goddess ploughing Zealand out of Sweden.'],
-   ['havnebadet','Havnebadet',55.6648,12.5727,'A swim in the harbour, right in the middle of the city.']];
+   ['havnebadet','Havnebadet',55.6648,12.5727,'A swim in the harbour, right in the middle of the city.'],
+   // two of the statues the game draws, where and as Københavns Kommune's monument register (k101 monumenter) has them
+   ['hca','H.C. Andersen',55.67532,12.56911,'Henry Luckow-Nielsen’s storyteller (1961), looking across the boulevard to Tivoli.'],
+   ['absalon','Absalon',55.67796,12.57996,'Bishop Absalon, given the town in 1167, on Vilhelm Bissen’s horse (1902).']];
  const postcards=POSTCARD_DEFS.map(([id,title,lat,lon,text])=>({id,title,text,p:ll([lat,lon])}));
  save.cards??={};
  let cardHint=null;
@@ -268,7 +274,7 @@ export function createCopenhagenGame({scene,city,mobilityData,cityData,toast,sou
  // Which way to turn for a view (dir: the camera's): '' in frame, else 'left' / 'right' / 'behind you' / 'too close'.
  function turnTo(c,dir){const dx=c.p[0]-player.x,dz=c.p[1]-player.z,d=Math.hypot(dx,dz),cos=(dx*dir[0]+dz*dir[1])/(d*Math.hypot(dir[0],dir[1])||1);if(d<20)return 'too close';if(cos>=Math.cos(38*Math.PI/180))return '';if(cos<-.6)return 'behind you';return dir[0]*dz-dir[1]*dx<0?'left':'right';} /* x east, z south: a negative cross is to the left */
  function photo({dir,snap}){
-  if(!player)return false;const best=framed(dir);
+  if(!player)return false;const best=framed(dir,true)||framed(dir); /* a view not yet taken first: Rådhuset in front of H.C. Andersen said 'Already in your album' */
   flash();
   if(!best){const near=postcards.filter(c=>!save.cards[c.id]&&dist(c.p,[player.x,player.z])<280).sort((a,b)=>dist(a.p,[player.x,player.z])-dist(b.p,[player.x,player.z]))[0],w=near&&turnTo(near,dir);banner('Nice photo',near&&w?`Not a postcard yet · ${esc(near.title)} is ${w==='too close'?'too close: back off a bit':w==='behind you'?'behind you':'to your '+w}`:'No postcard view here · face a landmark nearby','pick');return true;} /* the start hint said 'Face Nyhavn' with Nyhavn's view 54 m behind the car: N only said 'no postcard view here' */
   if(save.cards[best.id]){banner(best.title,'Already in your album','pick');return true;}

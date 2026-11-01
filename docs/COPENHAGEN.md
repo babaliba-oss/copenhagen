@@ -183,7 +183,8 @@ Notes:
 - `harbour-bath.js`: Havnebadet Islands Brygge (decks, diving tower, bathers); `inHarbourBath()` keeps boats out.
 - `pant.js` (today): empty cans by the benches, bins, bus shelters and hot-dog stands, worth their deposit (1 kr each) to
   whoever picks them up, as plenty of Copenhageners do: about a quarter of the benches, a third of the bins, nearly half
-  the shelters and two at every stand, picked by a hash of the spot (the same spots every visit), never on a road, in a
+  the shelters and two at every stand, seven on each of the quays where people sit with a beer and by the eight harbour baths
+  on the map (Københavns Kommune's bathing register, `HARBOUR_BATHS` in game.js), picked by a hash of the spot (the same spots every visit), never on a road, in a
   house or in the water; walk, ride or drive within 1.9 m. A can picked up is back after five minutes. Only the cans
   within 90 m are drawn (one instanced mesh, refilled four times a second), with a slow glint; the count shows next to
   the money and titles come at 10, 50, 150 and 400 cans (game.js). Can: the regular can of Daniel's "Cans!" pack (Tiago Oliveira, CC BY

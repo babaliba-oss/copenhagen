@@ -97,7 +97,7 @@ test('touch: a Postcard button shows while an album view not yet taken is in fra
 test('touch: the journal shows the postcard album (Menu > Journal says "Sagas & postcards"), with a tap hint, not N',()=>{
  store.clear();const was=body.classList.contains;body.classList.contains=c=>c==='touch';let g;try{({g}=play('copenhagen'));}finally{body.classList.contains=was;}
  const j=ids.get('cph-journal');j.contains=()=>true;g.key('KeyJ');
- assert.match(j.innerHTML,/<h2 class="cph-album-h">Postcards · 0\/13<\/h2>/);assert.match(j.innerHTML,/<div class="cph-album">.*Nyhavn/s);assert.match(j.innerHTML,/tap Postcard/);assert.doesNotMatch(j.innerHTML,/press N|cph-keyboard-only/);
+ assert.match(j.innerHTML,/<h2 class="cph-album-h">Postcards · 0\/15<\/h2>/);assert.match(j.innerHTML,/<div class="cph-album">.*Nyhavn/s);assert.match(j.innerHTML,/tap Postcard/);assert.doesNotMatch(j.innerHTML,/press N|cph-keyboard-only/);
  assert.doesNotMatch(fs.readFileSync('src/mobile-controls.css','utf8'),/cph-keyboard-only\{display:none/,'the album was hidden on phones');
 });
 test('touch: the Holger Danske saga says "Tap the saga card", not "Press K"; desktop keeps the key',()=>{
@@ -155,4 +155,22 @@ test('job 1 is a short first delivery in both eras, and its clock leaves time fo
   const clock=Number(ids.get('cph-job').innerHTML.match(/(\d+) s</)[1]),m=line();
   assert.ok(m>200&&m<1200,`${id}: job 1 is ${m|0} m by car`);assert.ok(m/clock<6,`${id}: ${m|0} m in ${clock} s`);}
  assert.doesNotMatch(JOBS.map(j=>j.d).join(' '),/Inderhavnsbroen is the fast way/,'a footbridge: the car\'s line goes round');
+});
+test('pant: cans by every harbour bath on the map (Københavns Kommune\'s bathing register), on the quay, not in the water',async()=>{
+ const {HARBOUR_BATHS}=await import('../src/copenhagen/game.js'),{createPant}=await import('../src/copenhagen/pant.js'),proj=(await import('proj4')).default;
+ store.clear();const {g,at,data}=play('copenhagen'),city=cities.find(x=>x.id==='copenhagen'),roads=new SpatialIndex(data.roads),houses=new SpatialIndex(data.buildings);
+ const clear=(x,z)=>!roads.at(x,z)&&!houses.at(x,z)&&!inWaterPolygons(data.water,x,z);
+ g.setFurniture([{k:'lamp',x:1e5,z:1e5}],{clear});
+ const P=proj('EPSG:4326',city.projection),ll=([lat,lon])=>{const [x,y]=P.forward([lon,lat]);return [x,-y];};
+ assert.equal(HARBOUR_BATHS.length,8);
+ for(const [name,lat,lon] of HARBOUR_BATHS){const [x,z]=ll([lat,lon]),p=createPant({items:[{k:'hotspot',x,z}],clear});assert.ok(p.count>=3,`${name}: ${p.count} cans`);}
+ // walk round Islands Brygge Havnebad: the game picks its cans up
+ const [bx,bz]=ll(HARBOUR_BATHS[0].slice(1));for(let r=0;r<=15;r+=1)for(let a=0;a<6.3;a+=.25)at([bx+Math.cos(a)*r,bz+Math.sin(a)*r],'walk',1,.3);
+ assert.ok(JSON.parse(store.get('cph-game-v1')).pant>=2,'cans picked up at the bath');
+});
+test('postcards of the statues the game draws, from the city\'s monument register; N takes a view not yet in the album first',()=>{
+ store.clear();const {g}=play('copenhagen'),me={x:-470,z:600,speed:0,heading:0},hca=[-433.4,521.1],look=[hca[0]-me.x,hca[1]-me.z];
+ g.update(1/30,me,'car',{running:true});g.photo({dir:look,snap:()=>null});assert.match(ids.get('cph-banner').innerHTML,/Postcard: H\.C\. Andersen/);
+ g.photo({dir:look,snap:()=>null});assert.match(ids.get('cph-banner').innerHTML,/Postcard: Rådhuset/,'the view behind it, not "Already in your album"');
+ const abs=[249.2,226.6];me.x=abs[0]+60;me.z=abs[1]+60;g.update(1/30,me,'car',{running:true});g.photo({dir:[-60,-60],snap:()=>null});assert.match(ids.get('cph-banner').innerHTML,/Postcard: Absalon/);
 });
