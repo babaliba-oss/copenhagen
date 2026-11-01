@@ -72,6 +72,8 @@ node scripts/furniture-ground.mjs copenhagen        # after surface-fill and map
 node scripts/indoor-items.mjs copenhagen            # after furniture-ground, kk-collision and collision-trim: drops furniture
                                                     # inside the model's drawn houses, lists such trees (indoor-trees.json)
 node scripts/furniture-ground.mjs copenhagen-1760   # the 1760 lanterns likewise
+python3 scripts/kk-demolished.py --again copenhagen  # last, today only: model houses demolished since 2013 out (below);
+node scripts/road-walls.mjs copenhagen && node scripts/indoor-items.mjs copenhagen && python3 scripts/surface-fill.py copenhagen
 ```
 
 Most of today's pavements are not mapped as areas (OpenStreetMap draws them as lines or not at all), so the rendered
@@ -104,6 +106,16 @@ within ~0.2 m, so neighbours' walls meet exactly; the foot of every wall reaches
 In 1760, today's street furniture on the period footprints (station entrances, kiosks, toilets) and statues modelled
 in detail are left out, and the ramparts are rebuilt as one smooth earthwork per stretch (`embankment: 1`).
 Pass `--faces <file>` (written once with `--save-faces <file>`) to skip re-reading the DXF on reruns.
+The model is from 2013: `scripts/kk-demolished.py <bygning.json>` takes out the model-only houses pulled down since
+(a piece of a house's roof plan of 50 m² or more that today's buildings cover by under 10%: GeoDanmark via Københavns
+Kommune's WFS layer `k101:bygning`, downloaded as GeoJSON in EPSG:4326). It edits the built tiles, the footprints
+(kk-footprints.json, fit-colliders' `model-` ones in city.pack) and the ground pads under them, and closes the
+neighbours that were one mesh with a removed piece where they now hang open. Strips under 3 m wide (bicycle sheds,
+canopies, glazed links) and pieces standing open or lifted over a street or the water (skyways, decks, the model's
+stray sheets) stay: GeoDanmark does not register those as buildings. The pieces removed are kept in
+`cities/copenhagen/demolished.json`, so after a rebuild `--again` takes them out without the download (2026-10:
+267 pieces of 240 houses, 63,000 m²; the Botanical Garden's old research glasshouses, Carlsberg's and Nordhavn's
+sheds and halls, Sydhavn's quay buildings). 1760 keeps the model as it is.
 Checks: `scripts/building-sweep.mjs` (rays from inside every house at a third of its height; a ray that gets out into
 the street - open sky joined to the map edge - without crossing a wall means you can see into the house).
 
