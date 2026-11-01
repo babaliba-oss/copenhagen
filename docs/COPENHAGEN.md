@@ -35,6 +35,8 @@ python3 scripts/fill-greenery.py copenhagen
 node scripts/movia-stops.mjs <kk data dir>/wfs copenhagen     # bus stop names and poles from Movia's register (k101
                                                     # stoppesteder_movia), over the OSM stops city-build.mjs wrote
 python3 scripts/kk-shelters.py <kk data dir>/wfs copenhagen   # the city's bus shelters (KK WFS k101 afa_byudstyr, Læskærm)
+python3 scripts/kk-water-toilets.py <kk data dir>/wfs copenhagen   # drinking posts and public toilets (k101 dp_vandinstallationer_p,
+                                                    # toilet_puma_agg_tmf_kk); then furniture-ground and indoor-items again
 python3 scripts/parked-cars.py copenhagen <kk data dir>/wfs   # after the buildings and shelters: tested against the drawn 3D
                                                     # roofs; cars only on the city's kerbside parking (k101 p_pladser)
 node scripts/parked-lanes.mjs copenhagen            # drops parked cars in a traffic lane or overlapping
