@@ -32,7 +32,12 @@ python3 scripts/traffic-rules.py <kk data dir>/wfs copenhagen   # after traffic-
                                                     # junctions and speed limits (KK WFS k101 layers ensrettede_gader,
                                                     # trafiksignal_oversigt, trafikhastigheder, hastighedszoner as GeoJSON)
 python3 scripts/fill-greenery.py copenhagen
-python3 scripts/parked-cars.py copenhagen                    # after the buildings: tested against the drawn 3D roofs
+node scripts/movia-stops.mjs <kk data dir>/wfs copenhagen     # bus stop names and poles from Movia's register (k101
+                                                    # stoppesteder_movia), over the OSM stops city-build.mjs wrote
+python3 scripts/kk-shelters.py <kk data dir>/wfs copenhagen   # the city's bus shelters (KK WFS k101 afa_byudstyr, Læskærm)
+python3 scripts/parked-cars.py copenhagen <kk data dir>/wfs   # after the buildings and shelters: tested against the drawn 3D
+                                                    # roofs; cars only on the city's kerbside parking (k101 p_pladser)
+node scripts/parked-lanes.mjs copenhagen            # drops parked cars in a traffic lane or overlapping
 python3 scripts/boats.py copenhagen
 python3 scripts/havnebus.py copenhagen                   # harbour bus route (after boats.py)
 python3 scripts/rails.py Copenhagen.osm.pbf copenhagen
