@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
-"""Copenhagen's own traffic rules on the road graph: one-way streets and signalled junctions, from the City of Copenhagen's
-map data (Københavns Kommune, CC BY 4.0, wfs-kbhkort.kk.dk k101: ensrettede_gader, trafiksignal_oversigt; GeoJSON in EPSG:4326).
+"""Copenhagen's own traffic rules on the road graph: one-way streets, signalled junctions and speed limits, from the
+City of Copenhagen's map data (Københavns Kommune, CC BY 4.0, wfs-kbhkort.kk.dk k101: ensrettede_gader,
+trafiksignal_oversigt, trafikhastigheder, hastighedszoner; GeoJSON in EPSG:4326).
 
   python3 scripts/traffic-rules.py <wfs dir> copenhagen
 
@@ -13,6 +14,9 @@ traffic-counts.py). Then:
   The per-edge arrays already there (traffic, bikeTraffic) are kept in step.
 - Signals: every KK signalled junction with no road edge carrying a signal ending within 30 m gets one, at its point,
   on the edges ending within 27 m (the rule city-build.mjs uses for OSM's highway=traffic_signals).
+- Speed limits: each edge takes the limit of the KK speed line it runs along (same name within 25 m, else the nearest
+  within 10 m); edges inside a completed 30 km/h zone with no line take 30; unnamed links at junctions the higher limit
+  of the streets they join. Writes mobility.json `speedLimit` (km/h per road edge, 0 unknown), read by src/mobility.js.
 Run after traffic-counts.py. Rerunning changes nothing more.
 """
 import gzip, json, math, re, sys
@@ -211,5 +215,26 @@ for name, p in kk:
 covered_after = sum(1 for _, p in kk if any(edges[i]['signal'] >= 0 for i in ends_near(edges, p, 30)))
 print(f'signals: {covered_before}/{len(kk)} KK signalled junctions had a mapped signal; {added} added; {covered_after}/{len(kk)} now; off the network: {off}')
 
-mob['rulesSource'] = 'One-way streets, signalled junctions: Københavns Kommune (CC BY 4.0), wfs-kbhkort.kk.dk k101'
+# ================= speed limits =================
+speed = Lines(load('trafikhastigheder'), lambda p: p.get('hastighedsgraense'))
+zones = prep(unary_union([shape(f['geometry']) for f in load('hastighedszoner') if (f['properties'].get('planlagt_udfort') or '').strip() == 'Udført' and f['properties'].get('pr_hastighed') == 30]))
+VALID = {15, 20, 30, 40, 50, 60, 70, 80}
+limits = [0] * len(edges)
+for i, e in enumerate(edges):
+    m = [s[1] for s in match(speed, e['points'], nnames[i], 25, 10, .6) if s and s[1] in VALID]
+    if m: limits[i] = max(set(m), key=m.count)
+    elif zones.contains(Point(*along(e['points'], .5)[0])): limits[i] = 30
+at = defaultdict(list)
+for i, e in enumerate(edges): at[e['from']].append(i); at[e['to']].append(i)
+for _ in range(3):  # unnamed junction links: the higher limit of the streets they join
+    fill = {}
+    for i, e in enumerate(edges):
+        if limits[i] or names[i] or e['length'] > 60: continue
+        nb = [limits[j] for n in (e['from'], e['to']) for j in at[n] if j != i and limits[j]]
+        if nb: fill[i] = max(nb)
+    for i, v in fill.items(): limits[i] = v
+mob['speedLimit'] = limits
+mob['rulesSource'] = 'One-way streets, signalled junctions, speed limits: Københavns Kommune (CC BY 4.0), wfs-kbhkort.kk.dk k101'
+from collections import Counter
+print(f'speed limits: {sum(1 for v in limits if v)}/{len(edges)} edges', dict(sorted(Counter(limits).items())))
 open(f'{OUT}/mobility.json', 'w', encoding='utf8').write(json.dumps(mob, separators=(',', ':'), ensure_ascii=False))

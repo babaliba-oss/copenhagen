@@ -20,7 +20,7 @@ function settleShape(a){
   if(typeof v==='number')a[k]=.5;else if(MIXED.has(k)){a[k]=.5;a[k]=null;}else{a[k]={};a[k]=[];a[k]='';a[k]=null;}a[k]=v;}
  return a;
 }
-const ROAD_EDGE_FIELDS=['_gi','fits','walled','zones','bounds'],WALK_EDGE_FIELDS=['_gi','_room','_roomOf'],edgeFields=(e,keys)=>{for(const k of keys)if(!(k in e))e[k]=undefined;};
+const ROAD_EDGE_FIELDS=['_gi','fits','walled','zones','bounds','speed'],WALK_EDGE_FIELDS=['_gi','_room','_roomOf'],edgeFields=(e,keys)=>{for(const k of keys)if(!(k in e))e[k]=undefined;};
 const STANDING_PROBES=[3,6,10,15]; // metres ahead checked for a standing bus
 const NEXT_ONE=[null],NO_EDGES=[],REACH_P={x:0,z:0,heading:0}; // the next planned edge, passed to cornerSpeedLimit without a fresh array per car
 // Walker grid cells (mobility step): a 1024-slot hash of 1.5 m cells; collisions only cost a distance test.
@@ -42,6 +42,14 @@ export const trafficWeight=e=>e.traffic>MIN_TRAFFIC?e.traffic:MIN_TRAFFIC;
 export function attachTraffic(edges,data){
  const t=data?.traffic,b=data?.bikeTraffic;if(!Array.isArray(t)||t.length!==edges.length)return false;
  for(let i=0;i<edges.length;i++){edges[i].traffic=t[i];edges[i].bikeTraffic=b?.[i]??QUIET_TRAFFIC;}
+ return true;
+}
+// Speed limits (mobility.json speedLimit, scripts/traffic-rules.py: Københavns Kommune's trafikhastigheder, km/h per road edge,
+// 0 unknown): edge.speed, which drivers keep their own pace against (traffic-driving.js edgeCruise: a 30 km/h street has them at
+// 3/5 of their pace on a 50 one). Maps without limits keep everyone at their own pace.
+export function attachSpeedLimits(edges,data){
+ const v=data?.speedLimit;if(!Array.isArray(v)||v.length!==edges.length)return false;
+ for(let i=0;i<edges.length;i++)edges[i].speed=v[i]||undefined;
  return true;
 }
 // One of `list` drawn with chance weight(e) (one random() as the even pick: seeded runs keep their sequence length).
@@ -123,7 +131,7 @@ export class Mobility {
   if(world?.laneWalls)this.walledLanes=markWalledLanes(this.roads.edges,world.laneWalls); // lanes through a wall the model draws on the road (road-walls.json) are routed round
   // What step() and spawn() work out per edge later (fits, conflict zones, walkers' room...) has its field from the start: each first
   // one added gave that edge a new shape mid-game, and the optimised code reading edges was thrown out ('wrong map').
-  this.weighted=attachTraffic(this.roads.edges,data);
+  this.weighted=attachTraffic(this.roads.edges,data);attachSpeedLimits(this.roads.edges,data);
   for(const e of this.roads.edges)edgeFields(e,ROAD_EDGE_FIELDS);for(const e of this.walks.edges)edgeFields(e,WALK_EDGE_FIELDS);
   this.stationEdges=this.roads.edges.filter(e=>e.points.some(([x,z])=>inStationTrafficArea({x,z})));
   // Main-road pool: extra cars that live only on a busy corridor (e.g. Olympia terminal → Kauppatori), both directions.
