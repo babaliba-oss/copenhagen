@@ -97,6 +97,7 @@ python3 scripts/kk-shelters.py <kk data dir>/wfs copenhagen && python3 scripts/k
 python3 scripts/kk-signs.py <kk data dir>/wfs copenhagen   # the city's road signs (k101 skilte_total, below)
 python3 scripts/parked-cars.py copenhagen <kk data dir>/wfs && node scripts/parked-lanes.mjs copenhagen
 python3 scripts/kk-roadworks.py <kk data dir>/wfs copenhagen   # the current roadworks (k101 trafikmelding, below): rebuild for fresh dates
+python3 scripts/kk-playgrounds.py <kk data dir>/wfs copenhagen   # play equipment (k101 dp_lege_aktivitetselementer_p, below)
 python3 scripts/surface-fill.py copenhagen && python3 scripts/kk-surfaces.py <kk data dir>/wfs copenhagen
 python3 scripts/kk-markings.py <kk data dir>/wfs copenhagen
 node scripts/furniture-ground.mjs copenhagen && node scripts/indoor-items.mjs copenhagen && node scripts/kerb-walks.mjs copenhagen
@@ -146,6 +147,17 @@ centre line (so no lane, job, race or saga route is ever closed), on a parked ca
 carries the works' `since` and `until` dates and main.js shows it from the day before the first to the day after the
 last (`datedNow`), so a build goes stale only as works end and new ones start: rebuild for fresh dates. parked-cars.py
 ignores them (the cars come first); then furniture-ground and indoor-items.
+
+### Playgrounds (scripts/kk-playgrounds.py)
+
+The park register's play and activity items (WFS `k101:dp_lege_aktivitetselementer_p`, 1,223 points) and the city's
+playgrounds (`k101:legeplads`, 73) put play equipment where the register has it: our own low-poly models in
+mapped-furniture.js (`solidParts`), each kind one solid instanced set pooled near the player: a swing's A-frame with two
+seats, a slide, a climbing frame, a spring rider, a timber sandbox edge, and a small football goal for the register's
+goals. The register says only "play equipment", so the kind comes from a hash of the item's id (a seesaw, 'Vippe', is a
+spring rider). An item stands on park or playground ground (a mapped park or lawn, or within 60 m of a playground) clear
+of roads, paths, houses, water, tree trunks and furniture, turned or moved up to 3 m if need be (2026-11: 668 placed,
+104 with no room, 30 off park ground); fitness and parkour equipment (196) is not drawn.
 
 ### Trees from the current register (scripts/kk-trees.py)
 

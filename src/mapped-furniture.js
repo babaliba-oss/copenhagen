@@ -29,7 +29,8 @@ export const POSTS={
  lantern:{height:3.1,radius:.07,strength:1.2}, // 1760 oil lantern on a wooden post
 };
 export const KNOCK_SOLID=new Set(['bollard','bench','bike-rack','hydrant','junction-box','drinking-post']);
-export const SOLIDS={bollard:[.22,.22,.95],'junction-box':[.85,.42,1.3],bench:[1.8,.6,.85],'bike-rack':[2.4,.55,.4],hydrant:[.36,.36,.8],shelter:[3.6,1.5,2.5],'hotdog-stand':[2.55,1.45,4.2],'drinking-post':[.36,.36,1.05],toilet:[2.4,1.8,2.7]}; // width, depth, height
+export const SOLIDS={bollard:[.22,.22,.95],'junction-box':[.85,.42,1.3],bench:[1.8,.6,.85],'bike-rack':[2.4,.55,.4],hydrant:[.36,.36,.8],shelter:[3.6,1.5,2.5],'hotdog-stand':[2.55,1.45,4.2],'drinking-post':[.36,.36,1.05],toilet:[2.4,1.8,2.7],
+ swing:[3.4,1.9,2.3],slide:[3.8,1.2,2.2],'climbing-frame':[2.3,2.3,2.2],'spring-rider':[.9,.5,.85],sandbox:[3,3,.3],goal:[3.1,1.2,1.25]}; // width, depth, height; the playground items: scripts/kk-playgrounds.py
 // Furniture whose photo position fell just inside the mapped water (benches and bins along Christianshavn's canal
 // quays, posts at the quay edge): no paving is drawn there (surface-tiles.js drops it over the water, bridge decks
 // aside), so it hung at quay height over the canal. Each is moved to the nearest dry ground within `reach` and `inland`
@@ -100,6 +101,9 @@ function paint(g,hex){
 const cyl=(r0,r1,h,y,hex,seg=7)=>paint(new THREE.CylinderGeometry(r0,r1,h,seg).translate(0,y,0),hex);
 const box=(w,h,d,x,y,z,hex)=>paint(new THREE.BoxGeometry(w,h,d).translate(x,y,z),hex);
 const METAL='#7d8689',DARK='#1d2629',WOOD='#5c4a3a';
+// A bar from a to b ([x,y,z]) of half width r (a 4-sided prism), and a flat plank of width w (across, along z) from a to b.
+function leg(a,b,r,hex){const A=new THREE.Vector3(...a),B=new THREE.Vector3(...b),d=B.clone().sub(A),g=new THREE.CylinderGeometry(r,r,d.length(),4);g.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,1,0),d.clone().normalize()));g.translate((A.x+B.x)/2,(A.y+B.y)/2,(A.z+B.z)/2);return paint(g,hex);}
+function slope(a,b,w,hex,t=.05){const A=new THREE.Vector3(...a),B=new THREE.Vector3(...b),d=B.clone().sub(A),g=new THREE.BoxGeometry(d.length(),t,w);const q=new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(1,0,0),d.clone().normalize());g.applyQuaternion(q);g.translate((A.x+B.x)/2,(A.y+B.y)/2,(A.z+B.z)/2);return paint(g,hex);}
 
 // Post templates in local space: base at the origin, facing +Z (lamp arms reach towards +Z, over the road).
 function postParts(kind){
@@ -315,6 +319,22 @@ export function createMappedFurniture(layer,{rangeScale=1,player=()=>null,mobili
   // Stop shelter, open towards the road (+Z): steel frame, roof, back and side glass, a bench and an advert panel at one end.
   shelter:([w,d,h])=>[...[-w/2+.05,w/2-.05].flatMap(x=>[box(.08,h,.08,x,h/2,-d/2+.06,'#3e4a4f'),box(.08,h,.08,x,h/2,d/2-.12,'#3e4a4f')]),box(w+.2,.12,d+.25,0,h+.06,0,'#4a565b'),
    box(w-.1,h-.35,.03,0,h/2+.1,-d/2+.06,'#a9c4cb'),box(.03,h-.35,d*.55,-w/2+.05,h/2+.1,-d*.2,'#a9c4cb'),box(.05,1.75,d*.62,w/2-.05,1.15,-d*.18,'#d8d3c4'),box(1.5,.06,.38,-.3,.47,-d/2+.3,'#5c4a3a'),box(.06,.45,.3,-.95,.23,-d/2+.3,'#2d3133'),box(.06,.45,.3,.35,.23,-d/2+.3,'#2d3133')],
+  // Play equipment on the city's playgrounds (scripts/kk-playgrounds.py), our own low-poly shapes: a swing's A-frame with
+  // two seats, a slide (platform on posts, ladder, chute down along +X), a climbing frame of bars, a spring rider, a timber
+  // sandbox edge round the sand, a small football goal (open towards +Z).
+  swing:([w,d,h])=>[...[-1,1].flatMap(sx=>[-1,1].map(sz=>leg([sx*(w/2-.1),0,sz*d*.42],[sx*(w/2-.1),h,0],.05,'#3f6f5a'))),box(w,.09,.09,0,h,0,'#3f6f5a'),
+   ...[-.6,.6].flatMap(x=>[box(.45,.04,.18,x,.45,0,'#c8463a'),box(.015,h-.5,.015,x-.2,(h+.45)/2,0,'#8a9296'),box(.015,h-.5,.015,x+.2,(h+.45)/2,0,'#8a9296')])],
+  slide:([w,d,h])=>{const px=-w/2+.55,top=1.35;return [...[-1,1].flatMap(sx=>[-1,1].map(sz=>box(.08,top+.6,.08,px+sx*.45,(top+.6)/2,sz*.45,'#8a6a46'))),box(1,.07,1,px,top,0,'#8a6a46'),
+   box(.94,.5,.04,px,top+.3,-.47,'#e2b53a'),...[.3,.6,.9,1.2].map(y=>box(.06,.04,.6,px-.62,y,0,'#8a6a46')),leg([px-.62,0,-.3],[px-.5,top,-.3],.03,'#8a6a46'),leg([px-.62,0,.3],[px-.5,top,.3],.03,'#8a6a46'),
+   slope([px+.5,top,0],[w/2,.25,0],.55,'#c8463a'),slope([px+.5,top+.12,-.29],[w/2,.37,-.29],.05,'#c8463a'),slope([px+.5,top+.12,.29],[w/2,.37,.29],.05,'#c8463a')];},
+  'climbing-frame':([w,d,h])=>{const b=(x0,y0,z0,x1,y1,z1)=>leg([x0,y0,z0],[x1,y1,z1],.035,'#4f7fa8'),e=w/2-.05,out=[];
+   for(const [x,z] of [[-e,-e],[e,-e],[e,e],[-e,e]])out.push(b(x,0,z,x,h,z));
+   for(const y of [h*.33,h*.66,h])out.push(b(-e,y,-e,e,y,-e),b(-e,y,e,e,y,e),b(-e,y,-e,-e,y,e),b(e,y,-e,e,y,e));
+   out.push(box(w*.9,.05,w*.9,0,h*.66,0,'#e2b53a'),box(.04,.6,w*.9,-e,h*.33+.3,0,'#c8463a'));return out;},
+  'spring-rider':([w,d,h])=>[cyl(.12,.12,.06,.03,'#5a5f62',8),cyl(.07,.07,.35,.22,'#d9a21f',6),box(.6,.24,.22,0,.52,0,'#c8463a'),box(.16,.22,.2,.26,.72,0,'#c8463a'),box(.04,.04,.34,.2,.78,0,'#3a3f42')],
+  sandbox:([w,d,h])=>[box(w,h,.14,0,h/2,-d/2+.07,'#8a6a46'),box(w,h,.14,0,h/2,d/2-.07,'#8a6a46'),box(.14,h,d-.28,-w/2+.07,h/2,0,'#8a6a46'),box(.14,h,d-.28,w/2-.07,h/2,0,'#8a6a46'),box(w-.28,.04,d-.28,0,h*.55,0,'#d8c48e')],
+  goal:([w,d,h])=>[box(.08,h,.08,-w/2+.04,h/2,d/2-.04,'#f2f2ee'),box(.08,h,.08,w/2-.04,h/2,d/2-.04,'#f2f2ee'),box(w,.08,.08,0,h-.04,d/2-.04,'#f2f2ee'),box(w,.05,.05,0,.03,-d/2+.03,'#c9ccc8'),
+   slope([-w/2+.04,h,d/2-.04],[-w/2+.04,.03,-d/2+.03],.04,'#c9ccc8'),slope([w/2-.04,h,d/2-.04],[w/2-.04,.03,-d/2+.03],.04,'#c9ccc8'),paint(new THREE.BoxGeometry(w-.12,.01,Math.hypot(h-.03,d-.2)).rotateX(Math.atan2(-(h-.03),d-.2)).translate(0,(h+.03)/2,0),'#d9dbd6')],
   // Hot-dog stand (street-food.js) where its model did not load: a white cart under a striped awning.
   'hotdog-stand':([w,d,h])=>[box(w,1,d,0,.5,0,'#e8e4da'),box(w+.2,.08,d+.3,0,2.3,0,'#b8322a'),...[-w/2+.05,w/2-.05].map(x=>box(.05,1.3,.05,x,1.65,-d/2+.1,'#8a8f92'))]};
  // Bicycles standing in the racks (Copenhagen racks are rarely empty): a low-poly bike, two per occupied rack.
