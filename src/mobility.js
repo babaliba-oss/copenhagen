@@ -33,6 +33,23 @@ export const FIT_WARM={r:480,move:40,samples:120}; // samples: vehicleFitsRoad t
 // every step while it lasted (walkers trailing a fast car). An agent whose trials are cut short goes on with the rest of its 80 the next
 // step. Not while the map fills (the first 3 s, reset()).
 export const SPAWN_WORK={trials:160,fitSamples:240}; // fitSamples: edges' fit worked out a step for spawning's candidates (after a jump: the rest wait)
+// Measured traffic (mobility.json traffic/bikeTraffic, scripts/traffic-counts.py: Copenhagen's counts, vehicles a day / 10000 per
+// road edge): cars appear on an edge in proportion to its length times its count and turn at junctions in proportion to the
+// counts ahead, so H.C. Andersens Boulevard is busy and the side streets quiet; the number of cars is the same. Maps without
+// counts keep the even spread (one edge as likely as another).
+export const QUIET_TRAFFIC=.15,MIN_TRAFFIC=.05;
+export const trafficWeight=e=>e.traffic>MIN_TRAFFIC?e.traffic:MIN_TRAFFIC;
+export function attachTraffic(edges,data){
+ const t=data?.traffic,b=data?.bikeTraffic;if(!Array.isArray(t)||t.length!==edges.length)return false;
+ for(let i=0;i<edges.length;i++){edges[i].traffic=t[i];edges[i].bikeTraffic=b?.[i]??QUIET_TRAFFIC;}
+ return true;
+}
+// One of `list` drawn with chance weight(e) (one random() as the even pick: seeded runs keep their sequence length).
+export function weightedPick(list,weight,random){
+ let total=0;for(let i=0;i<list.length;i++)total+=weight(list[i]);
+ let r=random()*total;for(let i=0;i<list.length;i++){r-=weight(list[i]);if(r<0)return list[i];}
+ return list[list.length-1];
+}
 export const nearStation=p=>hypot(p.x+620,p.z+45)<430;
 export const inStationTrafficArea=p=>p.x>-885&&p.x<-440&&p.z>-145&&p.z<55;
 export function prepareGraph(graph){
@@ -106,6 +123,7 @@ export class Mobility {
   if(world?.laneWalls)this.walledLanes=markWalledLanes(this.roads.edges,world.laneWalls); // lanes through a wall the model draws on the road (road-walls.json) are routed round
   // What step() and spawn() work out per edge later (fits, conflict zones, walkers' room...) has its field from the start: each first
   // one added gave that edge a new shape mid-game, and the optimised code reading edges was thrown out ('wrong map').
+  this.weighted=attachTraffic(this.roads.edges,data);
   for(const e of this.roads.edges)edgeFields(e,ROAD_EDGE_FIELDS);for(const e of this.walks.edges)edgeFields(e,WALK_EDGE_FIELDS);
   this.stationEdges=this.roads.edges.filter(e=>e.points.some(([x,z])=>inStationTrafficArea({x,z})));
   // Main-road pool: extra cars that live only on a busy corridor (e.g. Olympia terminal → Kauppatori), both directions.
@@ -130,6 +148,7 @@ export class Mobility {
   this.corridorEdges=this.corridor?this.roads.edges.filter(e=>e.length>10&&this.corridor(...e.points[Math.floor(e.points.length/2)])):[];
   this.corridorIds=new Set(this.corridorEdges.map(e=>e.id));
   if(this.trams)this.attachTrams(this.trams);if(this.buses)this.attachBuses(this.buses);
+  if(this.weighted)for(let i=roads;i<this.roads.edges.length;i++){const e=this.roads.edges[i];e.traffic??=QUIET_TRAFFIC;e.bikeTraffic??=QUIET_TRAFFIC;}
   for(let i=roads;i<this.roads.edges.length;i++)edgeFields(this.roads.edges[i],ROAD_EDGE_FIELDS);for(let i=walks;i<this.walks.edges.length;i++)edgeFields(this.walks.edges[i],WALK_EDGE_FIELDS);
   return {roads:this.roads.edges.slice(roads),walks:this.walks.edges.slice(walks),signalOffset:offset};
  }
@@ -317,6 +336,12 @@ export class Mobility {
   let l=this._spawnCache.lists.get(key);if(!l)this._spawnCache.lists.set(key,l=compute());return l;
  }
  nearCorridor(player){return this.corridorEdges.some(e=>{const p=e.points[Math.floor(e.points.length/2)];return hypot(p[0]-player.x,p[1]-player.z)<420;});}
+ // Measured traffic: an edge by its length times its count, from cumulative sums kept with the (per-frame) candidate list.
+ spawnPick(list){
+  let c=list._cumulative;if(!c){c=list._cumulative=new Float64Array(list.length);let t=0;for(let i=0;i<list.length;i++)c[i]=t+=list[i].length*trafficWeight(list[i]);}
+  const r=this.random()*c[c.length-1];let lo=0,hi=c.length-1;while(lo<hi){const m=(lo+hi)>>1;if(c[m]>r)hi=m;else lo=m+1;}
+  return list[lo];
+ }
  spawn(a,player){
   if(a.playerTaken){a.edge=null;a.speed=0;return;}
   a.knocked=undefined;a.damage=undefined; // not delete: a deleted property turns the agent into a slow dictionary object (and deoptimises step)
@@ -327,7 +352,7 @@ export class Mobility {
   const nearby=this.spawnCandidates(a,player,graph,()=>(a.stationOnly?this.stationEdges:a.corridorOnly?this.corridorEdges:this.edgesNear(graph,player,a.walking?this.walkSpawn:320)).filter(e=>{const p=e.points[Math.floor(e.points.length/2)],d=hypot(p[0]-player.x,p[1]-player.z);return (!a.walking||!e.crossing)&&d<(a.walking?200:a.corridorOnly?520:320)&&e.length>(a.walking?3:10)&&!(!a.walking&&(this.obstructed?.has(e)||this.trap(e,2,this.spawnWork!==Infinity)!==false));}));
   let occupancy=null,crowd=null; // walkers per edge (and per WALK_CROWD.r cell), counted once per spawn rather than once per trial
   for(let trial=a.spawnTrials;trial<80&&nearby.length;trial++){if(this.spawnWork--<=0){a.spawnTrials=trial;a.edge=null;a.speed=0;return;} // out of this step's placement work: on from here next step
-   a.edge=nearby[Math.floor(this.random()*nearby.length)];a.s=this.random()*a.edge.length;a.plan=[];a.prevDir=undefined;a.ox=undefined;a.gapBy=null;a.gapHeld=0;
+   a.edge=this.weighted&&!a.walking?this.spawnPick(nearby):nearby[Math.floor(this.random()*nearby.length)];a.s=this.random()*a.edge.length;a.plan=[];a.prevDir=undefined;a.ox=undefined;a.gapBy=null;a.gapHeld=0;
    const p=this.position(a);
    if(a.stationOnly&&!inStationTrafficArea(p))continue;
    if(!a.walking&&(this.cars.some(b=>b!==a&&b.edge&&trafficFootprintsOverlap(p,b))||this.hitsBody(carBox(p,1))||this.inConflict(a.edge,a.s)))continue;
@@ -398,7 +423,7 @@ export class Mobility {
   if(good.length)options=good;else{const back=this.roads.outgoing[edge.to].find(e=>e.to===edge.from);if(back&&!this.trap(back,1))options=[back];}
   // Dead end: a U-turn where the reverse direction exists.
   if(!options.length)options=this.roads.outgoing[edge.to];
-  return options.length?options[Math.floor(this.random()*options.length)]:null;
+  return options.length?this.weighted?weightedPick(options,trafficWeight,this.random):options[Math.floor(this.random()*options.length)]:null;
  }
  nextEdge(a){
   if(!a.walking)return this.pickNext(a.edge);

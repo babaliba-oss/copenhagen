@@ -1,4 +1,4 @@
-import {routePoint,prepareGraph} from '../mobility.js';
+import {routePoint,prepareGraph,weightedPick} from '../mobility.js';
 import {pointInPolygon,inWaterPolygons} from '../geo.js';
 import {raisedDecks,groundAt} from '../terrain.js';
 const hypot=(x,z)=>Math.sqrt(x*x+z*z); // not Math.hypot: in optimised code it allocated ~80 bytes a call (its arguments boxed)
@@ -8,6 +8,7 @@ const hypot=(x,z)=>Math.sqrt(x*x+z*z); // not Math.hypot: in optimised code it a
 // street graph near the player and is re-spawned ahead when done or left behind. Rendered with the shared
 // cyclist renderer (src/cyclists.js), which only needs `riders`.
 const RANGE=420;
+const BUSY_BIKES=.5; // 5000 riders a day (bikeTraffic is a day's count / 10000): a street this busy or busier is always taken when drawn
 // A rider on a deck link: on the deck from end to end, its surface; just off its ends, still inside the outline where it is
 // lower than a kerb, its foot; anywhere else the ground (a footway beneath it), NaN. Tabulated along the link every STEP m
 // (heightAt costs ~8 us a call; the riding line is fixed) and read by linear interpolation.
@@ -69,12 +70,13 @@ export class CityCyclists{
   const E=this.roads.edges;
   for(let tries=0;tries<40;tries++){
    const k=Math.floor(this.random()*(E.length+this.linkList.length)),e=k<E.length?E[k]:this.linkList[k-E.length];if(e.length<15||e.crossing)continue;
+   if(e.bikeTraffic!==undefined&&this.random()>e.bikeTraffic/BUSY_BIKES)continue; // measured cyclists (mobility.json bikeTraffic): a quiet street is picked less often
    const m=e.points[Math.floor(e.points.length/2)],d=hypot(m[0]-player.x,m[1]-player.z);if(d<40||d>340)continue;
    if(d<160&&player.heading!==undefined){const fx=-Math.sin(player.heading),fz=-Math.cos(player.heading);if(((m[0]-player.x)*fx+(m[1]-player.z)*fz)/d>.2)continue;} // not popping up ahead
    if(this.visibilityTest&&d<260&&tries<30&&this.visibilityTest({x:m[0],z:m[1]}))continue; // nor anywhere else the camera looks
    if(this.offset(e)===null)continue;
    const route=[e];let total=e.length,cur=e;
-   while(total<700){const next=this.onward(cur,(this.roads.outgoing[cur.to]||[]).map(i=>typeof i==='number'?E[i]:i).filter(n=>n.to!==cur.from&&n.length>4&&!n.crossing&&this.offset(n)!==null));if(!next.length)break;cur=next[Math.floor(this.random()*next.length)];route.push(cur);total+=cur.length;}
+   while(total<700){const next=this.onward(cur,(this.roads.outgoing[cur.to]||[]).map(i=>typeof i==='number'?E[i]:i).filter(n=>n.to!==cur.from&&n.length>4&&!n.crossing&&this.offset(n)!==null));if(!next.length)break;cur=this.pick(next);route.push(cur);total+=cur.length;}
    r.route=route;r.leg=0;r.s=this.random()*e.length*.5;r.speed=r.cruise*.8;return true;
   }
   r.route=null;return false;
@@ -82,7 +84,9 @@ export class CityCyclists{
  // visibilityTest: set by main.js (the camera frustum, as for the traffic); without one, anything within 160 m counts as seen.
  visible(r,player){const d=hypot(r.x-player.x,r.z-player.z);return d<RANGE&&(this.visibilityTest?d<12||this.visibilityTest(r):d<160);}
  extend(r){const E=this.roads.edges,cur=r.route.at(-1),out=(this.roads.outgoing[cur.to]||[]).map(i=>typeof i==='number'?E[i]:i).filter(n=>n.length>4&&!n.crossing),on=out.filter(n=>n.to!==cur.from),usual=on.filter(n=>this.offset(n)!==null);
-  const list=this.onward(cur,usual.length?usual:on.length?on:out);if(!list.length)return false;r.route.push(list[Math.floor(this.random()*list.length)]);return true;}
+  const list=this.onward(cur,usual.length?usual:on.length?on:out);if(!list.length)return false;r.route.push(this.pick(list));return true;}
+ // The next street: by the cyclists counted on it where counts are known (cycle-only deck links count as busy), else any.
+ pick(list){return list.every(e=>e.bikeTraffic===undefined)?list[Math.floor(this.random()*list.length)]:weightedPick(list,e=>e.bikeTraffic??BUSY_BIKES,this.random);}
  snapshot(){return this.riders.filter(r=>!r.playerTaken&&r.route).map(({id,x,z,heading,speed,deckY})=>({id,x,z,heading,speed,deckY}));}
  step(dt,player){
   if(!player)return;

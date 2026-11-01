@@ -26,6 +26,8 @@ rm -rf data/raw/cities/copenhagen/kk-street-backup
 python3 scripts/kk-street.py <kk data dir> copenhagen                # lamps, wires, trees, racks, bollards
 python3 scripts/add-starts.py copenhagen
 python3 scripts/prune-mobility.py copenhagen        # keep the main road/footpath network (no one stuck on islands)
+python3 scripts/traffic-counts.py <kk data dir>/trafiktaelling copenhagen   # after prune-mobility: the city's traffic counts
+                                                    # (Trafiktal) as a weight per road edge, so busy streets get the cars
 python3 scripts/fill-greenery.py copenhagen
 python3 scripts/parked-cars.py copenhagen                    # after the buildings: tested against the drawn 3D roofs
 python3 scripts/boats.py copenhagen
