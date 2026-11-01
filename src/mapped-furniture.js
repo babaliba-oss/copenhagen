@@ -76,6 +76,9 @@ export function placeBenches(items,{houses,wheels,walk}){
 // touch, side by side they stand one behind the other.
 export const BENCH_GAP=.6;
 export const benchesOverlap=(a,b,w=SOLIDS.bench[0])=>Math.hypot(a.x-b.x,a.z-b.z)<w+BENCH_GAP;
+// Dated furniture (the city's current roadworks, scripts/kk-roadworks.py: since/until as YYYY-MM-DD) stands from a day
+// before its first day to the end of the day after its last; undated furniture always. now: ms since the epoch.
+export function datedNow(it,now=Date.now()){const day=864e5;return !(it.until&&now>Date.parse(it.until)+2*day)&&!(it.since&&now<Date.parse(it.since)-day);}
 // A stable id per object: Mapillary feature id, else its source and place in the file.
 const itemId=(it,i)=>`mapped-${it.k}-${it.mly?.[0]??`${it.src||'item'}-${i}`}`;
 export const KNOCKABLE={bin:{radius:.26},barrier:{radius:.35},cone:{radius:.2}};

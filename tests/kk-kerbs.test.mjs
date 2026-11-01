@@ -41,7 +41,8 @@ test('the surface chunks draw the strips (6.8 cm) and the cycle tracks out to th
 });
 
 test('no street furniture or painted bicycle left on the wider carriageway',()=>{
- const items=read('furniture.json').items.filter(i=>i.k!=='wire-lamp'&&stripIndex.at(i.x,i.z));
+ // (the roadworks barriers, scripts/kk-roadworks.py, stand in the parking lane at the kerb on purpose)
+ const items=read('furniture.json').items.filter(i=>i.k!=='wire-lamp'&&i.src!=='kk-roadworks'&&stripIndex.at(i.x,i.z));
  assert.ok(items.length<40,`${items.length} on the strips: ${JSON.stringify(items.slice(0,5).map(i=>[i.k,i.x,i.z]))}`);
  const marks=read('cycle-marks.json').marks.filter(([x,z])=>stripIndex.at(x,z));
  assert.equal(marks.length,0);

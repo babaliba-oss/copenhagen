@@ -140,7 +140,7 @@ import {breakableSigns} from './breakable-signs.js';
 import {createParkedMicromobility} from './parked-micromobility.js';
 import {Finale} from './finale.js';
 import {createRoadblock} from './roadblock.js';
-import {createMappedFurniture,bringAshore,placeBenches} from './mapped-furniture.js';
+import {createMappedFurniture,bringAshore,placeBenches,datedNow} from './mapped-furniture.js';
 import {createCycleMarks} from './cycle-marks.js';
 import {createRadio,storedStation,storeStation} from './copenhagen/radio.js';
 import {createPlace} from './place-scene.js';
@@ -1629,7 +1629,8 @@ async function boot(){
     // of a lane only counts off the pavement (a post at the kerb); traffic islands keep their lights and signs.
     const onRoad=(x,z)=>lanes.at(x,z)&&!islands.at(x,z);
     const inLane=(x,z)=>onRoad(x,z)||[[.6,0],[-.6,0],[0,.6],[0,-.6]].some(([a,b])=>lanes.at(x+a,z+b))&&!walk.at(x,z)&&!islands.at(x,z);mapped.poleAllowed=(x,z)=>!inLane(x,z);
-    mapped.items=mapped.items.filter(it=>it.k==='wire-lamp'||!onRoad(it.x,it.z));/* wire lamps hang 7 m over the carriageway, where the register places them: dropped with the rest, 8,400 of 10,200 went and the few over the pavements hung from one wire */console.info(`Street furniture: ${before-mapped.items.length} items in traffic lanes dropped`);
+    {const now=Date.now();mapped.items=mapped.items.filter(it=>datedNow(it,now));} // dated items (the city's current roadworks, scripts/kk-roadworks.py): only while they run
+    mapped.items=mapped.items.filter(it=>it.k==='wire-lamp'||it.src==='kk-roadworks'||!onRoad(it.x,it.z)); /* roadworks barriers stand in the parking lane at the kerb, never in a traffic lane *//* wire lamps hang 7 m over the carriageway, where the register places them: dropped with the rest, 8,400 of 10,200 went and the few over the pavements hung from one wire */console.info(`Street furniture: ${before-mapped.items.length} items in traffic lanes dropped`);
     {const r=placeBenches(mapped.items,{houses:new SpatialIndex(data.buildings),wheels:new SpatialIndex(data.roads.filter(r=>!/Koroke/.test(r.kind))),walk});mapped.items=r.items; // benches along the kerb, facing the street; one bench per spot (mapped-furniture.js)
      console.info(`Street furniture: benches set along the kerb ${r.turned} (moved off the carriageway ${r.moved}, dropped ${r.dropped}), park benches turned to their footway ${r.parked}, doubles dropped ${r.doubled}`);}
     {const b=mapped.items.length;mapped.items=mapped.items.filter(it=>!([[0,0],[2.5,0],[-2.5,0],[0,2.5],[0,-2.5]].every(([a,b])=>inWaterPolygons(data.water,it.x+a,it.z+b))&&!lanes.at(it.x,it.z)&&!walk.at(it.x,it.z))); /* well out on the water, not the quay-edge lamps and bollards */console.info(`Street furniture: ${b-mapped.items.length} items standing in the water dropped`);} // signs and poles mapped on the water (bridge ends, survey drift)

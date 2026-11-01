@@ -96,6 +96,7 @@ node scripts/road-walls.mjs copenhagen
 python3 scripts/kk-shelters.py <kk data dir>/wfs copenhagen && python3 scripts/kk-water-toilets.py <kk data dir>/wfs copenhagen
 python3 scripts/kk-signs.py <kk data dir>/wfs copenhagen   # the city's road signs (k101 skilte_total, below)
 python3 scripts/parked-cars.py copenhagen <kk data dir>/wfs && node scripts/parked-lanes.mjs copenhagen
+python3 scripts/kk-roadworks.py <kk data dir>/wfs copenhagen   # the current roadworks (k101 trafikmelding, below): rebuild for fresh dates
 python3 scripts/surface-fill.py copenhagen && python3 scripts/kk-surfaces.py <kk data dir>/wfs copenhagen
 python3 scripts/kk-markings.py <kk data dir>/wfs copenhagen
 node scripts/furniture-ground.mjs copenhagen && node scripts/indoor-items.mjs copenhagen && node scripts/kerb-walks.mjs copenhagen
@@ -133,6 +134,18 @@ at 6.8 cm, the tracks at 5.2 cm and the paved-over track at 5.3 cm, all dropped 
 width against the kerbs -1.7 m -> +0.2 m), 273,000 m² of cycle track from the kerb out (58,000 m² of the old one paved
 over), 5,200 furniture items moved out of the road and 630 dropped; parked cars 3,025 -> 13,235, the city's road-marking
 paint kept 67,500 -> 74,500 m².
+
+### Current roadworks (scripts/kk-roadworks.py)
+
+The city's traffic messages (WFS `k101:trafikmelding`, 48 lines with start and end times; CC BY 4.0) list its roadworks.
+Each that has not ended by the build date (`--date`, default today; 2026-11-01: 23 of 41 roadworks, demonstrations left
+out) gets a row of the knockable red and white barriers (`barrier`, mapped-furniture.js) every 1.3 m in the parking lane
+just inside the kerb on the line's side of the road, turned along it, and a cone past each end of a row; a stretch over
+60 m long gets a 40 m site every 100 m (892 barriers, 70 cones). A barrier is left out within 1.7 m of a traffic lane's
+centre line (so no lane, job, race or saga route is ever closed), on a parked car, in a house or the water. Every item
+carries the works' `since` and `until` dates and main.js shows it from the day before the first to the day after the
+last (`datedNow`), so a build goes stale only as works end and new ones start: rebuild for fresh dates. parked-cars.py
+ignores them (the cars come first); then furniture-ground and indoor-items.
 
 ### Trees from the current register (scripts/kk-trees.py)
 

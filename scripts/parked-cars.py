@@ -145,7 +145,7 @@ else:
     stand = defaultdict(list)
     if os.path.exists(f'{OUT}/furniture.json'):
         for it in json.load(open(f'{OUT}/furniture.json', encoding='utf8'))['items']:
-            if it['k'] != 'wire-lamp': stand[math.floor(it['x'] / 10), math.floor(it['z'] / 10)].append((it['x'], it['z'], .3 if it['k'] != 'shelter' else 2.0))
+            if it['k'] != 'wire-lamp' and it.get('src') != 'kk-roadworks': stand[math.floor(it['x'] / 10), math.floor(it['z'] / 10)].append((it['x'], it['z'], .3 if it['k'] != 'shelter' else 2.0))
     def on_furniture(x, z, ux, uz):
         for i in (-1, 0, 1):
             for j in (-1, 0, 1):
