@@ -178,7 +178,7 @@ city['trees'] = kt + osm
 open(f'{OUT}/city.pack', 'wb').write(gzip.compress(json.dumps(city, separators=(',', ':')).encode(), 9))
 
 # credit
-line = 'Street trees, street lights, bike racks and bollards: City of Copenhagen open data (CC BY 4.0).'
+line = 'Street lights, bike racks and bollards: City of Copenhagen open data (CC BY 4.0).'  # the trees: scripts/kk-trees.py (the current register)
 if line not in entry.get('attribution', ''): entry['attribution'] = (entry.get('attribution', '') + ' ' + line).strip()
 json.dump(reg, open('public/cities/index.json', 'w'), indent=1, ensure_ascii=False)
 print('furniture', counts, 'wire lamps', nw, 'trees', len(kt), 'register +', len(osm), 'osm')

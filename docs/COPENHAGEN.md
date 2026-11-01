@@ -24,6 +24,8 @@ node scripts/surface-dissolve.mjs copenhagen      # street surfaces layered by r
 node scripts/mapillary-features.mjs copenhagen                       # needs MAPILLARY_TOKEN in .env.local
 rm -rf data/raw/cities/copenhagen/kk-street-backup
 python3 scripts/kk-street.py <kk data dir> copenhagen                # lamps, wires, trees, racks, bollards
+python3 scripts/kk-trees.py <kk data dir>/wfs copenhagen            # the current tree register (k101 trae_basis) in place of the
+                                                    # street-tree export's trees; then fill-greenery and, once built, kk-kerbs onwards
 python3 scripts/add-starts.py copenhagen
 python3 scripts/prune-mobility.py copenhagen        # keep the main road/footpath network (no one stuck on islands)
 python3 scripts/traffic-counts.py <kk data dir>/trafiktaelling copenhagen   # after prune-mobility: the city's traffic counts
@@ -131,6 +133,19 @@ at 6.8 cm, the tracks at 5.2 cm and the paved-over track at 5.3 cm, all dropped 
 width against the kerbs -1.7 m -> +0.2 m), 273,000 m² of cycle track from the kerb out (58,000 m² of the old one paved
 over), 5,200 furniture items moved out of the road and 630 dropped; parked cars 3,025 -> 13,235, the city's road-marking
 paint kept 67,500 -> 74,500 m².
+
+### Trees from the current register (scripts/kk-trees.py)
+
+The tree register (WFS `k101:trae_basis`, updated 2026-09; CC BY 4.0) lists the city's street and avenue trees and its
+park, square and churchyard trees with species and planting year: 23,976 in the map (private trees left out). They
+replace the 8,786 trees kk-street.py took from the older street-tree export (8,781 of which stand within 2 m of a current
+one); OpenStreetMap trees within 4 m of one go (11,016 -> 7,691) and fill-greenery.py plants its groves round them
+(15,516 -> 14,076). Heights grow from the planting year as before; a tree with no year (mostly old park and churchyard
+trees) gets 9-17 m from its id. 35,318 -> 45,743 trees: the parks and churchyards (Assistens Kirkegård had 350
+OpenStreetMap trees, now 2,100) cost up to ~1M more triangles of mid and far crowns in a view over them, the draw calls
+stay three BatchedMeshes. The kerbs keep a metre off every tree, so kk-kerbs.py and everything after it run again. The
+city's trees detected from aerial imagery (`automatisk_detekterede_traeer_kk_beta`, 343,000 with height and crown, courtyards
+included) are not used: seven times as many crowns again.
 
 ### Road signs from the city's register (scripts/kk-signs.py)
 
