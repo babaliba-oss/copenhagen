@@ -13,12 +13,12 @@ const near=(x,z,r)=>parked.cars.filter(c=>Math.hypot(c[0]-x,c[1]-z)<r).length;
 
 test('parked cars stand where the city has kerbside parking, and nowhere on the pedestrian streets',()=>{
  assert.match(parked.source,/Københavns Kommune/);
- assert.ok(parked.cars.length>2500&&parked.cars.length<4000,String(parked.cars.length));
+ assert.ok(parked.cars.length>10000&&parked.cars.length<16000,String(parked.cars.length)); // 3,025 before the carriageways reached the kerbs (kk-kerbs.py)
  assert.ok(near(-1699,1113,150)>=40,'Saxogade, Vesterbro: parking both sides'); // 14 within 200 m before the register
  assert.ok(parked.cars.some(c=>onStreet(['Saxogade'],c[0],c[1])));
  const pedestrian=['Købmagergade','Østergade','Amagertorv','Vimmelskaftet','Nygade','Frederiksberggade','Strøget'];
  assert.equal(parked.cars.filter(c=>onStreet(pedestrian,c[0],c[1])).length,0);
- assert.equal(near(189,156,200),0,'none around Amagertorv');
+ assert.equal(near(189,156,120),0,'none around Amagertorv'); // the nearest kerbside parking: Valkendorfsgade, Nikolaj Plads (140 m)
  assert.equal(near(176,-134,60),0,'none on Købmagergade by Kultorvet');
 });
 

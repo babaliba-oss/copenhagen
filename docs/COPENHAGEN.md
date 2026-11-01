@@ -87,6 +87,15 @@ node scripts/indoor-items.mjs copenhagen            # after furniture-ground, kk
 node scripts/furniture-ground.mjs copenhagen-1760   # the 1760 lanterns likewise
 python3 scripts/kk-demolished.py --again copenhagen  # last, today only: model houses demolished since 2013 out (below);
 node scripts/road-walls.mjs copenhagen && node scripts/indoor-items.mjs copenhagen && python3 scripts/surface-fill.py copenhagen
+python3 scripts/kk-kerbs.py <kk data dir>/wfs copenhagen     # last, today only, and again after any surface-dissolve.mjs: the
+                                                    # carriageways out to the city's kerb lines (k101 vejkant, below); then
+                                                    # everything that reads the road's width, in this order:
+node scripts/road-walls.mjs copenhagen
+python3 scripts/kk-shelters.py <kk data dir>/wfs copenhagen && python3 scripts/kk-water-toilets.py <kk data dir>/wfs copenhagen
+python3 scripts/parked-cars.py copenhagen <kk data dir>/wfs && node scripts/parked-lanes.mjs copenhagen
+python3 scripts/surface-fill.py copenhagen && python3 scripts/kk-surfaces.py <kk data dir>/wfs copenhagen
+python3 scripts/kk-markings.py <kk data dir>/wfs copenhagen
+node scripts/furniture-ground.mjs copenhagen && node scripts/indoor-items.mjs copenhagen && node scripts/kerb-walks.mjs copenhagen
 ```
 
 Most of today's pavements are not mapped as areas (OpenStreetMap draws them as lines or not at all), so the rendered
@@ -95,8 +104,32 @@ ground stopped at the carriageway's edge. Beside it lay the bare terrain, half a
 building (its mapped outline at 8.5 cm, surfaceChunks) as a pale line beyond it, at the base of every Nyhavn facade in the
 trailer's first shot. Walkers on it stood in the air. scripts/surface-fill.py paves whatever lies within 5 m of a road and
 is covered by no surface, building or water: 3.4 km², appended to the surface chunks at 4.5 cm (the ground shader's
-pavement band, under the mapped pavement). It drops its own earlier fill first, so it can be rerun. 1760 keeps its
+pavement band, under the mapped pavement; its outline thinned to 4 cm, reaching that far under its neighbours, 3.2 km²
+since the carriageways reach the kerbs). It drops its own earlier fill first, so it can be rerun. 1760 keeps its
 cobbles and the bare-ground pavements (main.js); `--dry` reports what it would add (0.12 km² there).
+
+### Carriageways as wide as the street (scripts/kk-kerbs.py)
+
+The carriageways are OpenStreetMap centrelines buffered by a width per road class (6.5 m for a residential street), a
+median 1.7 m narrower than the street between its kerbs: the parking lane lay on the pavement, so most of the city's
+kerbside parking had no room (no cars on Istedgade, Ryesgade or Nørrebrogade) and its edge lines were cut off at the
+drawn kerb. `kk-kerbs.py` takes GeoDanmark's road edges (Københavns Kommune's WFS layer `k101:vejkant`, vejtype
+`Kørevej` for the carriageway's kerb, `Cykelsti langs vej` for a cycle track's outer edge; GeoJSON, EPSG:4326, as the
+other k101 layers, `vejkant.json` in `<kk data dir>/wfs`) and sweeps each kerb line within 4.5 m outside a carriageway onto
+it, sampled every metre; a kerb whose way onto the road crosses another kerb (the back of a pavement, the next street) is
+not used. The strips stay 1.5 m off the houses (OpenStreetMap, the model's own footprints and GeoDanmark's buildings,
+`bygning_kk.json`), 3.8 m where a cycle track runs beside the road, off the water and the traffic islands, and a metre
+clear of the street trees (the trees in a parking lane stand in beds of their own). Roads drawn wider than their kerbs
+are left as they are, and Frederiksberg has no such data. The cycle tracks are then drawn from the new kerb out to their
+own edge (or, without one, 2.3 m wide beside a widened road), and the part of the old track left beyond is paved over.
+Street furniture on the new carriageway moves out past the kerb (and past a cycle track), the painted bicycles onto the
+track. city.pack carries the strips as roads (`kk-kerb-*`) and the pavements cut back to the new kerb (their uncut
+originals in `cities/copenhagen/kerb-pavement.json`, so a rerun starts from them); the surface chunks carry the strips
+at 6.8 cm, the tracks at 5.2 cm and the paved-over track at 5.3 cm, all dropped first on a rerun. The traffic lanes
+(mobility.json) keep their offsets from the centreline. 2026-11: 586,000 m² more carriageway in 16,700 strips (median
+width against the kerbs -1.7 m -> +0.2 m), 273,000 m² of cycle track from the kerb out (58,000 m² of the old one paved
+over), 5,200 furniture items moved out of the road and 630 dropped; parked cars 3,025 -> 13,235, the city's road-marking
+paint kept 67,500 -> 74,500 m².
 
 ### How the municipal model becomes houses (scripts/kk-buildings.py)
 

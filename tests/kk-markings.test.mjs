@@ -11,7 +11,7 @@ const city=JSON.parse(unzip(readFileSync(new URL('city.pack',dir)))),index=JSON.
 const lin=h=>[0,2,4].map(i=>{const c=parseInt(h.slice(i,i+2),16)/255;return c<=.04045?c/12.92:((c+.055)/1.055)**2.4;});
 const paint=[],ground=[];
 for(const r of index){const b=unzip(readFileSync(new URL(r.file+'.pack',dir))),a=new Float32Array(b.buffer.slice(b.byteOffset,b.byteOffset+b.byteLength));
- for(let i=0;i+17<a.length;i+=18){const y=a[i+1];if(Math.abs(y-.095)>1e-4&&!(Math.abs(y-.07)<1e-4&&a[i+3]<.6)&&!(Math.abs(y-.05)<1e-4&&a[i+3]-a[i+5]>.15))continue;
+ for(let i=0;i+17<a.length;i+=18){const y=a[i+1];if(Math.abs(y-.095)>1e-4&&!((Math.abs(y-.07)<1e-4||Math.abs(y-.068)<1e-4)&&a[i+3]<.6)&&!((Math.abs(y-.05)<1e-4||Math.abs(y-.052)<1e-4)&&a[i+3]-a[i+5]>.15))continue; // carriageway (6.8 cm: out to the kerb, kk-kerbs.py), cycle tracks
   const t={x:(a[i]+a[i+6]+a[i+12])/3,z:(a[i+2]+a[i+8]+a[i+14])/3,rgb:[a[i+3],a[i+4],a[i+5]],rings:[[[a[i],a[i+2]],[a[i+6],a[i+8]],[a[i+12],a[i+14]],[a[i],a[i+2]]]]};
   (Math.abs(y-.095)<1e-4?paint:ground).push(t);}}
 const is=(t,h)=>t.rgb.every((c,i)=>Math.abs(c-lin(h)[i])<1e-3),white=paint.filter(t=>is(t,'dedbcf')),blue=paint.filter(t=>is(t,'2f63ab'));
