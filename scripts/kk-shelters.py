@@ -36,11 +36,13 @@ bld = raster([b['rings'] for b in city['buildings']] + ([b['rings'] for b in jso
 # Cycle tracks as drawn: the ground surfaces' triangles in the cycle-track colour (scripts/world-formats.mjs, c8b8a5).
 lin = lambda c: (c / 255) / 12.92 if c / 255 <= .04045 else ((c / 255 + .055) / 1.055) ** 2.4
 TRACK = np.array([lin(0xc8), lin(0xb8), lin(0xa5)])
-im = Image.new('1', (N, N), 0); dr = ImageDraw.Draw(im)
+im = Image.new('1', (N, N), 0); dr = ImageDraw.Draw(im); paved = []
 for rec in json.load(open(f'{OUT}/surface-index.json')):
     v = np.frombuffer(gzip.decompress(open(f"{OUT}/{rec['file']}.pack", 'rb').read()), dtype=np.float32).reshape(-1, 3, 6)
     for tri in v[np.all(np.abs(v[:, 0, 3:] - TRACK) < .01, axis=1)]:
         dr.polygon([((p[0] + EXT) / G, (p[2] + EXT) / G) for p in tri], fill=1)
+    paved.extend(v[np.all(np.abs(v[:, :, 1] - .053) < 1e-4, axis=1)])  # an old track paved over where the kerb moved out (kk-kerbs.py)
+for tri in paved: dr.polygon([((p[0] + EXT) / G, (p[2] + EXT) / G) for p in tri], fill=0)
 track = np.array(im, dtype=bool)
 def hit(m, x, z):
     i, j = int((z + EXT) / G), int((x + EXT) / G)

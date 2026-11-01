@@ -6,9 +6,9 @@ surface chunks as flat triangles at 9.5 cm (2.5 cm over the road at 7 cm; the gr
 colour): white lines, zebra crossings, arrows and speed-bump teeth in white, yellow lines in yellow, the blue cycle
 crossings in blue and the red bus surface in red. No new meshes or draw calls.
 
-The game's carriageways are narrower than the real ones (~1.8 m), so every marking is clipped to what is drawn: the road
-band of the surface chunks (not the traffic islands) and the cycle tracks, less the houses. Edge lines beyond the drawn
-kerb are cut away, not moved. Left out: the parking bays (mostly beyond the drawn kerb; 100k triangles for what is left),
+Every marking is clipped to what is drawn: the road band of the surface chunks (not the traffic islands; with the strips
+kk-kerbs.py adds out to the city's kerbs) and the cycle tracks, less the houses. Edge lines beyond the drawn kerb (roads
+without the city's kerb data, Frederiksberg's) are cut away, not moved. Left out: the parking bays (mostly beyond the drawn kerb; 100k triangles for what is left),
 the road symbols (bicycles, BUS, text: 143k triangles for 2,400 m2; the generated bicycles on the cycle tracks stay), the
 cycle ramps and prefabricated bumps (objects, not paint).
 
@@ -50,7 +50,7 @@ def polygons(items):
 
 city = json.loads(read(ROOT + 'city.pack'))
 index = json.load(open(ROOT + 'surface-index.json'))
-tiles, changed, road_tris, cycle_tris = {}, set(), [], []
+tiles, changed, road_tris, cycle_tris, paved_tris = {}, set(), [], [], []
 for rec in index:
     a = np.frombuffer(read(ROOT + rec['file'] + '.pack'), np.float32).reshape(-1, 6)
     a = a[:len(a) // 3 * 3].reshape(-1, 3, 6)
@@ -58,14 +58,15 @@ for rec in index:
     if not keep.all(): changed.add(rec['file'])
     a = tiles[rec['file']] = a[keep]
     y = a[:, 0, 1]
-    road = (np.abs(y - .07) < 1e-4) & (a[:, 0, 3] < .6)  # carriageway (asphalt, setts, pavers), not the pale islands
-    cyc = (np.abs(y - .05) < 1e-4) & (a[:, 0, 3] - a[:, 0, 5] > .15)  # cycle-track asphalt (c8b8a5)
-    for sel, out in ((road, road_tris), (cyc, cycle_tris)):
+    road = ((np.abs(y - .07) < 1e-4) | (np.abs(y - .068) < 1e-4)) & (a[:, 0, 3] < .6)  # carriageway (asphalt, setts, pavers; out to the kerb, kk-kerbs.py), not the pale islands
+    cyc = ((np.abs(y - .05) < 1e-4) | (np.abs(y - .052) < 1e-4)) & (a[:, 0, 3] - a[:, 0, 5] > .15)  # cycle-track asphalt (c8b8a5)
+    paved = np.abs(y - .053) < 1e-4  # old track paved over by kk-kerbs.py
+    for sel, out in ((road, road_tris), (cyc, cycle_tris), (paved, paved_tris)):
         if sel.any(): out.append(a[sel][:, :, [0, 2]])
 mk = lambda arr: shapely.polygons(np.concatenate([arr, arr[:, :1]], axis=1)) if len(arr) else np.array([])
-road_tris = mk(np.concatenate(road_tris)); cycle_tris = mk(np.concatenate(cycle_tris))
+road_tris = mk(np.concatenate(road_tris)); cycle_tris = mk(np.concatenate(cycle_tris)); paved_tris = mk(np.concatenate(paved_tris)) if paved_tris else np.array([])
 road_tris = road_tris[shapely.area(road_tris) > 1e-4]; cycle_tris = cycle_tris[shapely.area(cycle_tris) > 1e-4]
-rtree, ctree = shapely.STRtree(road_tris), shapely.STRtree(cycle_tris)
+rtree, ctree, ptree = shapely.STRtree(road_tris), shapely.STRtree(cycle_tris), shapely.STRtree(paved_tris)
 houses = polygons(city['buildings'])
 if os.path.exists(ROOT + 'kk-footprints.json'): houses += polygons(json.load(open(ROOT + 'kk-footprints.json')))
 htree = shapely.STRtree(houses)
@@ -97,6 +98,8 @@ for (kx, kz), items in sorted(cells.items()):
     if not len(ri) and not len(ci): continue
     road = shapely.union_all(road_tris[ri]) if len(ri) else shapely.Polygon()
     cyc = shapely.union_all(cycle_tris[ci]) if len(ci) else shapely.Polygon()
+    pi = ptree.query(cell, 'intersects')
+    if len(pi) and not cyc.is_empty: cyc = cyc.difference(shapely.union_all(paved_tris[pi]))
     mask = shapely.union(road, cyc).intersection(cell)
     hi = htree.query(cell, 'intersects')
     if len(hi): mask = mask.difference(shapely.union_all([houses[i] for i in hi]))

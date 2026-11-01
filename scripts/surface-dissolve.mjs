@@ -16,7 +16,7 @@ import {surfaceChunks} from './world-formats.mjs';
 
 const id=process.argv[2];if(!/^[a-z0-9-]+$/.test(id||''))throw Error('Usage: node scripts/surface-dissolve.mjs <city>');
 const reg=JSON.parse(fs.readFileSync('public/cities/index.json')).cities.find(c=>c.id===id),OUT=path.join('public',reg.dataRoot.replace(/^\//,''));
-const city=JSON.parse(gunzipSync(fs.readFileSync(path.join(OUT,'city.pack'))));
+const city=JSON.parse(gunzipSync(fs.readFileSync(path.join(OUT,'city.pack'))));city.roads=city.roads.filter(r=>!String(r.id).startsWith('kk-kerb-')); // scripts/kk-kerbs.py draws its own strips (rerun it after this)
 // highway class of each OSM way (the 1760 build was made from today's raw cache)
 const rawDir=['data/raw/cities/'+id,'data/raw/cities/'+id.replace(/-\d+$/,'')].find(d=>fs.existsSync(path.join(d,'highways.json')));
 const highway=new Map();if(rawDir)for(const e of JSON.parse(fs.readFileSync(path.join(rawDir,'highways.json'))).elements)if(e.type==='way'&&e.tags?.highway)highway.set('osm-way-'+e.id,e.tags.highway);

@@ -10,8 +10,8 @@ cars stand where the city's parking register has kerbside parking. Each stretch 
 7 left free. A car stands beside the road edge its stretch runs along, on that side, facing the traffic of that side,
 moved from the register's kerb line in towards the middle until the drawn carriageway (city.pack roads) holds it
 clear of buildings; it is left out if it would then stand within 1.95 m of a lane line, 11 m of a junction or 5 m of
-a pedestrian crossing, or on street furniture (furniture.json, the overhead wire lamps aside). Many of the city's streets are drawn narrower than they are (OSM widths), with no room beside
-the lanes: those stay empty. Left out of the register: suspended stretches (midlertidigt nedlagt), no-parking and
+a pedestrian crossing, or on street furniture (furniture.json, the overhead wire lamps aside). The carriageways reach the city's kerbs (scripts/kk-kerbs.py,
+run first); a street still drawn narrower than it is (OSM widths, no kerb data) has no room beside the lanes and stays empty. Left out of the register: suspended stretches (midlertidigt nedlagt), no-parking and
 no-stopping ones, the taxi, motorcycle and coach bays, and car parks (P-område). The stretches end at junctions and
 driveways, so the cars do too. Without <wfs dir>: a slot every ~6 m beyond the lane of every road edge, 78% filled.
 """

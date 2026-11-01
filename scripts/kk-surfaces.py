@@ -77,7 +77,9 @@ for kind, (Y, colour, names) in KINDS.items():
             for g in polys:
                 for t in shapely.get_parts(shapely.constrained_delaunay_triangles(g)):
                     c = np.asarray(t.exterior.coords)[:3]
-                    if (c[1, 1] - c[0, 1]) * (c[2, 0] - c[0, 0]) - (c[1, 0] - c[0, 0]) * (c[2, 1] - c[0, 1]) < 0: c = c[[0, 2, 1]]  # facing up
+                    cross = (c[1, 1] - c[0, 1]) * (c[2, 0] - c[0, 0]) - (c[1, 0] - c[0, 0]) * (c[2, 1] - c[0, 1])
+                    if abs(cross) < 2e-3: continue  # a sliver along a cut edge
+                    if cross < 0: c = c[[0, 2, 1]]  # facing up
                     tris.append(c)
                 m2 += g.area
             v = np.zeros((len(tris), 3, 6), np.float32)

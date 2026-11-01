@@ -64,6 +64,7 @@ for kx in range(math.floor(x0 / CELL), math.floor(x1 / CELL) + 1):
         covered = [tri_geoms[i] for i in tri_tree.query(corridor)] + [solid[i] for i in solid_tree.query(corridor)]
         fill = corridor.difference(unary_union(covered)) if covered else corridor
         fill = fill.buffer(-.02, quad_segs=1).buffer(.02, quad_segs=1)  # numerical slivers along shared edges
+        fill = shapely.make_valid(fill.buffer(.04, join_style='mitre', mitre_limit=2).simplify(.04)).intersection(cell)  # the kerbs' 1 m samples thinned (half the triangles); 4 cm over its neighbours, never short of them
         parts = [g for g in getattr(fill, 'geoms', [fill]) if g.geom_type == 'Polygon' and g.area > .05]
         if not parts: continue
         tris = []
