@@ -210,7 +210,7 @@ export function createLandmarks({era=null,mills=[],anchors={},statues={}}={}){ /
   for(const m of tivoli(add,mat,spinners)){m.castShadow=true;group.add(m);}
   {const x=1465.3,z=-1438.7,w=waterAt(x,z)??seaLevel();add(mermaid(),x,z,{y:(w??groundAt(x,z))-.35,rot:2.2});} // her rock sits in the water (a fixed height left it floating over the harbour)
   if(statues.frederikV)add(statues.frederikV,1076.2,-438.8,{rot:-2.049});else add(rider(4.5),1076.2,-438.8,{rot:.12}); // the scan faces +Z: turned to face the palace square's centre
-  add(rider(3.6,'#4d6a59'),191.9,194.8,{rot:-1.2});add(gefion(),1371.2,-729.5,{rot:-.6});
+  add(rider(3.6,'#4d6a59'),249,227,{rot:-1.2}); // Absalon at the city's monument register point (55.67796, 12.57996), at the canal end of Højbro Plads: it stood 65 m north-west, in the middle of the squareadd(gefion(),1371.2,-729.5,{rot:-.6});
   {const o=operaGeometry(),{x,z,rot}=OPERA;add(o.opaque,x,z,{y:o.y,rot});const g=add(o.glass,x,z,{y:o.y,rot,material:foyerGlow(new THREE.MeshStandardMaterial({color:'#5f7684',roughness:.06,metalness:.55,transparent:true,opacity:.5,depthWrite:false}))}),l=add(o.lights,x,z,{y:o.y,rot,material:new THREE.MeshBasicMaterial({color:'#fff3d8'})}),u=add(o.soffit,x,z,{y:o.y,rot,material:new THREE.MeshStandardMaterial({color:'#c3c8cb',emissive:'#6b7075',roughness:.7,metalness:0})});g.castShadow=l.castShadow=l.receiveShadow=u.receiveShadow=false;g.name='Opera glass';} // Operaen (the model's block is hidden: main.js HIDE_TODAY; its footprint becomes the body's: operaFootprint)
   if(statues.hca)add(statues.hca,-427.1,520.1,{rot:-.725}); // Luckow-Nielsen's seated Andersen at City Hall's west corner, looking out over H.C. Andersens Boulevard
  }
