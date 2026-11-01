@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-"""Copenhagen's own traffic rules on the road graph: one-way streets, from the City of Copenhagen's
-map data (Københavns Kommune, CC BY 4.0, wfs-kbhkort.kk.dk k101: ensrettede_gader; GeoJSON in EPSG:4326).
+"""Copenhagen's own traffic rules on the road graph: one-way streets and signalled junctions, from the City of Copenhagen's
+map data (Københavns Kommune, CC BY 4.0, wfs-kbhkort.kk.dk k101: ensrettede_gader, trafiksignal_oversigt; GeoJSON in EPSG:4326).
 
   python3 scripts/traffic-rules.py <wfs dir> copenhagen
 
@@ -11,6 +11,8 @@ traffic-counts.py). Then:
   street's direction is dropped (the other keeps to the middle, as OSM one-ways); a single edge the wrong way is turned
   round. A change that would leave part of the network unreachable by car (a one-way stub at the map's edge) is undone.
   The per-edge arrays already there (traffic, bikeTraffic) are kept in step.
+- Signals: every KK signalled junction with no road edge carrying a signal ending within 30 m gets one, at its point,
+  on the edges ending within 27 m (the rule city-build.mjs uses for OSM's highway=traffic_signals).
 Run after traffic-counts.py. Rerunning changes nothing more.
 """
 import gzip, json, math, re, sys
@@ -186,5 +188,28 @@ for k in ('traffic', 'bikeTraffic'):
 edges[:] = [edges[i] for i in keep]; names = [names[i] for i in keep]; nnames = [nnames[i] for i in keep]
 mob['roads']['edges'] = edges
 
-mob['rulesSource'] = 'One-way streets: Københavns Kommune (CC BY 4.0), wfs-kbhkort.kk.dk k101'
+# ================= signalled junctions =================
+signals = mob['signals']
+def ends_near(es, p, r): return [i for i, e in enumerate(es) if math.dist(e['points'][-1], p) < r]
+kk = [((f['properties'].get('krydsets_navn') or '').strip(), local(*f['geometry']['coordinates'][:2])) for f in load('trafiksignal_oversigt')]
+covered_before = sum(1 for _, p in kk if any(edges[i]['signal'] >= 0 for i in ends_near(edges, p, 30)))
+added, off = 0, []
+for name, p in kk:
+    near = ends_near(edges, p, 30)
+    if any(edges[i]['signal'] >= 0 for i in near): continue
+    road = [i for i in ends_near(edges, p, 27) if edges[i]['signal'] < 0]
+    if not road:  # drawn off to the side: the nearest node within 45 m of it
+        k = min(range(len(nodes)), key=lambda k: math.dist(nodes[k], p))
+        if math.dist(nodes[k], p) > 45: off.append(name); continue
+        p = tuple(nodes[k]); road = [i for i in ends_near(edges, p, 27) if edges[i]['signal'] < 0]
+        if not road: off.append(name); continue
+    s = len(signals); signals.append({'p': [round(p[0], 2), round(p[1], 2)], 'name': name})
+    for i in road: edges[i]['signal'] = s
+    for w in mob['walks']['edges']:
+        if w['signal'] < 0 and math.dist(w['points'][-1], p) < 27: w['signal'] = s
+    added += 1
+covered_after = sum(1 for _, p in kk if any(edges[i]['signal'] >= 0 for i in ends_near(edges, p, 30)))
+print(f'signals: {covered_before}/{len(kk)} KK signalled junctions had a mapped signal; {added} added; {covered_after}/{len(kk)} now; off the network: {off}')
+
+mob['rulesSource'] = 'One-way streets, signalled junctions: Københavns Kommune (CC BY 4.0), wfs-kbhkort.kk.dk k101'
 open(f'{OUT}/mobility.json', 'w', encoding='utf8').write(json.dumps(mob, separators=(',', ':'), ensure_ascii=False))
