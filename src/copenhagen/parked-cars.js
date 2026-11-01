@@ -6,7 +6,7 @@ import {groundAt,waterAt} from '../terrain.js';
 // (per-car colour) and the fixed parts (glass, tyres, lights): the detailed Blender bodies near the player, a
 // simple low-poly car (~250 triangles instead of ~3,800) further out, nothing beyond view range. The batches are
 // city-wide pools refilled with the cars in range (CHUNK is the lookup grid). Each car is a box the player's car can push (step()); walkers get them as boxes (near()).
-const CHUNK=150,PHONE=typeof matchMedia==='function'&&matchMedia('(pointer:coarse)').matches,NEAR=PHONE?90:170,RANGE=PHONE?320:420; /* phones: the 3,800-triangle cars within 90 m (170 m: ~120k triangles) */
+const CHUNK=150,PHONE=typeof matchMedia==='function'&&matchMedia('(pointer:coarse)').matches,NEAR=PHONE?60:110,RANGE=PHONE?320:420; /* the 3,800-triangle cars only this close: with the kerbs widened to the city's (kk-kerbs.py) there are 4x the cars, and within the old 90/170 m up to 113/277 detailed cars stood round one spot; at 60/110 m it is at most 62/142, about what the old radii drew before (71/144) */
 const paint=(g,hex)=>{const n=g.index?g.toNonIndexed():g;if(n!==g)g.dispose();n.deleteAttribute('uv');const c=new THREE.Color(hex),a=new Float32Array(n.attributes.position.count*3);for(let i=0;i<a.length;i+=3)a.set([c.r,c.g,c.b],i);n.setAttribute('color',new THREE.BufferAttribute(a,3));return n;};
 // A box whose top face is pulled in (cabin taper). Forward is -Z.
 function taper(w,h,d,x,y,z,inX,inFront,inBack){
