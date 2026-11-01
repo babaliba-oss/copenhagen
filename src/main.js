@@ -379,6 +379,11 @@ surfaceMaterial.onBeforeCompile=shader=>{
    #endif
   }
   diffuseColor.rgb*=1.0+grain*0.13;
+ }else if(vGround.y>0.059&&vGround.y<0.065){
+  // Gravel paths and pea gravel (6.2 cm: Københavns Kommune's surface register, scripts/kk-surfaces.py): small stones a shade
+  // darker or paler each, faded out where a stone is smaller than a pixel, and a slow drift where feet and bikes wear it.
+  float s1=groundHash(floor(vGround.xz*26.0)),s2=groundHash(floor(vGround.xz*61.0)+5.3),fine=mix(0.5,s1*0.6+s2*0.4,1.0-smoothstep(0.02,0.09,footprint));
+  diffuseColor.rgb*=(0.86+0.28*fine)*(1.0+(groundNoise(vGround.xz/5.0)-0.5)*0.16);grain=0.0;gRough=0.95;
  }else if(vGround.y>0.04&&vGround.y<0.06){
   #ifdef ASPHALT_CYCLE_TRACKS
   // Copenhagen's cycle tracks are asphalt, a shade lighter than the carriageway (the data paints them red-beige).
