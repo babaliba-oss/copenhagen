@@ -303,12 +303,12 @@ export function createMappedFurniture(layer,{rangeScale=1,player=()=>null,mobili
   'bike-rack':([w,d,h])=>[box(w,.025,.025,0,.07,-.12,'#4c5356'),box(w,.025,.025,0,.07,.12,'#4c5356'),box(w-.3,.022,.022,0,.33,0,'#4c5356'),...[-.9,-.3,.3,.9].map(x=>box(.025,.3,.26,x,.2,0,'#4c5356'))], // Copenhagen ground rack: low wheel-slot rail (it reads as a fence when tall and empty)
   hydrant:([w,,h])=>[cyl(w*.4,w*.45,h,h/2,'#b8322a',8),cyl(w*.5,w*.5,.08,h,'#b8322a',8)],
   // Copenhagen's green drinking post (Københavns Kommune's register, scripts/kk-water-toilets.py): a cast-iron column on a
-  // plinth, a collar and a domed cap, the bowl and its brass spout on the +Z side.
-  'drinking-post':([w,,h])=>[cyl(w*.45,w*.5,.08,.04,'#2a5236',10),cyl(w*.24,w*.3,h-.22,.08+(h-.22)/2,'#2e5b3c',10),cyl(w*.3,w*.3,.05,h-.12,'#2a5236',10),cyl(w*.06,w*.3,.1,h-.05,'#2a5236',10),
-   cyl(w*.36,w*.2,.08,h-.3,'#2a5236',10).translate(0,0,w*.36),cyl(w*.28,w*.28,.012,h-.255,'#6f8a8c',10).translate(0,0,w*.36),box(.03,.05,.09,0,h-.17,w*.2,'#b8964a'),box(.04,.04,.03,0,h-.2,-w*.27,'#b8964a')],
+  // plinth, a collar and a domed cap, the bowl and its brass spout on the +Z side (a lighter green than the paint, which read black in the shade).
+  'drinking-post':([w,,h])=>[cyl(w*.45,w*.5,.08,.04,'#3c7a4c',10),cyl(w*.24,w*.3,h-.22,.08+(h-.22)/2,'#46895a',10),cyl(w*.3,w*.3,.05,h-.12,'#3c7a4c',10),cyl(w*.06,w*.3,.1,h-.05,'#3c7a4c',10),
+   cyl(w*.36,w*.2,.08,h-.3,'#3c7a4c',10).translate(0,0,w*.36),cyl(w*.28,w*.28,.012,h-.255,'#6f8a8c',10).translate(0,0,w*.36),box(.03,.05,.09,0,h-.17,w*.2,'#b8964a'),box(.04,.04,.03,0,h-.2,-w*.27,'#b8964a')],
   // Public toilet cabin (the register's Danfo, Københavner, Zenzo and pissoir kinds alike), door and WC sign on +Z.
-  toilet:([w,d,h])=>[box(w+.06,.1,d+.06,0,.05,0,'#8a8d88'),box(w,h-.25,d,0,.1+(h-.25)/2,0,'#5d6a63'),box(w+.2,.15,d+.2,0,h-.075,0,'#39433f'),box(w-.1,.05,d-.1,0,h-.17,0,'#f4efd8'),
-   box(.9,2.05,.04,w*.15,1.12,d/2+.01,'#2b3532'),box(.04,.04,.06,w*.15-.36,1.1,d/2+.04,'#c9ccc8'),box(.36,.36,.02,-w*.3,1.95,d/2+.01,'#e9ece8'),box(.26,.26,.02,-w*.3,1.95,d/2+.025,'#2b62a8')],
+  toilet:([w,d,h])=>[box(w+.06,.1,d+.06,0,.05,0,'#a3a69f'),box(w,h-.25,d,0,.1+(h-.25)/2,0,'#97a49c'),box(w+.2,.15,d+.2,0,h-.075,0,'#56625d'),box(w-.1,.05,d-.1,0,h-.17,0,'#f4efd8'),
+   box(.9,2.05,.04,w*.15,1.12,d/2+.01,'#5a6862'),box(.04,.04,.06,w*.15-.36,1.1,d/2+.04,'#c9ccc8'),box(.36,.36,.02,-w*.3,1.95,d/2+.01,'#e9ece8'),box(.26,.26,.02,-w*.3,1.95,d/2+.025,'#2b62a8')],
   // Stop shelter, open towards the road (+Z): steel frame, roof, back and side glass, a bench and an advert panel at one end.
   shelter:([w,d,h])=>[...[-w/2+.05,w/2-.05].flatMap(x=>[box(.08,h,.08,x,h/2,-d/2+.06,'#3e4a4f'),box(.08,h,.08,x,h/2,d/2-.12,'#3e4a4f')]),box(w+.2,.12,d+.25,0,h+.06,0,'#4a565b'),
    box(w-.1,h-.35,.03,0,h/2+.1,-d/2+.06,'#a9c4cb'),box(.03,h-.35,d*.55,-w/2+.05,h/2+.1,-d*.2,'#a9c4cb'),box(.05,1.75,d*.62,w/2-.05,1.15,-d*.18,'#d8d3c4'),box(1.5,.06,.38,-.3,.47,-d/2+.3,'#5c4a3a'),box(.06,.45,.3,-.95,.23,-d/2+.3,'#2d3133'),box(.06,.45,.3,.35,.23,-d/2+.3,'#2d3133')],
