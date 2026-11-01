@@ -72,6 +72,7 @@ echo '[]' > public/cities/copenhagen-1760/insets.json && echo '{}' > public/citi
 node scripts/building-sweep.mjs copenhagen-1760 --hide     # 1760: shells you see straight through join duplicates.json
 python3 scripts/fit-colliders.py copenhagen && python3 scripts/fit-colliders.py copenhagen-1760   # last: footprints = the houses you see
 node scripts/shed-colliders.mjs copenhagen-1760 --write   # after fit-colliders: the small drawn sheds, booths and pillars it leaves without one
+python3 scripts/era-1760-years.py --again               # after shed-colliders: houses BBR dates to 1760 or earlier in, anachronisms out (below)
 python3 scripts/surface-fill.py copenhagen          # after fit-colliders, and again after any surface-dissolve.mjs: paving for the
                                                     # unmapped strips between the streets and the houses (below)
 python3 scripts/kk-surfaces.py <kk data dir>/wfs copenhagen   # after surface-fill: the city's natural stone as setts and its gravel
@@ -131,6 +132,22 @@ sheds and halls, Sydhavn's quay buildings). 1760 keeps the model as it is.
 Checks: `scripts/building-sweep.mjs` (rays from inside every house at a third of its height; a ray that gets out into
 the street - open sky joined to the map edge - without crossing a wall means you can see into the house).
 
+### 1760 against the buildings' years (scripts/era-1760-years.py)
+
+Københavns Kommune's building layer (WFS `k101:bygning_kk`, GeoDanmark footprints with the BBR fields; CC BY 4.0) dates
+every building standing today (`opfoerelse_aar`; years before 1500 are placeholders). Of the 633 it dates 1500-1760,
+616 were already drawn in 1760. The script takes the rest from today's model when 60% of a model house stands on such
+buildings and 1760 draws nothing there (2026-11: 14 houses, among them Prinsens Palæ, today's National Museum, which
+kk-buildings.py's MODERN names left out, the powder house on Frederiks Bastion, Kommandørhuset and back houses in Nyhavn
+and Frederiksstaden), in the period palette with a `model-` footprint. Names the game already takes out by hand (GONE,
+HIDE_1760, era.json) stay out: BBR dates Masteskurene to 1746 and Thorvaldsens Museum to 1743 (the coach house
+Bindesbøll rebuilt). A later BBR year on an old plot is not an anachronism (the 1728 and 1795 fires rebuilt the centre
+on the old plots, drawn as period houses); the script's ANACHRONISMS are blocks where 1760 had no house (Halvtolv in
+Christiania, the 1870s blocks on the rampart by Nørreport, houses out on Amager, Operaparken's car park and pavilions,
+the 2016 kiosks on Kvæsthusbroen): they join era.json's anachronisms and lose their footprints. Operaparken's paths are
+laid as its lawn. `<kk data dir>/wfs/bygning_kk.json` in place of `--again` picks the houses again
+(cities/copenhagen-1760/bbr-1760.json).
+
 ### Footprints are the houses you see (scripts/fit-colliders.py)
 
 The car, walkers, parked cars and street furniture take the city's footprints (`city.pack` buildings) as the solid houses;
@@ -175,7 +192,7 @@ Notes:
 - `radio.js`: the car radio (L, Shift+L back, or click/tap the now-playing card at the top right; the last station is
   remembered, station 1 on the first drive): stations from `radio-stations.json` stream public-domain / CC0 / CC BY
   recordings from the library that hosts them; each station loops on its own clock like a broadcast.
-- `landmarks.js`: Vor Frelsers stair, Børsen spire, Tivoli rides, statues, flags, 1760 windmills.
+- `landmarks.js`: Vor Frelsers stair, Børsen spire, Tivoli rides, statues, flags, 1760 windmills and the first palace chapel.
 - `parked-cars.js`, `boats.js`, `rails.js`, `trains.js`, `city-cyclists.js`, `cafes.js`: street life.
 - `boats.js` in 1760: among the big moorings, the merchant schooner and Amphion, then Daniel's frigate (Svjatoi Nikolai,
   furled sails) and weathered galleon, about 50 m bow to bowsprit: picked by a hash of the mooring's position, and only

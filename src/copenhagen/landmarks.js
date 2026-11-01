@@ -179,6 +179,21 @@ function christiansborg1760(){
  p.push(paint(new THREE.ConeGeometry(.9,11.2,8).translate(tx,77.6,0),COPPER),at(paint(new THREE.SphereGeometry(.55,10,8),GOLD),tx,83.4,0),bx(.12,.8,.12,tx,84,0,GOLD));
  return mergeGeometries(p);
 }
+// The first palace chapel (consecrated 1740, Rococo interior by Eigtved; burned 1794) stood where the Slotskirke stands:
+// a building of its own, linked to the palace by a gallery. C. F. Hansen reused much of its outer walls for his 1813-26
+// church and gave it the portico and dome (unofficialroyalty.com "Christiansborg Palace Chapel"; en.wikipedia
+// "Christiansborg Palace (1st)"). 1760 draws the walls on the model's plan with a copper hipped roof, no dome.
+export const CHAPEL1760={x:214.55,z:326.56,rot:CB1760.rot,hx:32,hz:14.3,eave:21,top:29};
+function chapel1760(){
+ const {hx,hz,eave:E,top:T}=CHAPEL1760,B=-1.5,p=[],WALL='#d3c6a6',PLINTH='#9b9283',TRIM='#e6ddc8',GLASS='#2b2e33';
+ p.push(bx(2*hx,E-B,2*hz,0,(E+B)/2,0,WALL),bx(2*hx+.6,1.4,2*hz+.6,0,B+.7+1.2,0,PLINTH),bx(2*hx+1,.9,2*hz+1,0,E-.45,0,TRIM));
+ const r=.5,c=[[-hx-r,E,-hz-r],[hx+r,E,-hz-r],[hx+r,E,hz+r],[-hx-r,E,hz+r]],g=[[-hx+hz,T,0],[hx-hz,T,0]];
+ p.push(quad(c[0],c[1],g[1],g[0],[0,1,-1],COPPER),quad(c[2],c[3],g[0],g[1],[0,1,1],COPPER),quad(c[1],c[2],g[1],g[1],[1,1,0],COPPER),quad(c[3],c[0],g[0],g[0],[-1,1,0],COPPER)); // hips over both ends
+ const win=(o,t,n,s,y0,h,w)=>{for(const [dw,off,hex] of [[.6,.05,TRIM],[0,.09,GLASS]]){const q=o.map((v,i)=>v+t[i]*s+n[i]*off),W=(w+dw)/2,y=y0-dw/2,H=h+dw,pt=(a,b)=>[q[0]+t[0]*a,y+b,q[2]+t[2]*a];p.push(quad(pt(-W,0),pt(W,0),pt(W,H),pt(-W,H),n,hex));}};
+ for(const sg of [-1,1]){for(let k=-5;k<=5;k++)for(const [y0,h] of [[2.2,5],[10,8.5]])win([0,0,sg*hz],[1,0,0],[0,0,sg],k*5.4,y0,h,2.2); // long fronts: tall church windows over a low row
+  for(let k=-1;k<=1;k++)for(const [y0,h] of [[2.2,5],[10,8.5]])win([sg*hx,0,0],[0,0,1],[sg,0,0],k*7,y0,h,2.2);}
+ return mergeGeometries(p);
+}
 // Today's model draws the palace complex as one part: in 1760 its main block (the third palace, 1907-28) is taken out and
 // the first palace drawn in its place; the riding ground's wings (1738-46, which survived 1794) stay. region: the cut in
 // the palace's frame; footprint: the mapped outline less that region (shapely), for the collision and walkers' indexes.
@@ -194,8 +209,8 @@ export function cutFootprints1760(buildings){for(let i=buildings.length-1;i>=0;i
 export const cutRoadWalls1760=walls=>walls.filter(w=>{const c=CUT_1760[w.id];if(!c)return true;const r=w.rings[0],x=r.reduce((s,q)=>s+q[0],0)/r.length,z=r.reduce((s,q)=>s+q[1],0)/r.length;return !inCut(c,x,z);});
 // Buildings that did not exist in 1760: today's Vor Frue (1829, the Gothic church is drawn instead), Jerusalemskirken
 // (1896), the English Church (1887), Sankt Pauls (1877), Kong Haakons Kirke (1958), Alexander Nevsky (1883),
-// Sankt Ansgar (1842) and Ny Christiansborg (modern).
-export const HIDE_1760=['kk-osm-relation-19856927','kk-osm-way-25451190','kk-osm-way-134471983','kk-osm-way-36790389','kk-osm-way-26604470','kk-osm-way-89752515','kk-osm-way-55601707','kk-osm-way-133986381','kk-osm-relation-8833442'];
+// Sankt Ansgar (1842), Ny Christiansborg (modern) and Hansen's Slotskirke (1826: the first chapel is drawn instead).
+export const HIDE_1760=['kk-osm-way-25521086','kk-osm-relation-19856927','kk-osm-way-25451190','kk-osm-way-134471983','kk-osm-way-36790389','kk-osm-way-26604470','kk-osm-way-89752515','kk-osm-way-55601707','kk-osm-way-133986381','kk-osm-relation-8833442'];
 export function createLandmarks({era=null,mills=[],anchors={},statues={}}={}){ // statues: scanned models where loaded (frederikV), else the hand-built riders
  const group=new THREE.Group();group.name='Hand-built landmarks';
  const mat=new THREE.MeshStandardMaterial({vertexColors:true,roughness:.45,metalness:.35}),built=facadeGrain(new THREE.MeshStandardMaterial({vertexColors:true,roughness:.6,metalness:.2})); // built: brick, plaster and roof courses like the city's own buildings (statues and rides keep the plain finish)
@@ -225,6 +240,7 @@ export function createLandmarks({era=null,mills=[],anchors={},statues={}}={}){ /
   add(spireTower(),336,158,{material:built});rect('Sankt Nikolaj',336,158,0,0,0,5.9,5.9); // Sankt Nikolaj tower and spire (lost in 1795)
   {const {x,z,rot,hx,hz}=CB1760;add(christiansborg1760(),x,z,{rot,material:built}); // the first Christiansborg (main.js cuts today's main block out of the model: cutParts1760)
    rect('Christiansborg',x,z,rot,0,0,hx,hz);rect('Christiansborg',x,z,rot,-hx-.9,0,.9,16);rect('Christiansborg',x,z,rot,hx+.6,0,.6,13);for(const s of [-1,1])rect('Christiansborg',x,z,rot,0,s*(hz+.6),12,.6);rect('Christiansborg tower',x,z,rot,-hx-1.15,0,1.15,7);} // block, risalits (west, east, north, south), the tower's front
+  {const {x,z,rot,hx,hz}=CHAPEL1760;add(chapel1760(),x,z,{rot,material:built});rect('Slotskapellet',x,z,rot,0,0,hx,hz);} // the first palace chapel on Hansen's walls (HIDE_1760 takes his domed church out)
   if(anchors.marmorkirken){const [x,,z]=anchors.marmorkirken;add(buildingSite(),x,z); // Frederik's Church, building site
    solid('Frederiks Kirke building site',Array.from({length:28},(_,k)=>[x+Math.cos(k/28*Math.PI*2)*18.9,z+Math.sin(k/28*Math.PI*2)*18.9])); // scaffold ring (r 17 + 1.6) round the half-built rotunda
    rect('treadwheel crane',x,z,0,26,.7,3.2,.9);rect('stone blocks',x,z,0,-21.6,8.2,3.6,.9);rect('stone blocks',x,z,0,21.2,-10,2.4,.7);}

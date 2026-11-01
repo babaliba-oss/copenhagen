@@ -1,0 +1,170 @@
+{
+"source": "Københavns Kommune, WFS k101:bygning_kk (GeoDanmark footprints, BBR opfoerelse_aar), CC BY 4.0, containing data from GeoDanmark",
+"note": "today's model houses on buildings BBR dates 1500-1760 that the 1760 build left out (scripts/era-1760-years.py)",
+"houses": [
+{
+"id": "kk-osm-way-653487712",
+"name": "",
+"years": [
+1700
+],
+"address": [
+"Ryesgade 3"
+],
+"m2": 51
+},
+{
+"id": "kk--9-96",
+"name": "",
+"years": [
+1732
+],
+"address": [
+"Klosterstræde 8"
+],
+"m2": 14
+},
+{
+"id": "kk-osm-relation-1989714",
+"name": "Prinsens Palæ",
+"years": [
+1684
+],
+"address": [
+"Frederiksholms Kanal 12"
+],
+"m2": 9449
+},
+{
+"id": "kk-osm-way-134471984",
+"name": "",
+"years": [
+1707
+],
+"address": [
+"Øster Voldgade 36"
+],
+"m2": 204
+},
+{
+"id": "kk-800--88",
+"name": "",
+"years": [
+1670,
+1681,
+1690,
+1700
+],
+"address": [
+"Nyhavn 17",
+"Nyhavn 5",
+"Nyhavn 9A",
+"Store Strandstræde 10"
+],
+"m2": 121
+},
+{
+"id": "kk-830--471",
+"name": "",
+"years": [
+1750
+],
+"address": [
+"Store Kongensgade 66"
+],
+"m2": 144
+},
+{
+"id": "kk-863-1003",
+"name": "",
+"years": [
+1719,
+1750
+],
+"address": [
+"Dronningensgade 23",
+"Overgaden Oven Vandet 26"
+],
+"m2": 15
+},
+{
+"id": "kk-1187--696",
+"name": "",
+"years": [
+1757
+],
+"address": [
+"Amaliegade 31A"
+],
+"m2": 11
+},
+{
+"id": "kk-1013--547",
+"name": "",
+"years": [
+1752,
+1758
+],
+"address": [
+"Fredericiagade 7",
+"Frederiksgade 17"
+],
+"m2": 133
+},
+{
+"id": "kk-1037-570",
+"name": "",
+"years": [
+1700
+],
+"address": [
+"Strandgade 44B"
+],
+"m2": 15
+},
+{
+"id": "kk-osm-way-104566664",
+"name": "Krudthus - Frederiks Bastion",
+"years": [
+1744
+],
+"address": [
+"Refshalevej 28"
+],
+"m2": 293
+},
+{
+"id": "kk-osm-way-104486879",
+"name": "",
+"years": [
+1690
+],
+"address": [
+"Refshalevej 20"
+],
+"m2": 198
+},
+{
+"id": "kk-osm-way-105216112",
+"name": "",
+"years": [
+1688
+],
+"address": [
+"Nordområdet 270"
+],
+"m2": 192
+},
+{
+"id": "kk-osm-way-107323198",
+"name": "Kommandørhuset",
+"years": [
+1735
+],
+"address": [
+"Nordområdet 262A"
+],
+"m2": 133
+}
+]
+}
