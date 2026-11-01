@@ -31,3 +31,9 @@ test('drinking posts are knockable posts and toilets solid cabins, one instanced
  assert.ok(sets.includes('Mapped toilet'),sets.join());
  const near=m.knockables.near(0,0,3);assert.ok(near.length>=1,'the post near (0,0) can be knocked');
 });
+
+test('today\'s Copenhagen credits the city\'s registers behind the drinking posts, toilets, baths, monuments and surfaces',()=>{
+ const today=JSON.parse(readFileSync(new URL('../public/cities/index.json',import.meta.url),'utf8')).cities.find(c=>c.id==='copenhagen');
+ for(const name of ['Vandinstallationer','Toiletter','Svømmehaller og badezoner','Badestationer','Monumenter','Belægninger'])assert.match(today.attribution,new RegExp(name));
+ assert.match(today.attribution,/Belægninger, CC BY 4\.0 \(wfs-kbhkort\.kk\.dk\)/);
+});
