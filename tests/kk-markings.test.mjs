@@ -39,3 +39,8 @@ test('no generated dashes or zebra stripes where the city\'s paint is drawn; the
  assert.ok(!covered(-1919,612),'Frederiksberg Allé');assert.ok(!covered(1e5,0));
  const life=readFileSync(new URL('../src/street-life.js',import.meta.url),'utf8');assert.match(life,/excluded:\(x,z\)=>authoredOlympiaMarkings\(x,z\)\|\|painted\(x,z\)/);assert.match(life,/if\(painted\(p\.x,p\.z\)\|\|/);
 });
+
+test('today\'s Copenhagen credits the city\'s road-marking register',()=>{
+ const today=JSON.parse(readFileSync(new URL('../public/cities/index.json',import.meta.url),'utf8')).cities.find(c=>c.id==='copenhagen');
+ assert.match(today.attribution,/Road markings \(lane and stop lines, zebra crossings, arrows, blue cycle crossings\): Københavns Kommune, Afmærkning, CC BY 4\.0 \(wfs-kbhkort\.kk\.dk\)/);
+});
