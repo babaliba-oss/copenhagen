@@ -1,6 +1,17 @@
 import polygonClipping from 'polygon-clipping';
 import {pointInPolygon, segmentDistance} from './geo.js';
 
+// Københavns Kommune's road-marking register is drawn into today's Copenhagen surface chunks (scripts/kk-markings.py);
+// road-markings.json is the bitmask of 16 m cells it covers. registerCoverage(data)(x,z) says whether the city's own paint
+// lies there, so the generated centre dashes and zebra stripes (street-life.js) are left out and not drawn twice.
+export function registerCoverage(data){
+ if(!data?.bits||!data.n||!data.cell)return ()=>false;
+ const raw=typeof atob==='function'?atob(data.bits):Buffer.from(data.bits,'base64').toString('binary'),bytes=new Uint8Array(raw.length);
+ for(let i=0;i<raw.length;i++)bytes[i]=raw.charCodeAt(i);
+ const {n,cell,origin}=data;
+ return (x,z)=>{const cx=Math.floor((x-origin)/cell),cz=Math.floor((z-origin)/cell);if(cx<0||cz<0||cx>=n||cz>=n)return false;const i=cz*n+cx;return (bytes[i>>3]>>(i&7)&1)===1;};
+}
+
 // Ground-plan fits from Helsinki's 2025 5 cm orthophoto, not survey drawings.
 // Corners are metre-scale estimates.
 export const REVIEWED_CROSSINGS = [

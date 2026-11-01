@@ -4,7 +4,7 @@ import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';
 import {createTrafficRenderer} from './traffic-renderer.js';
 import {routePoint,signalGreen} from './mobility.js';
 import {signalAnchor,authoredOlympiaMarkings} from './road-safety.js';
-import {crossingPolygons,kerbSegments} from './crossing-markings.js';
+import {crossingPolygons,kerbSegments,registerCoverage} from './crossing-markings.js';
 import {createGraniteKerbs,keepLongKerbs} from './street-furniture.js';
 import earcut,{flatten} from 'earcut';
 import {createPersonBatch,advanceGait,personLook,smoothHeading} from './person-model.js';
@@ -12,7 +12,8 @@ import {createBreakableSigns} from './breakable-signs.js';
 import {groundAt} from './terrain.js';
 import {drapeGeometry,settleObject} from './terrain-mesh.js';
 
-export function createStreetLife(scene,mobility,{paintedMarkings=true,mappedSignalNear=null}={}){ // paintedMarkings:false for 1760 (no zebra stripes or centre lines)
+export function createStreetLife(scene,mobility,{paintedMarkings=true,mappedSignalNear=null,registerMarkings=null}={}){ // paintedMarkings:false for 1760 (no zebra stripes or centre lines)
+ const painted=registerCoverage(registerMarkings); // Copenhagen: where the city's own paint is drawn in the surface chunks (scripts/kk-markings.py), no generated dashes or stripes
  const group=new THREE.Group();scene.add(group);
  const traffic=createTrafficRenderer(mobility.cars);group.add(traffic.group);
  // Walking pedestrians share the articulated person model used by every crowd.
@@ -41,7 +42,7 @@ export function createStreetLife(scene,mobility,{paintedMarkings=true,mappedSign
   roads=fresh(roads,seenRoads,'roads');walks=fresh(walks,seenWalks,'walks');const pavements=fresh(pavement,seenPavements,'pavement');
   if(!roads.length&&!walks.length&&!pavements.length)return;
  const markings=[];
- const crossingData=crossingPolygons(walks,mobility.world,{excluded:authoredOlympiaMarkings,...(initial?{}:{reviewed:[]})});
+ const crossingData=crossingPolygons(walks,mobility.world,{excluded:(x,z)=>authoredOlympiaMarkings(x,z)||painted(x,z),...(initial?{}:{reviewed:[]})});
  for(const polygon of crossingData.polygons){
   const flat=flatten(polygon),indices=earcut(flat.vertices,flat.holes,2),positions=[];
   // Earcut is counterclockwise in XY. Mapping its second axis to world Z
@@ -56,7 +57,7 @@ export function createStreetLife(scene,mobility,{paintedMarkings=true,mappedSign
  // Road centrelines only where the municipal graph indicates a two-way carriageway.
  for(const edge of roads){if(edge.separateCarriageway||edge.lane<1||edge.from>edge.to||edge.length<18)continue;
   // dashes run the whole edge (short blocks too), stopping 7 m short of each junction box
-  for(let s=7+((edge.length-14)%6)/2;s<=edge.length-7;s+=6){const p=routePoint(edge,s,0);if(!mobility.world.roads.at(p.x,p.z)||mobility.world.buildings.at(p.x,p.z))continue;const g=new THREE.PlaneGeometry(.10,2.7);g.rotateX(-Math.PI/2);g.rotateY(p.heading);g.translate(p.x,.092,p.z);markings.push(g);}
+  for(let s=7+((edge.length-14)%6)/2;s<=edge.length-7;s+=6){const p=routePoint(edge,s,0);if(painted(p.x,p.z)||!mobility.world.roads.at(p.x,p.z)||mobility.world.buildings.at(p.x,p.z))continue;const g=new THREE.PlaneGeometry(.10,2.7);g.rotateX(-Math.PI/2);g.rotateY(p.heading);g.translate(p.x,.092,p.z);markings.push(g);}
  }
  if(!paintedMarkings){markings.forEach(g=>g.dispose());markings.length=0;}
  if(markings.length){const geometries=markings.map(g=>g.index?g.toNonIndexed():g);const material=new THREE.MeshStandardMaterial({color:'#e7e3d4',roughness:1,side:THREE.DoubleSide,polygonOffset:true,polygonOffsetFactor:-1}),merged=drapeGeometry(mergeGeometries(geometries)); /* 500 m cells: one city-wide mesh (78k triangles) was never frustum-culled */for(const g of splitByCell(merged,500)){const m=new THREE.Mesh(g,material);m.name='Centre-line dashes';m.receiveShadow=true;group.add(m);}merged.dispose();new Set([...geometries,...markings]).forEach(g=>g.dispose());}

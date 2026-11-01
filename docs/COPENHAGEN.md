@@ -76,6 +76,9 @@ python3 scripts/surface-fill.py copenhagen          # after fit-colliders, and a
                                                     # unmapped strips between the streets and the houses (below)
 python3 scripts/kk-surfaces.py <kk data dir>/wfs copenhagen   # after surface-fill: the city's natural stone as setts and its gravel
                                                     # paths as gravel (k101 dp_belaegninger), cut out of roads, houses, water
+python3 scripts/kk-markings.py <kk data dir>/wfs copenhagen  # after kk-surfaces, and again after any surface-dissolve.mjs: the city's
+                                                    # road markings (k101 afmaerkning_total) painted on the drawn roads and
+                                                    # cycle tracks; road-markings.json turns the generated dashes/zebras off there
 node scripts/furniture-ground.mjs copenhagen        # after surface-fill and mapillary-features: flags the furniture with no
                                                     # surface under it, set down onto the bare ground or lawn (main.js)
 node scripts/indoor-items.mjs copenhagen            # after furniture-ground, kk-collision and collision-trim: drops furniture
