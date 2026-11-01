@@ -92,6 +92,7 @@ python3 scripts/kk-kerbs.py <kk data dir>/wfs copenhagen     # last, today only,
                                                     # everything that reads the road's width, in this order:
 node scripts/road-walls.mjs copenhagen
 python3 scripts/kk-shelters.py <kk data dir>/wfs copenhagen && python3 scripts/kk-water-toilets.py <kk data dir>/wfs copenhagen
+python3 scripts/kk-signs.py <kk data dir>/wfs copenhagen   # the city's road signs (k101 skilte_total, below)
 python3 scripts/parked-cars.py copenhagen <kk data dir>/wfs && node scripts/parked-lanes.mjs copenhagen
 python3 scripts/surface-fill.py copenhagen && python3 scripts/kk-surfaces.py <kk data dir>/wfs copenhagen
 python3 scripts/kk-markings.py <kk data dir>/wfs copenhagen
@@ -130,6 +131,26 @@ at 6.8 cm, the tracks at 5.2 cm and the paved-over track at 5.3 cm, all dropped 
 width against the kerbs -1.7 m -> +0.2 m), 273,000 m² of cycle track from the kerb out (58,000 m² of the old one paved
 over), 5,200 furniture items moved out of the road and 630 dropped; parked cars 3,025 -> 13,235, the city's road-marking
 paint kept 67,500 -> 74,500 m².
+
+### Road signs from the city's register (scripts/kk-signs.py)
+
+Københavns Kommune's sign register (WFS `k101:skilte_total`, `skilte_total.json` in `<kk data dir>/wfs`; CC BY 4.0) lists
+every sign post with its main plates (`hovedtavle_1`, `_2`, the back `hovedtavle_1_bagside`), their supplementary plates
+and the text on them (a speed limit, a zone's number). The standing posts (`Opstillet`) become furniture `sign` items
+(`src: 'kk-skilte'`) whose faces are our own drawings of the Danish signs (`src/danish-signs.js`, painted into the sign
+atlas at load by `mapped-furniture.js`: white prohibitory discs with a red rim, blue mandatory discs, blue information
+plates, zone plates, white supplementary plates with an arrow, a cyclist or lines of text). It draws the commonest ~70
+codes: 88% of the standing main plates (90% without the bus-stop plates `SO`, which `movia-stops.mjs` draws as the stop
+poles); a post with none of them is left out (2026-11: 13,200 posts with 26,300 plates; 1,400 with no drawn face). A
+post stands at its register point when that is clear of the drawn carriageway, the cycle tracks, the houses and the water,
+else moved out from the road up to 4.5 m (5,200 moved; 840 with no room, mostly on medians drawn as carriageway, left
+out). The register has no bearing: a plate faces the drivers on its side of the nearest road edge (on a one-way street
+those along it, a no-entry disc the wrong-way ones; a path sign in a park the walkers on its path), a back plate and the
+second plate of a post marked double-sided the other way. A speed plate (C55) shows the limit the game keeps on the road
+it faces (`mobility.json` `speedLimit`, from the city's speed lines): 26 of 156 said otherwise. The photo-detected signs
+(Mapillary) are dropped wherever the register has signs (100 m cells and their neighbours: 16,500), so Frederiksberg keeps
+its 700; main.js's clutter filter for photo signs leaves the register's posts alone. Then parked-cars, parked-lanes,
+furniture-ground and indoor-items again.
 
 ### How the municipal model becomes houses (scripts/kk-buildings.py)
 

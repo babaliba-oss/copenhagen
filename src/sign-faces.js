@@ -2,6 +2,7 @@
 // "regulatory--no-parking--g1"). signFace() is pure data so the city build and the tests
 // can use it; drawSignFace() paints one face onto a 2D canvas cell for the runtime atlas.
 // Colours follow the hand-built Helsinki signs: Finnish blue, yellow prohibitory fields, red rims.
+import {danishSign,drawDanish} from './danish-signs.js';
 export const SIGN_COLOURS={blue:'#0955ac',yellow:'#f3d43e',red:'#df4732',white:'#f5f5ef',black:'#15201e',grey:'#929b9d'};
 
 // code (without the --gN variant) → face. Unknown codes fall back by family to a plate of the right shape.
@@ -66,6 +67,7 @@ const FAMILY={regulatory:{shape:'circle',style:'prohibitory'},warning:{shape:'tr
 const KEYS=Object.keys(FACES).map(c=>c.split('--')[1]),faceKey=code=>{const [family,key]=code.split('--');return KEYS.filter(k=>k===key).length>1&&!/^(regulatory|information)$/.test(family)?`${family}-${key}`:key;};
 export function signFace(value=''){
  if(/^FI:/i.test(value))return finnishSign(value);
+ if(/^DK:/i.test(value))return danishSign(value); // Copenhagen's sign register (danish-signs.js)
  const code=String(value).replace(/--g\d+$/,'');
  const m=speed.exec(code);
  if(m)return {code,face:`speed-${m[1]}`,shape:'circle',style:'speed',text:m[1],known:true};
@@ -162,6 +164,8 @@ export function drawSignFace(c,f,x0,y0,w,h){
  const person=(x,y,s,fill)=>{c.fillStyle=fill;c.beginPath();c.arc(x,y-s*.42,s*.12,0,Math.PI*2);c.fill();c.strokeStyle=fill;c.lineWidth=s*.13;c.beginPath();c.moveTo(x,y-s*.28);c.lineTo(x+s*.04,y+s*.05);c.lineTo(x-s*.18,y+s*.42);c.moveTo(x+s*.04,y+s*.05);c.lineTo(x+s*.22,y+s*.4);c.moveTo(x-s*.2,y-s*.08);c.lineTo(x,y-s*.22);c.lineTo(x+s*.2,y-s*.02);c.stroke();};
  const bike=(x,y,s,fill)=>{c.strokeStyle=fill;c.lineWidth=s*.08;for(const dx of [-.28,.28]){c.beginPath();c.arc(x+dx*s,y+s*.15,s*.2,0,Math.PI*2);c.stroke();}c.beginPath();c.moveTo(x-s*.28,y+s*.15);c.lineTo(x-s*.05,y-s*.18);c.lineTo(x+s*.2,y-s*.18);c.lineTo(x+s*.28,y+s*.15);c.moveTo(x-s*.05,y-s*.18);c.lineTo(x+.02*s,y+s*.15);c.lineTo(x+s*.2,y-s*.18);c.stroke();};
  const ring=(field)=>{disc(r,C.red);disc(r*.78,field);};
+ if(f.dk&&drawDanish(c,f,{cx,cy,r,bx,by,bw,bh})){c.restore();return;}
+ if(f.dk&&drawDanish(c,f,{cx,cy,r,bx,by,bw,bh})){c.restore();return;}
  if(drawFinnish(c,f,{C,cx,cy,r,bx,by,bw,bh,poly,disc,text,person,bike,arrow,ring})){c.restore();return;}
  if(f.shape==='circle'){
   if(f.style==='speed'||f.style==='prohibitory'){ring(C.yellow);if(f.text)text(f.text,r*(f.text.length>2?.62:.8),C.black);}
