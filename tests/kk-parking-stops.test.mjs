@@ -2,6 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {gunzipSync} from 'node:zlib';
+import {expandMobility} from '../src/mobility-pack.js';
+import {prepareGraph,routePoint} from '../src/mobility.js';
 
 // Copenhagen's parked cars, bus stops and bus shelters from Københavns Kommune's map data (scripts/parked-cars.py,
 // scripts/movia-stops.mjs, scripts/kk-shelters.py).
@@ -31,4 +33,14 @@ test('bus stops carry Movia\'s names, and the city\'s bus shelters stand off the
  assert.ok(shelters.length>100,String(shelters.length));
  const roads=city.roads.filter(r=>!/island/.test(r.kind||''));
  for(const s of shelters)assert.ok(!roads.some(r=>r.bbox[0]<=s.x&&s.x<=r.bbox[2]&&r.bbox[1]<=s.z&&s.z<=r.bbox[3]&&inside(r.rings[0],s.x,s.z)),`shelter ${s.ref} on the road`);
+});
+
+test('no parked car stands where a car driving its lane would touch it, on the bends and junction turns too (parked-lanes.mjs)',()=>{
+ const roads=prepareGraph(expandMobility(read('mobility.json')).roads),grid=new Map(),C=10,key=(x,z)=>Math.floor(x/C)+','+Math.floor(z/C);
+ for(const c of parked.cars){const k=key(c[0],c[1]);if(!grid.has(k))grid.set(k,[]);grid.get(k).push(c);}
+ const box=(a,b,[aw,al],[bw,bl])=>{const axes=[a[2],b[2]].flatMap(y=>[[Math.sin(y),Math.cos(y)],[Math.cos(y),-Math.sin(y)]]),dx=b[0]-a[0],dz=b[1]-a[1],r=(c,w,l,[ux,uz])=>l*Math.abs(Math.sin(c[2])*ux+Math.cos(c[2])*uz)+w*Math.abs(Math.cos(c[2])*ux-Math.sin(c[2])*uz);return axes.every(ax=>Math.abs(dx*ax[0]+dz*ax[1])<r(a,aw,al,ax)+r(b,bw,bl,ax));};
+ const hit=new Set();
+ for(const e of roads.edges){if(e.crossing)continue;for(let s=0;s<=e.length;s+=.5){const p=routePoint(e,s,e.lane),m=[p.x,p.z,p.heading],gx=Math.floor(p.x/C),gz=Math.floor(p.z/C);
+  for(let i=-1;i<=1;i++)for(let j=-1;j<=1;j++)for(const c of grid.get((gx+i)+','+(gz+j))||[])if(box(c,m,[.9,2.15],[.98,2.36]))hit.add(c);}}
+ assert.equal(hit.size,0,JSON.stringify([...hit].slice(0,5))); // 8 of 13,204 before (one across the lane at -2194,-1363)
 });

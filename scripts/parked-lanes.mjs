@@ -16,7 +16,15 @@ const HW=.9,HL=2.15,CLEAR=HW+.98,C=10,grid=new Map(),cell=(x,z)=>Math.floor(x/C)
 const add=(map,k,v)=>{let l=map.get(k);if(!l)map.set(k,l=[]);l.push(v);};
 for(const e of roads.edges){if(e.crossing)continue;for(const off of new Set([e.lane,...(e.laneOffsets||[])]))for(let s=0;s<=e.length;s+=1){const p=routePoint(e,s,off);add(grid,cell(p.x,p.z),[p.x,p.z]);}}
 const near=(map,x,z)=>{const gx=Math.floor(x/C),gz=Math.floor(z/C),out=[];for(let i=-1;i<=1;i++)for(let j=-1;j<=1;j++)out.push(...(map.get((gx+i)+','+(gz+j))||[]));return out;};
-const inLane=([x,z,yaw])=>{const ux=Math.sin(yaw),uz=Math.cos(yaw);return near(grid,x,z).some(([px,pz])=>{const dx=px-x,dz=pz-z;return Math.abs(dx*ux+dz*uz)<HL+.3&&Math.abs(dz*ux-dx*uz)<CLEAR;});};
+// A lane past the car at an angle (a bend, a junction turn) runs a moving car's corner (half 0.98 x 2.36 m) into it with
+// its centre line further off the car's axis than CLEAR: each lane point is also tested as that car's box, along the lane
+// (with the kerbs out to the city's, 13,200 cars instead of 3,000, 8 stood so on the bends and turns, one across a lane).
+const moving=[];for(const e of roads.edges){if(e.crossing)continue;for(const off of new Set([e.lane,...(e.laneOffsets||[])]))for(let s=0;s<=e.length;s+=.5){const p=routePoint(e,s,off);moving.push([p.x,p.z,p.heading]);}}
+const movingGrid=new Map();for(const m of moving)add(movingGrid,cell(m[0],m[1]),m);
+const boxes=(a,b,[aw,al],[bw,bl])=>{const axes=[a[2],b[2]].flatMap(y=>[[Math.sin(y),Math.cos(y)],[Math.cos(y),-Math.sin(y)]]),dx=b[0]-a[0],dz=b[1]-a[1];
+ const r=(c,w,l,[ux,uz])=>l*Math.abs(Math.sin(c[2])*ux+Math.cos(c[2])*uz)+w*Math.abs(Math.cos(c[2])*ux-Math.sin(c[2])*uz);
+ return axes.every(ax=>Math.abs(dx*ax[0]+dz*ax[1])<r(a,aw,al,ax)+r(b,bw,bl,ax));};
+const inLane=c=>{const [x,z,yaw]=c,ux=Math.sin(yaw),uz=Math.cos(yaw);return near(grid,x,z).some(([px,pz])=>{const dx=px-x,dz=pz-z;return Math.abs(dx*ux+dz*uz)<HL+.3&&Math.abs(dz*ux-dx*uz)<CLEAR;})||near(movingGrid,x,z).some(m=>Math.abs(m[0]-x)<5&&Math.abs(m[1]-z)<5&&boxes(c,m,[HW,HL],[.98,2.36]));};
 // Two boxes overlap (separating axes on both cars' axes).
 const overlap=(a,b)=>{const axes=[a[2],b[2]].flatMap(y=>[[Math.sin(y),Math.cos(y)],[Math.cos(y),-Math.sin(y)]]),dx=b[0]-a[0],dz=b[1]-a[1];
  const r=(c,[ux,uz])=>HL*Math.abs(Math.sin(c[2])*ux+Math.cos(c[2])*uz)+HW*Math.abs(Math.cos(c[2])*ux-Math.sin(c[2])*uz);
