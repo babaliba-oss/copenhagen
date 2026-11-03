@@ -150,8 +150,9 @@ export function spaceTrees(trees){
 // stand 4-8 m apart: over Assistens Kirkegård 5,800 crowns within 850 m (2,800 before kk-trees.py), 0.7M triangles of
 // mid crowns on a phone. A tree with at least `dense` others within `reach` m is drawn at mid (far) only if no kept one
 // stands within `mid` (`far`) m; the kept ones get crowns `grow` times wider there, so the groves stay closed. Street rows
-// (a neighbour each side every 8-10 m) are not dense. Pure: per level, 1 = not drawn, 2 = kept and drawn wider, 0 = as is.
-export const THIN={dense:6,reach:15,mid:12,far:20,grow:{mid:1.2,far:1.4}};
+// (a neighbour each side every 8-10 m) are not dense. Within the near level a dense tree past `near` m gets the mid crown
+// (the full EZ crowns are 2-9k triangles: 70 of them stood within 60 m on Nørrebrogade by the churchyard). Pure: per level, 1 = not drawn, 2 = kept and drawn wider, 0 = as is.
+export const THIN={dense:6,reach:15,near:30,mid:12,far:20,grow:{mid:1.2,far:1.4}};
 export function thinDense(trees,{dense=THIN.dense,reach=THIN.reach,mid=THIN.mid,far=THIN.far}=THIN){
  const n=trees.length,C=Math.max(reach,mid,far),X=new Float64Array(n),Z=new Float64Array(n),grid=new Map();
  for(let k=0;k<n;k++){X[k]=trees[k].p[0];Z[k]=trees[k].p[1];const g=Math.floor(X[k]/C)*65536+Math.floor(Z[k]/C);let l=grid.get(g);if(!l)grid.set(g,l=[]);l.push(k);}
@@ -160,7 +161,7 @@ export function thinDense(trees,{dense=THIN.dense,reach=THIN.reach,mid=THIN.mid,
  for(let k=0;k<n;k++){let c=0;for(const l of cells(k))for(const o of l){const dx=X[o]-X[k],dz=Z[o]-Z[k];if(o!==k&&dx*dx+dz*dz<r2)c++;}isDense[k]=c>=dense?1:0;}
  const pick=r=>{const out=new Uint8Array(n),q=r*r;for(let k=0;k<n;k++){if(!isDense[k])continue;let taken=false;
    for(const l of cells(k)){for(const o of l){if(out[o]!==2)continue;const dx=X[o]-X[k],dz=Z[o]-Z[k];if(dx*dx+dz*dz<q){taken=true;break;}}if(taken)break;}out[k]=taken?1:2;}return out;};
- return {mid:pick(mid),far:pick(far)};
+ return {mid:pick(mid),far:pick(far),dense:isDense};
 }
 export const SPECIES_LOD={near:95,mid:460,far:850}; // near: full EZ crowns (about 2-9k triangles each)
 export function treeLevel(d,b=SPECIES_LOD){return d<b.near?'near':d<b.mid?'mid':d<b.far?'far':null;}
@@ -168,7 +169,7 @@ export function createSpeciesTrees(trees,{detailed=false,models=null,lod=SPECIES
  trees=spaceTrees(trees);
  const group=new THREE.Group();group.name='Species trees';
  const material=new THREE.MeshStandardMaterial({vertexColors:true,roughness:.95,metalness:0,emissive:'#3a4a28',emissiveIntensity:.45});
- const thinned=thin?thinDense(trees,{...THIN,...thin}):null,grow={...THIN.grow,...thin?.grow};
+ const thinned=thin?thinDense(trees,{...THIN,...thin}):null,grow={...THIN.grow,...thin?.grow},thinNear=thin?.near??THIN.near;
  const items=trees.map((t,i)=>({t,inst:treeInstance(t,i)})),used=new Set(items.map(o=>`${o.inst.family}|${o.inst.variant}`));
  const meshes={},ids={},triangles={};const m=new THREE.Object3D(),tint=new THREE.Color();
  // Near trees: the detailed EZ-Tree crowns (as in Helsinki) where the family has one; the procedural near shape otherwise.
@@ -190,7 +191,7 @@ export function createSpeciesTrees(trees,{detailed=false,models=null,lod=SPECIES
  // leaf cards stand mostly upright and read as bare branches from above, so the procedural 'mid' crowns are used.
  const update=(focus,{high=false}={})=>{
   if(last&&high===lastHigh&&Math.hypot(focus.x-last.x,focus.z-last.z)<8)return;last={x:focus.x,z:focus.z};lastHigh=high;
-  for(let i=0;i<items.length;i++){const t=items[i].t;let l=treeLevel(Math.hypot(t.p[0]-focus.x,t.p[1]-focus.z),lod);if(l&&l!=='near'&&thinned?.[l][i]===1)l=null;if(high&&l==='near')l='mid';if(l===shown[i])continue;
+  for(let i=0;i<items.length;i++){const t=items[i].t;const d=Math.hypot(t.p[0]-focus.x,t.p[1]-focus.z);let l=treeLevel(d,lod);if(thinned){if(l==='near'&&thinned.dense[i]&&d>=thinNear)l='mid';else if(l&&l!=='near'&&thinned[l][i]===1)l=null;}if(high&&l==='near')l='mid';if(l===shown[i])continue;
    if(shown[i])vis(shown[i],i,false);if(l)vis(l,i,true);shown[i]=l;}
  };
  const families={};for(const {inst} of items)families[inst.family]=(families[inst.family]||0)+1;

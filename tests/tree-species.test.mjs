@@ -76,5 +76,5 @@ test('phones thin dense plantings beyond the near level, never a street row or a
  const on=createSpeciesTrees(far,{thin:{}}),off=createSpeciesTrees(far);
  on.update({x:0,z:0});off.update({x:0,z:0});
  assert.equal(off.levels().mid,far.length);assert.ok(on.levels().mid<far.length*.5,`mid shown ${on.levels().mid}`);assert.ok(on.stats.thinned.mid>0);
- on.update({x:230,z:30});assert.equal(on.levels().near,far.length,'near crowns all there');
+ on.update({x:230,z:30});const lv=on.levels();assert.ok(lv.near>0&&lv.near<far.length,'near crowns within 30 m only');assert.equal(lv.near+lv.mid,far.length,'every grove tree drawn within the near range');
 });
