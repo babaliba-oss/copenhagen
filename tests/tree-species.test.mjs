@@ -59,3 +59,22 @@ test('detailed crowns dissolve near the camera', async () => {
  leaves.material.onBeforeCompile(shader);assert.match(shader.fragmentShader,/length\(vViewPosition\)/);assert.match(shader.fragmentShader,/discard/);
  assert.ok(LEAF_NEAR.to<8,'the car, 8 m ahead of the lens, keeps the crowns over it');
 });
+test('phones thin dense plantings beyond the near level, never a street row or a lone tree', async () => {
+ const {thinDense,THIN}=await import('../src/tree-species.js');
+ const grove=[];for(let i=0;i<12;i++)for(let j=0;j<12;j++)grove.push({p:[i*5,j*5],species:'TILIA',height:14}); // 60 m square, 5 m apart
+ const row=[];for(let i=0;i<30;i++)row.push({p:[500+i*9,0],species:'TILIA',height:14}); // a street row, 9 m apart
+ const lone={p:[-400,-400],species:'ACER',height:12},trees=[...grove,...row,lone],t=thinDense(trees);
+ const g=a=>a.slice(0,grove.length),dropped=a=>a.filter(v=>v===1).length;
+ assert.ok(dropped(g(t.mid))>grove.length/2&&dropped(g(t.mid))<grove.length*.95,`grove mid ${dropped(g(t.mid))}`);
+ assert.ok(dropped(g(t.far))>=dropped(g(t.mid)),'far thinned at least as much as mid');
+ assert.ok(g(t.mid).includes(2),'some crowns kept');
+ assert.equal(t.mid.slice(grove.length).filter(Boolean).length,0,'row and lone tree untouched');
+ // kept crowns stay at least THIN.mid apart
+ const kept=grove.filter((_,i)=>t.mid[i]===2);for(const a of kept)for(const b of kept)if(a!==b)assert.ok(Math.hypot(a.p[0]-b.p[0],a.p[1]-b.p[1])>=THIN.mid);
+ // in the scene: a thinned grove tree is hidden at mid, kept at near; without thin all show
+ const far=[...grove.map(x=>({...x,p:[x.p[0]+200,x.p[1]]}))];
+ const on=createSpeciesTrees(far,{thin:{}}),off=createSpeciesTrees(far);
+ on.update({x:0,z:0});off.update({x:0,z:0});
+ assert.equal(off.levels().mid,far.length);assert.ok(on.levels().mid<far.length*.5,`mid shown ${on.levels().mid}`);assert.ok(on.stats.thinned.mid>0);
+ on.update({x:230,z:30});assert.equal(on.levels().near,far.length,'near crowns all there');
+});

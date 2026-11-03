@@ -146,12 +146,29 @@ export function spaceTrees(trees){
 }
 // All species trees of a city in three BatchedMeshes (near, mid, far): one draw call per level, with
 // per-tree visibility by distance and per-tree frustum culling. Returns {group, update(focus), stats}.
+// Dense plantings thinned beyond the near level (phones: main.js passes thin). The register's park and churchyard trees
+// stand 4-8 m apart: over Assistens Kirkegård 5,800 crowns within 850 m (2,800 before kk-trees.py), 0.7M triangles of
+// mid crowns on a phone. A tree with at least `dense` others within `reach` m is drawn at mid (far) only if no kept one
+// stands within `mid` (`far`) m; the kept ones get crowns `grow` times wider there, so the groves stay closed. Street rows
+// (a neighbour each side every 8-10 m) are not dense. Pure: per level, 1 = not drawn, 2 = kept and drawn wider, 0 = as is.
+export const THIN={dense:6,reach:15,mid:12,far:20,grow:{mid:1.2,far:1.4}};
+export function thinDense(trees,{dense=THIN.dense,reach=THIN.reach,mid=THIN.mid,far=THIN.far}=THIN){
+ const n=trees.length,C=Math.max(reach,mid,far),X=new Float64Array(n),Z=new Float64Array(n),grid=new Map();
+ for(let k=0;k<n;k++){X[k]=trees[k].p[0];Z[k]=trees[k].p[1];const g=Math.floor(X[k]/C)*65536+Math.floor(Z[k]/C);let l=grid.get(g);if(!l)grid.set(g,l=[]);l.push(k);}
+ const cells=k=>{const gi=Math.floor(X[k]/C),gj=Math.floor(Z[k]/C),out=[];for(let i=-1;i<=1;i++)for(let j=-1;j<=1;j++){const l=grid.get((gi+i)*65536+gj+j);if(l)out.push(l);}return out;};
+ const isDense=new Uint8Array(n),r2=reach*reach;
+ for(let k=0;k<n;k++){let c=0;for(const l of cells(k))for(const o of l){const dx=X[o]-X[k],dz=Z[o]-Z[k];if(o!==k&&dx*dx+dz*dz<r2)c++;}isDense[k]=c>=dense?1:0;}
+ const pick=r=>{const out=new Uint8Array(n),q=r*r;for(let k=0;k<n;k++){if(!isDense[k])continue;let taken=false;
+   for(const l of cells(k)){for(const o of l){if(out[o]!==2)continue;const dx=X[o]-X[k],dz=Z[o]-Z[k];if(dx*dx+dz*dz<q){taken=true;break;}}if(taken)break;}out[k]=taken?1:2;}return out;};
+ return {mid:pick(mid),far:pick(far)};
+}
 export const SPECIES_LOD={near:95,mid:460,far:850}; // near: full EZ crowns (about 2-9k triangles each)
 export function treeLevel(d,b=SPECIES_LOD){return d<b.near?'near':d<b.mid?'mid':d<b.far?'far':null;}
-export function createSpeciesTrees(trees,{detailed=false,models=null,lod=SPECIES_LOD,ground=groundAt}={}){ // ground(x,z): the height a trunk stands at (main.js: the ground drawn there, not the field) // lod: phones draw the full crowns to 60 m (95 m: 220k triangles of near trees at Kongens Nytorv) // models: ez-trees.js loadTreeModels(), the near crowns of the broadleaf families
+export function createSpeciesTrees(trees,{detailed=false,models=null,lod=SPECIES_LOD,ground=groundAt,thin=null}={}){ // thin: THIN (or its overrides) to thin dense plantings beyond the near level // ground(x,z): the height a trunk stands at (main.js: the ground drawn there, not the field) // lod: phones draw the full crowns to 60 m (95 m: 220k triangles of near trees at Kongens Nytorv) // models: ez-trees.js loadTreeModels(), the near crowns of the broadleaf families
  trees=spaceTrees(trees);
  const group=new THREE.Group();group.name='Species trees';
  const material=new THREE.MeshStandardMaterial({vertexColors:true,roughness:.95,metalness:0,emissive:'#3a4a28',emissiveIntensity:.45});
+ const thinned=thin?thinDense(trees,{...THIN,...thin}):null,grow={...THIN.grow,...thin?.grow};
  const items=trees.map((t,i)=>({t,inst:treeInstance(t,i)})),used=new Set(items.map(o=>`${o.inst.family}|${o.inst.variant}`));
  const meshes={},ids={},triangles={};const m=new THREE.Object3D(),tint=new THREE.Color();
  // Near trees: the detailed EZ-Tree crowns (as in Helsinki) where the family has one; the procedural near shape otherwise.
@@ -162,7 +179,7 @@ export function createSpeciesTrees(trees,{detailed=false,models=null,lod=SPECIES
   const verts=[...geos.values()].reduce((n,g)=>n+g.attributes.position.count,0);
   const bm=new THREE.BatchedMesh(Math.max(1,items.length),Math.max(3,verts),0,material);bm.name=`Species trees (${level})`;
   const gid=new Map([...geos].map(([k,g])=>[k,bm.addGeometry(g)]));ids[level]=[];triangles[level]=0;
-  for(const {t,inst} of items){const id=bm.addInstance(gid.get(`${inst.family}|${inst.variant}`));m.position.set(t.p[0],ground(t.p[0],t.p[1]),t.p[1]);m.rotation.set(0,inst.yaw,0);m.scale.set(inst.width,inst.height,inst.width);m.updateMatrix();
+  for(const [i,{t,inst}] of items.entries()){const id=bm.addInstance(gid.get(`${inst.family}|${inst.variant}`));m.position.set(t.p[0],ground(t.p[0],t.p[1]),t.p[1]);m.rotation.set(0,inst.yaw,0);const w=inst.width*(thinned?.[level]?.[i]===2?grow[level]:1);m.scale.set(w,inst.height,w);m.updateMatrix();
    bm.setMatrixAt(id,m.matrix);bm.setColorAt(id,tint.setScalar(inst.tint));bm.setVisibleAt(id,false);ids[level].push(id);triangles[level]+=geos.get(`${inst.family}|${inst.variant}`).attributes.position.count/3;}
   geos.forEach(g=>g.dispose());
   bm.perObjectFrustumCulled=true;bm.castShadow=level==='near';bm.receiveShadow=level!=='far';bm.userData.shadowLod=true;meshes[level]=bm;group.add(bm);
@@ -173,11 +190,11 @@ export function createSpeciesTrees(trees,{detailed=false,models=null,lod=SPECIES
  // leaf cards stand mostly upright and read as bare branches from above, so the procedural 'mid' crowns are used.
  const update=(focus,{high=false}={})=>{
   if(last&&high===lastHigh&&Math.hypot(focus.x-last.x,focus.z-last.z)<8)return;last={x:focus.x,z:focus.z};lastHigh=high;
-  for(let i=0;i<items.length;i++){const t=items[i].t;let l=treeLevel(Math.hypot(t.p[0]-focus.x,t.p[1]-focus.z),lod);if(high&&l==='near')l='mid';if(l===shown[i])continue;
+  for(let i=0;i<items.length;i++){const t=items[i].t;let l=treeLevel(Math.hypot(t.p[0]-focus.x,t.p[1]-focus.z),lod);if(l&&l!=='near'&&thinned?.[l][i]===1)l=null;if(high&&l==='near')l='mid';if(l===shown[i])continue;
    if(shown[i])vis(shown[i],i,false);if(l)vis(l,i,true);shown[i]=l;}
  };
  const families={};for(const {inst} of items)families[inst.family]=(families[inst.family]||0)+1;
- group.userData={count:trees.length,families,templates:used.size*LEVELS.length,drawCalls:LEVELS.length,trianglesIfAllNear:triangles.near,trianglesIfAllMid:triangles.mid,trianglesIfAllFar:triangles.far,
+ group.userData={count:trees.length,families,templates:used.size*LEVELS.length,drawCalls:LEVELS.length,thinned:thinned?{mid:thinned.mid.reduce((n,v)=>n+(v===1),0),far:thinned.far.reduce((n,v)=>n+(v===1),0)}:null,trianglesIfAllNear:triangles.near,trianglesIfAllMid:triangles.mid,trianglesIfAllFar:triangles.far,
   accuracy:'Register positions, species and height classes; crown shapes per species family from current photos',source:'Procedural geometry (src/tree-species.js)'};
  return {group,update,stats:group.userData,levels:()=>{const c={near:0,mid:0,far:0};for(const l of shown)if(l)c[l]++;return c;}};
 }
