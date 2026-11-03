@@ -165,7 +165,6 @@ export function drawSignFace(c,f,x0,y0,w,h){
  const bike=(x,y,s,fill)=>{c.strokeStyle=fill;c.lineWidth=s*.08;for(const dx of [-.28,.28]){c.beginPath();c.arc(x+dx*s,y+s*.15,s*.2,0,Math.PI*2);c.stroke();}c.beginPath();c.moveTo(x-s*.28,y+s*.15);c.lineTo(x-s*.05,y-s*.18);c.lineTo(x+s*.2,y-s*.18);c.lineTo(x+s*.28,y+s*.15);c.moveTo(x-s*.05,y-s*.18);c.lineTo(x+.02*s,y+s*.15);c.lineTo(x+s*.2,y-s*.18);c.stroke();};
  const ring=(field)=>{disc(r,C.red);disc(r*.78,field);};
  if(f.dk&&drawDanish(c,f,{cx,cy,r,bx,by,bw,bh})){c.restore();return;}
- if(f.dk&&drawDanish(c,f,{cx,cy,r,bx,by,bw,bh})){c.restore();return;}
  if(drawFinnish(c,f,{C,cx,cy,r,bx,by,bw,bh,poly,disc,text,person,bike,arrow,ring})){c.restore();return;}
  if(f.shape==='circle'){
   if(f.style==='speed'||f.style==='prohibitory'){ring(C.yellow);if(f.text)text(f.text,r*(f.text.length>2?.62:.8),C.black);}
