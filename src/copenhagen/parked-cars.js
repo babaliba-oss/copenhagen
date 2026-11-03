@@ -95,7 +95,7 @@ export function createParkedCars(data,{bodies=[],skip=null}={}){ // skip(x,z): l
   return hit;}
  let lastFocus=null,lastHit=-1;
  // Boxes for a walker or rider (they don't push cars): {x,z,heading,halfWidth,halfLength}.
- const nearBoxes=(x,z,r,out=[])=>{for(const i of nearby(x,z,list))if(Math.hypot(px[i]-x,pz[i]-z)<r)out.push({x:px[i],z:pz[i],heading:pyaw[i],halfWidth:HW,halfLength:HL});return out;};
+ const nearBoxes=(x,z,r,out=[])=>{for(const i of nearby(x,z,list))if(Math.hypot(px[i]-x,pz[i]-z)<r)out.push({x:px[i],z:pz[i],heading:pyaw[i],halfWidth:HW,halfLength:HL,kerb:true});return out;};
  // points: [[x,z],...] along a route; every car within r of one is hidden (and no longer an obstacle). Without points, all come back.
  const hideAlong=(points=[],r=1.7)=>{for(const c of hidden)obstacles[c].disabled=false;hidden.clear();
   for(const [x,z] of points){const i=Math.floor(x/CHUNK),j=Math.floor(z/CHUNK);for(let di=-1;di<=1;di++)for(let dj=-1;dj<=1;dj++)for(const c of cells.get((i+di)*100000+j+dj)||[])if(!hidden.has(c)&&Math.hypot(poses[c*16+12]-x,poses[c*16+14]-z)<r+1.2){hidden.add(c);obstacles[c].disabled=true;}}

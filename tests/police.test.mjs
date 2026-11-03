@@ -242,6 +242,15 @@ test('a unit taking the kerb-side passing offset does not go into the kerb-parke
  assert.ok(run(false)>0,'unlisted, it moves over into them');
  assert.equal(run(true),0,'listed: never inside one');
 });
+test('a unit drives on past kerb-parked cars standing just clear of its lane (parked-cars.py keeps them 1.95 m off the lane lines)',()=>{
+ const run=kerbTag=>{const p=new PoliceSimulation(graph(),world),walker={x:6,z:-190,heading:0,speed:0,walking:true,halfLength:.3};p.report('pedestrian',1);
+  const e=p.graph.edges[1],kerb=[10,15,20,25,30,35,40].map(s=>{const q=routePoint(e,s,e.lane+1.95);return {x:q.x,z:q.z,heading:q.heading,halfLength:2.15,halfWidth:.9,kerb:kerbTag};});
+  p.units=[{id:'unit',edge:e,s:.6,x:0,z:-.6,heading:0,speed:0,stuck:0}];p.dispatch=100;let overlap=0;
+  for(let i=0;i<120;i++){const u=p.units[0];p.step(1/30,walker,kerb.filter(k=>Math.hypot(k.x-u.x,k.z-u.z)<8));if(kerb.some(k=>trafficFootprintsOverlap(p.units[0],k)))overlap++;}
+  return {s:p.units[0].edge===e?p.units[0].s:Infinity,overlap};};
+ const kerb=run(true);assert.ok(kerb.s>25,`on past them (at ${kerb.s.toFixed(1)} m after 4 s)`);assert.equal(kerb.overlap,0);
+ assert.ok(run(undefined).s<10,'the same boxes as cars on the move (no kerb tag) still hold it 6 m behind the first');
+});
 // A crossroads at the origin (one-way arms: north up the z axis from the south, on to the north, and west to east), with
 // traffic's junction boxes (lane-model.js stopGap/startGap).
 const crossroads=()=>{const g=prepareGraph({nodes:[[0,100],[0,0],[0,-100],[-100,0],[100,0]],edges:[{from:0,to:1,lane:0,points:[[0,100],[0,0]]},{from:1,to:2,lane:0,points:[[0,0],[0,-100]]},{from:3,to:1,lane:0,points:[[-100,0],[0,0]]},{from:1,to:4,lane:0,points:[[0,0],[100,0]]}]});annotateJunctions(g,[]);return g;};

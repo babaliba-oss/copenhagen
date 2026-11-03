@@ -115,6 +115,11 @@ function kerbRoom(u,world,graph){
 // (the lane cuts a tight corner: the narrow street by the wall at 950,437), steps NUDGES m off its lane instead and keeps
 // that offset 1.5 s, through the corner. It stood there to the end of the chase (13-17 s).
 const NUDGES=[-.25,.25];
+// A kerb-parked car (parked-cars.js near(), kerb: true) beside its way holds a unit only where the bodies come within
+// KERB_SIDE of each other side by side, not at the 2.3 m kept from a car on the lane: the parked cars stand 1.95 m off
+// the lane lines (scripts/parked-cars.py), and with the carriageways out to the city's kerbs (13,200 of them, was 3,000) a
+// unit stood 12-16 s, 6 m behind one 2.25 m to its side (0.37 m clear), in every seed of the chase sim (edge 42279).
+const KERB_SIDE=.05;
 const BACK_OUT=3,BACK_AFTER=ON_FOOT.after+1; // s it first stands there: time to send its officer to a stopped player within reach on foot (ON_FOOT, FOOT_CHASE)
 // Officer positions are kept on the unit (unit.officer): {x,z,heading,speed,back,path,k,...}; the renderer draws them there.
 const newOfficer=(x,z,heading)=>({x,z,heading,speed:0,back:false,path:null,k:0,plan:0,gx:NaN,gz:NaN});
@@ -580,7 +585,7 @@ export class PoliceSimulation{
    let room=Infinity,front=null,fk=-1,off;for(let k=0;k<near.length;k++){const a=obstacles[near[k]],dx=a.x-unit.x,dz=a.z-unit.z,d2=dx*dx+dz*dz;if(d2>676||pass&&a.holdBy===unit)continue;if(round&&a.officer&&near[k]>=base){if(unit.stuck>2)unit.roundUntil=this.time+3;continue;}const forward=-dx*sh-dz*ch;if(forward<=0||forward>=24)continue;
     let side=Math.abs(dx*ch-dz*sh);const d=unit.s+Math.sqrt(d2),e=unit.edge;if(near[k]<base&&a!==player&&side<2.3&&d<=e.length+(ahead?ahead.length:0)){ /* the player and the other units: straight on, as before (how close it follows them) */const W=this.wayPoint||={x:0,z:0,heading:0}; /* at its present offset from the centre line (a passing offset, or its lane) */if(off===undefined){routePoint(e,unit.s,0,undefined,undefined,W);off=(unit.x-W.x)*Math.cos(W.heading)-(unit.z-W.z)*Math.sin(W.heading);}
      if(d<=e.length)routePoint(e,d,off,undefined,undefined,W);else routePoint(ahead,d-e.length,off-e.lane+ahead.lane,undefined,undefined,W);side=Math.abs((a.x-W.x)*Math.cos(W.heading)-(a.z-W.z)*Math.sin(W.heading));}
-    if(side<2.3){desired=Math.min(desired,Math.max(0,(forward-6)*1.4));if(forward<room){room=forward;front=a;fk=near[k];}}}
+    if(side<(a.kerb?(unit.halfWidth??.98)+a.halfWidth+KERB_SIDE:2.3)){desired=Math.min(desired,Math.max(0,(forward-6)*1.4));if(forward<room){room=forward;front=a;fk=near[k];}}}
    unit.queued=fk>0&&fk<base; // behind a traffic car (not the player, slot 0, nor another unit): FOOT_NEAR
    {const line=stopLine(unit.edge),d=line-unit.s;if(d>-.3&&d<30&&this.holdsShort(unit,ahead,field,line,near,player,surge?SURGE.arrestRange:10)){const t=Math.max(0,d);desired=Math.min(desired,Math.sqrt(6*t),t*1.3);}} // stop at the stop line (traffic's comfortable stop: mobility.js stopBefore)
    if(this.time<unit.yieldUntil)desired=0; // letting by a car that waited on it (below)
