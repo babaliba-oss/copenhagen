@@ -271,6 +271,13 @@ Notes:
 
 - `game.js`: delivery jobs, sagas, journal (J), treasure map (K), hidden nisser, the morning paper, GPS line.
 - `characters.js` / `data.js`: authored characters and their dialogue, for both eras.
+- Jobs and ranks: `JOBS` (20, today) and `JOBS_1760` (13) in `data.js` run in order and start again after the last
+  (`save.job` counts on, so a longer list needs no migration). New jobs go at the end, with both ends on a road of that
+  map (`tests/copenhagen-progress.test.mjs`; the lines, clocks and pay are played in `copenhagen-game.test.mjs`).
+  Deliveries move you up seven ranks (`RANKS` in `game.js`, the last at 30), each worth 10% more pay. On top of that a
+  rank gives: today a paint for your own car (`PAINTS`, at ranks 1-4 and 6, picked in the journal, stored as the
+  optional `save.paint`; unlocked by the delivery count, so old saves have them), in 1760 a purse paid at the promotion
+  (`PURSES`). The journal and the money panel (desktop) say what the next rank is and what it gives (`nextUp`).
 - `carriage.js` + `gait.js`: the 1760 coach (player) and NPC coaches (traffic spaces them by their 6.6 m length,
   `COACH_HALF_LENGTH`, not as cars). With the models below loaded, a coach and its pair are one merged geometry animated
   in the vertex shader (`gait.js`): per-vertex `anim`/`pivot` mark the horses' legs (swing about the shoulder/hip, the knee

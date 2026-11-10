@@ -13,6 +13,16 @@ export const JOBS = [
   { t: 'Library returns', d: 'Three overdue books for the Black Diamond. The fine is already embarrassing.', a: [55.68126, 12.57580, 'Rundetårn'], b: [55.67340, 12.58210, 'Den Sorte Diamant'], pay: 340 },
   { t: 'Ice lollies for the lifeguards', d: 'A cool box for the lifeguards at Havnebadet. They melt, so take Langebro.', a: [55.67340, 12.58210, 'Den Sorte Diamant'], b: [55.66486, 12.57416, 'Havnebadet Islands Brygge'], pay: 410 }, // on the street by the park: the quay's spot was on the lawn, 44 m from the road
   { t: 'Flowers for Strøget', d: 'A bucket of tulips for a shop on Amagertorv. Mind the pedestrians.', a: [55.67961, 12.56626, 'Ørstedsparken'], b: [55.67870, 12.57920, 'Amagertorv'], pay: 300 },
+  { t: 'Coffee for the scaffolders', d: 'Børsen burned in 2024 and is being put back, spire and all. The builders want coffee.', a: [55.67894, 12.58107, 'Nikolaj Plads'], b: [55.67581, 12.58415, 'Børsen'], pay: 260 },
+  { t: 'Papers for Parliament', d: 'A folder from City Hall for Christiansborg. Nobody will read it, but it has to be there.', a: [55.67499, 12.56952, 'Rådhuset'], b: [55.67618, 12.58027, 'Christiansborg'], pay: 290 },
+  { t: 'Steaks for the Glyptotek', d: 'The museum café has run out. Kødbyen has plenty.', a: [55.66801, 12.56001, 'Kødbyen'], b: [55.67300, 12.57139, 'Glyptoteket'], pay: 330 },
+  { t: 'Lost suitcase', d: 'Left on the train from Aarhus. The owner is at Nordre Toldbod and the boat will not wait.', a: [55.67316, 12.56421, 'Hovedbanegården'], b: [55.68839, 12.59895, 'Nordre Toldbod'], pay: 560 },
+  { t: 'A chair on loan', d: 'One Danish chair from Designmuseum for a show at Nationalmuseet. It is worth more than the car.', a: [55.68692, 12.59351, 'Designmuseum'], b: [55.67497, 12.57436, 'Nationalmuseet'], pay: 500 },
+  { t: 'Popcorn for the Planetarium', d: 'The kiosk at the Planetarium is out of popcorn. The cinema at Fisketorvet made too much.', a: [55.66284, 12.56182, 'Fisketorvet'], b: [55.67111, 12.55609, 'Planetarium'], pay: 340 },
+  { t: 'Coffee for the bridge', d: 'Four coffees for people sitting in the sun on Dronning Louises Bro. They are not going anywhere.', a: [55.67948, 12.57487, 'Gråbrødretorv'], b: [55.68665, 12.56396, 'Dronning Louises Bro'], pay: 350 },
+  { t: 'Oysters for the gallery', d: 'A tray of oysters from Torvehallerne for an opening at the national gallery. On ice, so no detours.', a: [55.68361, 12.57010, 'Torvehallerne'], b: [55.68811, 12.57719, 'Statens Museum for Kunst'], pay: 300 },
+  { t: 'A scarf for the Mermaid', d: 'Somebody knitted the Little Mermaid a scarf. Take it out to Langelinie. Do not ask.', a: [55.67956, 12.58396, 'Magasin'], b: [55.69290, 12.59874, 'Den Lille Havfrue'], pay: 480 },
+  { t: 'Herbs for Noma', d: 'A crate of herbs picked on Amager for Noma. They look like weeds. Do not say that.', a: [55.66343, 12.58497, 'Islands Brygge'], b: [55.68289, 12.61003, 'Noma'], pay: 560 },
 ];
 
 // Copenhagen 1760 (the copenhagen-1760 city): errands inside the walls, on foot or by cart.
@@ -24,6 +34,12 @@ export const JOBS_1760 = [
   { t: 'Drawings for the marble church', d: 'Rolled drawings from Monsieur Jardin for the builders at Frederiks Kirke, by the new palaces. Keep them dry.', a: [55.67762, 12.58641, 'Holmens Kanal'], b: [55.68400, 12.59300, 'Amalienborg'], pay: 288 },
   { t: 'Bread for the Watch', d: 'Rye loaves for the guard at Nørreport before the gate closes.', a: [55.67820, 12.57338, 'Gammeltorv'], b: [55.68320, 12.57160, 'Nørreport'], pay: 96 },
   { t: 'Tobacco to the Kastel', d: 'A twist of tobacco for an officer at Kastellet. He says the last boy was slow.', a: [55.68005, 12.58033, 'Østergade'], b: [55.68997, 12.59526, 'Kastellet'], pay: 144 }, // at Kongeporten: the footways and the road stop at the gate, and from the middle (55.69130, 12.59350) the line ran its last 146 m straight over the moat
+  { t: 'Paint for the Academy', d: 'Pigments off a Dutch ship for the Academy of Arts at Charlottenborg. The blue costs more than you earn in a year.', a: [55.68904, 12.59850, 'Toldboden'], b: [55.68033, 12.58783, 'Charlottenborg'], pay: 144 },
+  { t: 'A wig for the actor', d: 'A powdered wig from the wigmaker on Vimmelskaftet for an actor at the Komediehus. He goes on at six, bald or not.', a: [55.67834, 12.57399, 'Vimmelskaftet'], b: [55.67942, 12.58558, 'Komediehuset'], pay: 144 },
+  { t: 'Candles for Holmens Kirke', d: 'Tallow candles from the chandler by Nikolaj Kirke for the sexton at Holmens Kirke. The navy likes to see the hymn book.', a: [55.67894, 12.58107, 'Nikolaj Kirke'], b: [55.67622, 12.58288, 'Holmens Kirke'], pay: 96 },
+  { t: 'Tea from the Company', d: 'A chest of tea off the China ship, from the Asiatic Company in Christianshavn to a merchant on Kultorvet.', a: [55.67460, 12.59019, 'Asiatisk Kompagni'], b: [55.68244, 12.57552, 'Kultorvet'], pay: 240 },
+  { t: 'Leeches for the hospital', d: 'A jar of leeches from the apothecary on Amagertorv for the new Frederiks Hospital. Keep the lid on.', a: [55.67875, 12.57991, 'Amagertorv'], b: [55.68692, 12.59351, 'Frederiks Hospital'], pay: 192 },
+  { t: 'Salt cod for Nyboder', d: 'A barrel of salt cod from Gammel Strand for the sailors\' rows at Nyboder. Six families, one barrel.', a: [55.67750, 12.57856, 'Gammel Strand'], b: [55.68858, 12.58707, 'Nyboder'], pay: 192 },
 ];
 
 export const SAGAS = [

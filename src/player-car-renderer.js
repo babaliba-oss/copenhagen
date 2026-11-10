@@ -42,6 +42,8 @@ export function createPlayerCarRenderer(scene){
   for(const [car,entry]of entries){entry.damage.update(car);if(entry===selected)continue;parked.add(entry.model);groundPose(car.x,car.z,car.heading,1.4,.8,slope);entry.model.position.set(car.x,.12+slope.y,car.z);entry.model.rotation.set(slope.pitch,car.heading,slope.roll,'YXZ');entry.model.visible=Math.hypot(car.x-travel.actor.x,car.z-travel.actor.z)<650;animateVehicle(entry.model,0,0,dt,false);}
   selected.model.visible=true;lights.visible=api.headlights&&WEATHER_UNIFORMS.night.value>.5&&travel.car===travel.homeCar;
  },setVisible(visible){active.visible=parked.visible=visible;},
+ // The starter car's paint (a rank reward picked in the Copenhagen journal); null puts the first colour back.
+ setPaint(hex){starter.traverse(m=>{if(!m.isMesh||m.material.name!=='paint')return;m.material.userData.stock??=m.material.color.getHex();m.material.color.set(hex??m.material.userData.stock);});},
  // Swap the starter's procedural body for a Blender-made one (scripts/blender/player-car.py). Meshes are merged
  // per material name and take the starter's own materials (paint colour, env reflections); wheels stay.
  async upgradeBody(url){

@@ -99,6 +99,13 @@ body.era-1760 #app .speedometer .gear{color:#cdb68a}
 .cph-money{display:flex;flex-wrap:wrap;align-items:baseline;gap:0 8px}
 .cph-rank{flex-basis:100%;font:700 10px/1.4 Manrope,sans-serif;letter-spacing:.08em;text-transform:uppercase;color:#7a6a4a}
 .cph-rank i{display:block;height:3px;margin-top:2px;border-radius:2px;background:linear-gradient(90deg,#c8902a var(--p),#0001 var(--p))}
+.cph-next{flex-basis:100%;font:500 11px/1.4 Manrope,sans-serif;color:#747168}
+body.touch .cph-next{display:none} /* phones: the money pill is one line; the journal has it */
+.cph-jrank{margin:10px 0 0;font-size:13px;color:#55534b}
+.cph-paints{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:8px 0 12px;font-size:12px;color:#747168}
+.cph-paints button{padding:4px 10px 4px 8px;border-radius:999px;background:#fff;box-shadow:0 0 0 1px #0002;font:600 12px Manrope,sans-serif;color:#30312e;cursor:pointer}
+.cph-paints button::before{content:'';display:inline-block;width:10px;height:10px;margin-right:6px;border-radius:50%;background:var(--c,#b8bcb8);box-shadow:0 0 0 1px #0002}
+.cph-paints button.on{box-shadow:0 0 0 2px #30312e}.cph-paints button:disabled{opacity:.5;cursor:default}
 /* GTA-style banner for big moments */
 #cph-banner{position:fixed;left:0;right:0;top:40%;z-index:70;text-align:center;pointer-events:none;animation:cph-ban 3.4s ease both}
 #cph-banner.cph-banner-rank{animation-duration:4.6s}

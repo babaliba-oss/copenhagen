@@ -153,7 +153,15 @@ export const raceStartName=(id,historic=false)=>RACES[historic?'h':'m'].find(r=>
 // The harbour baths and bathing zones (Københavns Kommune, k101 svoemmehaller_mv and badestation, CC BY 4.0): on a warm
 // day the decks and quays are full, and the cans with them (pant hotspots below).
 export const HARBOUR_BATHS=[['Islands Brygge Havnebad',55.66862,12.57779],['Fisketorvet Havnebad',55.66298,12.56393],['Kalvebod Bølge Badezone',55.66928,12.57561],['Halfdansgade Badezone',55.6659,12.57436],['Havnegade Badezone',55.67799,12.59249],['Søndre Refshalebassin Badezone',55.68993,12.60957],['La Banchina Badezone',55.68937,12.61087],['Halvandet Badezone',55.69527,12.609]]; // the eight on the map (Havnevigen and Sandkaj lie beyond its edge), each at the register point or the nearest quay beside it with room for the cans (Kalvebod Bølge floats: 46 m)
-export function createCopenhagenGame({scene,city,mobilityData,cityData,toast,soundOn=()=>true,audio=null,blocked=null,routeSlice=2,night=null}){ // night(on): a saga flagged night (Fire Watch) turns the sky to night while it runs and back after
+// ---- rank rewards, on top of the 10% a rank adds to the pay. Today: a paint for your own car, picked in the journal
+// (unlocked by the rank, so an old save with the deliveries has them). 1760: a purse, paid once at the promotion.
+export const PAINTS=[['Postbox red','#b3202a',1],['Bus yellow','#e8b21e',2],['Copper green','#4f8f7b',3],['Harbour blue','#1f4f7a',4],['Gold','#b8912f',6]]; // [name, colour, rank]
+export const PURSES={2:96,4:192,6:480}; // rank: skilling
+export const rankReward=(era,r)=>{if(era==='h')return PURSES[r]?`a purse of ${PURSES[r]} sk.`:'';const p=PAINTS.find(x=>x[2]===r);return p?`${p[0]} paint`:'';};
+// The journal's and the money panel's "what's next": the next rank, how far, and what comes with it.
+export function nextUp(ranks,n,era){const r=ranks.reduce((k,[,at],i)=>n>=at?i:k,0),next=ranks[r+1];if(!next)return 'Top rank. Nothing left to earn but money.';
+ const left=next[1]-n,gift=rankReward(era,r+1);return `Next: ${next[0]} in ${left} ${left===1?'delivery':'deliveries'}${gift?` · ${gift}`:''}`;}
+export function createCopenhagenGame({scene,city,mobilityData,cityData,toast,soundOn=()=>true,audio=null,blocked=null,routeSlice=2,night=null,paint=null}){ // paint(hex|null): main.js paints the starter car // night(on): a saga flagged night (Fire Watch) turns the sky to night while it runs and back after
  let nightOn=false; // routeSlice: ms a frame for a new GPS line's groundwork (prepare) // blocked(x,z): a solid house there (the GPS line's last stretch)
  const proj=proj4('EPSG:4326',city.projection);
  const ll=([lat,lon])=>{const [x,y]=proj.forward([lon,lat]);return [x,-y];};
@@ -177,6 +185,7 @@ export function createCopenhagenGame({scene,city,mobilityData,cityData,toast,sou
   for(const k of ['money','job','delivered','streak','pant'])if(save[k]!==undefined&&!Number.isFinite(save[k]))save[k]=0;save.job=Math.max(0,Math.floor(save.job||0)); // a fractional or negative job index threw every frame
   for(const k of ['done','cards','best','pantTaken'])if(k in save&&!obj(save[k]))save[k]=k==='done'?{}:undefined;
   for(const k of ['lore','nisser'])if(!Array.isArray(save[k]))save[k]=[];
+  if(save.paint!==undefined&&typeof save.paint!=='string')delete save.paint;
   if(save.active&&(!obj(save.active)||!Array.isArray(save.active.done)))save.active=null;
  }
  if(save.active&&(!byId[save.active.id]||byId[save.active.id].limit))save.active=null; // timed sagas restart after a reload
@@ -220,6 +229,7 @@ export function createCopenhagenGame({scene,city,mobilityData,cityData,toast,sou
  const RANKS=ERA==='h'?[['Errand boy',0],['Runner',2],['Messenger',5],['Trusted courier',9],['Merchant’s man',14],['Court messenger',20],['Legend of the town',30]]
   :[['Newcomer',0],['Bike courier',2],['Cargo rider',5],['Street regular',9],['Harbour hand',14],['City fixer',20],['Copenhagen legend',30]];
  const rankOf=n=>{let r=0;RANKS.forEach(([,at],i)=>{if(n>=at)r=i;});return r;};
+ const paintHex=()=>{const p=ERA==='m'&&PAINTS.find(x=>x[0]===save.paint);return p&&rankOf(save.delivered||0)>=p[2]?p[1]:null;};paint?.(paintHex()); // the paint picked in the journal, if the rank has it
  const payBonus=()=>1+.1*rankOf(save.delivered||0);
 
  // ---- world markers ----
@@ -362,9 +372,11 @@ export function createCopenhagenGame({scene,city,mobilityData,cityData,toast,sou
   const rows=sagas.map(q=>{const done=!!save.done[q.id],act=save.active?.id===q.id;const cards=q.steps.map((s,k)=>[s,k]).filter(([s,k])=>s.card&&save.lore.includes(q.id+':'+k));
    return `<article class="cph-jq${done?' done':''}${act?' act':''}"><div class="cph-jh"><span>${q.limit?'Timed · ':''}${fmtKr(q.pay)} ${UNIT}</span></div><h3>${esc(q.title)}</h3><p class="cph-js">${done?'Complete':act?`In progress · ${save.active.done.length}/${q.steps.length}`:`Ask ${esc(giverName(q))}`}</p>${cards.map(([s])=>`<details><summary>${esc(s.card[0])}</summary><p>${esc(s.card[1])}</p></details>`).join('')}${!done&&!act?`<button data-way="${q.giver}">Show me the way</button>`:''}${act?`<button data-abandon="1">Abandon</button>`:''}</article>`;}).join('');
   const album=postcards.map(c=>{const got=save.cards[c.id];return `<figure class="cph-pc${got?'':' empty'}">${got?.img?`<img src="${got.img}" alt="">`:`<div class="cph-pc-blank">?</div>`}<figcaption>${esc(c.title)}</figcaption></figure>`;}).join('');
-  journal.innerHTML=`<div class="cph-jcard" role="dialog" aria-modal="true" aria-label="Journal"><div class="cph-jtop"><div><p class="cph-kick">Stories from Danish history and folklore</p><h2>Sagas</h2></div><button id="cph-jclose">Close <kbd>${keyLabel('J')}</kbd></button></div><div class="cph-jlist">${rows}</div><h2 class="cph-album-h">Postcards · ${Object.keys(save.cards).length}/${postcards.length}</h2><p class="cph-js">${TOUCH?'Find a landmark, face it and tap Postcard.':'Find a landmark, face it and press N.'}</p><div class="cph-album">${album}</div></div>`;
+  const n=save.delivered||0,rank=rankOf(n),paints=ERA!=='m'?'':`<p class="cph-paints"><span>Car paint</span><button data-paint=""${paintHex()?'':' class="on"'}>Standard</button>${PAINTS.map(([name,hex,at])=>`<button data-paint="${name}" style="--c:${hex}"${rank<at?' disabled':''}${paintHex()===hex?' class="on"':''}>${name}${rank<at?` · ${esc(RANKS[at][0])}`:''}</button>`).join('')}</p>`;
+  journal.innerHTML=`<div class="cph-jcard" role="dialog" aria-modal="true" aria-label="Journal"><div class="cph-jtop"><div><p class="cph-kick">Stories from Danish history and folklore</p><h2>Sagas</h2></div><button id="cph-jclose">Close <kbd>${keyLabel('J')}</kbd></button></div><p class="cph-jrank"><b>${esc(RANKS[rank][0])}</b> · ${n} ${n===1?'delivery':'deliveries'} · ${esc(nextUp(RANKS,n,ERA))}</p>${paints}<div class="cph-jlist">${rows}</div><h2 class="cph-album-h">Postcards · ${Object.keys(save.cards).length}/${postcards.length}</h2><p class="cph-js">${TOUCH?'Find a landmark, face it and tap Postcard.':'Find a landmark, face it and press N.'}</p><div class="cph-album">${album}</div></div>`;
   $('cph-jclose').onclick=()=>toggleJournal(false);
   journal.querySelectorAll('[data-way]').forEach(b=>b.onclick=()=>{const c=people.find(p=>p.script===b.dataset.way);if(c){wayTo=[c.x,c.z];routeFor=null;toggleJournal(false);toast(`Route set to ${CHARACTERS.find(x=>x.id===c.script).name}`);}});
+  journal.querySelectorAll('[data-paint]').forEach(b=>b.onclick=()=>{save.paint=b.dataset.paint;if(!save.paint)delete save.paint;persist();paint?.(paintHex());renderJournal();});
   journal.querySelectorAll('[data-abandon]').forEach(b=>b.onclick=()=>{save.active=null;wayTo=null;persist();routeFor=null;renderJournal();});
   if(!journal.contains(document.activeElement))$('cph-jclose').focus({preventScroll:true}); // also after Abandon redraws it
  }
@@ -417,7 +429,7 @@ export function createCopenhagenGame({scene,city,mobilityData,cityData,toast,sou
    const t=el.querySelector('h3')?.textContent||'';if(t!==el.__t){el.__t=t;el.classList.remove('settled');clearTimeout(el.__settle);el.__settle=setTimeout(()=>el.classList.add('settled'),10000);}}};
  function updateHud(){
   {const n=save.delivered||0,r=rankOf(n),next=RANKS[r+1],from=RANKS[r][1],pct=next?Math.round((n-from)/(next[1]-from)*100):100;
-   setHtml($('cph-money'),`<b>${fmtKr(save.money)} ${UNIT}</b>${save.nisser?.length?` · nisser ${save.nisser.length}/${nisser.length}`:''}${save.pant?` · pant ${save.pant}`:''}<span class="cph-rank">${esc(RANKS[r][0])}${save.streak>1?` · streak ×${save.streak}`:''}<i style="--p:${pct}%"></i></span>`);}
+   setHtml($('cph-money'),`<b>${fmtKr(save.money)} ${UNIT}</b>${save.nisser?.length?` · nisser ${save.nisser.length}/${nisser.length}`:''}${save.pant?` · pant ${save.pant}`:''}<span class="cph-rank">${esc(RANKS[r][0])}${save.streak>1?` · streak ×${save.streak}`:''}<i style="--p:${pct}%"></i></span><span class="cph-next">${esc(nextUp(RANKS,n,ERA))}</span>`);}
   if(race){const r=race.r,b=save.best[r.id];setHtml($('cph-job'),`<p class="cph-kick">Race · checkpoint ${Math.min(race.k+1,r.cps.length)}/${r.cps.length}${TOUCH?'':' · <kbd>X</kbd> quit'}</p><h3>${esc(r.title)}</h3><p class="cph-race-time">${race.countdown>0?Math.ceil(race.countdown):fmtT(race.t)}</p><p>Gold ${fmtT(r.par[0])} · silver ${fmtT(r.par[1])} · bronze ${fmtT(r.par[2])}${b!=null?` · best ${fmtT(b)}`:''}</p>`);}
   else{
   const j=job(),t=state==='a'?j.A:j.B,d=line.points&&target().kind==='job'&&routeFor&&dist(routeFor,t)<=1&&line.off<30?line.remaining():dist(t,[player.x,player.z]); // the line may lead to a saga step or a character instead; a line left behind (a teleport or start switch, until the lazy rebuild lands) gives the straight distance, not the old line's 140 m; so does the last job's line until the next one's is built (it read 0 m at the drop-off for a pick-up 1.3 km away)
@@ -488,8 +500,9 @@ export function createCopenhagenGame({scene,city,mobilityData,cityData,toast,sou
    else{const before=rankOf(save.delivered||0);save.delivered=(save.delivered||0)+1;save.streak=(save.streak||0)+1;
     const base=j.pay+(hopped?0:timer*(ERA==='h'?1.5:3)) /* 3 a second left (was 4): the clocks now leave a normal player more time on the longer lines; per second of slack paid at the old rate, a 30 km/h run of the ten jobs earned about 75% more. 1.5 in 1760, where jobs pay 96-288 skilling: at 3 a 30 km/h run's slack paid 137% of the job on average (220% on the Kastel run) against 71% today; at 1.5 it is 69% */,streakBonus=save.streak>=3?Math.round(base*.25):0,pay=Math.round(base*payBonus())+streakBonus;save.money+=pay;save.job++;state='a';chainHold=2.5;persist();routeFor=null;
     const after=rankOf(save.delivered);say('job_delivered',{index:(save.job-1)%jobs.length+1});
+    const purse=after>before&&ERA==='h'?PURSES[after]||0:0;if(purse){save.money+=purse;persist();}
     if(after>before)shareCard('Promoted',RANKS[after][0],`${save.delivered} deliveries · jobs pay +${after*10}%`,{kind:'rank',text:`Promoted to ${RANKS[after][0]} after ${save.delivered} deliveries in ${GAME}.`,url:shareUrl({historic:ERA==='h'})});
-    if(after>before)banner(`Promoted: ${RANKS[after][0]}`,`+${fmtKr(pay)} ${UNIT} · jobs now pay +${after*10}%${RANKS[after+1]?` · next: ${esc(RANKS[after+1][0])} at ${RANKS[after+1][1]} deliveries`:''}`,'rank');
+    if(after>before)banner(`Promoted: ${RANKS[after][0]}`,`+${fmtKr(pay)} ${UNIT} · jobs now pay +${after*10}%${rankReward(ERA,after)?` · ${ERA==='h'?'':'new: '}${esc(rankReward(ERA,after))}`:''}${RANKS[after+1]?` · next: ${esc(RANKS[after+1][0])} at ${RANKS[after+1][1]} deliveries`:''}`,'rank');
     else banner('Delivered!',`+${fmtKr(pay)} ${UNIT}${streakBonus?` · streak ×${save.streak} bonus +${fmtKr(streakBonus)}`:''}${timer>20&&!hopped?' · fast':''}`,'pass');}
   }
   mkA.visible=state==='a';mkB.visible=state==='b';mkA.position.set(j.A[0],groundAt(...j.A),j.A[1]);mkB.position.set(j.B[0],groundAt(...j.B),j.B[1]);

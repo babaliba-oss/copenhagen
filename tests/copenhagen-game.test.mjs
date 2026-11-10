@@ -11,9 +11,9 @@ globalThis.addEventListener=globalThis.removeEventListener=()=>{};globalThis.fet
 const THREE=await import('three'),{expandCity}=await import('../src/city-pack.js'),{expandMobility}=await import('../src/mobility-pack.js'),{SpatialIndex,inWaterPolygons}=await import('../src/geo.js');
 const {createCopenhagenGame}=await import('../src/copenhagen/game.js'),{JOBS,JOBS_1760,SAGAS}=await import('../src/copenhagen/data.js');
 const cities=JSON.parse(fs.readFileSync('public/cities/index.json','utf8')).cities;
-function play(id,prep=()=>{}){
+function play(id,prep=()=>{},more={}){
  let c=fs.readFileSync(`public/cities/${id}/city.pack`);if(c[0]===0x1f)c=gunzipSync(c);const data=expandCity(JSON.parse(c)),houses=new SpatialIndex(data.buildings);prep(data);
- const g=createCopenhagenGame({scene:new THREE.Scene(),city:cities.find(x=>x.id===id),mobilityData:expandMobility(JSON.parse(fs.readFileSync(`public/cities/${id}/mobility.json`,'utf8'))),cityData:data,toast(){},soundOn:()=>false,blocked:(x,z)=>!!houses.at(x,z),routeSlice:Infinity}); // routeSlice: each new line at once (in the game a new line's groundwork is spread over frames)
+ const g=createCopenhagenGame({scene:new THREE.Scene(),city:cities.find(x=>x.id===id),mobilityData:expandMobility(JSON.parse(fs.readFileSync(`public/cities/${id}/mobility.json`,'utf8'))),cityData:data,toast(){},soundOn:()=>false,blocked:(x,z)=>!!houses.at(x,z),routeSlice:Infinity,...more}); // routeSlice: each new line at once (in the game a new line's groundwork is spread over frames)
  const me={x:0,z:0,speed:0,heading:0},banner=()=>ids.get('cph-banner')?.innerHTML.replace(/<[^>]+>/g,'')||'';
  const at=([x,z],mode='car',steps=2,dt=1/30)=>{me.x=x;me.z=z;for(let i=0;i<steps;i++)g.update(dt,me,mode,{running:true});};
  const line=()=>(g.route()||[]).reduce((s,p,i,a)=>i?s+Math.hypot(p[0]-a[i-1][0],p[1]-a[i-1][1]):0,0);
@@ -173,4 +173,14 @@ test('postcards of the statues the game draws, from the city\'s monument registe
  g.update(1/30,me,'car',{running:true});g.photo({dir:look,snap:()=>null});assert.match(ids.get('cph-banner').innerHTML,/Postcard: H\.C\. Andersen/);
  g.photo({dir:look,snap:()=>null});assert.match(ids.get('cph-banner').innerHTML,/Postcard: Rådhuset/,'the view behind it, not "Already in your album"');
  const abs=[249.2,226.6];me.x=abs[0]+60;me.z=abs[1]+60;g.update(1/30,me,'car',{running:true});g.photo({dir:[-60,-60],snap:()=>null});assert.match(ids.get('cph-banner').innerHTML,/Postcard: Absalon/);
+});
+test('rank rewards: a paint only with its rank (an old save has none and keeps its place), a purse at a 1760 promotion, and the money panel says what is next',()=>{
+ const start=sv=>{store.clear();if(sv)store.set('cph-game-v1',JSON.stringify(sv));let got='unset';const {at}=play('copenhagen',()=>{},{paint:h=>{got=h;}});at([5000,5000],'car',90);return got;};
+ assert.equal(start(null),null,'a new game: the car as it was');assert.match(ids.get('cph-money').innerHTML,/Next: Bike courier in 2 deliveries · Postbox red paint/);
+ assert.equal(start({money:900,job:13,delivered:31,done:{hca:1}}),null,'an old save: nothing picked');assert.match(ids.get('cph-job').innerHTML,/Job 14\/20/,'past the first ten it goes on into the new jobs');assert.match(ids.get('cph-money').innerHTML,/Copenhagen legend.*Top rank/s);
+ assert.equal(start({delivered:14,paint:'Harbour blue'}),'#1f4f7a');assert.equal(start({delivered:13,paint:'Harbour blue'}),null,'not at that rank yet');assert.equal(start({delivered:30,paint:7}),null,'a hand-edited save');
+ const key='cph-game-v1-1760',money=()=>JSON.parse(store.get(key)).money;
+ for(const [delivered,purse] of [[4,96],[3,0]]){store.clear();store.set(key,JSON.stringify({delivered,money:0}));const {at,job,banner}=play('copenhagen-1760');at([5000,5000],'car',90);at(job());at(job(),'car',1);
+  const paid=Number(banner().match(/\+([\d,]+) sk\./)[1].replace(/\D/g,''));assert.equal(money(),paid+purse,`from ${delivered} deliveries: ${banner()}`);
+  if(purse)assert.match(banner(),/Promoted: Messenger.*a purse of 96 sk\./);else assert.doesNotMatch(banner(),/purse/);}
 });
