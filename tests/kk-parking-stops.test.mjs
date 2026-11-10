@@ -44,3 +44,36 @@ test('no parked car stands where a car driving its lane would touch it, on the b
   for(let i=-1;i<=1;i++)for(let j=-1;j<=1;j++)for(const c of grid.get((gx+i)+','+(gz+j))||[])if(box(c,m,[.9,2.15],[.98,2.36]))hit.add(c);}}
  assert.equal(hit.size,0,JSON.stringify([...hit].slice(0,5))); // 8 of 13,204 before (one across the lane at -2194,-1363)
 });
+
+// Walkers and the bus shelters (scripts/shelter-walks.mjs): footways ran through 18 of the 125 shelters' boxes (within a
+// walker's reach, 1.15 m, of 29), and walkers stood against them until they were recycled.
+test('no walker\'s footway runs through a bus shelter, and those taken round one keep to the pavement',async()=>{
+ const {shelterCrossings,crosses}=await import('../scripts/shelter-walks.mjs'),{cutWalksAtKerbs}=await import('../src/mobility-pack.js'),{SOLIDS}=await import('../src/mapped-furniture.js');
+ const m=expandMobility(read('mobility.json')),walks=cutWalksAtKerbs(m.walks,m.walkerCut).walks,items=read('furniture.json').items,shelters=items.filter(i=>i.k==='shelter');
+ assert.deepEqual(shelterCrossings(walks,shelters,.3).map(h=>`${h.shelter.ref} ${h.a} -> ${h.b}`),[]); /* two shelters stand across the only paving (-38,-1022 and -2029,1530): the footway ends short of them (kerb-walks.mjs) */
+ assert.ok(shelterCrossings(walks,shelters,.9).length<=30,'most pass 0.9 m clear or more'); // 28 segments at 10 shelters on narrow paving
+ /* by the shelters: every walker's footway on paving, off the carriageway, out of the houses and the other solid furniture */
+ const houses=city.buildings.filter(b=>!/^(roof|construction|carport|bridge)$/.test(b.kind||'')),roads=city.roads.filter(r=>!/island|Koroke/.test(r.kind||'')),solid=items.filter(i=>/^(shelter|toilet|hotdog-stand)$/.test(i.k)); /* what a walker cannot walk through (mapped-furniture.js: the rest is knocked over) */
+ const inAny=(list,x,z)=>list.some(r=>r.bbox[0]<=x&&x<=r.bbox[2]&&r.bbox[1]<=z&&z<=r.bbox[3]&&inside(r.rings[0],x,z)&&!r.rings.slice(1).some(h=>inside(h,x,z)));
+ const bad=[];let seen=0;
+ for(const e of walks.edges){if(e.crossing)continue;for(let i=1;i<e.points.length;i++){const a=e.points[i-1],b=e.points[i],by=shelters.filter(s=>crosses(s,a,b,4));if(!by.length)continue;
+  const near=l=>l.filter(r=>by.some(s=>r.bbox[0]<=s.x+12&&s.x-12<=r.bbox[2]&&r.bbox[1]<=s.z+12&&s.z-12<=r.bbox[3])),H=near(houses),R=near(roads),P=near(city.pavement),n=Math.max(1,Math.ceil(Math.hypot(b[0]-a[0],b[1]-a[1])/.25));
+  for(let k=0;k<=n;k++){const x=a[0]+(b[0]-a[0])*k/n,z=a[1]+(b[1]-a[1])*k/n;if(!by.some(s=>Math.hypot(x-s.x,z-s.z)<6))continue;seen++;
+   const what=inAny(H,x,z)?'house':inAny(R,x,z)?'carriageway':!inAny(P,x,z)?'no paving':solid.some(it=>{const [w,d]=SOLIDS[it.k],c=Math.cos(it.yaw||0),n=Math.sin(it.yaw||0);return Math.abs((x-it.x)*c-(z-it.z)*n)<w/2&&Math.abs((x-it.x)*n+(z-it.z)*c)<d/2;})?'furniture':'';
+   if(what)bad.push(`${what} at ${x.toFixed(1)},${z.toFixed(1)}`);}}}
+ assert.ok(seen>1500,String(seen));assert.deepEqual(bad.slice(0,5),[]);
+});
+
+test('a footway through a shelter is taken round it, behind where there is room, its ends and its way back kept',async()=>{
+ const {moveWalksOffShelters,shelterCrossings}=await import('../scripts/shelter-walks.mjs');
+ const make=()=>{const n=[[-20,0],[20,0]];return {nodes:n.map(p=>[...p]),edges:[{from:0,to:1,points:[[-20,0],[20,0]],length:40,crossing:false},{from:1,to:0,points:[[20,0],[-20,0]],length:40,crossing:false}]};};
+ const s={k:'shelter',x:0,z:.2,yaw:0,ref:['t']}; /* open side to +z: the road is that way */
+ let w=make(),r=moveWalksOffShelters(w,[s],()=>true);
+ assert.equal(r.moved,1);assert.equal(r.left.length,0);assert.equal(shelterCrossings(w,[s],1.15).length,0);
+ const [e,back]=w.edges;assert.deepEqual(e.points[0],[-20,0]);assert.deepEqual(e.points.at(-1),[20,0]);assert.deepEqual(back.points,[...e.points].reverse());
+ assert.ok(e.points.length>2&&e.points.slice(1,-1).every(p=>p[1]<=0),'behind the shelter');assert.ok(e.length>40&&e.length<43&&back.length===e.length,String(e.length));
+ assert.equal(moveWalksOffShelters(w,[s],()=>true).moved,0,'a second run changes nothing');
+ /* paving only 1 m deep behind it: round it closer; none at all: left as it is and said so */
+ w=make();r=moveWalksOffShelters(w,[s],(x,z)=>z>-1.6&&z<.01);assert.equal(r.moved,1);assert.ok(r.left[0].clear<1.15&&r.left[0].clear>=.3);assert.equal(shelterCrossings(w,[s],.3).length,0);
+ w=make();r=moveWalksOffShelters(w,[s],(x,z,c,own,bare)=>!!bare);assert.equal(r.moved,0);assert.equal(r.left.length,1);assert.deepEqual(w.edges[0].points,[[-20,0],[20,0]]);
+});

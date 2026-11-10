@@ -7,13 +7,15 @@
 // is not walkable, a pavement polygon is. Run after the city's mobility.json is built. Not for 1760 (walkers use the street).
 // Writes it into public/cities/<city>/mobility.json as walkerCut (the graph itself is left as it is).   node scripts/kerb-walks.mjs copenhagen
 import fs from 'node:fs';import zlib from 'node:zlib';
-import {expandCity} from '../src/city-pack.js';import {SpatialIndex} from '../src/geo.js';import {expandMobility,kerbPieces,cutWalksAtKerbs} from '../src/mobility-pack.js';
+import {expandCity} from '../src/city-pack.js';import {SpatialIndex} from '../src/geo.js';import {expandMobility,kerbPieces,cutWalksAtKerbs} from '../src/mobility-pack.js';import {crosses} from './shelter-walks.mjs';
 const city=process.argv[2]||'copenhagen',dir=`public/cities/${city}`;
 let pack=fs.readFileSync(`${dir}/city.pack`);if(pack[0]===31&&pack[1]===139)pack=zlib.gunzipSync(pack);
 const data=expandCity(JSON.parse(pack.toString()));
 const houses=new SpatialIndex(data.buildings.filter(b=>!/^(roof|construction|carport|bridge)$/.test(b.kind||''))),roads=new SpatialIndex(data.roads.filter(r=>!/Koroke/.test(r.kind||''))),pavement=new SpatialIndex(data.pavement);
 const m=expandMobility(JSON.parse(fs.readFileSync(`${dir}/mobility.json`,'utf8')));
-delete m.walkerCut;m.walkerCut=kerbPieces(m.walks,(x,z)=>!!houses.at(x,z)||!roads.at(x,z)&&!!pavement.at(x,z));
+// A footway still running through a bus shelter (scripts/shelter-walks.mjs --fix found no ground to take it round) ends 0.6 m short of it.
+const shelters=fs.existsSync(`${dir}/furniture.json`)?JSON.parse(fs.readFileSync(`${dir}/furniture.json`,'utf8')).items.filter(i=>i.k==='shelter'):[],inShelter=(x,z)=>shelters.some(s=>Math.abs(x-s.x)<3&&Math.abs(z-s.z)<3&&crosses(s,[x,z],[x+1e-4,z+1e-4],.3));
+delete m.walkerCut;m.walkerCut=kerbPieces(m.walks,(x,z)=>!!houses.at(x,z)||!roads.at(x,z)&&!!pavement.at(x,z)&&!inShelter(x,z));
 fs.writeFileSync(`${dir}/mobility.json`,JSON.stringify(m));
 const r=cutWalksAtKerbs(m.walks,m.walkerCut);
 console.log(`${city}: walkers' graph: ${r.cut} footways cut at a kerb, ${r.dropped} on the carriageway dropped, ${r.pruned} spurs pruned; footway ${r.km[0]} km -> ${r.km[1]} km; ${m.walks.edges.length} -> ${r.walks.edges.length} edges`);

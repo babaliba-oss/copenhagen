@@ -102,8 +102,20 @@ python3 scripts/frb-furniture.py <frb dir> copenhagen   # Frederiksberg's bins, 
                                                     # playgrounds (below); after the kk-*.py furniture
 python3 scripts/surface-fill.py copenhagen && python3 scripts/kk-surfaces.py <kk data dir>/wfs copenhagen
 python3 scripts/kk-markings.py <kk data dir>/wfs copenhagen
-node scripts/furniture-ground.mjs copenhagen && node scripts/indoor-items.mjs copenhagen && node scripts/kerb-walks.mjs copenhagen
+node scripts/furniture-ground.mjs copenhagen && node scripts/indoor-items.mjs copenhagen
+node scripts/shelter-walks.mjs copenhagen --fix && node scripts/kerb-walks.mjs copenhagen   # footways round the bus shelters, then the walkers' cut
 ```
+
+Walkers and bus shelters: a shelter is solid, and a footway mapped through one left walkers standing against it until
+they were recycled (footways ran through the boxes of 18 of the 125 shelters, within a walker's 1.15 m reach of 29).
+`scripts/shelter-walks.mjs copenhagen --fix` moves those footways in mobility.json round the shelter's box: behind it
+where both ways are as long, 1.15 m clear where the paving has room, else 0.9, 0.6, 0.45 or 0.3 m, on pavement 0.2 m
+off the kerb, 0.6 m off the houses and clear of other solid furniture (27 footways and one junction moved; 9 shelters
+on narrow paving are passed closer than 0.9 m, the one at 620,101 at 0.3 m, where walkers with a wide step aside stop
+a moment first). Two shelters stand across the only paving (-38,-1022 beside a bench, -2029,1530 on a 2 m path):
+`kerb-walks.mjs` ends the walkers' footway 0.6 m short of them, so walkers turn there. Without `--fix` (and with a
+margin: `node scripts/shelter-walks.mjs copenhagen 0.3`) it only lists what still crosses and exits 1 if anything does.
+Run it again after kk-shelters.py or a new mobility.json; a second run changes nothing.
 
 Most of today's pavements are not mapped as areas (OpenStreetMap draws them as lines or not at all), so the rendered
 ground stopped at the carriageway's edge. Beside it lay the bare terrain, half a metre below street level
@@ -265,6 +277,13 @@ stray sheets) stay: GeoDanmark does not register those as buildings. The pieces 
 `cities/copenhagen/demolished.json`, so after a rebuild `--again` takes them out without the download (2026-10:
 267 pieces of 240 houses, 63,000 m²; the Botanical Garden's old research glasshouses, Carlsberg's and Nordhavn's
 sheds and halls, Sydhavn's quay buildings). 1760 keeps the model as it is.
+`python3 scripts/building-strays.py copenhagen [out.json]` lists stray geometry in the drawn houses and changes nothing:
+a roof point pulled 15 m or more out of the house or up over it (spike), or a loose group of triangles 4 m or more
+outside the mapped footprint (piece; 133 houses, mostly decks, ramps and basements the map leaves out). 2026-11: six
+houses with a sheet pulled to a far point (kk-osm-way-67528468 Wakeup Copenhagen at -590,1458 and its neighbour
+kk-osm-way-253797399 to the same point; kk-osm-way-105951035 at 434,-872; kk-osm-way-587591587 at 1353,242;
+kk-osm-way-1103097512 Locke Aparthotel at -522,1207; kk-osm-way-133961765 at 355,-304), not trimmed yet; Børsen's and
+Sankt Johannes Kirke's spires are listed too and are right.
 Checks: `scripts/building-sweep.mjs` (rays from inside every house at a third of its height; a ray that gets out into
 the street - open sky joined to the map edge - without crossing a wall means you can see into the house).
 
