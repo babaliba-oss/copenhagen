@@ -521,6 +521,10 @@ figure too. `?procedural` turns the rigged and baked ones off.
   compression (the dev server sends everything plain): today 28.8 MB / 205 requests before the button -> 25.9 MB / 198.
 - `boot()` yields between its long building steps (`await breathe()`), so the loading bar and the page stay
   responsive; the half-built city is not drawn in those gaps.
+- Helsinki (`?city=helsinki`, linked from /about) still works, but its hand-built scenery modules are a separate
+  chunk (src/helsinki-scenery.js, imported inside `buildHelsinkiScenery`), so Copenhagen does not download them:
+  main script 1,779 kB -> 1,575 kB (675 -> 594 kB gzipped). A scenery module only Helsinki uses goes in that file,
+  not in main.js's imports. index.html holds Copenhagen's text; `helsinkiPage()` in the same file puts Helsinki's back.
 
 Shared changes: `facade-grain.js` (brick, plaster, roof courses, window grid on far shells),
 `night-windows.js` and the Night look in `weather.js`, lamp light in `mapped-furniture.js`,

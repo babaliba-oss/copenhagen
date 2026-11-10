@@ -45,13 +45,11 @@ import {loadTileImages,aheadPoint,tilePriority,createFrameQueue,createDetailSche
 import {createSurfaceStreamer} from './surface-streaming.js';
 import {createCathedral,createSenateSquare,loadSenateMaterials} from './cathedral.js';
 import {USPENSKI,createUspenskiCathedral} from './uspenski-cathedral.js';
-import {createKauppatori} from './kauppatori.js';
 import {advanceOcclusion,stableShadowTarget,shadowFrame,compileWhenReady} from './render-stability.js';
 import {HARBOUR_START} from './demo-route.js';
 import {createLandcover} from './landcover.js';
 import {TramSimulation} from './tram-simulation.js';
 import {createTramRenderer} from './trams.js';
-import {createHarbour} from './harbour.js';
 import {drivingCameraPose,cameraWallStrips,overviewCameraPose,createDriveCameraState,stepDriveCamera,DRIVE_FOV} from './driving-camera.js';
 import {surfaceDetailAt,rumbleFor,createRumbleState} from './road-surface.js';
 import {createSkyEnvironment} from './environment.js';
@@ -59,23 +57,9 @@ import {correctHarbourLanes,olympiaTramOnlySurfaces,harbourCorridor,HARBOUR_CORR
 import {inHarbour} from './harbour-layout.js';
 import {Cyclists,createCyclistRenderer} from './cyclists.js';
 import {ScooterRiders,createScooterRiderRenderer} from './scooter-riders.js';
-import {createBindAds} from './bind-ads.js';
-import {createLasipalatsiStops} from './lasipalatsi-stop.js';
-import {createKauppatoriTramStops} from './kauppatori-tram-stops.js';
-import {createStationStreetLife} from './station-street-life.js';
-import {createStationStatues} from './station-statues.js';
-import {createStationBuildingDetails} from './station-building.js';
 import {createLocationReadout,describeLocation,useProjection} from './location-readout.js';
 import {areaCaption,HELSINKI_AREAS} from './area-caption.js';
-import {createWaterfrontLandmarks} from './waterfront-landmarks.js';
-import {createStreetNameSigns} from './street-name-signs.js';
-import {createPalaceLife} from './palace-life.js';
-import {createRouteDirectionSigns} from './route-direction-signs.js';
-import {createCityHallFlag} from './city-hall-flag.js';
 import {createMarketStreetSurface,GRANITE_SETTS_GLSL} from './market-street-surface.js';
-import {createLaivasillankatuSigns} from './laivasillankatu-signs.js';
-import {createKauppatoriFingerpost} from './kauppatori-fingerpost.js';
-import {createSofiankatuSigns} from './sofiankatu-signs.js';
 import {createBusSystem} from './bus-system.js';
 import {installTransit} from './extension-transit.js';
 import {createSea,removeLegacyWater,splitByCell,settleBridgeDecks} from './sea.js';
@@ -83,8 +67,6 @@ import {PoliceSimulation} from './police.js';
 import {createPoliceRenderer} from './police-renderer.js';import {setPoliceLettering} from './police-model.js';
 import './police-alert.css';
 import {cutLowerYard} from './port-yard.js';
-import {createRouteCrossingSigns} from './route-crossing-signs.js';
-import {createEtelarantaGantry} from './etelaranta-gantry.js';
 import {createMarketLife,marketGullColony,createInstancedPeople,setBakedPeople,setCrowdRoads} from './market-life.js';
 import {createCopenhagenGame,raceStartName} from './copenhagen/game.js';
 import {SITE,GAME_LINE,shareOut,shareSaid} from './copenhagen/share.js';
@@ -110,15 +92,8 @@ const TODAY_MIX=[0,0,1,1,1,2,2,3,3,4,4,5,5,6,7,8,9,9,9,9,9,10,10,10,11,11]; // r
 const PERIOD_MIX=[0,0,0,6,6,6,6,7,7,1,1,2,15,4,5,8,9,10,11,12,13,14]; // 1760: women two times in five (Daniel's Victorian woman most, the merchant's wife, W_Medieval), the men in his 18th-century costumes (the red coat also in brown and green; the blue one is the player's), and sailors: the Royal Navy ship boy and the six of the pirate crew
 import {WATER_LEVEL as CPH_WATER} from './quay.js';
 import {createBirds,shoreSamples,inWater} from './birds.js';
-import {createSenateStreetProps} from './senate-street-props.js';
-import {createUniversityLife} from './university-life.js';
-import {createKauppatoriRoadworks} from './kauppatori-roadworks.js';
-import {createMannerheimintieGantry} from './mannerheimintie-gantry.js';
-import {createKaivokatuDetails} from './kaivokatu-details.js';
-import {createKamppiChapel} from './kamppi-chapel.js';
 import {createAngryDrivers} from './angry-drivers.js';
 import {createStationKiosk,STATION_KIOSK_RATU} from './station-kiosk.js';
-import {createTerminalLife} from './terminal-life.js';
 import {ImpactSystem} from './impacts.js';
 import {createCrowdReaction} from './crowd-reaction.js';
 import {createPlayerCarRenderer} from './player-car-renderer.js';
@@ -1570,6 +1545,7 @@ async function boot(){
     if(pos.length){let g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));g.computeVertexNormals();g=drapeGeometry(g,{maxEdge:touchScreen?8:4});for(const part of splitByCell(g,500)){const m=new THREE.Mesh(part,ground.material);m.name='1760 pavements off the cobbles';m.receiveShadow=true;cityModel.add(m);}g.dispose(); /* 500 m cells: one city-wide mesh was never culled */console.info('1760 pavements off the cobbles',pos.length/9,'triangles before draping');}}
    // Helsinki's hand-built scenery (landmarks, harbour, street life, signs). Other cities get the generic engine only.
    async function buildHelsinkiScenery(){
+   const {createKauppatori,createHarbour,createBindAds,createLasipalatsiStops,createKauppatoriTramStops,createStationStreetLife,createStationStatues,createStationBuildingDetails,createWaterfrontLandmarks,createStreetNameSigns,createPalaceLife,createRouteDirectionSigns,createCityHallFlag,createLaivasillankatuSigns,createKauppatoriFingerpost,createSofiankatuSigns,createRouteCrossingSigns,createEtelarantaGantry,createSenateStreetProps,createUniversityLife,createKauppatoriRoadworks,createMannerheimintieGantry,createKaivokatuDetails,createKamppiChapel,createTerminalLife,helsinkiPage}=await import('./helsinki-scenery.js');helsinkiPage(); // Helsinki's own scenery modules load with Helsinki only
    progress(30,'Loading roads and waterfront');
    const [pavilions]=await Promise.all([new GLTFLoader().loadAsync('/models/senate-pavilions.glb'),loadSenateMaterials(Math.min(8,renderer.capabilities.getMaxAnisotropy()))]);
    pavilions.scene.traverse(m=>{if(m.isMesh){m.castShadow=true;m.receiveShadow=true;}});cityModel.add(pavilions.scene);
@@ -1806,14 +1782,12 @@ async function boot(){
     document.querySelector('#sources-dialog .dialog-copy').textContent=`Everything this city is made from is listed below with its licence. Built with the worldhood city builder; maintained by ${city.maintainers?.length?city.maintainers.join(', '):'the community'}.`;
     document.querySelector('#sources-dialog .help-note').textContent=`An evolving reconstruction of the city. Building heights, facades and street details may be estimated. ${hasTerrain()?'Terrain follows the bundled elevation data.':'Terrain is flattened.'} Traffic and public transport are simulated rather than live services.`;
     document.querySelector('#sources-dialog .attribution').textContent=city.attribution;
-    const sourceLinks=document.querySelector('#sources-dialog .source-links');sourceLinks.replaceChildren();
-    for(const [label,href]of [['OpenStreetMap','https://www.openstreetmap.org/copyright'],['Data and asset credits','https://github.com/worldhood/worldhood/blob/main/NOTICE.md']]){const a=document.createElement('a');a.textContent=label+' ↗';a.href=href;a.target='_blank';a.rel='noreferrer';sourceLinks.append(a);}
     document.querySelector('#map-dialog .map-caption').firstChild.textContent=`${city.name.toUpperCase()} FROM OPEN DATA `;
     document.querySelector('#help-dialog .help-note').textContent=city.era===1760?'Explore this single-player city playground on foot or by coach. Share the streets with other coaches and townsfolk; buildings, ramparts and water constrain movement.':'Explore this single-player city playground on foot, by car, bicycle or scooter. Share the streets with simulated traffic and pedestrians. Available rides start near each starting point; buildings and water constrain movement.';
     $('district-label').textContent=city.name.toUpperCase();
     document.querySelector('#pause-overlay h2').textContent=`${city.name} can wait.`;
     $('sources-btn').firstChild.textContent=`Map data © OpenStreetMap contributors · ODbL${city.furniture&&/Mapillary/i.test(city.attribution||'')?' · Mapillary':''}${/Digiroad/.test(city.attribution)?' · Digiroad CC BY':''}${city.terrain?/National Land Survey/.test(city.terrain.source)?' · NLS elevation CC BY':' · Mapterhorn elevation':''} `;
-    document.querySelector('.minimap-caption').firstChild.textContent=`${city.name.toUpperCase()} CENTRE `;const cathedralLabel=$('cathedral-label');if(cathedralLabel)cathedralLabel.hidden=true;
+    document.querySelector('.minimap-caption').firstChild.textContent=`${city.name.toUpperCase()} CENTRE `;
    }
    if(extensions.length){
     const names=extensions.map(e=>e.title).join(' and ');
@@ -1833,7 +1807,6 @@ async function boot(){
    document.querySelector('#help-dialog .dialog-copy').textContent=city.era===1760?`Explore ${city.name} by coach or on foot. Follow the line: a yellow beam is a pick-up, teal the drop-off, red a saga step, blue a race start. The minimap stays north-up.`:`Explore ${city.name} by car, on foot, by bicycle or on a scooter. Follow the purple line: a yellow beam is a pick-up, teal the drop-off, red a saga step, purple a race start. The minimap stays north-up.`;
    if(city.era===1760)for(const el of document.querySelectorAll('.help-grid span')){const t={'Handbrake / bike or scooter brake':'Rein in','Enter a nearby car / ride':'Board your coach','Recover car':'Recover coach','Get out / get off':'Step down','Accelerate / reverse':'Drive on / back up','Travel to 1760 / back to today':'Back to today'}[el.textContent];if(t)el.textContent=t;if(/^(Car horn|Radio: next \/ previous station)$/.test(el.textContent)){el.nextElementSibling?.remove();el.remove();}} // no horn or radio on a coach // 1760: a coach, no bikes or scooters
    if(touchScreen)document.querySelector('#help-dialog .dialog-copy').textContent=`Steer with the arrow buttons: tap for a little, hold for more (or Thumb or Tilt: Menu > Steering), hold Go, Brake to slow down and reverse. Stopped, the button above the controls gets you out${city.era===1760?' or back on your coach':', onto a bike or into a car'}. Walk up to someone and tap Say hello. Yellow beam: a pick-up. Teal: the drop-off. Red: a saga step. ${city.era===1760?'Blue':'Purple'}: a race start. Menu has the city map, the journal and the camera.`;
-   document.querySelector('#help-dialog .dialog-drive').firstChild.textContent='Keep exploring ';
    finale.coach=city.era===1760;if(city.era===1760){const n=document.querySelector('#busted-overlay .end-note');if(n)n.textContent='Continue puts you back on the street right here, coach mended and wanted level cleared · Restart returns to your starting point';const h=[...document.querySelectorAll('.controls-hint span')].find(e=>/Recover car/.test(e.textContent));if(h)h.lastChild.textContent=' Recover coach';} // 1760 has no car: the BUSTED card said 'car repaired'
    if(city.era===1760)for(const row of document.querySelectorAll('.boot-controls>div')){const dt=row.querySelector('dt'),t=dt?.textContent;if(/radio/i.test(t||'')){row.remove();continue;}const n={'Handbrake':'Rein in','Use a nearby car or ride':'Board your coach','Recover car':'Recover coach','Get out / get off':'Step down','1760 / horn / FPS':'Back to today / FPS'}[t];if(n)dt.textContent=n;if(t==='1760 / horn / FPS')row.querySelector('dd').innerHTML='<kbd>Y</kbd> / <kbd>P</kbd>';} // the 1760 welcome card listed the car, horn and radio
    const helpGrid=document.querySelector('#help-dialog .help-grid');if(helpGrid)$('pause-controls').append(helpGrid.cloneNode(true));
