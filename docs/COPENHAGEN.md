@@ -462,6 +462,14 @@ figure too. `?procedural` turns the rigged and baked ones off.
   most 256 parts for that to work.
 - Dev helpers (vite dev only): `openCityDrive.pick(nx,ny)` names what is under a screen point,
   `openCityDrive.inspectCamera({eye,target})` freezes a reference view, `getState().quality` shows the governor level.
+- First visit: the build ships smaller copies of four data files (vite.config.js `compactPacks`; `public/` keeps
+  the plain ones for scripts and tests): city.pack and mobility.json (src/city-pack.js, src/mobility-pack.js),
+  furniture.json without the provenance fields and bus-corridors.json with its points as centimetre steps
+  (src/wire-pack.js). The two scanned statues, Andersen in Nyhavn and the nisse load once the start button is up
+  (`readyGate` in main.js); the pumpkins only in their season. Measure against a production build served with
+  compression (the dev server sends everything plain): today 28.8 MB / 205 requests before the button -> 25.9 MB / 198.
+- `boot()` yields between its long building steps (`await breathe()`), so the loading bar and the page stay
+  responsive; the half-built city is not drawn in those gaps.
 
 Shared changes: `facade-grain.js` (brick, plaster, roof courses, window grid on far shells),
 `night-windows.js` and the Night look in `weather.js`, lamp light in `mapped-furniture.js`,

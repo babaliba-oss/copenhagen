@@ -30,3 +30,12 @@ test('after dark the foyer glass glows warm (night uniform), and by day it adds 
  const sh={uniforms:{},fragmentShader:'#include <common>\nvoid main(){\n#include <emissivemap_fragment>\n}'};m.onBeforeCompile(sh);
  assert.match(sh.fragmentShader,/totalEmissiveRadiance\+=vec3\([^)]*\)\*uNight/);assert.equal(sh.uniforms.uNight.value,0,'daylight: no glow');
 });
+test('the two scanned statues can be set up after the rest (they load once the game is ready)',async()=>{
+ const THREE=await import('three'),count=g=>{let n=0;g.traverse(o=>{if(o.isMesh)n++;});return n;};
+ const now=createLandmarks({era:null,anchors:{},mills:[]}),later=createLandmarks({era:null,anchors:{},mills:[],statuesLater:true});
+ const n0=count(later.group);later.addStatues({});assert.equal(count(later.group),n0+1,'no scan arrived: the hand-built rider at Amalienborg');later.addStatues({});assert.equal(count(later.group),n0+1,'once');
+ const two=createLandmarks({era:null,anchors:{},mills:[],statuesLater:true}),m0=count(two.group),geo=()=>new THREE.BoxGeometry(1,2,1);two.addStatues({frederikV:geo(),hca:geo()});assert.equal(count(two.group),m0+2);
+ const at=(g,x,z)=>g.children.some(o=>Math.abs(o.position.x-x)<.01&&Math.abs(o.position.z-z)<.01);assert.ok(at(two.group,1076.2,-438.8)&&at(two.group,-427.1,520.1));
+ const c=count(now.group);now.addStatues({frederikV:geo()});assert.equal(count(now.group),c,'without statuesLater the rider is in from the start and addStatues adds nothing');
+ const old=createLandmarks({era:1760,anchors:{},mills:[],statuesLater:true}),k=count(old.group);old.addStatues({});assert.equal(count(old.group),k,'1760: neither statue stands yet');
+});

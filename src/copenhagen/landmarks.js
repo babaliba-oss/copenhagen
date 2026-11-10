@@ -211,11 +211,11 @@ export const cutRoadWalls1760=walls=>walls.filter(w=>{const c=CUT_1760[w.id];if(
 // (1896), the English Church (1887), Sankt Pauls (1877), Kong Haakons Kirke (1958), Alexander Nevsky (1883),
 // Sankt Ansgar (1842), Ny Christiansborg (modern) and Hansen's Slotskirke (1826: the first chapel is drawn instead).
 export const HIDE_1760=['kk-osm-way-25521086','kk-osm-relation-19856927','kk-osm-way-25451190','kk-osm-way-134471983','kk-osm-way-36790389','kk-osm-way-26604470','kk-osm-way-89752515','kk-osm-way-55601707','kk-osm-way-133986381','kk-osm-relation-8833442'];
-export function createLandmarks({era=null,mills=[],anchors={},statues={}}={}){ // statues: scanned models where loaded (frederikV), else the hand-built riders
+export function createLandmarks({era=null,mills=[],anchors={},statues={},statuesLater=false}={}){ // statues: scanned models where loaded (frederikV), else the hand-built riders; statuesLater: the two scans are left out here and set up by addStatues() when they have arrived
  const group=new THREE.Group();group.name='Hand-built landmarks';
  const mat=new THREE.MeshStandardMaterial({vertexColors:true,roughness:.45,metalness:.35}),built=facadeGrain(new THREE.MeshStandardMaterial({vertexColors:true,roughness:.6,metalness:.2})); // built: brick, plaster and roof courses like the city's own buildings (statues and rides keep the plain finish)
  const add=(geo,x,z,{y=null,rot=0,material=mat}={})=>{const m=new THREE.Mesh(geo,material);m.position.set(x,y??groundAt(x,z),z);m.rotation.y=rot;m.castShadow=true;m.receiveShadow=true;group.add(m);return m;};
- const today=era!==1760,flags=[],rotors=[];
+ const today=era!==1760,flags=[],rotors=[];let later=null;
  const scaled=(geo,a,design)=>{const m=add(geo,a[0],a[2],{material:built});m.scale.y=a[1]/design;return m;};
  if(anchors.vorFrelsers?.[3]>60)scaled(vorFrelsers(),anchors.vorFrelsers,86);
  if(anchors.borsen?.[3]>35)scaled(borsen(),anchors.borsen,53);
@@ -224,10 +224,10 @@ export function createLandmarks({era=null,mills=[],anchors={},statues={}}={}){ /
  if(today){
   for(const m of tivoli(add,mat,spinners)){m.castShadow=true;group.add(m);}
   {const x=1465.3,z=-1438.7,w=waterAt(x,z)??seaLevel();add(mermaid(),x,z,{y:(w??groundAt(x,z))-.35,rot:2.2});} // her rock sits in the water (a fixed height left it floating over the harbour)
-  if(statues.frederikV)add(statues.frederikV,1076.2,-438.8,{rot:-2.049});else add(rider(4.5),1076.2,-438.8,{rot:.12}); // the scan faces +Z: turned to face the palace square's centre
+  const scans=s=>{if(s.frederikV)add(s.frederikV,1076.2,-438.8,{rot:-2.049});else add(rider(4.5),1076.2,-438.8,{rot:.12});if(s.hca)add(s.hca,-427.1,520.1,{rot:-.725});};if(!statuesLater)scans(statues);later=scans; // the scan faces +Z: turned to face the palace square's centre
   add(rider(3.6,'#4d6a59'),249,227,{rot:-1.2}); // Absalon at the city's monument register point (55.67796, 12.57996), at the canal end of Højbro Plads: it stood 65 m north-west, in the middle of the squareadd(gefion(),1371.2,-729.5,{rot:-.6});
   {const o=operaGeometry(),{x,z,rot}=OPERA;add(o.opaque,x,z,{y:o.y,rot});const g=add(o.glass,x,z,{y:o.y,rot,material:foyerGlow(new THREE.MeshStandardMaterial({color:'#5f7684',roughness:.06,metalness:.55,transparent:true,opacity:.5,depthWrite:false}))}),l=add(o.lights,x,z,{y:o.y,rot,material:new THREE.MeshBasicMaterial({color:'#fff3d8'})}),u=add(o.soffit,x,z,{y:o.y,rot,material:new THREE.MeshStandardMaterial({color:'#c3c8cb',emissive:'#6b7075',roughness:.7,metalness:0})});g.castShadow=l.castShadow=l.receiveShadow=u.receiveShadow=false;g.name='Opera glass';} // Operaen (the model's block is hidden: main.js HIDE_TODAY; its footprint becomes the body's: operaFootprint)
-  if(statues.hca)add(statues.hca,-427.1,520.1,{rot:-.725}); // Luckow-Nielsen's seated Andersen at City Hall's west corner, looking out over H.C. Andersens Boulevard
+  // (in scans above) Luckow-Nielsen's seated Andersen at City Hall's west corner, looking out over H.C. Andersens Boulevard
  }
  add(rider(3.2,era===1760?'#b8a46a':'#55715f'),624.6,-57.9,{rot:.6}); // in the middle of Krinsen (the mapped lawn's centroid) // Christian V (1688; gilded lead until 1940s)
  for(const [x,z,h] of flagTops){const pole=add(mergeGeometries([paint(new THREE.CylinderGeometry(.08,.1,8,6).translate(0,4,0),'#e9e6dc')]),x,z,{y:groundAt(x,z)+h});const f=flag();f.position.set(x,groundAt(x,z)+h+7.2,z);group.add(f);flags.push(f);}
@@ -261,5 +261,5 @@ export function createLandmarks({era=null,mills=[],anchors={},statues={}}={}){ /
  if(rotors.length){sailBatch=new THREE.InstancedMesh(rotors[0].geometry,mat,rotors.length);sailBatch.name='Windmill sails';sailBatch.instanceMatrix.setUsage(THREE.DynamicDrawUsage);sailBatch.frustumCulled=false;
   for(const r of rotors){group.remove(r);if(r.geometry!==sailBatch.geometry)r.geometry.dispose();}group.add(sailBatch);}
  let t=0,acc=0;
- return {group,obstacles,update(dt){t+=dt;acc+=dt;if(sailBatch){turn-=dt*.6;rotors.forEach((r,i)=>sailBatch.setMatrixAt(i,spin.makeRotationZ(turn).setPosition(r.position)));sailBatch.instanceMatrix.needsUpdate=true;}for(const sp of spinners){if(sp.axis==='z')sp.m.rotation.z+=dt*sp.rate;else sp.m.rotation.y+=dt*sp.rate;}if(acc>.05){acc=0;for(const f of flags)f.userData.wave?.(t);}}};
+ return {group,obstacles,addStatues(s={}){if(statuesLater&&later){later(s);later=null;}},update(dt){t+=dt;acc+=dt;if(sailBatch){turn-=dt*.6;rotors.forEach((r,i)=>sailBatch.setMatrixAt(i,spin.makeRotationZ(turn).setPosition(r.position)));sailBatch.instanceMatrix.needsUpdate=true;}for(const sp of spinners){if(sp.axis==='z')sp.m.rotation.z+=dt*sp.rate;else sp.m.rotation.y+=dt*sp.rate;}if(acc>.05){acc=0;for(const f of flags)f.userData.wave?.(t);}}};
 }

@@ -62,6 +62,12 @@ body.booting :is(.topbar,.location-tag,.dashboard,.right-tools,.bottomline,.land
 #load-percent{font-variant-numeric:tabular-nums;white-space:nowrap}
 #intro .load-progress{display:block;height:3px;background:#30312e20;margin:var(--s-12) 0 var(--s-4);overflow:hidden}
 #intro #load-fill{width:0;background:var(--orange);transition:width .3s;height:100%}
+/* While it loads: what to do first and the few controls that matter (keys, or the touch buttons on a phone: style.css swaps them). */
+.boot-tips{margin-top:var(--s-12)}
+#intro.boot-screen .boot-first{max-width:none;margin:0 0 var(--s-8);font:500 var(--t-14)/20px var(--ui);color:var(--ink);text-align:left}
+.boot-tips .boot-controls{margin-bottom:0}
+#intro.boot-screen .boot-tips .boot-touch{margin-bottom:0}
+#intro.failed .boot-tips{display:none}
 
 /* A deeper orange than the brand dot so the 16 px label reads at 4.5:1 or better. */
 #intro .primary-btn{width:100%;min-height:56px;margin:0;padding:0 var(--s-16) 0 var(--s-24);border-radius:8px;background-color:#bf4d2b;font:700 var(--t-16)/24px var(--ui);letter-spacing:0}
