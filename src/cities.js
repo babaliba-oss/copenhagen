@@ -45,6 +45,6 @@ export function renameStarts(starts,names){for(const s of starts||[]){const to=n
 
 // Keep the address bar shareable: it always names the current city and start.
 export function startUrl(location,city,start){
- const url=new URL(location.href);url.searchParams.set('city',city.id);url.searchParams.set('start',slug(start.id||start.name));
+ const url=new URL(location.href);url.searchParams.set('city',city.id);url.searchParams.set('start',slug(start.id||start.name));url.searchParams.delete('race'); // ?race= (a shared result) named the first start only
  return url.pathname+url.search+url.hash;
 }

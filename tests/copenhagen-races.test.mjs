@@ -53,3 +53,33 @@ test('today: the bike\'s GPS line over Cykelslangen is drawn on the deck, not un
   assert.ok(on>40,`${on} vertices along the raised deck`);assert.equal(low,0,`${low} of ${on} below the deck`);
  }finally{JOBS[0]=job;setRaisedDecks([]);store.delete('cph-game-v1');}
 });
+test('a race medal, a finished saga and a promotion each put up a result card whose link opens that map there; O shares it',async()=>{
+ const {RACES,raceStartName}=await import('../src/copenhagen/game.js'),{pickStart}=await import('../src/cities.js');
+ for(const id of ['copenhagen','copenhagen-1760']){const historic=id.endsWith('1760'),said=[],{g,at,job,data}=play(id,()=>{},{toast:m=>said.push(m)});store.clear();
+  assert.equal(g.debug().share,null);
+  // a race, a checkpoint a second: gold
+  const start=g.raceStarts()[0];at([start[0]+60,start[1]],'car',2);at(start,'car',2);const rid=g.debug().race.id;at(start,'car',8,.5);
+  for(let i=0;i<60&&g.debug().race;i++)at(g.minimapTargets()[0].p,'car',1,1);
+  let s=g.debug().share;assert.equal(s.kind,'race');assert.match(s.text,/ in \d:\d\d\.\d \(gold\) in Grand Tour Copenhagen(, 1760)?\. Can you beat it\?$/);
+  assert.equal(s.url,`https://gtcopenhagen.com/?${historic?'city=copenhagen-1760&':''}race=${rid}`);assert.equal(ids.get('cph-share').hidden,false);
+  const name=raceStartName(rid,historic),l=data.landmarks.find(x=>x.name===name);assert.ok(l,`?race=${rid} starts at ${name}`);assert.ok(Math.hypot(l.x-start[0],l.z-start[1])<60,'by the race\'s start beam');
+  // O: no share sheet here, so the line and the link are copied, and it says so
+  let copied='';Object.defineProperty(globalThis,'navigator',{value:{clipboard:{writeText:async t=>{copied=t;}}},configurable:true});
+  assert.equal(g.key('KeyO'),true);await new Promise(r=>setTimeout(r,5));assert.equal(copied,`${s.text} ${s.url}`);assert.deepEqual(said,['Link copied.']);
+  assert.equal(g.debug().share,null);assert.equal(ids.get('cph-share').hidden,true);assert.equal(g.key('KeyO'),false,'O does nothing without a card');
+  // a slow run earns no card
+  at([start[0]+60,start[1]],'car',2);at(start,'car',2);at(start,'car',8,.5);for(let i=0;i<9000&&g.debug().race;i++)at(start,'car',1,5);assert.equal(g.debug().share,null);
+  // a saga: the link starts by whoever tells it
+  const q=SAGAS.find(x=>x.id==='nisse'),who=g.people.find(x=>x.script===q.giver);g.api.sagaAccept('nisse');
+  for(let n=0;n<40&&!g.debug().share;n++){const t=g.minimapTargets().filter(m=>m.color==='#e0313e')[0];if(!t)break;at(t.p,'walk',2,.001);for(let i=0;i<4;i++)g.key('Enter');}
+  s=g.debug().share;assert.equal(s?.kind,'saga');assert.match(s.text,/^I finished the saga “Porridge for the Nisser” in Grand Tour Copenhagen(, 1760)?\.$/);
+  const u=new URL(s.url),at0=pickStart(data.landmarks,u.searchParams.get('start'));assert.equal(u.searchParams.get('city'),historic?'copenhagen-1760':null);assert.ok(at0&&Math.hypot(at0.x-who.x,at0.z-who.z)<600,'a start near the saga\'s giver');
+  // deliveries until the first promotion
+  g.teleported();assert.equal(g.debug().share,null,'a map jump puts the card away');
+  for(let i=0;i<4&&!g.debug().share;i++){at([5000,5000],'car',90);at(job());at(job());}
+  s=g.debug().share;assert.equal(s?.kind,'rank');assert.match(s.text,/^Promoted to .+ after 2 deliveries in Grand Tour Copenhagen(, 1760)?\.$/);assert.equal(s.url,historic?'https://gtcopenhagen.com/?city=copenhagen-1760':'https://gtcopenhagen.com/');
+ }
+ for(const [era,id] of [['m','copenhagen'],['h','copenhagen-1760']]){let c=fs.readFileSync(`public/cities/${id}/city.pack`);if(c[0]===0x1f)c=gunzipSync(c);const names=expandCity(JSON.parse(c)).landmarks.map(l=>l.name);
+  for(const r of RACES[era])assert.ok(names.includes(r.via[0])||era==='h'&&r.via[0]==='Højbro',`${r.id} starts at a place on the map`);}
+ assert.equal(raceStartName('lakes-loop'),'Torvehallerne');assert.equal(raceStartName('nope'),null);assert.equal(raceStartName(null,true),null);
+});

@@ -12,6 +12,9 @@ import {SpatialIndex,bounds,inWaterPolygons} from '../geo.js';
 import {JOBS,JOBS_1760,SAGAS,CHARACTERS} from './data.js';
 import {connectCharacters} from './characters.js';
 import {createPant,PANT_KR} from './pant.js';
+import {shareUrl,shareOut,shareSaid} from './share.js';
+import {track} from '../track.js';
+import {slug} from '../cities.js';
 import './copenhagen.css';
 import {keyLabel} from '../gamepad.js';
 
@@ -136,6 +139,17 @@ function beam(scene,color,h=80){
  g.add(col,ring);g.visible=false;scene.add(g);return g;
 }
 
+// Checkpoint races by era ('h' 1760, 'm' today): via are start names on the city map, the first one is where the race starts.
+export const RACES={h:[
+   {id:'coach-dash',title:'The Coachman’s Dash',via:['Kongens Nytorv','Højbro','Gammeltorv','Vesterport']},
+   {id:'harbour-run',title:'Harbour Run',via:['Nyhavn','Amalienborg','Kongens Nytorv']},
+   {id:'rampart-ride',title:'Rampart Ride',via:['Nørreport','Kultorvet','Rundetårn','Christiansborg']}],
+ m:[{id:'harbour-sprint',title:'Harbour Sprint',via:['Kongens Nytorv','Christiansborg','Christianshavn']},
+   {id:'lakes-loop',title:'Lakes Loop',via:['Torvehallerne','Dronning Louises Bro','The Lakes','Rådhuspladsen']},
+   {id:'mermaid-run',title:'Tivoli to the Mermaid',via:['Tivoli','Rådhuspladsen','Kongens Nytorv','Amalienborg','Little Mermaid']},
+   {id:'brygge-blast',title:'Brygge Blast',via:['Islands Brygge','Christiansborg','Nyhavn']}]};
+// ?race=<id> (main.js, share links): the start a race begins at.
+export const raceStartName=(id,historic=false)=>RACES[historic?'h':'m'].find(r=>r.id===id)?.via[0]||null;
 // The harbour baths and bathing zones (Københavns Kommune, k101 svoemmehaller_mv and badestation, CC BY 4.0): on a warm
 // day the decks and quays are full, and the cans with them (pant hotspots below).
 export const HARBOUR_BATHS=[['Islands Brygge Havnebad',55.66862,12.57779],['Fisketorvet Havnebad',55.66298,12.56393],['Kalvebod Bølge Badezone',55.66928,12.57561],['Halfdansgade Badezone',55.6659,12.57436],['Havnegade Badezone',55.67799,12.59249],['Søndre Refshalebassin Badezone',55.68993,12.60957],['La Banchina Badezone',55.68937,12.61087],['Halvandet Badezone',55.69527,12.609]]; // the eight on the map (Havnevigen and Sandkaj lie beyond its edge), each at the register point or the nearest quay beside it with room for the cans (Kalvebod Bølge floats: 46 m)
@@ -176,7 +190,8 @@ export function createCopenhagenGame({scene,city,mobilityData,cityData,toast,sou
  const journal=document.createElement('div');journal.id='cph-journal';journal.hidden=true;
  const tmap=document.createElement('div');tmap.id='cph-tmap';tmap.hidden=true;tmap.innerHTML=`<div class="cph-tmap-wrap"><div id="cph-tmap-canvas"></div><p>Just the map. The saga card tells you if you’re getting warmer.</p><button id="cph-tmap-close">Put the map away <kbd>K</kbd></button></div>`;
  const snapBtn=document.createElement('button');snapBtn.id='cph-postcard';snapBtn.type='button';snapBtn.hidden=true;snapBtn.innerHTML='<span aria-hidden="true">📷</span> Postcard'; /* touch: what N does, shown while an album view is in frame (main.js takes the click, touch-docks.js places it) */
- document.body.append(hud,lore,journal,tmap,snapBtn);
+ const shareEl=document.createElement('div');shareEl.id='cph-share';shareEl.hidden=true;shareEl.innerHTML=`<div class="cph-share-text"><p class="cph-kick" id="cph-share-kick"></p><h3 id="cph-share-title"></h3><p id="cph-share-sub"></p></div><button id="cph-share-go" type="button">Share <kbd>O</kbd></button><button id="cph-share-x" type="button" aria-label="Close">×</button>`;
+ document.body.append(hud,lore,journal,tmap,snapBtn,shareEl);
  const $=id=>document.getElementById(id);
 
  // ---- pant: empty cans by benches, bins, shelters and hot-dog stands, 1 kr each (pant.js); today only ----
@@ -194,6 +209,13 @@ export function createCopenhagenGame({scene,city,mobilityData,cityData,toast,sou
  function chime(kind){if(!soundOn())return;try{const ac=audioContext();const t0=ac.currentTime,notes=kind==='fail'?[392,330,262]:kind==='rank'?[523,659,784,1047]:[523,659,784];
   notes.forEach((f,i)=>{const o=ac.createOscillator(),g=ac.createGain();o.type='triangle';o.frequency.value=f;g.gain.setValueAtTime(0,t0+i*.11);g.gain.linearRampToValueAtTime(.09,t0+i*.11+.02);g.gain.exponentialRampToValueAtTime(.001,t0+i*.11+.5);o.connect(g).connect(ac.destination);o.start(t0+i*.11);o.stop(t0+i*.11+.55);});}catch{}}
  function banner(title,sub='',kind='pass'){ban.className='cph-banner-'+kind;ban.innerHTML=`<h2>${esc(title)}</h2>${sub?`<p>${sub}</p>`:''}`;ban.hidden=false;ban.style.animation='none';void ban.offsetWidth;ban.style.animation='';clearTimeout(banT);banT=setTimeout(()=>{ban.hidden=true;},kind==='rank'?4600:3400);chime(kind);}
+ // ---- result card: a race medal, a finished saga or a promotion, with a Share button (O). One line and a link (share.js); goes by itself after 16 s ----
+ const GAME='Grand Tour Copenhagen'+(ERA==='h'?', 1760':''),say=(e,p)=>{if(!trailer&&!filming)track(e,p);};
+ let shareNow=null,shareT=0;
+ function closeShare(){clearTimeout(shareT);shareNow=null;shareEl.hidden=true;}
+ function shareCard(kick,title,sub,what){if(trailer||filming)return;shareNow=what;$('cph-share-kick').textContent=kick;$('cph-share-title').textContent=title;$('cph-share-sub').textContent=sub;shareEl.hidden=false;clearTimeout(shareT);shareT=setTimeout(closeShare,16000);shareT?.unref?.();}
+ function doShare(){const w=shareNow;if(!w)return;closeShare();shareOut(w).then(how=>{if(how!=='cancelled')say('share',{what:w.kind,how});const said=shareSaid(how,w.url);if(said)toast(said,{ms:how==='failed'?9000:0});});}
+ $('cph-share-go').onclick=doShare;$('cph-share-x').onclick=closeShare;
  // ---- courier ranks: deliveries move you up; every rank pays 10% more ----
  const RANKS=ERA==='h'?[['Errand boy',0],['Runner',2],['Messenger',5],['Trusted courier',9],['Merchant’s man',14],['Court messenger',20],['Legend of the town',30]]
   :[['Newcomer',0],['Bike courier',2],['Cargo rider',5],['Street regular',9],['Harbour hand',14],['City fixer',20],['Copenhagen legend',30]];
@@ -228,14 +250,7 @@ export function createCopenhagenGame({scene,city,mobilityData,cityData,toast,sou
  const job=()=>jobs[save.job%jobs.length];
 
  // ---- checkpoint races: routes follow the road graph between named places; medals by time ----
- const RACE_DEFS=ERA==='h'?[
-   {id:'coach-dash',title:'The Coachman’s Dash',via:['Kongens Nytorv','Højbro','Gammeltorv','Vesterport']},
-   {id:'harbour-run',title:'Harbour Run',via:['Nyhavn','Amalienborg','Kongens Nytorv']},
-   {id:'rampart-ride',title:'Rampart Ride',via:['Nørreport','Kultorvet','Rundetårn','Christiansborg']}]
-  :[{id:'harbour-sprint',title:'Harbour Sprint',via:['Kongens Nytorv','Christiansborg','Christianshavn']},
-   {id:'lakes-loop',title:'Lakes Loop',via:['Torvehallerne','Dronning Louises Bro','The Lakes','Rådhuspladsen']},
-   {id:'mermaid-run',title:'Tivoli to the Mermaid',via:['Tivoli','Rådhuspladsen','Kongens Nytorv','Amalienborg','Little Mermaid']},
-   {id:'brygge-blast',title:'Brygge Blast',via:['Islands Brygge','Christiansborg','Nyhavn']}];
+ const RACE_DEFS=RACES[ERA];
  const lms=cityData?.landmarks||[],lm=n=>lms.find(l=>l.name===n);
  // Planned once here and again, round the walls (blocked: the world exists by then), when the race starts.
  const planRace=(d,bl)=>{const pts=d.via.map(lm);if(pts.some(p=>!p))return null;
@@ -287,14 +302,16 @@ export function createCopenhagenGame({scene,city,mobilityData,cityData,toast,sou
  const flashEl=document.createElement('div');flashEl.id='cph-flash';document.body.append(flashEl);
  function flash(){flashEl.classList.remove('on');void flashEl.offsetWidth;flashEl.classList.add('on');}
 
- let race=null,hopped=false,chainHold=0; // race: {r, k (next checkpoint), t, countdown}; hopped: the job's delivery leg crossed a map jump or reset (no speed bonus)
+ let race=null,hopped=false,pickedUp=false,chainHold=0; // race: {r, k (next checkpoint), t, countdown}; hopped: the job's delivery leg crossed a map jump or reset (no speed bonus)
  const H=ERA==='h',mkStart=races.map(()=>beam(scene,H?0x2f5c9e:0x9b5de5,60)),mkCp=beam(scene,H?0xe0a040:0xff4fd8,90),mkCp2=beam(scene,H?0xe0a040:0xff4fd8,40); // 1760: Prussian blue and lantern gold, not neon (the starts were sealing-wax red, too close to a saga step's red)
  const fmtT=t=>`${Math.floor(t/60)}:${String(Math.floor(t%60)).padStart(2,'0')}.${Math.floor(t%1*10)}`;
- function startRace(r){if(blocked&&!r.walls){r.walls=true;const q=planRace(r,blocked);if(q)Object.assign(r,{cps:q.cps,len:q.len,par:q.par,pay:q.pay});}race={r,k:0,t:0,countdown:3.4};routeFor=null;banner(r.title,`${r.cps.length} checkpoints · ${(r.len/1000).toFixed(1)} km · gold ${fmtT(r.par[0])}`,'pick');}
+ function startRace(r){closeShare();if(blocked&&!r.walls){r.walls=true;const q=planRace(r,blocked);if(q)Object.assign(r,{cps:q.cps,len:q.len,par:q.par,pay:q.pay});}race={r,k:0,t:0,countdown:3.4};routeFor=null;banner(r.title,`${r.cps.length} checkpoints · ${(r.len/1000).toFixed(1)} km · gold ${fmtT(r.par[0])}`,'pick');}
  function finishRace(){const r=race.r,t=race.t,medal=t<=r.par[0]?0:t<=r.par[1]?1:t<=r.par[2]?2:3;const names=['Gold','Silver','Bronze'];
   const prev=save.best[r.id],best=medal<3&&(prev==null||t<prev);if(best)save.best[r.id]=t; // a 'too slow' run is not a best time
-  if(medal<3){const pay=Math.round(r.pay*[1,.6,.35][medal]*payBonus());save.money+=pay;banner(`${names[medal]}!`,`${esc(r.title)} · ${fmtT(t)}${best?' · new best':''} · +${fmtKr(pay)} ${UNIT}`,medal===0?'rank':'pass');}
+  if(medal<3){const pay=Math.round(r.pay*[1,.6,.35][medal]*payBonus());save.money+=pay;banner(`${names[medal]}!`,`${esc(r.title)} · ${fmtT(t)}${best?' · new best':''} · +${fmtKr(pay)} ${UNIT}`,medal===0?'rank':'pass');
+   shareCard(`Race · ${names[medal].toLowerCase()}`,r.title,`${fmtT(t)}${best?' · new best':''}`,{kind:'race',text:`${r.title} in ${fmtT(t)} (${names[medal].toLowerCase()}) in ${GAME}. Can you beat it?`,url:shareUrl({historic:H,race:r.id})});}
   else banner('Too slow',`${esc(r.title)} · ${fmtT(t)} · bronze is ${fmtT(r.par[2])}`,'fail');
+  say('race_finish',{id:r.id,medal:names[medal]?.toLowerCase()||'none'});
   race=null;races.forEach(r=>r.armed=false);persist();routeFor=null;}
 
  // ---- sagas ----
@@ -304,8 +321,10 @@ export function createCopenhagenGame({scene,city,mobilityData,cityData,toast,sou
  function showLore(q,card){loreQ.push([q,card]);if(!loreOpen)nextLore();}
  function nextLore(){const it=loreQ.shift();if(!it){loreOpen=false;lore.hidden=true;return;}const [q,[t,txt]]=it;loreOpen=true;$('cph-lore-kick').textContent=q.title;$('cph-lore-title').textContent=t;$('cph-lore-text').textContent=txt;lore.hidden=false;}
  $('cph-lore-go').onclick=()=>nextLore();
- function startSaga(id){const q=byId[id];save.active={id,done:[],t:q.limit||0,shown:-1};persist();routeFor=null;wayTo=null;banner('Saga started',`${esc(q.title)} · ${q.steps[0].clue?'find the X on the map':'follow the red beam'}`,'pick');} /* Holger's map has no beam to follow */
- function endSaga(win){const q=byId[save.active.id];if(win){save.done[q.id]=1;save.money+=q.pay;banner('Saga complete',`${esc(q.title)} · +${fmtKr(q.pay)} ${UNIT}`,'rank');}else banner('Saga failed',`${esc(q.title)} · talk to ${esc(giverName(q))} to try again`,'fail');save.active=null;persist();routeFor=null;}
+ function startSaga(id){const q=byId[id];say('saga_start',{id});save.active={id,done:[],t:q.limit||0,shown:-1};persist();routeFor=null;wayTo=null;banner('Saga started',`${esc(q.title)} · ${q.steps[0].clue?'find the X on the map':'follow the red beam'}`,'pick');} /* Holger's map has no beam to follow */
+ function endSaga(win){const q=byId[save.active.id];if(win){save.done[q.id]=1;save.money+=q.pay;banner('Saga complete',`${esc(q.title)} · +${fmtKr(q.pay)} ${UNIT}`,'rank');say('saga_finish',{id:q.id});
+  {const g=people.find(p=>p.script===q.giver),near=g&&lms.reduce((b,l)=>!b||dist([l.x,l.z],[g.x,g.z])<dist([b.x,b.z],[g.x,g.z])?l:b,null); /* the link starts by whoever tells the saga */
+   shareCard('Saga complete',q.title,`${sagas.filter(s=>save.done[s.id]).length} of ${sagas.length} sagas`,{kind:'saga',text:`I finished the saga “${q.title}” in ${GAME}.`,url:shareUrl({historic:ERA==='h',start:near?slug(near.id||near.name):null})});}}else banner('Saga failed',`${esc(q.title)} · talk to ${esc(giverName(q))} to try again`,'fail');save.active=null;persist();routeFor=null;}
  const api={
   era:ERA,
   money:()=>fmtKr(save.money)+' '+UNIT,
@@ -465,10 +484,11 @@ export function createCopenhagenGame({scene,city,mobilityData,cityData,toast,sou
   if(state==='b'&&running){timer-=dt;if(timer<=0){banner('Job failed',`Too slow: ${esc(j.t)}. Streak lost.`,'fail');save.streak=0;save.job++;state='a';persist();routeFor=null;}}
   const t=state==='a'?j.A:j.B;
   if(running&&dist(here,t)<9&&!(state==='a'&&chainHold>0)){ /* a job picked up where the last one was delivered (Den Sorte Diamant) waits a moment: its banner replaced "Delivered!" the next frame */
-   if(state==='a'){state='b';wayTo=null;hopped=false;const len=pathLen(lineFrom(walk,j.A,j.B))||dist(j.A,j.B)*1.4,byCar=pathLen(lineFrom(road,j.A,j.B))||dist(j.A,j.B)*1.6;timer=Math.round(Math.max(len/6,byCar/(ERA==='h'?6:7))+25); /* timed along the GPS lines themselves, on foot and by car (or coach), from the pick-up: the clock's own road route left out the line's footway head and tail and its start off the road, and Wienerbrød's 3.6 km line had 311 s (42 km/h through the one-way streets). 7 m/s by car (about 23 km/h with the 25 s to get going, as the longer jobs had), 6 by coach, 6 on foot or bike */banner('Picked up',`Deliver to <b>${esc(j.bName)}</b> in ${timer} s`,'pick');routeFor=null;}
+   if(state==='a'){state='b';wayTo=null;hopped=false;const len=pathLen(lineFrom(walk,j.A,j.B))||dist(j.A,j.B)*1.4,byCar=pathLen(lineFrom(road,j.A,j.B))||dist(j.A,j.B)*1.6;timer=Math.round(Math.max(len/6,byCar/(ERA==='h'?6:7))+25); /* timed along the GPS lines themselves, on foot and by car (or coach), from the pick-up: the clock's own road route left out the line's footway head and tail and its start off the road, and Wienerbrød's 3.6 km line had 311 s (42 km/h through the one-way streets). 7 m/s by car (about 23 km/h with the 25 s to get going, as the longer jobs had), 6 by coach, 6 on foot or bike */if(!pickedUp){pickedUp=true;say('job_pickup');}banner('Picked up',`Deliver to <b>${esc(j.bName)}</b> in ${timer} s`,'pick');routeFor=null;}
    else{const before=rankOf(save.delivered||0);save.delivered=(save.delivered||0)+1;save.streak=(save.streak||0)+1;
     const base=j.pay+(hopped?0:timer*(ERA==='h'?1.5:3)) /* 3 a second left (was 4): the clocks now leave a normal player more time on the longer lines; per second of slack paid at the old rate, a 30 km/h run of the ten jobs earned about 75% more. 1.5 in 1760, where jobs pay 96-288 skilling: at 3 a 30 km/h run's slack paid 137% of the job on average (220% on the Kastel run) against 71% today; at 1.5 it is 69% */,streakBonus=save.streak>=3?Math.round(base*.25):0,pay=Math.round(base*payBonus())+streakBonus;save.money+=pay;save.job++;state='a';chainHold=2.5;persist();routeFor=null;
-    const after=rankOf(save.delivered);
+    const after=rankOf(save.delivered);say('job_delivered',{index:(save.job-1)%jobs.length+1});
+    if(after>before)shareCard('Promoted',RANKS[after][0],`${save.delivered} deliveries · jobs pay +${after*10}%`,{kind:'rank',text:`Promoted to ${RANKS[after][0]} after ${save.delivered} deliveries in ${GAME}.`,url:shareUrl({historic:ERA==='h'})});
     if(after>before)banner(`Promoted: ${RANKS[after][0]}`,`+${fmtKr(pay)} ${UNIT} · jobs now pay +${after*10}%${RANKS[after+1]?` · next: ${esc(RANKS[after+1][0])} at ${RANKS[after+1][1]} deliveries`:''}`,'rank');
     else banner('Delivered!',`+${fmtKr(pay)} ${UNIT}${streakBonus?` · streak ×${save.streak} bonus +${fmtKr(streakBonus)}`:''}${timer>20&&!hopped?' · fast':''}`,'pass');}
   }
@@ -506,6 +526,7 @@ export function createCopenhagenGame({scene,city,mobilityData,cityData,toast,sou
   if(tmapOpen){if(['KeyK','Escape','Enter'].includes(code))closeTreasure();return true;}
   if(journalOpen){if(code==='KeyJ'||code==='Escape')toggleJournal(false);return true;}
   if(code==='KeyX'&&race){banner('Race abandoned',esc(race.r.title),'fail');race=null;races.forEach(r=>r.armed=false);routeFor=null;return true;}
+  if(code==='KeyO'&&shareNow){doShare();return true;}
   if(code==='KeyJ'){toggleJournal(true);return true;}
   if(code==='KeyK'){showTreasure();return true;}
   return false;
@@ -518,6 +539,6 @@ export function createCopenhagenGame({scene,city,mobilityData,cityData,toast,sou
   banner:(title,sub,kind)=>banner(title,sub,kind),
   end(){if(!trailer)return;try{save=JSON.parse(trailerSave);}catch{}trailer=false;trailerSave=null;routeFor=null;ban.hidden=true;}};
  // A map jump, reset or restart (main.js setStart): a race can't go on from somewhere else, and a delivery reached that way earns no time bonus.
- function teleported(){if(race){banner('Race abandoned',esc(race.r.title),'fail');race=null;routeFor=null;}races.forEach(r=>r.armed=false); /* arriving on a start (the map's Nørreport, Kongens Nytorv) started that race unasked: drive off 30 m and back to start it */if(wayTo){wayTo=null;routeFor=null;}if(state==='b')hopped=true;}
- return {delivered:()=>save.delivered||0,timed:()=>race?'race':state==='b'?'delivery':save.active&&byId[save.active.id]?.limit?'saga':null, /* what a reload (the era switch) would drop: none of it is saved */raceStarts:()=>races.map(r=>r.start),teleported,setFurniture,trailer:trailerApi,paper:()=>{try{sessionStorage.removeItem('cph-paper-'+ERA);}catch{}showPaper();},photo,debug:()=>({race:race&&{id:race.r.id,k:race.k,t:race.t,c:race.countdown},armed:races.map(r=>r.armed),state,started,player:player&&[player.x,player.z]}),update,key,blocking,people,api,minimapTargets:()=>{const out=[];if(race){out.push({p:race.r.cps[race.k],color:ERA==='h'?'#e0a040':'#ff4fd8',job:true}); /* job: the big map opens framing the player and this (bf03502), the next checkpoint in a race */return out;}for(const r of races)if(state!=='b')out.push({p:r.start,color:ERA==='h'?'#2f5c9e':'#9b5de5',small:true});const j=job();out.push({p:state==='a'?j.A:j.B,color:state==='a'?'#f2b134':'#46c2b0',job:true});if(save.active){const q=byId[save.active.id];for(const k of frontier())if(!q.steps[k].clue)out.push({p:q.steps[k].p,color:'#e0313e'});}return out;},route:()=>line.ahead()};
+ function teleported(){closeShare();if(race){banner('Race abandoned',esc(race.r.title),'fail');race=null;routeFor=null;}races.forEach(r=>r.armed=false); /* arriving on a start (the map's Nørreport, Kongens Nytorv) started that race unasked: drive off 30 m and back to start it */if(wayTo){wayTo=null;routeFor=null;}if(state==='b')hopped=true;}
+ return {delivered:()=>save.delivered||0,timed:()=>race?'race':state==='b'?'delivery':save.active&&byId[save.active.id]?.limit?'saga':null, /* what a reload (the era switch) would drop: none of it is saved */raceStarts:()=>races.map(r=>r.start),teleported,setFurniture,trailer:trailerApi,paper:()=>{try{sessionStorage.removeItem('cph-paper-'+ERA);}catch{}showPaper();},photo,debug:()=>({share:shareNow&&{...shareNow},race:race&&{id:race.r.id,k:race.k,t:race.t,c:race.countdown},armed:races.map(r=>r.armed),state,started,player:player&&[player.x,player.z]}),update,key,blocking,people,api,minimapTargets:()=>{const out=[];if(race){out.push({p:race.r.cps[race.k],color:ERA==='h'?'#e0a040':'#ff4fd8',job:true}); /* job: the big map opens framing the player and this (bf03502), the next checkpoint in a race */return out;}for(const r of races)if(state!=='b')out.push({p:r.start,color:ERA==='h'?'#2f5c9e':'#9b5de5',small:true});const j=job();out.push({p:state==='a'?j.A:j.B,color:state==='a'?'#f2b134':'#46c2b0',job:true});if(save.active){const q=byId[save.active.id];for(const k of frontier())if(!q.steps[k].clue)out.push({p:q.steps[k].p,color:'#e0313e'});}return out;},route:()=>line.ahead()};
 }

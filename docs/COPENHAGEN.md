@@ -356,6 +356,51 @@ Notes:
 - `../prompts.js`: the basics as one-time toasts (drive, get out, talk, map and journal, era), each remembered in
   localStorage as `hint-<id>`; one at a time, never over a race, a conversation or a chase. The help dialog is the reference.
 
+### Sharing (src/copenhagen/share.js)
+
+Text and a link, no pictures. A race medal, a finished saga and a promotion put up a small result card (`#cph-share`,
+game.js) with a Share button (`O` on a keyboard); it goes by itself after 16 s. The pause card ("Share the game") and
+the phone menu ("Share") share the plain link. `navigator.share` where the browser has it, else the line and the link
+are copied and a toast says so.
+
+- Race: `Lakes Loop in 2:01.4 (gold) in Grand Tour Copenhagen. Can you beat it?` + `https://gtcopenhagen.com/?race=lakes-loop`.
+  `?race=<id>` (ids in `RACES`, game.js) puts the player at that race's start; nothing starts by itself (a race is
+  armed once you have driven 30 m off its beam). 1760 links also carry `?city=copenhagen-1760`.
+- Saga: the link starts at the place nearest to whoever tells the saga (`?start=`). Promotion: the map only.
+
+### Analytics (src/track.js)
+
+Off by default. `track(event, props)` reads one setting, `<meta name="analytics" content="…">` in `index.html`:
+
+| content | what happens |
+| --- | --- |
+| `none` | Nothing. No network calls. |
+| `goatcounter https://CODE.goatcounter.com/count` | GoatCounter's count endpoint. A page view per load (the path keeps `?city=`), each event as `name/value/value` (GoatCounter has no properties). |
+| `plausible gtcopenhagen.com` | Plausible's events API (`https://plausible.io/api/event`; a third word sets another API URL for a self-hosted one). Values go as custom properties. |
+
+To switch it on: make the site at the provider, put its line in the meta tag, deploy. Both work from a static page:
+no Worker, no script tag from the provider.
+
+Privacy: no cookies, no ids kept in the browser, nothing the player typed, no position. Sent are the event name, the
+values below and, on the page view, the referrer. Do Not Track and Global Privacy Control turn it off, as do localhost
+and `?cinematic`. A failed call is dropped without a word. Either provider sees the visitor's IP address and user
+agent, as any server does; both say they do not store them.
+
+| event | values | where |
+| --- | --- | --- |
+| `pageview` | `city`, `era` (today / 1760), `device` (phone / desktop) | main.js, once the map is known |
+| `ready` | `seconds` to the start button: under 5 s, 5-10 s, 10-20 s, 20-40 s, 40-80 s, over 80 s | main.js |
+| `start` | | main.js `start()` |
+| `job_pickup` | | game.js, the first pick-up after each page load |
+| `job_delivered` | `index` (the job's number in the list) | game.js |
+| `saga_start`, `saga_finish` | `id` | game.js |
+| `race_finish` | `id`, `medal` (gold / silver / bronze / none) | game.js |
+| `era_switch` | `to` (today / 1760) | main.js `eraJump()` |
+| `share` | `what` (race / saga / rank / game), `how` (shared / copied / failed) | game.js, main.js |
+| `busted` | | main.js `setBusted()` |
+
+A new event: call `track()` and add it to this table.
+
 ### Trailer footage (src/cinematic.js, src/cine-drive.js)
 
 `?cinematic` runs the trailer shots by themselves with the interface hidden and no music. Most shots follow the
