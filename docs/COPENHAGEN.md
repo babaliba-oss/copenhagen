@@ -138,11 +138,11 @@ paint kept 67,500 -> 74,500 m².
 
 ### Current roadworks (scripts/kk-roadworks.py)
 
-The city's traffic messages (WFS `k101:trafikmelding`, 48 lines with start and end times; CC BY 4.0) list its roadworks.
-Each that has not ended by the build date (`--date`, default today; 2026-11-01: 23 of 41 roadworks, demonstrations left
+The city's traffic messages (WFS `k101:trafikmelding`, 55 lines on 2026-11-10, with start and end times; CC BY 4.0) list its roadworks.
+Each that has not ended by the build date (`--date`, default today; 2026-11-10: 26 of 48 roadworks, demonstrations left
 out) gets a row of the knockable red and white barriers (`barrier`, mapped-furniture.js) every 1.3 m in the parking lane
 just inside the kerb on the line's side of the road, turned along it, and a cone past each end of a row; a stretch over
-60 m long gets a 40 m site every 100 m (892 barriers, 70 cones). A barrier is left out within 1.7 m of a traffic lane's
+60 m long gets a 40 m site every 100 m (2026-11-10: 1,046 barriers, 80 cones). A barrier is left out within 1.7 m of a traffic lane's
 centre line (so no lane, job, race or saga route is ever closed), on a parked car, in a house or the water. Every item
 carries the works' `since` and `until` dates and main.js shows it from the day before the first to the day after the
 last (`datedNow`), so a build goes stale only as works end and new ones start: rebuild for fresh dates. parked-cars.py
