@@ -2,7 +2,7 @@
 """Parked cars along the kerbs, kept only where the carriageway surface is there and no building, traffic lane, crossing
 or junction is. Writes public/cities/<id>/parked.json ({cars:[[x, z, yaw, paint]]}).
 
-  python3 scripts/parked-cars.py copenhagen [<wfs dir>] && node scripts/parked-lanes.mjs copenhagen  (drops cars in any traffic lane, and overlaps)
+  python3 scripts/parked-cars.py copenhagen [<wfs dir> [<frb dir>]] && node scripts/parked-lanes.mjs copenhagen  (drops cars in any traffic lane, and overlaps)
 
 With <wfs dir> (Københavns Kommune map data, CC BY 4.0, wfs-kbhkort.kk.dk k101 p_pladser as GeoJSON in EPSG:4326) the
 cars stand where the city's parking register has kerbside parking. Each stretch of it is cut into its number of spaces
@@ -14,13 +14,17 @@ a pedestrian crossing, or on street furniture (furniture.json, the overhead wire
 run first); a street still drawn narrower than it is (OSM widths, no kerb data) has no room beside the lanes and stays empty. Left out of the register: suspended stretches (midlertidigt nedlagt), no-parking and
 no-stopping ones, the taxi, motorcycle and coach bays, and car parks (P-område). The stretches end at junctions and
 driveways, so the cars do too. Without <wfs dir>: a slot every ~6 m beyond the lane of every road edge, 78% filled.
+With <frb dir> as well (Frederiksberg Kommune, Parkeringspladser, CC BY 4.0, opendata.dk/city-of-frederiksberg:
+parkeringspladser.geojson, the marked parking strips as polygons) the strips of Frederiksberg, which Copenhagen's
+register stops at, are stretches too, after the city's: a strip's long axis, a space every 5.4 m. The motorcycle and
+taxi bays, the parking cellars and the strips with no type are left out.
 """
 import gzip, json, math, random, sys
 from collections import defaultdict
 from PIL import Image, ImageDraw
 import numpy as np
 
-cid = sys.argv[1]; OUT = f'public/cities/{cid}'; KK = sys.argv[2] if len(sys.argv) > 2 else None
+cid = sys.argv[1]; OUT = f'public/cities/{cid}'; KK = sys.argv[2] if len(sys.argv) > 2 else None; FRB = sys.argv[3] if len(sys.argv) > 3 else None
 city = json.loads(gzip.decompress(open(f'{OUT}/city.pack', 'rb').read()))
 mob = json.load(open(f'{OUT}/mobility.json'))
 EXT = city['extent'] + 100; G = .5; N = int(2 * EXT / G)
@@ -100,6 +104,17 @@ else:
         for line in f['geometry']['coordinates']:
             pl = [to_local.transform(*q[:2]) for q in line]; pl = [(a, -b) for a, b in pl]
             if all(abs(x) < EXT and abs(z) < EXT for x, z in pl) and len(pl) > 1: stretches.append([len(stretches), p['antal_pladser'], pl, p.get('vejnavn')])
+    if FRB:  # pladstype 1-3 disabled, 4 cars, 5 shared cars, 6 and 9 electric cars; not 7 motorcycles, 8 taxis, 10 cellars
+        from shapely.geometry import Polygon
+        for f in json.load(open(f'{FRB}/parkeringspladser.geojson', encoding='utf8'))['features']:
+            if not f.get('geometry') or f['properties'].get('pladstype') not in (1, 2, 3, 4, 5, 6, 9): continue
+            ring = [to_local.transform(*q[:2]) for q in f['geometry']['coordinates'][0]]; ring = [(a, -b) for a, b in ring]
+            if not all(abs(x) < EXT and abs(z) < EXT for x, z in ring): continue
+            c = list(Polygon(ring).minimum_rotated_rectangle.exterior.coords)
+            if len(c) < 5: continue
+            if math.dist(c[0], c[1]) < math.dist(c[1], c[2]): c = c[1:] + c[1:2]
+            pl = [((c[0][0] + c[3][0]) / 2, (c[0][1] + c[3][1]) / 2), ((c[1][0] + c[2][0]) / 2, (c[1][1] + c[2][1]) / 2)]; L = math.dist(*pl)
+            if L >= 5.2: stretches.append([len(stretches), int(L // 5.4) or 1, pl, None])
     # The road graph's lane lines (each edge's lane offset right of travel) and junction nodes, for placing the cars.
     nodes = mob['roads']['nodes']; deg = defaultdict(int)
     for e in mob['roads']['edges']: deg[e['from']] += 1; deg[e['to']] += 1
@@ -199,6 +214,6 @@ else:
                 placed[math.floor(c[0] / 10), math.floor(c[1] / 10)].append((c[0], c[1])); cars.append(c + [r.randrange(len(PAINT))]); got += 1
         with_car += got > 0
     print(f'{len(stretches)} parking stretches ({sum(n for _, n, _, _ in stretches)} spaces), {tried} spaces along them as parallel bays, {with_car} stretches with a car; left empty: {dict(WHY)}')
-    meta = {'source': 'Kerbside parking: Københavns Kommune, Parkeringspladser (p_pladser), CC BY 4.0 (wfs-kbhkort.kk.dk)'}
+    meta = {'source': 'Kerbside parking: Københavns Kommune, Parkeringspladser (p_pladser), CC BY 4.0 (wfs-kbhkort.kk.dk)' + ('; in Frederiksberg: Frederiksberg Kommune, Parkeringspladser, CC BY 4.0 (opendata.dk/city-of-frederiksberg)' if FRB else '')}
 json.dump({'paints': PAINT, **meta, 'cars': cars}, open(f'{OUT}/parked.json', 'w'), separators=(',', ':'), ensure_ascii=False)
 print('parked cars', len(cars))

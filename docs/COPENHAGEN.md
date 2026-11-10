@@ -95,9 +95,11 @@ python3 scripts/kk-kerbs.py <kk data dir>/wfs copenhagen     # last, today only,
 node scripts/road-walls.mjs copenhagen
 python3 scripts/kk-shelters.py <kk data dir>/wfs copenhagen && python3 scripts/kk-water-toilets.py <kk data dir>/wfs copenhagen
 python3 scripts/kk-signs.py <kk data dir>/wfs copenhagen   # the city's road signs (k101 skilte_total, below)
-python3 scripts/parked-cars.py copenhagen <kk data dir>/wfs && node scripts/parked-lanes.mjs copenhagen
+python3 scripts/parked-cars.py copenhagen <kk data dir>/wfs <frb dir> && node scripts/parked-lanes.mjs copenhagen   # <frb dir>: Frederiksberg's parking strips too
 python3 scripts/kk-roadworks.py <kk data dir>/wfs copenhagen   # the current roadworks (k101 trafikmelding, below): rebuild for fresh dates
 python3 scripts/kk-playgrounds.py <kk data dir>/wfs copenhagen   # play equipment (k101 dp_lege_aktivitetselementer_p, below)
+python3 scripts/frb-furniture.py <frb dir> copenhagen   # Frederiksberg's bins, parking machines, toilets, drinking posts and
+                                                    # playgrounds (below); after the kk-*.py furniture
 python3 scripts/surface-fill.py copenhagen && python3 scripts/kk-surfaces.py <kk data dir>/wfs copenhagen
 python3 scripts/kk-markings.py <kk data dir>/wfs copenhagen
 node scripts/furniture-ground.mjs copenhagen && node scripts/indoor-items.mjs copenhagen && node scripts/kerb-walks.mjs copenhagen
@@ -158,6 +160,46 @@ goals. The register says only "play equipment", so the kind comes from a hash of
 spring rider). An item stands on park or playground ground (a mapped park or lawn, or within 60 m of a playground) clear
 of roads, paths, houses, water, tree trunks and furniture, turned or moved up to 3 m if need be (2026-11: 668 placed,
 104 with no room, 30 off park ground); fitness and parkour equipment (196) is not drawn.
+
+### Frederiksberg (scripts/frb-furniture.py, parked-cars.py)
+
+The west of the map is Frederiksberg, its own municipality: Københavns Kommune's registers stop at the border, so it had
+only the photo detections. Frederiksberg Kommune publishes these on opendata.dk/city-of-frederiksberg, each CC BY 4.0
+(the licence is in the portal's catalogue record: `admin.opendata.dk/api/3/action/package_show?id=<dataset>`). Only the
+resources of those datasets are used; the same GC2 server has other tables with no licence, which are not.
+
+```sh
+mkdir -p <frb dir> && cd <frb dir>        # outside the repo
+D=https://admin.opendata.dk/dataset
+curl -L -o skraldespande.geojson $D/7015bce7-e225-421d-bb35-d11dcbf3238e/resource/107d6358-7d72-40e4-b05c-6d82c0283b04/download/skraldespande.geojson
+curl -L -o parkeringsautomater.geojson $D/9f6d4e71-b587-4e3d-8907-1a81dac1d9c2/resource/4959ebbe-a41d-43d7-a992-ab97c98ac1e7/download/parkeringsautomater.geojson
+curl -L -o legepladser.geojson $D/b5e66c0e-8fe7-4454-8130-90d43d8dcd6b/resource/d006897b-df53-4088-beb8-d493ac48b39c/download/friluftstilbud_legepladser.geojson
+curl -L -o multibaner.geojson $D/b5e66c0e-8fe7-4454-8130-90d43d8dcd6b/resource/1539c5e1-ee97-42bb-b9a9-53717e3a105b/download/friluftstilbud_multibaner.geojson
+curl -L -o vandposter.geojson $D/b5e66c0e-8fe7-4454-8130-90d43d8dcd6b/resource/46047840-6d07-4228-a7ff-057718719beb/download/friluftstilbud_vandposter.geojson
+G='https://gc2ekstern.frederiksberg.dk/api/v2/sql/frederiksberg'
+curl -o toiletter.geojson "$G?format=geojson&q=select%20*%20from%20byrum.toiletter_offentlige&srs=4326"
+curl -o parkeringspladser.geojson "$G?q=select%20gid,%20ogr_geometry,%20pladstype,%20max_tid,%20max_tid_periode%20from%20mobilitet.parkeringspladser_type_view&format=geojson&srs=4326"
+```
+
+| dataset (opendata.dk/city-of-frederiksberg/…) | file | in the map | becomes |
+|---|---|---|---|
+| Skraldespande (`skraldespande-frb`, surveyed 2014) | skraldespande.geojson | 543 of 1,184 | 450 `bin` (src `frb-skrald`) |
+| Parkeringsautomater (`parkeringsautomater`) | parkeringsautomater.geojson | 8 of 25 | 7 `parking-meter` (`frb-automat`) |
+| Offentlige toiletter (`offentlige-toiletter-frederiksberg`) | toiletter.geojson | 10 of 28 | 3 `toilet` (`frb-toilet`) |
+| Friluftstilbud (`friluftstilbud_frederiksberg`): Vandposter | vandposter.geojson | 2 of 8 | 2 `drinking-post` (`frb-vand`) |
+| Friluftstilbud: Legepladser, Multibaner | legepladser.geojson, multibaner.geojson | 10 of 20, 2 of 6 | 50 play pieces, 4 `goal` (`frb-leg`) |
+| Parkeringspladser (`parkering_frederiksberg`) | parkeringspladser.geojson | 2,369 of 5,230 strips | 533 parked cars (parked.json) |
+
+`frb-furniture.py` only adds: a bin or parking machine with one within 4 m already (the photo detection of the same
+one) is left out, as are the bins the register wants taken down and the toilets inside a house (only the
+register's free-standing ones, 'fristå.toilet', get a cabin). Items stand at the
+register's point, moved up to 1.5 m off the carriageway, cycle tracks, houses and other furniture. The playground and
+ball-court sets are one point per place, so the equipment is ours: five pieces round a playground's point, two goals
+round a court's, on clear ground. The parking machines' file also carries SIM and PUK numbers; only the position and the
+machine's id are read. `parked-cars.py` takes the parking strips (polygons; cars, disabled, shared and electric bays)
+as stretches after the city's, a space every 5.4 m along a strip's long axis. Frederiksberg has no kerb data, so most
+streets are still drawn at OSM width and 533 cars fit of some 7,200 spaces. Not used: the electric chargers (no model),
+the 3D model (DWG), the parking zones and school districts.
 
 ### Trees from the current register (scripts/kk-trees.py)
 

@@ -14,8 +14,8 @@ const corners=(it)=>{const [w,d]=SOLIDS[it.k],c=Math.cos(it.yaw||0),s=Math.sin(i
 
 test('the city\'s drinking posts and toilets stand clear of the roads, the houses and the water',()=>{
  const posts=items.filter(i=>i.k==='drinking-post'),toilets=items.filter(i=>i.k==='toilet');
- assert.ok(posts.length>=60&&posts.every(i=>i.src==='kk-vand'),`${posts.length} drinking posts`);
- assert.ok(toilets.length>=30&&toilets.every(i=>i.src==='kk-toilet'),`${toilets.length} toilets`);
+ assert.ok(posts.length>=60&&posts.every(i=>/^(kk|frb)-vand$/.test(i.src)),`${posts.length} drinking posts`); // frb-: Frederiksberg's (scripts/frb-furniture.py)
+ assert.ok(toilets.length>=30&&toilets.every(i=>/^(kk|frb)-toilet$/.test(i.src)),`${toilets.length} toilets`);
  const roads=city.roads.filter(r=>!/island/.test(r.kind||'')),houses=[...city.buildings,...kk];
  for(const it of [...posts,...toilets])for(const [x,z] of corners(it)){
   assert.ok(!on(roads,x,z),`${it.k} ${it.ref} on the road`);assert.ok(!on(houses,x,z),`${it.k} ${it.ref} in a house`);assert.ok(!on(city.water,x,z),`${it.k} ${it.ref} in the water`);}
