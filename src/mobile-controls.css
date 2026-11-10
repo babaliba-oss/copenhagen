@@ -170,7 +170,7 @@
  /* tap targets: the journal's Close and Show me the way (33-35 px), the lore and treasure-map buttons, the big map's zoom and Whole city (38 px), the morning paper's Read later (31 px) */
  body.touch :is(.cph-lore-card,.cph-jcard,.cph-tmap-wrap,.cph-paper-card) button,body.touch #big-map .bm-tools button{min-height:44px;min-width:44px}
 }
-@media(pointer:coarse){body.touch #help-dialog .help-grid{display:none}} /* a keyboard table; the copy above it explains the touch controls */
+@media(pointer:coarse){body.touch:not(.gamepad) #help-dialog .help-grid{display:none}} /* a keyboard table; the copy above it explains the touch controls */
 /* Race card on a phone: a third of the landscape screen before. Time smaller, card only as wide as its text. */
 body.touch #cph-hud .cph-race-time{font-size:22px!important;margin:0!important;line-height:1.05}
 body.touch #cph-hud .cph-card:has(.cph-race-time){width:max-content;max-width:100%;padding:5px 10px}

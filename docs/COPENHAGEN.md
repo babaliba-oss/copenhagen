@@ -349,6 +349,12 @@ Notes:
   with its coloured awnings is the fallback). `soundscape.js`: engine, tyres, bells, hooves,
   and generative Danish folk tunes (fiddle over accordion oom-pah-pah; a cittern in 1760) as background music (U).
 - `big-map.js`: the full-screen map (M) with click-to-travel.
+- `../gamepad.js`: a standard-mapping gamepad feeds the same `keys` set and `keys.tilt` as the keyboard and the touch
+  controls (RT/LT, left stick, A handbrake or run); the other buttons act as their keys (`PAD_KEYS`; A, B and Start by
+  context in `padTap`, main.js). Polled only once a pad has connected. While the pad is the last thing used,
+  `body.gamepad` is set and hints show pad buttons: `data-pad` attributes in index.html, `keyLabel()` in generated text.
+- `../prompts.js`: the basics as one-time toasts (drive, get out, talk, map and journal, era), each remembered in
+  localStorage as `hint-<id>`; one at a time, never over a race, a conversation or a chase. The help dialog is the reference.
 
 ### Trailer footage (src/cinematic.js, src/cine-drive.js)
 

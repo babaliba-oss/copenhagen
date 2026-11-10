@@ -149,7 +149,7 @@ body.clean-capture.driving #wanted:not([hidden])+#radio-now{top:82px}
 .radio-now-hint{margin-top:3px;font-size:10.5px;line-height:1.6;color:#9db3a6}
 #radio-now kbd{min-width:0;padding:1px 4px;font:700 9.5px/1.2 Manrope,sans-serif;color:#f4f3e9;border-color:#e8efe64d;background:#ffffff14;vertical-align:1px}
 /* Hint: keys on a keyboard, "tap" on a touch screen; "tune in" while the radio is off. */
-#radio-now .rh-touch,#radio-now.off .rh-on,#radio-now:not(.off) .rh-off{display:none}
+body.gamepad #radio-now .rh-back,#radio-now .rh-touch,#radio-now.off .rh-on,#radio-now:not(.off) .rh-off{display:none}
 /* A new station, or the card coming up: a short glow */
 #radio-now.flash{animation:radio-flash .8s ease-out}
 @keyframes radio-flash{from{transform:scale(1.05);border-color:#ffe9a8;box-shadow:0 0 0 4px #ffe9a866,0 8px 26px #10252130}}

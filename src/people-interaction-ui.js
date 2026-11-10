@@ -1,4 +1,5 @@
 import './people-interaction.css';
+import {padInUse} from './gamepad.js';
 
 export function createPeopleInteractionUI({interact,choose,toggleVoice=()=>{},focusWorld=()=>{},doc=document}){
  const root=doc.createElement('section');root.id='people-interaction';root.hidden=true;root.setAttribute('aria-label','Conversation');
@@ -21,7 +22,7 @@ export function createPeopleInteractionUI({interact,choose,toggleVoice=()=>{},fo
    root.hidden=hidden||!state||!(state.active||state.nearby);
    if(root.hidden)return;
    const invitation=state.person?.vendor?'Talk to seller':'Say hello';
-   talk.textContent=doc.body.classList.contains('touch')?invitation:`G · ${invitation}`;
+   talk.textContent=padInUse(doc)?`X · ${invitation}`:doc.body.classList.contains('touch')?invitation:`G · ${invitation}`;
    talk.hidden=!!state.active;panel.hidden=!state.active;
    if(state.active){
     title.textContent=state.person?.name||state.person?.label||'Passerby';
