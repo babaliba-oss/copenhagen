@@ -11,9 +11,10 @@ Per house (a part of a tile), with its vertices welded at 1 cm:
   piece   a group of triangles sharing no vertex with the house's main body, 4 m2 or more, every vertex 4 m or more
           outside the mapped footprint (kk-osm-/osm- houses, city.pack). With --pieces also model-only houses' groups
           10 m or more from the main body (many: the model's leftover groups are scattered pieces under one id).
-Church spires, masts and flagpoles on a roof show up as spikes too: look before trimming. Worst first.
+Church spires, masts and flagpoles on a roof show up as spikes too: look before trimming (scripts/building-trim.py
+cuts the houses named there). Parts the game does not draw (duplicates.json) are skipped. Worst first.
 """
-import gzip, json, sys
+import gzip, json, os, sys
 import numpy as np
 from scipy.spatial import cKDTree
 from shapely.geometry import Polygon, MultiPoint, Point
@@ -29,6 +30,7 @@ def poly(f):
         if len(r) > 2: out = out.symmetric_difference(Polygon(r).buffer(0))
     return out
 foot = {b['id']: b for b in city['buildings']}
+hidden = set(json.load(open(R + 'duplicates.json'))) if os.path.exists(R + 'duplicates.json') else set()
 out = []
 for t in idx['tiles']:
     bb = t['bbox']
@@ -36,7 +38,7 @@ for t in idx['tiles']:
     a = np.frombuffer(gzip.decompress(open(R + t['file'], 'rb').read()), dtype=np.float32).reshape(-1, 5)
     for p in t['parts']:
         T = a[p['start']:p['start'] + p['count'], :3].reshape(-1, 3, 3).astype(np.float64)
-        if len(T) < 6: continue
+        if len(T) < 6 or f"{t['file']}:{p['start']}" in hidden: continue
         V, inv = np.unique(np.round(T.reshape(-1, 3), 2), axis=0, return_inverse=True); F = inv.reshape(-1, 3)
         c = np.median(V, 0)
         if np.hypot(c[0], c[2]) > RADIUS: continue

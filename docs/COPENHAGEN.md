@@ -88,6 +88,7 @@ node scripts/indoor-items.mjs copenhagen            # after furniture-ground, kk
                                                     # inside the model's drawn houses, lists such trees (indoor-trees.json)
 node scripts/furniture-ground.mjs copenhagen-1760   # the 1760 lanterns likewise
 python3 scripts/kk-demolished.py --again copenhagen  # last, today only: model houses demolished since 2013 out (below);
+python3 scripts/building-trim.py copenhagen           # then the stray roof sheets of the houses named in it (below);
 node scripts/road-walls.mjs copenhagen && node scripts/indoor-items.mjs copenhagen && python3 scripts/surface-fill.py copenhagen
 python3 scripts/kk-kerbs.py <kk data dir>/wfs copenhagen     # last, today only, and again after any surface-dissolve.mjs: the
                                                     # carriageways out to the city's kerb lines (k101 vejkant, below); then
@@ -279,11 +280,18 @@ stray sheets) stay: GeoDanmark does not register those as buildings. The pieces 
 sheds and halls, Sydhavn's quay buildings). 1760 keeps the model as it is.
 `python3 scripts/building-strays.py copenhagen [out.json]` lists stray geometry in the drawn houses and changes nothing:
 a roof point pulled 15 m or more out of the house or up over it (spike), or a loose group of triangles 4 m or more
-outside the mapped footprint (piece; 133 houses, mostly decks, ramps and basements the map leaves out). 2026-11: six
-houses with a sheet pulled to a far point (kk-osm-way-67528468 Wakeup Copenhagen at -590,1458 and its neighbour
-kk-osm-way-253797399 to the same point; kk-osm-way-105951035 at 434,-872; kk-osm-way-587591587 at 1353,242;
-kk-osm-way-1103097512 Locke Aparthotel at -522,1207; kk-osm-way-133961765 at 355,-304), not trimmed yet; Børsen's and
-Sankt Johannes Kirke's spires are listed too and are right.
+outside the mapped footprint (piece; 132 houses, mostly decks, ramps and basements the map leaves out); parts the game
+does not draw (duplicates.json) are skipped. Børsen's and Sankt Johannes Kirke's spires are listed as spikes and are right.
+`python3 scripts/building-trim.py copenhagen` (after kk-demolished.py, edits the built tiles in place, a second run
+changes nothing) cuts the sheets off the houses named in it: every triangle with a corner more than 15 m outside the
+house's mapped footprint is cut to the footprint, so the roof keeps no hole (2026-11: kk-osm-way-67528468 Wakeup
+Copenhagen at -590,1458 and the pavilion kk-osm-way-253797399 beside it, kk-osm-way-105951035 at 434,-872,
+kk-osm-way-133961765 at 355,-304; nine triangles). A house in its `BLOCK` list is drawn as its footprint pushed up to
+the height given: kk-osm-way-1103097512, Locke Aparthotel in Postbyen, whose model was pieces of the old post terminal
+spread over 60 x 130 m (32 m as before; the real towers are taller). The `model-` footprints fit-colliders.py had given
+the sheets go with them (8, with their collision-trim.json entries and ground pads), as kk-demolished.py does; run
+road-walls.mjs after it for the camera's walls. The sixth spike, kk-osm-way-587591587, is half of the hall on
+Grønlandske Handels Plads, which duplicates.json already hides.
 Checks: `scripts/building-sweep.mjs` (rays from inside every house at a third of its height; a ray that gets out into
 the street - open sky joined to the map edge - without crossing a wall means you can see into the house).
 
