@@ -336,6 +336,22 @@ Notes:
 - File names must not contain commas (Cloudflare's asset server redirect-loops on them).
 - Data requests carry `?v=<build id>` (src/cache-bust.js), so a deploy never mixes with cached city files.
 
+## Engine entry (src/main.js and src/main-*.js)
+
+`src/main.js` holds boot, the frame loop, input, the HUD wiring and the state they share. Pieces that need little
+of that state live beside it and are imported by main.js only (none of them imports main.js back):
+
+| File | Holds |
+| --- | --- |
+| `main-ground.js` | water mask, perched pools, ground patches, the scanned ground textures and the street-surface shader (`surfaceShader`), 1760's pavements off the cobbles |
+| `main-parts.js` | `prepareParts`: what boot does to the model's building parts (duplicates, skyways, recolours, houseboats, default heights; 1760: `GONE`, `NEWER`, period heights). The scripts that need `GONE` read it from here |
+| `main-furniture.js` | `tidyFurniture`: Copenhagen's mapped furniture filtered before it is built (lanes, water, benches, duplicate signs, signal heads, poles) |
+| `main-page.js` | `cityDialogs`, `helpTexts`: the texts boot writes into the map, sources and help dialogs, 1760 wording |
+| `main-occlusion.js` | `fadeOccluders`: fading the buildings between camera and player, once a frame |
+| `main-util.js` | `json`, `unpack`, `geometry`, `pool` |
+
+Tests that read main.js as text read all of these joined: `mainSource` in `tests/helpers/main-source.mjs`.
+
 ## Game layer (src/copenhagen)
 
 - `game.js`: delivery jobs, sagas, journal (J), treasure map (K), hidden nisser, the morning paper, GPS line.

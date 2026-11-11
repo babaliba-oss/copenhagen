@@ -17,7 +17,7 @@ const city=process.argv[2]||'copenhagen-1760',write=process.argv.includes('--wri
 const idx=JSON.parse(fs.readFileSync(path.join(root,'buildings3d-index.json'),'utf8'));
 const pack=JSON.parse(zlib.gunzipSync(fs.readFileSync(path.join(root,'city.pack'))));
 {let tb=fs.readFileSync(path.join(root,'terrain.pack'));if(tb[0]===31)tb=zlib.gunzipSync(tb);setTerrain(decodeTerrain(tb.buffer.slice(tb.byteOffset,tb.byteOffset+tb.byteLength)));}
-const GONE=eval(fs.readFileSync('src/main.js','utf8').match(/const GONE=(\/\^.*?\/[a-z]*);/)[1]);
+const GONE=eval(fs.readFileSync('src/main-parts.js','utf8').match(/const GONE=(\/\^.*?\/[a-z]*);/)[1]);
 const dups=new Set(JSON.parse(fs.readFileSync(path.join(root,'duplicates.json'),'utf8'))),late=new Set(JSON.parse(fs.readFileSync(path.join(root,'era.json'),'utf8')).anachronisms||[]);
 const hidden=new Set(HIDE_1760),kind=new Map(pack.buildings.map(b=>[b.id,b.kind])),lanes=new SpatialIndex(pack.roads.filter(r=>/^Ajorata/.test(r.kind||'')));
 const kk=new Map();for(const t of idx.tiles)for(const p of t.parts)if(p.id.startsWith('kk-osm-'))kk.set(p.id.slice(3),p.bbox);

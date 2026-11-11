@@ -12,7 +12,7 @@ import {decodeTerrain,setTerrain,groundAt,liftBuildings} from '../src/terrain.js
 const args=process.argv.slice(2).filter(a=>!a.startsWith('--')),city=args[0]||'copenhagen-1760',R=+(args[1]||1700),root=args[2]||`public/cities/${city}`;
 const idx=JSON.parse(fs.readFileSync(path.join(root,'buildings3d-index.json'),'utf8'));
 {let tb=fs.readFileSync(`public/cities/${city}/terrain.pack`);if(tb[0]===31)tb=zlib.gunzipSync(tb);setTerrain(decodeTerrain(tb.buffer.slice(tb.byteOffset,tb.byteOffset+tb.byteLength)));}
-let gone=null;if(city.endsWith('1760')){const src=fs.readFileSync('src/main.js','utf8'),m=src.match(/const GONE=(\/\^.*?\/[a-z]*);/);if(m)gone=eval(m[1]);}
+let gone=null;if(city.endsWith('1760')){const src=fs.readFileSync('src/main-parts.js','utf8'),m=src.match(/const GONE=(\/\^.*?\/[a-z]*);/);if(m)gone=eval(m[1]);}
 const dups=new Set((()=>{try{return JSON.parse(fs.readFileSync(path.join(root,'duplicates.json'),'utf8'));}catch{return [];}})());
 // triangles
 const T=[];const parts=[];

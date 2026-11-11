@@ -1,8 +1,9 @@
 // The page as it arrives (index.html) is Copenhagen's: nothing from Helsinki shows before the game's code runs,
 // or to a crawler. Helsinki puts its own text back when it loads (src/helsinki-scenery.js).
+import {mainSource} from './helpers/main-source.mjs';
 import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs';
 const read=p=>fs.readFileSync(new URL(p,import.meta.url),'utf8');
-const html=read('../index.html'),main=read('../src/main.js'),scenery=read('../src/helsinki-scenery.js');
+const html=read('../index.html'),main=mainSource,scenery=read('../src/helsinki-scenery.js');
 const city=JSON.parse(read('../public/cities/index.json')).cities.find(c=>c.id==='copenhagen');
 test('index.html carries no Helsinki text',()=>{assert.doesNotMatch(html,/helsinki|helsingin|HSL|Olympia|Kauppatori|Aleksanterinkatu|SENAATINTORI/i);});
 test('the static dialogs say what main.js writes for Copenhagen today',()=>{

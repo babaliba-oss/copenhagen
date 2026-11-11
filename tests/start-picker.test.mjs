@@ -1,3 +1,4 @@
+import {mainSource} from './helpers/main-source.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {cycleIndex,cycleStart,pickerStep,swipeStep,startPosition,createStartPicker} from '../src/start-picker.js';
@@ -92,7 +93,7 @@ test('a mouse or touch click hands focus back, a keyboard press keeps it on the 
 
 test('Enter on a focused arrow is left to the button, not taken over by the game keys',async()=>{
  const {readFile}=await import('node:fs/promises');
- const main=await readFile(new URL('../src/main.js',import.meta.url),'utf8');
+ const main=mainSource;
  assert.doesNotMatch(main,/closest\?\.\('\.start-arrow'\)/,'no Enter special case for the arrows');
  assert.match(main,/e\.code!=='Escape'&&e\.target\.closest\?\.\('button,/,'keys on a focused button stay with the button');
 });

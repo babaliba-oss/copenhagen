@@ -1,3 +1,4 @@
+import {mainSource} from './helpers/main-source.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
@@ -26,7 +27,7 @@ test('horizon pixel equals the fog colour and the zenith is a deeper blue',()=>{
 test('sun direction is the shadow light offset used in main.js',()=>{
  assert.deepEqual([...SUN_OFFSET],[-160,260,160]);
  assert.ok(Math.abs(SUN_DIRECTION.length()-1)<1e-9&&SUN_DIRECTION.y>0);
- const main=readFileSync(new URL('../src/main.js',import.meta.url),'utf8');
+ const main=mainSource;
  // The light sits at target + the active look's sun offset (weather.js; midday = SUN_OFFSET); the shadow box is snapped in that basis.
  assert.match(main,/sun\.position\.copy\(sun\.target\.position\)\.add\(sunOffset\)/);assert.match(main,/new THREE\.Vector3\(-160,260,160\)/);
  assert.match(main,/createSky\(/);

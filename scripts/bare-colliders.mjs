@@ -15,7 +15,7 @@ const city=process.argv[2]||'copenhagen-1760',write=process.argv.includes('--wri
 const idx=JSON.parse(fs.readFileSync(path.join(root,'buildings3d-index.json'),'utf8'));
 const pack=JSON.parse(zlib.gunzipSync(fs.readFileSync(path.join(root,'city.pack'))));
 {let tb=fs.readFileSync(path.join(root,'terrain.pack'));if(tb[0]===31)tb=zlib.gunzipSync(tb);setTerrain(decodeTerrain(tb.buffer.slice(tb.byteOffset,tb.byteOffset+tb.byteLength)));}
-let gone=null;if(city.endsWith('1760')){const m=fs.readFileSync('src/main.js','utf8').match(/const GONE=(\/\^.*?\/[a-z]*);/);if(m)gone=eval(m[1]);}
+let gone=null;if(city.endsWith('1760')){const m=fs.readFileSync('src/main-parts.js','utf8').match(/const GONE=(\/\^.*?\/[a-z]*);/);if(m)gone=eval(m[1]);}
 const dups=new Set((()=>{try{return JSON.parse(fs.readFileSync(path.join(root,'duplicates.json'),'utf8'));}catch{return [];}})());
 const afloat=p=>{if(!gone)return false;const [a,b,c,d]=p.bbox,ix=(c-a)*.25,iz=(d-b)*.25;return [[(a+c)/2,(b+d)/2],[a+ix,b+iz],[c-ix,b+iz],[a+ix,d-iz],[c-ix,d-iz]].filter(([x,z])=>inWaterPolygons(pack.water,x,z)).length>=4;};
 // highest drawn surface per 1 m cell (walls seen edge-on: along their line, at their top)

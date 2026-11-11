@@ -1,6 +1,7 @@
 // First-minutes hints a newcomer needs (read from the source: they live inside main.js and game.js).
+import {mainSource} from './helpers/main-source.mjs';
 import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs';
-const main=fs.readFileSync(new URL('../src/main.js',import.meta.url),'utf8'),game=fs.readFileSync(new URL('../src/copenhagen/game.js',import.meta.url),'utf8');
+const main=mainSource,game=fs.readFileSync(new URL('../src/copenhagen/game.js',import.meta.url),'utf8');
 test('the start hint on a keyboard says how to drive and where to go, and stays up long enough to be read (the first of the one-time prompts)',()=>{
  const p=fs.readFileSync(new URL('../src/prompts.js',import.meta.url),'utf8');
  assert.match(p,/WASD or arrow keys to drive/);assert.match(p,/line to the beam: your first job/);assert.match(p,/id==='drive'\?9000/);assert.match(main,/prompts\.update\(/);

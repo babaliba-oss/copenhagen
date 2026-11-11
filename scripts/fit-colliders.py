@@ -31,7 +31,7 @@ idx = json.load(open(f'{root}/buildings3d-index.json'))
 data = json.loads(gzip.decompress(open(f'{root}/city.pack', 'rb').read()))
 gone = None
 if ERA:
-    m = re.search(r'const GONE=/(\^.*?\$)/i;', open('src/main.js').read())
+    m = re.search(r'const GONE=/(\^.*?\$)/i;', open('src/main-parts.js').read())
     gone = re.compile(m.group(1), re.I)
 dups = set(json.load(open(f'{root}/duplicates.json'))) if os.path.exists(f'{root}/duplicates.json') else set()
 

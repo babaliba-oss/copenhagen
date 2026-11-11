@@ -57,7 +57,7 @@ ROOFS_1760 = ['#9c4a30', '#8a3f2a', '#a85a3a', '#93442d', '#4d4f52']
 pick = lambda pal, s, salt: pal[int(hashlib.md5((salt + s).encode()).hexdigest(), 16) % len(pal)]
 hexrgb = lambda h: [round(int(h[i:i + 2], 16) / 255, 3) for i in (1, 3, 5)]
 
-main = open('src/main.js').read()
+main = open('src/main-parts.js').read()
 GONE = re.compile(re.search(r'const GONE=/(\^.*?\$)/i;', main).group(1), re.I)
 HIDE = set(json.loads(re.search(r'export const HIDE_1760=(\[.*?\]);', open('src/copenhagen/landmarks.js').read()).group(1).replace("'", '"')))
 ERA_TXT = open(E + 'era.json').read(); era = json.loads(ERA_TXT)

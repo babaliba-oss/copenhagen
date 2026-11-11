@@ -1,5 +1,6 @@
 // Plays the Copenhagen game layer (src/copenhagen/game.js) on the real city data, without a page: a few HTML stand-ins
 // for the HUD, the player moved from spot to spot, update() stepped by hand.
+import {mainSource} from './helpers/main-source.mjs';
 import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs';import {gunzipSync} from 'node:zlib';import {register} from 'node:module';
 register('data:text/javascript,'+encodeURIComponent("export async function load(u,c,n){return u.endsWith('.css')?{format:'module',source:'',shortCircuit:true}:n(u,c);}"));
 class El{constructor(){this.hidden=false;this.innerHTML='';this.style={};this.dataset={};this.attrs={};this.classList={add(){},remove(){},contains:()=>false,toggle(){}};}setAttribute(k,v){this.attrs[k]=v;}append(){}replaceChildren(){}remove(){}querySelector(){return null;}querySelectorAll(){return [];}getContext(){return new Proxy({},{get:()=>()=>({addColorStop(){}})});}get offsetWidth(){return 0;}}
@@ -92,7 +93,7 @@ test('touch: a Postcard button shows while an album view not yet taken is in fra
  step(look(card[0]-me.x,card[1]-me.z));assert.equal(btn.hidden,false);
  g.photo({dir:[card[0]-me.x,card[1]-me.z],snap:()=>null});step(look(card[0]-me.x,card[1]-me.z));assert.equal(btn.hidden,true,'taken: no button for it');
  const css=fs.readFileSync('src/copenhagen/copenhagen.css','utf8');assert.match(css,/#cph-postcard\{display:none\}\nbody\.touch\.driving:not\(\.busted\) #cph-postcard:not\(\[hidden\]\)\{[^}]*min-height:44px[^}]*right:var\(--mobile-right|#cph-postcard\{display:none\}\nbody\.touch\.driving:not\(\.busted\) #cph-postcard:not\(\[hidden\]\)\{[^}]*right:var\(--mobile-right[^}]*min-height:44px/,'touch only, 44 px, inside the safe area');
- assert.match(fs.readFileSync('src/main.js','utf8'),/closest\?\.\('#cph-card-hint,#cph-postcard'\)/,'its click takes the photo');
+ assert.match(mainSource,/closest\?\.\('#cph-card-hint,#cph-postcard'\)/,'its click takes the photo');
 });
 test('touch: the journal shows the postcard album (Menu > Journal says "Sagas & postcards"), with a tap hint, not N',()=>{
  store.clear();const was=body.classList.contains;body.classList.contains=c=>c==='touch';let g;try{({g}=play('copenhagen'));}finally{body.classList.contains=was;}

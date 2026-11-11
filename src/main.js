@@ -143,6 +143,12 @@ import './worldhood-brand.css';
 import earcut from 'earcut';
 import {decodeTerrain,setTerrain,hasTerrain,groundAt,groundPose,liftBuildings,footprintBase,flattenWaterBodies,waterAt,raiseDryHollows,levelBanks,sinkShallowWater,raiseBridgeDecks,terrain,seaLevel,isRaisedDeck} from './terrain.js';
 import {drapeGeometry,dropSunkenSurfaces,settleObject,createTerrainGround,drawLakeMap} from './terrain-mesh.js';
+import {json,unpack,geometry,pool} from './main-util.js';
+import {WATER_MASK,extractPerchedPools,createPoolSheets,buildWaterMask,groundPatches,surfaceShader,pavements1760} from './main-ground.js';
+import {fadeOccluders} from './main-occlusion.js';
+import {prepareParts} from './main-parts.js';
+import {tidyFurniture} from './main-furniture.js';
+import {cityDialogs,helpTexts} from './main-page.js';
 const impacts=new ImpactSystem();impacts.onVehicleHit=(from,car,a)=>mobility?.knock(a,from,car)??null;
 const finale=new Finale({doc:document}); // shared offence log, pursuit pressure, arrest cinematic and BUSTED screen
 const locationReadout=createLocationReadout();
@@ -267,135 +273,8 @@ const ground=new THREE.Mesh(new THREE.PlaneGeometry(11000,11000),groundPatches(n
 // Unmapped ground (yards, lots, verges): soft patches of worn grass and gravel instead of one flat grey.
 // Copenhagen's harbour reads blue, not Baltic grey: deeper blue body, a little less grey sky, livelier ripples.
 function tintSea(s){const u=s?.material?.uniforms;if(!u||!city?.id?.startsWith('copenhagen'))return;u.uDeep.value.set(city.era===1760?'#24566a':'#1c5b80');u.uShore.value.set('#3a5866');u.uReflect.value=.66;u.uRipple.value=1.35;}
-// Mapped water, rasterised (2 m texels): the drawn ground is cut away inside it. With 10 m ground cells a
-// triangle from a quay vertex to a sunk canal vertex rose above the water as a pale ramp beside every quay.
-const WATER_MASK={uWaterMask:{value:null},uWaterRect:{value:new THREE.Vector4(0,0,1,0)},uSeaY:{value:-1e9}};
-// Fountains and ponds standing above the water level the terrain gives them (Gefionspringvandet on its slope
-// sat 2-5 m above the harbour level it inherited): as water polygons they cut a pit into the ground lined with
-// quay walls. Taken out of the water list and drawn as a water sheet laid on the ground instead.
-function extractPerchedPools(data){
- const pools=[];
- data.water=data.water.filter(w=>{const b=w.bbox||(w.bbox=bounds(w.rings));if(!w.rings?.[0]?.length||(b[2]-b[0])*(b[3]-b[1])>30000)return true;
-  let mn=Infinity;for(const p of w.rings[0])mn=Math.min(mn,groundAt(p[0],p[1]));const lvl=waterAt((b[0]+b[2])/2,(b[1]+b[3])/2)??seaLevel();
-  if(lvl!==null&&mn>lvl+1.2){pools.push(w);return false;}return true;});
- return pools;
-}
-function createPoolSheets(pools){
- const geoms=[];
- for(const w of pools){const shape=new THREE.Shape(w.rings[0].map(p=>new THREE.Vector2(p[0],-p[1])));for(const r of w.rings.slice(1))shape.holes.push(new THREE.Path(r.map(p=>new THREE.Vector2(p[0],-p[1]))));
-  const g=new THREE.ShapeGeometry(shape);g.rotateX(-Math.PI/2);geoms.push(g);}
- const merged=drapeGeometry(mergeGeometries(geoms),{maxEdge:2,lift:.12});geoms.forEach(g=>g.dispose());
- const m=new THREE.Mesh(merged,new THREE.MeshStandardMaterial({color:'#3f6f80',roughness:.08,metalness:.1,transparent:true,opacity:.92}));m.name='Fountain and pond water';m.receiveShadow=true;return m;
-}
-function buildWaterMask(water,extent,res=2){
- if(typeof document==='undefined'||!water?.length||!extent)return;const n=Math.ceil(2*extent/res),c=document.createElement('canvas');c.width=c.height=n;
- const ctx=c.getContext('2d');ctx.fillStyle='#fff';
- // each polygon on its own (even-odd within it keeps island holes): overlapping polygons (a canal drawn over the harbour) cancelled out as one path
- // a grey 8 m band round every shore first: low ground there is the terrain ramping down into the water
- ctx.strokeStyle='rgb(60,60,60)';ctx.lineWidth=8/res;ctx.lineJoin='round';for(const w of water){ctx.beginPath();for(const ring of w.rings||[]){ring.forEach(([x,z],i)=>{const px=(x+extent)/res,pz=(z+extent)/res;i?ctx.lineTo(px,pz):ctx.moveTo(px,pz);});ctx.closePath();}ctx.stroke();}
- for(const w of water){ctx.beginPath();for(const ring of w.rings||[]){ring.forEach(([x,z],i)=>{const px=(x+extent)/res,pz=(z+extent)/res;i?ctx.lineTo(px,pz):ctx.moveTo(px,pz);});ctx.closePath();}ctx.fill('evenodd');}
- const t=new THREE.CanvasTexture(c);t.flipY=false;t.generateMipmaps=false;t.minFilter=t.magFilter=THREE.LinearFilter;t.colorSpace=THREE.NoColorSpace;
- WATER_MASK.uWaterMask.value=t;WATER_MASK.uWaterRect.value.set(-extent,-extent,n*res,1);WATER_MASK.uSeaY.value=seaLevel()??-1e9;
-}
-function groundPatches(material){
- material.onBeforeCompile=shader=>{Object.assign(shader.uniforms,WATER_MASK);
-  shader.fragmentShader=shader.fragmentShader.replace('#include <clipping_planes_fragment>','#include <clipping_planes_fragment>\n if(uWaterRect.w>0.){vec2 wuv=(vGp.xz-uWaterRect.xy)/uWaterRect.z;if(all(greaterThan(wuv,vec2(0.)))&&all(lessThan(wuv,vec2(1.)))){float wm=texture2D(uWaterMask,wuv).r;if(wm>.6)discard;}} /* .6: the cut falls a few cm inside the shoreline, under the coping; at .72 the ground (level with the quay up to the water since createTerrainGround keeps shore vertices up) stuck out past the wall face as a pale ledge */');
-  shader.vertexShader=shader.vertexShader.replace('#include <common>','#include <common>\nvarying vec3 vGp;').replace('#include <project_vertex>','#include <project_vertex>\nvGp=(modelMatrix*vec4(transformed,1.)).xyz;');
-  Object.assign(shader.uniforms,GROUND_TEX);
-  shader.fragmentShader=shader.fragmentShader.replace('#include <common>','#include <common>\nvarying vec3 vGp;uniform sampler2D tSlabC,tSlabN,tSettsC,uWaterMask;uniform vec4 uWaterRect;uniform float uSeaY;vec3 gpNrm=vec3(0.,0.,1.);float gpNw=0.;float gpH(vec2 p){return fract(sin(dot(p,vec2(41.7,113.1)))*4371.3);}float gpN(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);return mix(mix(gpH(i),gpH(i+vec2(1,0)),f.x),mix(gpH(i+vec2(0,1)),gpH(i+vec2(1,1)),f.x),f.y);}')
-   .replace('#include <color_fragment>','#include <color_fragment>\n{float n=gpN(vGp.xz/23.)*.6+gpN(vGp.xz/7.)*.3+gpN(vGp.xz/2.1)*.1;float fp=length(fwidth(vGp.xz));float g=(gpH(floor(vGp.xz*9.))-.5)*(1.-smoothstep(.05,.3,fp));\nvec3 grass=vec3(.29,.36,.2),gravel=vec3(.42,.4,.35);\n#ifdef DIRT_GROUND\n grass=vec3(.25,.28,.15);gravel=vec3(.27,.22,.16); // 1760: unpaved yards and verges are packed brown earth\n#endif\n#ifdef URBAN_GROUND\n vec2 tp=vGp.xz/1.4,ti=floor(tp),tf=fract(tp);float joint=(1.-step(.05,tf.x)*step(.05,tf.y))*(1.-smoothstep(.04,.2,fp));float tone=gpH(ti)*.1-.05;vec2 sl=vGp.xz/.625,slc=floor(sl),g2=abs(fract(sl)-.5);float seam=smoothstep(.478,.5,max(g2.x,g2.y))*(1.-smoothstep(.04,.2,fp));float pl=dot(texture2D(tSlabC,vGp.xz/1.9).rgb,vec3(.3333));float stain=step(.93,gpH(slc+8.3))*(.6+.4*gpN(vGp.xz*1.7));vec3 pave=vec3(.40,.395,.375)*(.97+.06*gpH(slc+3.1))*(.82+.25*pl/.75)*(1.-stain*.06)*(1.-seam*.16)*(1.+(n-.5)*.08);gpNrm=texture2D(tSlabN,vGp.xz/1.9).xyz*2.-1.;gpNw=.6*(1.-smoothstep(.08,.45,fp));float moss=smoothstep(.8,.92,gpN(vGp.xz/31.));diffuseColor.rgb=mix(pave,mix(gravel,grass,.6),moss*.3); /* concrete slabs like the mapped pavements */\n#elif defined(DIRT_GROUND)\n {vec3 st=texture2D(tSettsC,vGp.xz/vec2(2.2,1.1)).rgb;diffuseColor.rgb=mix(mix(st*vec3(1.,.9,.76)*.62,gravel,.35),grass,smoothstep(.6,.85,gpN(vGp.xz/41.))*.3)*(1.-smoothstep(.5,.8,n)*.12);} // 1760: unmapped ground in town reads as the same worn cobbles and earth as the streets\n#else\n diffuseColor.rgb=mix(gravel,grass,smoothstep(.38,.62,n))*(1.+g*.18);\n#endif\n}')
-   .replace('#include <normal_fragment_maps>','#include <normal_fragment_maps>\n if(gpNw>0.){vec3 nW=normalize(vec3(gpNrm.x,gpNrm.z,gpNrm.y));normal=normalize(mix(normal,normalize((viewMatrix*vec4(nW,0.)).xyz),gpNw));}');
- };
- return material;
-}
 const surfaceMaterial=new THREE.MeshStandardMaterial({vertexColors:true,roughness:1,side:THREE.DoubleSide});
-// Photo-scanned ground (ambientCG, CC0; scripts/textures/prepare.py): asphalt cut from Road007 between its lane
-// markings (mirrored so the cut tiles), PavingStones150 cobbles for stone carriageways and squares, Grass005 for lawns.
-const GROUND_TEX=(()=>{const L=new THREE.TextureLoader(),t=(f,srgb,wrap=THREE.RepeatWrapping)=>{const x=L.load(`/materials/${f}`);x.wrapS=x.wrapT=wrap;x.anisotropy=8;if(srgb)x.colorSpace=THREE.SRGBColorSpace;return x;};
- const M=THREE.MirroredRepeatWrapping;
- return {tAsphaltC:{value:t('asphalt-color.jpg',true,M)},tAsphaltN:{value:t('asphalt-normal.jpg',false,M)},tAsphaltR:{value:t('asphalt-rough.jpg',false,M)},
-  tSettsC:{value:t('setts-color.jpg',true)},tSettsN:{value:t('setts-normal.jpg',false)},tSettsR:{value:t('setts-rough.jpg',false)},
-  tSlabC:{value:t('slab-color.jpg',true)},tSlabN:{value:t('slab-normal.jpg',false)},
-  tGrassC:{value:t('grass-color.jpg',true)},tGrassN:{value:t('grass-normal.jpg',false)}};})();
-surfaceMaterial.onBeforeCompile=shader=>{
- Object.assign(shader.uniforms,GROUND_TEX);
- shader.vertexShader='varying vec3 vGround;\n#ifdef TERRAIN\nattribute float terrainY;\n#endif\n'+shader.vertexShader.replace('#include <begin_vertex>','#include <begin_vertex>\nvGround=position;\n#ifdef TERRAIN\nvGround.y-=terrainY;\n#endif');
- // uWetness comes from weather.js (WEATHER_UNIFORMS.wetness): rain darkens and smooths the asphalt bays.
- shader.uniforms.uWetness=WEATHER_UNIFORMS.wetness;
- shader.fragmentShader='varying vec3 vGround;uniform float uWetness;uniform sampler2D tAsphaltC,tAsphaltN,tAsphaltR,tSettsC,tSettsN,tSettsR,tSlabC,tSlabN,tGrassC,tGrassN;\nfloat groundHash(vec2 p){return fract(sin(dot(p,vec2(41.7,113.1)))*4371.3);}\nfloat groundNoise(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.0-2.0*f);return mix(mix(groundHash(i),groundHash(i+vec2(1,0)),f.x),mix(groundHash(i+vec2(0,1)),groundHash(i+vec2(1,1)),f.x),f.y);}\n'+GRANITE_SETTS_GLSL+shader.fragmentShader.replace('#include <color_fragment>',`#include <color_fragment>
- // Filter sub-pixel masonry and grain; unfiltered fract() patterns sparkle in motion.
- vec2 GDX=dFdx(vGround.xz),GDY=dFdy(vGround.xz); // derivatives taken before any branch: textures inside branches use textureGrad (no mip seams at surface borders)
- float footprint=max(length(dFdx(vGround.xz)),length(dFdy(vGround.xz)));
- vec2 settFp=vec2(length(vec2(dFdx(vGround.x),dFdy(vGround.x))),length(vec2(dFdx(vGround.z),dFdy(vGround.z))));
- float detail=1.0-smoothstep(0.07,0.40,footprint);
- float grain=(fract(sin(dot(floor(vGround.xz*18.0),vec2(12.9898,78.233)))*43758.5453)-0.5)*(1.0-smoothstep(0.02,0.08,footprint));
- float wetRough=0.0;vec3 gN=vec3(0.,0.,1.);float gNw=0.,gRough=-1.;
- float texFade=1.0-smoothstep(0.08,0.45,footprint); // photo normals fade out where a texel is smaller than a pixel
- if(vGround.y>0.065&&vGround.y<0.075){
-  if(diffuseColor.r<0.35){
-   // Asphalt: the scanned surface at two scales (breaks up the repeat), a slow tone drift, no painted patches.
-   vec2 au=vGround.xz/2.6,au2=mat2(.8,-.6,.6,.8)*vGround.xz/7.3;
-   vec3 asp=mix(textureGrad(tAsphaltC,au,GDX/2.6,GDY/2.6).rgb,textureGrad(tAsphaltC,au2,mat2(.8,-.6,.6,.8)*GDX/7.3,mat2(.8,-.6,.6,.8)*GDY/7.3).rgb,.35);
-   float tone=groundNoise(vGround.xz/11.0)-0.5;
-   diffuseColor.rgb=asp*vec3(1.0,0.97,0.92)*1.6*(1.0+tone*0.10); // weathered asphalt (albedo about 0.12): the fresh-black scan read purple-black under the evening sky
-   gN=textureGrad(tAsphaltN,au,GDX/2.6,GDY/2.6).xyz*2.0-1.0;gNw=.8*texFade;gRough=textureGrad(tAsphaltR,au,GDX/2.6,GDY/2.6).r;grain=0.0;
-   // Wet asphalt: darker, puddles in the low spots of the tone field, far less grain.
-   float puddle=smoothstep(0.62,0.75,groundNoise(vGround.xz/3.5+7.0))*uWetness;
-   diffuseColor.rgb*=1.0-uWetness*0.22-puddle*0.25;grain*=1.0-uWetness*0.7;wetRough=max(uWetness*0.5,puddle);
-   #ifdef DIRT_ROADS
-   // 1760: no asphalt anywhere; unpaved roads are packed earth with wheel ruts and gravel.
-   gNw=0.;gRough=-1.;{float n=groundNoise(vGround.xz/4.0),rut=groundNoise(vGround.xz*vec2(.35,.35)+3.0);diffuseColor.rgb=vec3(0.20,0.16,0.11)*(0.82+n*0.32)*(1.0-smoothstep(0.55,0.75,rut)*0.18);diffuseColor.rgb*=1.0-puddle*0.35;}
-   #endif
-  }
-  // Stone carriageways (aaa99e) get the shared photo-guided granite setts; light islands keep slabs.
-  else if(diffuseColor.r<0.55){vec2 su=vGround.xz/vec2(2.2,1.1);{vec3 st=textureGrad(tSettsC,su,GDX/vec2(2.2,1.1),GDY/vec2(2.2,1.1)).rgb;diffuseColor.rgb=mix(st,vec3(dot(st,vec3(.3,.59,.11))),.55)*vec3(0.95,0.95,0.98)*(1.0+(groundNoise(vGround.xz/9.0)-0.5)*0.12);
-   #ifdef DIRT_ROADS
-   diffuseColor.rgb=mix(diffuseColor.rgb,st*vec3(1.0,.9,.76)*.92,.65)*(1.0-smoothstep(.5,.8,groundNoise(vGround.xz/5.0+11.0))*.22); // 1760 brosten: rounded field stones, brown-grey, dirt and dung in the joints
-   #endif
-  } /* granite grey: the scan alone read as orange dirt in low sun */gN=textureGrad(tSettsN,su,GDX/vec2(2.2,1.1),GDY/vec2(2.2,1.1)).xyz*2.0-1.0;gNw=texFade;gRough=textureGrad(tSettsR,su,GDX/vec2(2.2,1.1),GDY/vec2(2.2,1.1)).r;grain=0.0;} // scanned cobbles
-  else {vec2 cell=abs(fract(vGround.xz/vec2(0.28,0.2))-0.5);float seam=smoothstep(0.42,0.49,max(cell.x,cell.y));diffuseColor.rgb*=1.0-mix(0.2,seam,detail)*0.22;
-   #ifdef DIRT_ROADS
-   // 1760: today's pale traffic islands and plazas are the same worn field-stone cobbles as the walks.
-   {vec2 su=vGround.xz/vec2(1.5,.75);diffuseColor.rgb=textureGrad(tSettsC,su,GDX/vec2(1.5,.75),GDY/vec2(1.5,.75)).rgb*vec3(1.0,.93,.82)*.9*(1.0+(groundNoise(vGround.xz/7.0)-0.5)*0.16);gN=textureGrad(tSettsN,su,GDX/vec2(1.5,.75),GDY/vec2(1.5,.75)).xyz*2.0-1.0;gNw=texFade*.8;}
-   #endif
-  }
-  diffuseColor.rgb*=1.0+grain*0.13;
- }else if(vGround.y>0.059&&vGround.y<0.065){
-  // Gravel paths and pea gravel (6.2 cm: Københavns Kommune's surface register, scripts/kk-surfaces.py): small stones a shade
-  // darker or paler each, faded out where a stone is smaller than a pixel, and a slow drift where feet and bikes wear it.
-  float s1=groundHash(floor(vGround.xz*26.0)),s2=groundHash(floor(vGround.xz*61.0)+5.3),fine=mix(0.5,s1*0.6+s2*0.4,1.0-smoothstep(0.02,0.09,footprint));
-  diffuseColor.rgb*=(0.86+0.28*fine)*(1.0+(groundNoise(vGround.xz/5.0)-0.5)*0.16);grain=0.0;gRough=0.95;
- }else if(vGround.y>0.04&&vGround.y<0.06){
-  #ifdef ASPHALT_CYCLE_TRACKS
-  // Copenhagen's cycle tracks are asphalt, a shade lighter than the carriageway (the data paints them red-beige).
-  if(diffuseColor.r-diffuseColor.b>0.15){vec2 cu=vGround.xz/2.1;diffuseColor.rgb=textureGrad(tAsphaltC,cu,GDX/2.1,GDY/2.1).rgb*vec3(1.0,0.97,0.93)*1.9*(1.0+(groundNoise(vGround.xz/7.0)-0.5)*0.1);gN=textureGrad(tAsphaltN,cu,GDX/2.1,GDY/2.1).xyz*2.0-1.0;gNw=.7*texFade;gRough=textureGrad(tAsphaltR,cu,GDX/2.1,GDY/2.1).r;grain=0.0;} // cycle track: the same scanned asphalt, a shade lighter
-  else
-  #endif
-  { // Pavement: 62.5 cm concrete slabs (Copenhagen fortovsfliser), each its own shade, scanned surface, sunk joints.
-   vec2 sl=vGround.xz/0.625,slc=floor(sl),g2=abs(fract(sl)-0.5);float seam=smoothstep(0.478,0.5,max(g2.x,g2.y))*detail;
-   vec3 plaster=textureGrad(tSlabC,vGround.xz/1.9,GDX/1.9,GDY/1.9).rgb;float pl=dot(plaster,vec3(.3333));
-   float sh=groundHash(slc+3.1),stain=step(0.92,groundHash(slc+8.3))*(0.6+0.4*groundNoise(vGround.xz*1.7));
-   vec3 slab=mix(diffuseColor.rgb,vec3(dot(diffuseColor.rgb,vec3(.3333))),.85)*vec3(1.04,1.0,.93); // grey concrete, not the data's blue tint
-   diffuseColor.rgb=slab*0.66*(0.97+0.06*sh)*(0.82+0.25*pl/0.75)*(1.0-stain*0.06)*(1.0-seam*0.16)*(1.0+(groundNoise(vGround.xz/6.0)-0.5)*0.08); // even, quiet slabs: strong per-slab tones read as holes
-   gN=textureGrad(tSlabN,vGround.xz/1.9,GDX/1.9,GDY/1.9).xyz*2.0-1.0;gNw=0.35*texFade;grain=0.0;
-   #ifdef DIRT_ROADS
-   // 1760: no concrete pavements. Walkways are small field-stone cobbles, worn pale and dusty.
-   {vec2 su=vGround.xz/vec2(1.5,.75);diffuseColor.rgb=textureGrad(tSettsC,su,GDX/vec2(1.5,.75),GDY/vec2(1.5,.75)).rgb*vec3(1.0,.96,.88)*.98*(1.0+(groundNoise(vGround.xz/7.0)-0.5)*0.16);diffuseColor.rgb=mix(diffuseColor.rgb,vec3(.2,.24,.12),smoothstep(.62,.85,groundNoise(vGround.xz/37.0+5.0))*.22); /* weeds and grass on the open ground */gN=textureGrad(tSettsN,su,GDX/vec2(1.5,.75),GDY/vec2(1.5,.75)).xyz*2.0-1.0;gNw=texFade*.8;}
-   #endif
-  }
- }else if(diffuseColor.g>diffuseColor.r*1.06&&diffuseColor.g>diffuseColor.b*1.04){
-  // lawns in the surface data (pale green): scanned grass at two scales, a deeper summer green
-  vec2 gu=vGround.xz/2.2;vec3 gr=mix(textureGrad(tGrassC,gu,GDX/2.2,GDY/2.2).rgb,textureGrad(tGrassC,mat2(.8,-.6,.6,.8)*vGround.xz/6.1,mat2(.8,-.6,.6,.8)*GDX/6.1,mat2(.8,-.6,.6,.8)*GDY/6.1).rgb,.4);
-  gr=mix(gr,vec3(dot(gr,vec3(.3,.59,.11))),.3)*vec3(1.,1.,1.3);diffuseColor.rgb=gr*vec3(.62,.66,.5)*(1.0+(groundNoise(vGround.xz/9.0)-0.5)*0.22);gN=textureGrad(tGrassN,gu,GDX/2.2,GDY/2.2).xyz*2.0-1.0;gNw=.5*texFade;
- }else{diffuseColor.rgb*=1.0+grain*0.04;
-  #ifdef DIRT_ROADS
-  // 1760: other pale surfaces (plazas, building plots of today's data) are worn cobbles too.
-  if(dot(diffuseColor.rgb,vec3(.3333))>.45){vec2 su=vGround.xz/vec2(1.5,.75);diffuseColor.rgb=textureGrad(tSettsC,su,GDX/vec2(1.5,.75),GDY/vec2(1.5,.75)).rgb*vec3(1.0,.93,.82)*.9*(1.0+(groundNoise(vGround.xz/7.0)-0.5)*0.16);}
-  #endif
- }
- `).replace('#include <roughnessmap_fragment>','#include <roughnessmap_fragment>\n if(gRough>=0.0)roughnessFactor=mix(roughnessFactor,clamp(gRough*1.1,0.35,1.0),0.85);\n roughnessFactor*=1.0-wetRough*0.6;')
-  .replace('#include <normal_fragment_maps>','#include <normal_fragment_maps>\n if(gNw>0.0){vec3 nW=normalize(vec3(gN.x,gN.z,gN.y));normal=normalize(mix(normal,normalize((viewMatrix*vec4(nW,0.0)).xyz)*(gl_FrontFacing?1.0:-1.0),gNw));}');
-};
+surfaceShader(surfaceMaterial); // src/main-ground.js
 const buildingMaterial=facadeGrain(new THREE.MeshStandardMaterial({vertexColors:true,roughness:.88}));
 look=createLook({scene,sky,hemi,sun,post,surfaces:[surfaceMaterial],getSea:()=>sea,initial:'golden'}); // golden evening is the default look; T cycles the others
 $('look-label').textContent=look.label;look.onChange((name,label)=>{$('look-label').textContent=label;});$('look-btn').addEventListener('click',()=>{look.cycle();toast(look.label);$('world').focus();});
@@ -443,11 +322,6 @@ function toast(message,{important=false,ms=0}={}){const el=$('toast');if(!import
 // timer: timers in a background tab wait a second each.
 const breathe=()=>{coveredDrawAt=performance.now(); /* no drawing of the half-built city behind the title picture in these gaps (the frame loop draws it at most every 400 ms): as before, it is drawn while start-up waits on a download */return globalThis.scheduler?.yield?scheduler.yield():new Promise(r=>{const c=new MessageChannel();c.port1.onmessage=()=>{c.port1.close();r();};c.port2.postMessage(0);});};
 function progress(n,message){globalThis.__bootStage=`${message} (${n}%)`;if(gameIsStopped())throw new Error('Startup stopped after a game failure');loadingScreen.progress(n,message);}
-// Static hosts answer a missing file with the app's index.html (200, text/html): treat that as a 404.
-async function json(url,{cache='default'}={}){const r=await fetch(url,{cache,headers:{Accept:'application/json'}});const missing=r.ok&&/text\/html/i.test(r.headers.get('content-type')||'');if(!r.ok||missing)throw Object.assign(Error(`Could not load ${url} (${missing?404:r.status})`),{status:missing?404:r.status});return r.json();}
-async function unpack(url,{timeout=0}={}){const r=await fetch(url,timeout&&typeof AbortSignal!=='undefined'&&AbortSignal.timeout?{signal:AbortSignal.timeout(timeout)}:undefined);if(!r.ok||/text\/html/.test(r.headers.get('content-type')||''))throw Error(`Could not load ${url} (${r.ok?'a page came back, not the file':r.status})`);const bytes=await r.arrayBuffer();const magic=new Uint8Array(bytes,0,2);if(magic[0]===31&&magic[1]===139)return new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer();return bytes;}
-async function geometry(url){const a=new Float32Array(await unpack(`${url}.pack`));const g=new THREE.BufferGeometry();const buffer=new THREE.InterleavedBuffer(a,6);g.setAttribute('position',new THREE.InterleavedBufferAttribute(buffer,3,0));g.setAttribute('color',new THREE.InterleavedBufferAttribute(buffer,3,3));g.computeVertexNormals();g.computeBoundingSphere();return g;}
-async function pool(items,n,fn){let next=0;await Promise.all(Array.from({length:Math.min(n,items.length)},async()=>{while(next<items.length){const item=items[next++];await fn(item);}}));}
 
 function createCar(){
  const g=new THREE.Group();
@@ -515,16 +389,6 @@ async function createTrees(trees=data.trees){
  for(const mesh of detailed.children){mesh.userData.shadowLod=true;cells.get(mesh.userData.cell)?.detailed[mesh.userData.lod==='far'?'far':'near'].push(mesh);}
 }
 const FALLBACK_WALLS=['#d9b46a','#c9c2b0','#e3d6b8','#a8503a','#d8a77a','#b9c4bd','#e6dfcf','#9c4a36'];
-// Does the camera ray hit one waiting part's walls (its own triangles in the tile's merged shell) within `far`?
-const _ra=new THREE.Vector3(),_rb=new THREE.Vector3(),_rc=new THREE.Vector3(),_rh=new THREE.Vector3(),_rl=new THREE.Ray(),_rm=new THREE.Matrix4();
-function partOnRay(tile,w,ray,far){
- for(const m of tile.children){const r=m.userData.range;if(!r||w.start<r[0]||w.start>=r[1])continue;
-  const p=m.geometry.attributes.position;_rl.copy(ray).applyMatrix4(_rm.copy(m.matrixWorld).invert());
-  for(let v=w.start-r[0],e=Math.min(p.count,v+w.count);v+2<e;v+=3){_ra.fromBufferAttribute(p,v);_rb.fromBufferAttribute(p,v+1);_rc.fromBufferAttribute(p,v+2);
-   if(_rl.intersectTriangle(_ra,_rb,_rc,false,_rh)&&_rh.applyMatrix4(m.matrixWorld).distanceTo(ray.origin)<far)return true;}
-  return false;}
- return false;
-}
 // Footprints the fallback pass never draws (when no model covers them): kept out of collision, they were invisible walls.
 const SKYWAY_CLEAR=5,skywayUndersides=new WeakMap(); // metres of headroom under a skyway lifted off the street; the underside drawn once per part, kept off the part (parts go to the building worker: a mesh on one could not be cloned, and the tile failed and reloaded every 20 s)
 // The underside of a lifted skyway (the model draws none: from the street you looked up into the box): its mapped outline at the clearance.
@@ -1359,29 +1223,7 @@ function frame(now){
   marketShopRenderer?.update(started&&!paused&&!mapOpen?dt:0,{viewer:car,shop:marketShop,hand:police?.busted?null:travelRenderer.hand(),visible:!inspectionCamera,dropped:gullEncounter.snapshot().dropped});
 
  {const r=Math.round(heading*200)/200;if(r!==compassShown){compassShown=r;compassSvg??=document.querySelector('.compass svg');compassSvg.style.transform=`rotate(${r}rad)`;}} /* only when it turns */
- // Fade only the buildings between the chase camera and the player, preserving a readable road view.
- if(car&&started){const target=new THREE.Vector3(car.x,1+groundAt(car.x,car.z),car.z),ray=new THREE.Ray(camera.position.clone(),target.clone().sub(camera.position).normalize()),hit=new THREE.Vector3(),limit=camera.position.distanceTo(target);
-  // Blocks from the city model are large and L-shaped: a box test alone fades a whole block the car is merely
-  // next to, so shells that pass the box test are checked against their real walls.
-  // Drive camera in Copenhagen: the boom already shortens before walls (drivingCameraPose), and a see-through
-  // building read as broken (walls missing, windows floating), so nothing fades; Follow and High still fade.
-  const noFade=chaseCamera&&city.id.startsWith('copenhagen');
-  const updated=new Set(),decided=new Map();occlusionRay.ray.copy(ray);occlusionRay.far=Math.max(0,limit-3);
-  for(const tile of loadedTiles.values())if(tile.visible)for(const mesh of tile.children){if(!mesh.visible||!mesh.userData.shell)continue;const state=mesh.userData.occlusion;if(!state||decided.get(state))continue;
-   const near=!!ray.intersectBox(mesh.userData.box,hit)&&hit.distanceTo(camera.position)<limit-3;decided.set(state,!noFade&&near&&occlusionRay.intersectObject(mesh,false).length>0);}
-  // Waiting parts: the box test alone faded whole L-shaped blocks the car was only beside (it read as a
-  // building with a wall missing), so a part fades only if the camera ray really hits its walls in the merged shell.
-  for(const tile of loadedTiles.values())if(tile.visible&&tile.userData.level==='near'&&tile.userData.mask?.shown){
-   const boxed=new Set();for(const w of tile.userData.waiting)if(ray.intersectBox(w.box,hit)&&hit.distanceTo(camera.position)<limit-3)boxed.add(w);
-   const walls=new Set();for(const w of boxed)if(partOnRay(tile,w,ray,limit-3))walls.add(w); // only the boxed parts' own triangles
-   for(const w of tile.userData.waiting){const was=w.occlusion.opacity;const fade=!noFade&&walls.has(w);if(!fade&&was>.999)continue;advanceOcclusion(w.occlusion,fade,dt);tile.userData.mask.set(w.i,w.occlusion.opacity>.995?1:Math.max(.01,w.occlusion.opacity));}}
-  // Detail batches: a part fades through its per-part value (and the tile's batches switch to the dithering variant).
-  if(!noFade)for(const tile of loadedTiles.values()){const b=tile.userData.batches;if(!tile.visible||!b?.parts.length)continue;let fading=false;
-   for(const p of b.parts){if(!p.occlusion.detailed)continue;const fade=!!ray.intersectBox(p.box,hit)&&hit.distanceTo(camera.position)<limit-3&&partOnRay(tile,p.w,ray,limit-3);
-    if(!fade&&p.occlusion.opacity>.999)continue;advanceOcclusion(p.occlusion,fade,dt);b.set(p.i,p.occlusion.opacity>.995?1:Math.max(.01,p.occlusion.opacity));if(p.occlusion.opacity<.995)fading=true;}
-   b.dither(fading);}
-  for(const tile of loadedTiles.values())if(tile.visible)for(const mesh of tile.children){if(!mesh.visible||mesh.userData.batch)continue;const state=mesh.userData.occlusion;if(!updated.has(state)){let fade;if(decided.has(state))fade=decided.get(state);else{const intersects=!noFade&&ray.intersectBox(mesh.userData.box,hit);fade=!!intersects&&hit.distanceTo(camera.position)<limit-3;}advanceOcclusion(state,fade,dt);updated.add(state);}mesh.material.opacity=state.opacity;mesh.material.depthWrite=state.opacity>.999;const fading=state.opacity<.999;if(mesh.material.transparent!==fading){mesh.material.transparent=fading;mesh.material.needsUpdate=true;}}
- }
+ fadeOccluders(dt,car,started,chaseCamera,city,camera,occlusionRay,loadedTiles); // src/main-occlusion.js
  // Shadow box and texel snapping follow the active look's sun (weather.js re-applies the same offset below).
  {const sunOffset=look?look.current.sunOffset:new THREE.Vector3(-160,260,160),sf=shadowFrame(sunOffset);
   if(Math.abs(sun.shadow.camera.top-sf.halfHeight)>.5||Math.abs(sun.shadow.camera.right-sf.halfWidth)>.5){Object.assign(sun.shadow.camera,{left:-sf.halfWidth,right:sf.halfWidth,top:sf.halfHeight,bottom:-sf.halfHeight});sun.shadow.camera.updateProjectionMatrix();sun.shadow.normalBias=sf.normalBias;}
@@ -1469,29 +1311,7 @@ async function boot(){
    if(eraData){const late=dropLateBridges(data,mobilityData?.walks,(await eraData)?.lateBridges,mobilityData?.roads);if(late.length)console.info('Bridges built after the era left out (era.json lateBridges)',late.length);} /* today's footbridges in 1760: Inderhavnsbroen, the 2016 bridge by the Bryghus, Kastellet's side bridges */
    if(city.era===1760)cutFootprints1760(data.buildings);else if(city.id==='copenhagen')operaFootprint(data.buildings); /* the Opera's mapped outline is its roof: the body under it is what is solid */ // today's Christiansborg main block is cut out of 1760 (the first palace is drawn instead: landmarks.js CUT_1760); the riding ground's wings keep their outline
    if(city.id.startsWith('copenhagen'))tramData={...tramData,paths:[],stops:[]}; // no street trams: its trams.json holds S-train route relations (Boulevard tunnel); drawn as tram track they crossed Nørreport at street level
-   if(city.id.startsWith('copenhagen')){const dup=new Set(await json(dataUrl('duplicates.json')).catch(()=>[]));const ins=new Set(await json(dataUrl('insets.json')).catch(()=>[]));const late=new Set((eraData&&(await eraData)?.anachronisms)||[]);let n=0;for(const t of roofIndex.tiles)for(const p of t.parts){const k=t.file+':'+p.start;if(dup.has(k)||late.has(p.id)){p.duplicate=true;n++;if(late.has(p.id))placeHidden.add(p.id);}else if(ins.has(k))p.inset=true;} /* anachronisms (era.json): models from today left in 1760, Knippelsbro's 1937 tower */
-  {const kk=new Map();for(const t of roofIndex.tiles)for(const p of t.parts)if(p.id.startsWith('kk-osm-'))kk.set(p.id.slice(3),p.bbox);let n=0; // the OpenStreetMap box of a building the municipal model also has (kk-<same id>) stood inside it, two houses built into each other (10 m box through a 16 m model): the box goes when the model covers most of it
-   if(city.era!==1760){const kind=new Map(data.buildings.map(b=>[b.id,b.kind])),lanes=new SpatialIndex(data.roads.filter(r=>/^Ajorata/.test(r.kind||'')));let n=0;for(const t of roofIndex.tiles)for(const p of t.parts){if(p.duplicate||kind.get(p.id.replace(/^kk-/,''))!=='bridge'||!(p.height>SKYWAY_CLEAR+3))continue;const [a,b,c,d]=p.bbox,st=Math.max(.5,Math.min(c-a,d-b)/6);let s=0,r=0;for(let x=a+st/2;x<c;x+=st)for(let z=b+st/2;z<d;z+=st){s++;if(lanes.at(x,z))r++;}if(s&&r/s>=.85){p.skyway=true;n++;}}if(n)console.info('Skyways over the street lifted off the carriageway',n);} /* today's skyways (Gutenberghus over Vognmagergade, the Black Diamond's two over Christians Brygge) are modelled as solid blocks from the ground up: cars drove through them (their footprints are kind bridge, no collision). 1760 removes them (below) */
-   for(const t of roofIndex.tiles)for(const p of t.parts){const b=kk.get(p.id),a=p.bbox;if(!b||p.duplicate)continue;const share=Math.max(0,Math.min(a[2],b[2])-Math.max(a[0],b[0]))*Math.max(0,Math.min(a[3],b[3])-Math.max(a[1],b[1]))/Math.max(1e-6,(a[2]-a[0])*(a[3]-a[1]));if(share>=.5){p.duplicate=true;n++;}}
-   if(n)console.info('OpenStreetMap boxes standing inside the model\'s own building, dropped',n);}
-  // Block walls that complete a named building take its colours (recolour.json, scripts/building-duplicates.mjs).
-  const rec=await json(dataUrl('recolour.json')).catch(()=>({})),byKey=new Map();for(const t of roofIndex.tiles)for(const p of t.parts)byKey.set(t.file+':'+p.start,p);
-  for(const [k,[owners,flat]] of Object.entries(rec)){const p=byKey.get(k);if(!p)continue;const cs=owners.map(o=>byKey.get(o)?.color);p.recolour=new Map();for(let i=0;i<flat.length;i+=2)if(cs[flat[i+1]])p.recolour.set(flat[i],cs[flat[i+1]]);}console.info('Duplicate building copies dropped',n);} // the city model's double copies, found by comparing triangles (scripts/building-duplicates.mjs)
-   if(city.era===1760){
-    // The 1760 model is today's building stock filtered by age, and some newer buildings slipped through.
-    // Built on what was then water, rampart or open ground: removed. Built on old town plots: they become
-    // anonymous period houses (no name, no photo front, period height and colours below).
-    const GONE=/^(Tietgens Ærgrelse|BLOX|Den Sorte Diamant|Vandkulturhuset Papirøen|Det Arktiske Hus|Langelinie Pavillonen|Den Grå Hal|Pyramiden|Karlsvognen|Stjerneskibet|Tinghuset|Alrunes Have|Den Grønne Genbrugshal|Mikkel Vibe Spejdergruppe|Rainmaking Loft|Masteskurene|Bohlendachhuset|Basecamp|Netto|Hal C|Bålhytte|Tolvkanten|Sølyst|Løvehuset|Multihuset|Suvannabhumi|T-Huset|Fabrikken|Nissehuset|M-huset|Torpedohallen|Restaurant Aure|Grønsagen|Børnebyen|Røde Sols Plads|Wonderland|Snedkeriet Optimisten|Rosenhuset|Fredens Ark|Marmorkirken|Turbinehallerne|Adelgade (koblingsstation|transformerstation)|Jeudan Parking.*|Nationalbanken|Bevar Christiania Boden|Kajak Foreningen Nyhed)$/i;
-    const NEWER=/^(1 Hotel Copenhagen|Motel One.*|NH Collection.*|Wakeup.*|Soho House.*|Hotel Danmark|Hotel d.Angleterre|Illum|Magasin Du Nord|Danske Bank Finanscenter|Metropol-bygningen|Gutenberghus|Socialdemokratiet|Rosenborgcentret|Bycenter Rysensteen|Geocenter|Elektricitetshuset|Hovedbiblioteket|Danish Institute for Study Abroad|Knud Højgaards Hus|Kvindernes Bygning|Copenhagen Institute of Interaction Design|Finanstilsynet|House of Amber|Tjæreborg|Lagkagehuset|Restaurant Kanalen|Svenska Kyrkan|Den Engelske Kirke|Sankt Ansgars Kirke|Jerusalemskirken|Sankt Pauls Kirke|Sankt Aleksander Nevskij Kirke|Kong Haakons Kirke|Synagogen|Domhuset|Københavns Universitet|Københavns Universitetsbibliotek.*|Thorvaldsens Museum|Det Kongelige Teater|Frihedsmuseet|C\.F\. Tietgens Hus|The Rock|Fvi|Botanisk Haves Butik|Bådteatret)$/i;
-    let gone=0,anon=0;for(const t of roofIndex.tiles)for(const p of t.parts){if(!p.name)continue;
-     if(GONE.test(p.name)){placeHidden.add(p.id);gone++;}
-     else if(NEWER.test(p.name)){p.period=p.name;p.name='';p.noFacade=false;p.texture=null;delete p.color;delete p.roofColor;delete p.facade;anon++;}}
-    console.info('1760: newer buildings removed',gone,'turned into period houses',anon);
-    {const kind=new Map(data.buildings.map(b=>[b.id,b.kind])),lanes=new SpatialIndex(data.roads.filter(r=>/^Ajorata/.test(r.kind||'')));let n=0;for(const t of roofIndex.tiles)for(const p of t.parts){if(p.name||placeHidden.has(p.id))continue;const [a,b,c,d]=p.bbox,st=Math.max(.5,Math.min(c-a,d-b)/6);let s=0,r=0;for(let x=a+st/2;x<c;x+=st)for(let z=b+st/2;z<d;z+=st){s++;if(lanes.at(x,z))r++;}if(/^(bridge|elevator)$/.test(kind.get(p.id.replace(/^kk-/,''))||'')||s&&r/s>=.85){placeHidden.add(p.id);n++;}}console.info('1760: skyways, lifts and boxes standing on the carriageway removed',n);}} /* today's skyways (Gutenberghus over Vognmagergade, the Black Diamond's over Christians Brygge, Knippelsbro's tower) are modelled as solid blocks from the ground up, standing in the street with no collision */
-   if(city.era===1760){let n=0;for(const t of roofIndex.tiles)for(const p of t.parts){if(p.name||p.noFacade||p.duplicate||p.height<=13.5)continue;let h=0;for(const ch of p.id)h=(h*31+ch.charCodeAt(0))>>>0;
-     p.sourceHeight??=p.height;p.height=p.measuredHeight=9.5+(h%9)*.5;n++;}console.info('1760: houses brought down to period height',n);} // the municipal model is today's city: 5-7 storey blocks. In 1760 houses had 2-4 storeys under steep roofs
-   if(city.id.startsWith('copenhagen')){const afloat=[];for(const t of roofIndex.tiles)for(const p of t.parts){const [a,b,c,d]=p.bbox,ix=(c-a)*.25,iz=(d-b)*.25,wet=[[(a+c)/2,(b+d)/2],[a+ix,b+iz],[c-ix,b+iz],[a+ix,d-iz],[c-ix,d-iz]].filter(([x,z])=>inWaterPolygons(data.water,x,z)).length;if(wet>=4){if(city.era===1760)p.duplicate=true;else if(!p.id.startsWith('kk-')&&p.height===10){p.sourceHeight=10;p.height=p.measuredHeight=3.4;}afloat.push(p);}}console.info('Buildings standing in the water (houseboats: low, none in 1760)',afloat.length);if(import.meta.env.DEV)window.__afloat=afloat.map(p=>[p.id,p.name||'',p.height,p.bbox.map(Math.round).join(',')]);} // houseboats and ships mapped as buildings: OpenStreetMap's default 10 m made them tall boxes in the canals
-   if(city.id==='copenhagen'){let n=0;for(const t of roofIndex.tiles)for(const p of t.parts){const [a,b,c,d]=p.bbox;if(p.id.startsWith('kk-')||p.height!==10||p.sourceHeight!==undefined||(c-a)*(d-b)>=150)continue;p.sourceHeight=10;p.height=p.measuredHeight=3.4;n++;}console.info('Small houses at the default height brought down (kiosks, sheds, rides)',n);} /* the city model's own houses are surveyed; newer ones from OpenStreetMap without a height got 10 m, and every kiosk, shed and Tivoli carousel stood as a blank 10 m tower */
+   await prepareParts(city,roofIndex,data,eraData,placeHidden,SKYWAY_CLEAR,json); // src/main-parts.js
    if(city.facades)attachFacades(roofIndex,await json(dataUrl(city.facades)).catch(()=>null)); // photo-described street fronts (optional, any city)
    if(city.estimatedFacades)estimateFacades(roofIndex,{era:city.era}); // plausible fronts for untextured official meshes (see facade-data.js)
    // Photo-matched places (squares with their tram stop, trees and landmarks; scripts/place-build.mjs): measured heights,
@@ -1539,11 +1359,7 @@ async function boot(){
    if(city.id.startsWith('copenhagen')){const lawns=(data.parks||[]).filter(p=>/Nurmikko|Kenttä/.test(p.kind)&&p.rings?.[0]?.length>3).map(p=>p.rings);if(lawns.length){const g=settleObject(createLandcover({polygons:lawns,chunk:450}),{maxEdge:touchScreen?40:10,tolerance:touchScreen?.3:.18}); /* phones: 40 m and 30 cm (1760: 503k triangles at 20 m/18 cm) */ /* phones: 20 m (1760's fields drew ~840k triangles at 10 m) */ /* lawns lie under the surfaces: a coarser drape (1760's fields and ramparts made ~5M triangles); 450 m chunks, so the ones behind the camera are culled (900-1800 m chunks drew 1.4M triangles of a 1760 frame) */g.name='Mapped lawns (under the surfaces)';g.position.y-=touchScreen?.3:.22;g.updateMatrixWorld(true);cityModel.add(g);/* the coarse drape strays up to 18 cm: sunk below it, lawns no longer poke through paved squares (1760 blotches); terrain ground sits 50 cm down */}} // lawns the surface data leaves bare (Krinsen on Kongens Nytorv, park lawns)
    await breathe();
    sea=createSea(data.water,data,{helsinkiHarbour:helsinki,deckColor:city.era===1760?'#6b5e4e':'#4a4b4d',deckTexture:city.era===1760?'setts':'asphalt'});tintSea(sea);if(hasTerrain()){console.info('Ground raised under bridge decks the elevation model never saw',raiseBridgeDecks(sea.group.userData.bridges,(x,z)=>inWaterPolygons(data.water,x,z)));console.info('Bridge deck plates brought down under the paving',settleBridgeDecks(sea.group));}setSurfaceBridges(sea.group.userData.bridges);cityModel.add(sea.group);ground.geometry.dispose();ground.geometry=sea.groundGeometry;
-   if(city.era===1760&&hasTerrain()){ // today's pavements outside the cobbled town (Slotsholmen, Holmen) had no surface of their own: the bare ground lay half a metre down beside the drawn roads, and the walkers on it stood 60 cm in the air. They get the bare ground's own material, laid on the ground just under the cobbles.
-    const cobbles=data.pavement.filter(p=>p.name==='Brosten'&&p.rings?.length),pos=[];
-    for(const p of data.pavement){if(p.name==='Brosten'||/silta/i.test(p.kind||'')||!(p.rings?.[0]?.length>2))continue;const r=p.rings[0];let cx=0,cz=0;for(const q of r){cx+=q[0];cz+=q[1];}cx/=r.length;cz/=r.length;if(cobbles.some(c=>pointInPolygon(cx,cz,c.rings)))continue;
-     const flat=[],holes=[];p.rings.forEach((ring,k)=>{if(k)holes.push(flat.length/2);for(const q of ring)flat.push(q[0],q[1]);});const ids=earcut(flat,holes,2);for(let t=0;t<ids.length;t+=3){const [a,b,c]=[ids[t],ids[t+1],ids[t+2]],up=(flat[b*2]-flat[a*2])*(flat[c*2+1]-flat[a*2+1])-(flat[b*2+1]-flat[a*2+1])*(flat[c*2]-flat[a*2])<0;for(const i of up?[a,b,c]:[a,c,b])pos.push(flat[i*2],0,flat[i*2+1]);}} /* wound to face up (earcut's x,y winding faces down once y is the map's z) */
-    if(pos.length){let g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));g.computeVertexNormals();g=drapeGeometry(g,{maxEdge:touchScreen?8:4});for(const part of splitByCell(g,500)){const m=new THREE.Mesh(part,ground.material);m.name='1760 pavements off the cobbles';m.receiveShadow=true;cityModel.add(m);}g.dispose(); /* 500 m cells: one city-wide mesh was never culled */console.info('1760 pavements off the cobbles',pos.length/9,'triangles before draping');}}
+   pavements1760(city,data,touchScreen,ground,cityModel); // src/main-ground.js
    // Helsinki's hand-built scenery (landmarks, harbour, street life, signs). Other cities get the generic engine only.
    async function buildHelsinkiScenery(){
    const {createKauppatori,createHarbour,createBindAds,createLasipalatsiStops,createKauppatoriTramStops,createStationStreetLife,createStationStatues,createStationBuildingDetails,createWaterfrontLandmarks,createStreetNameSigns,createPalaceLife,createRouteDirectionSigns,createCityHallFlag,createLaivasillankatuSigns,createKauppatoriFingerpost,createSofiankatuSigns,createRouteCrossingSigns,createEtelarantaGantry,createSenateStreetProps,createUniversityLife,createKauppatoriRoadworks,createMannerheimintieGantry,createKaivokatuDetails,createKamppiChapel,createTerminalLife,helsinkiPage}=await import('./helsinki-scenery.js');helsinkiPage(); // Helsinki's own scenery modules load with Helsinki only
@@ -1648,41 +1464,7 @@ async function boot(){
    const mapped=furnitureData&&await furnitureData;let mappedFurniture=null;
    if(mapped?.items)for(const pl of places)mapped.items=mapped.items.filter(i=>!(pl.dropFurniture||[]).some(([x,z,r])=>Math.hypot(i.x-x,i.z-z)<r)); // replaced by the place's own lamps and masts
    if(mapped?.items&&city.id==='copenhagen')mapped.items.push(...hotdogItems()); // hot-dog stands on the squares (street-food.js)
-   if(mapped?.items?.length&&city.id.startsWith('copenhagen')){ /* furniture placed from photos can land on the carriageway: drop what stands in a traffic lane, off the pavement */
-    const lanes=new SpatialIndex(data.roads.filter(r=>/^Ajorata/.test(r.kind))),islands=new SpatialIndex(data.roads.filter(r=>/Koroke/.test(r.kind))),walk=new SpatialIndex(data.pavement);const before=mapped.items.length;
-    // The carriageway is drawn over any footway mapped across it (crossings, squares), so a foot on it stands in the road
-    // even where a footway polygon overlaps (a wire pole and a lamp stood mid-junction on Kongens Nytorv). Within 0.6 m
-    // of a lane only counts off the pavement (a post at the kerb); traffic islands keep their lights and signs.
-    const onRoad=(x,z)=>lanes.at(x,z)&&!islands.at(x,z);
-    const inLane=(x,z)=>onRoad(x,z)||[[.6,0],[-.6,0],[0,.6],[0,-.6]].some(([a,b])=>lanes.at(x+a,z+b))&&!walk.at(x,z)&&!islands.at(x,z);mapped.poleAllowed=(x,z)=>!inLane(x,z);
-    {const now=Date.now();mapped.items=mapped.items.filter(it=>datedNow(it,now));} // dated items (the city's current roadworks, scripts/kk-roadworks.py): only while they run
-    mapped.items=mapped.items.filter(it=>it.k==='wire-lamp'||it.src==='kk-roadworks'||!onRoad(it.x,it.z)); /* roadworks barriers stand in the parking lane at the kerb, never in a traffic lane *//* wire lamps hang 7 m over the carriageway, where the register places them: dropped with the rest, 8,400 of 10,200 went and the few over the pavements hung from one wire */console.info(`Street furniture: ${before-mapped.items.length} items in traffic lanes dropped`);
-    {const r=placeBenches(mapped.items,{houses:new SpatialIndex(data.buildings),wheels:new SpatialIndex(data.roads.filter(r=>!/Koroke/.test(r.kind))),walk});mapped.items=r.items; // benches along the kerb, facing the street; one bench per spot (mapped-furniture.js)
-     console.info(`Street furniture: benches set along the kerb ${r.turned} (moved off the carriageway ${r.moved}, dropped ${r.dropped}), park benches turned to their footway ${r.parked}, doubles dropped ${r.doubled}`);}
-    {const b=mapped.items.length;mapped.items=mapped.items.filter(it=>!([[0,0],[2.5,0],[-2.5,0],[0,2.5],[0,-2.5]].every(([a,b])=>inWaterPolygons(data.water,it.x+a,it.z+b))&&!lanes.at(it.x,it.z)&&!walk.at(it.x,it.z))); /* well out on the water, not the quay-edge lamps and bollards */console.info(`Street furniture: ${b-mapped.items.length} items standing in the water dropped`);} // signs and poles mapped on the water (bridge ends, survey drift)
-    {const decks=new SpatialIndex((sea?.group?.userData?.bridges||[]).filter(d=>d.rings?.[0]?.length>2)),houses=new SpatialIndex(data.buildings||[]),r=bringAshore(mapped.items,{wet:(x,z)=>inWaterPolygons(data.water,x,z),deck:(x,z)=>!!decks.at(x,z),blocked:(x,z)=>!!houses.at(x,z)||onRoad(x,z)});mapped.items=r.items;console.info(`Street furniture: ${r.moved} items on the quay edge moved ashore, ${r.dropped} dropped`);} /* the rest of the quay-edge items: no paving is drawn over the mapped water, they hung over the canal (benches on Christianshavn's quays) */
-    // Sign clutter: photo detections give blank blue 'generic plates' (no readable type) and the same sign seen
-    // from several photos. Keep posts with a real face, one per face within 5 m, and at most 3 posts in 8 m.
-    {const grid=new Map(),key=(x,z)=>Math.floor(x/8)+','+Math.floor(z/8),near=(x,z)=>{const out=[],gx=Math.floor(x/8),gz=Math.floor(z/8);for(let i=-1;i<=1;i++)for(let j=-1;j<=1;j++)for(const q of grid.get((gx+i)+','+(gz+j))||[])if(Math.hypot(q.x-x,q.z-z)<8)out.push(q);return out;};let dropped=0;
-     mapped.items=mapped.items.filter(it=>{if(it.k!=='sign'||it.src==='kk-skilte')return true; /* the city's sign register (scripts/kk-signs.py): real posts, one record each */const keep=(it.faces||[]).map((f,i)=>f!=='generic-plate'?i:-1).filter(i=>i>=0),faces=keep.map(i=>it.faces[i]);if(!faces.length){dropped++;return false;}if(Array.isArray(it.yaws)&&it.yaws.length===it.faces.length)it.yaws=keep.map(i=>it.yaws[i]);
-      const ns=near(it.x,it.z);if(ns.length>=3||ns.some(q=>Math.hypot(q.x-it.x,q.z-it.z)<5&&q.faces.some(f=>faces.includes(f)))){dropped++;return false;}
-      it.faces=faces;const k=key(it.x,it.z);if(!grid.has(k))grid.set(k,[]);grid.get(k).push(it);return true;});
-     console.info(`Street furniture: ${dropped} duplicate or blank signs dropped`);}
-    // Signal heads: one head seen from several photos lands as several posts a few metres apart. Keep one per
-    // kind and facing (35 degrees) within 5 m.
-    {const kept=new Map(),cell=(x,z)=>Math.floor(x/5)+','+Math.floor(z/5);let dropped=0;
-     mapped.items=mapped.items.filter(it=>{if(it.k!=='traffic-light'&&it.k!=='crossing-light')return true;const gx=Math.floor(it.x/5),gz=Math.floor(it.z/5);
-      for(let i=-1;i<=1;i++)for(let j=-1;j<=1;j++)for(const q of kept.get((gx+i)+','+(gz+j))||[])if(q.k===it.k&&Math.hypot(q.x-it.x,q.z-it.z)<5&&Math.abs(Math.atan2(Math.sin((q.yaw||0)-(it.yaw||0)),Math.cos((q.yaw||0)-(it.yaw||0))))<.6){dropped++;return false;}
-      {let n=0;for(let i=-1;i<=1;i++)for(let j=-1;j<=1;j++)for(const q of kept.get((gx+i)+','+(gz+j))||[])if(q.k===it.k&&Math.hypot(q.x-it.x,q.z-it.z)<6)n++;if(n>=3){dropped++;return false;}} // a traffic island holds a few heads, not a forest
-      const key=cell(it.x,it.z);if(!kept.has(key))kept.set(key,[]);kept.get(key).push(it);return true;});
-     console.info(`Street furniture: ${dropped} duplicate signal heads dropped`);}
-    // Photo 'poles': in Copenhagen mostly the post of a lamp or sign already mapped, never a timber utility pole.
-    // Drop those within 2.5 m of another post or 6 m of a kept pole; the rest stand as plain galvanised posts.
-    {const POSTED=/^(lamp|sign|traffic-light|crossing-light|mast-lamp|park-lamp|parking-meter)$/,grid=new Map(),cell=(x,z)=>Math.floor(x/6)+','+Math.floor(z/6);
-     for(const it of mapped.items)if(POSTED.test(it.k)){const k=cell(it.x,it.z);if(!grid.has(k))grid.set(k,[]);grid.get(k).push(it);}
-     const close=(x,z,r,test)=>{const gx=Math.floor(x/6),gz=Math.floor(z/6);for(let i=-1;i<=1;i++)for(let j=-1;j<=1;j++)for(const q of grid.get((gx+i)+','+(gz+j))||[])if(test(q)&&Math.hypot(q.x-x,q.z-z)<r)return true;return false;};
-     let dropped=0;mapped.items=mapped.items.filter(it=>{if(it.k!=='pole')return true;if(close(it.x,it.z,2.5,q=>q.k!=='steel-pole')||close(it.x,it.z,6,q=>q.k==='steel-pole')){dropped++;return false;}it.k='steel-pole';const k=cell(it.x,it.z);if(!grid.has(k))grid.set(k,[]);grid.get(k).push(it);return true;});
-     console.info(`Street furniture: ${dropped} duplicate poles dropped`);}}
+   tidyFurniture(mapped,city,data,sea); // src/main-furniture.js
    await breathe();
    {const bare=mapped?.items&&cityModel.getObjectByName('Terrain ground')?.userData.heightAt;if(bare){const lawns=new SpatialIndex((data.parks||[]).filter(p=>/Nurmikko|Kenttä/.test(p.kind)&&p.rings?.[0]?.length>3));let n=0;for(const it of mapped.items){if(!it.bare)continue;const g=groundAt(it.x,it.z),b=bare(it.x,it.z);if(b==null)continue;it.drop=Math.min(0,(lawns.at(it.x,it.z)?Math.max(b,g-(touchScreen?.3:.22)):b)-g);if(it.drop<-.05)n++;}console.info(`Street furniture: ${n} items off the paving set down onto the bare ground or lawn drawn there`);}} /* furniture.json bare (scripts/furniture-ground.mjs): no street surface is drawn under them, and the bare ground lies under the height field (8 cm plus sag, 50 cm beside lawns), the mapped lawns 22 cm (phones 30): at groundAt they floated (benches, bins and lamps by the park lawns) */
    if(mapped?.items?.length){const bikeParts=blenderLoads?await blenderLoads.rackBike:null,furnitureModels=blenderLoads?await blenderLoads.furniture:{};
@@ -1775,41 +1557,14 @@ async function boot(){
    if(city.id.startsWith('copenhagen'))bigMap=createBigMap({base:()=>mapCache,view:()=>mapView,landmarks:()=>data.landmarks,player:()=>car,targets:()=>cph?.minimapTargets()||[],route:()=>cph?.route?.(),onTravel:travelTo,radius:()=>RADIUS});
    const menu=$('landmark-buttons');data.landmarks.forEach((l,i)=>{const b=document.createElement('button');b.textContent=`${i+1}  ${l.name}`;b.addEventListener('click',()=>visitStart(l,b));menu.append(b);});
    updateDataCounts();
-   if(!helsinki){
-    document.querySelector('#map-dialog h2').textContent=`${city.name}.`;
-    document.querySelector('#map-dialog .dialog-copy').textContent=`${(city.radius/1000).toFixed(1)} km around the centre of ${city.name}. Pick a starting point, then find your own way.`;
-    document.querySelector('#map-dialog .map-caption span').textContent=`${(city.radius/1000).toFixed(1)} KM PLAYABLE RADIUS`;
-    document.querySelector('#sources-dialog h2').textContent=`${city.name}, from open data.`;
-    document.querySelector('#sources-dialog .dialog-copy').textContent=`Everything this city is made from is listed below with its licence. Built with the worldhood city builder; maintained by ${city.maintainers?.length?city.maintainers.join(', '):'the community'}.`;
-    document.querySelector('#sources-dialog .help-note').textContent=`An evolving reconstruction of the city. Building heights, facades and street details may be estimated. ${hasTerrain()?'Terrain follows the bundled elevation data.':'Terrain is flattened.'} Traffic and public transport are simulated rather than live services.`;
-    document.querySelector('#sources-dialog .attribution').textContent=city.attribution;
-    document.querySelector('#map-dialog .map-caption').firstChild.textContent=`${city.name.toUpperCase()} FROM OPEN DATA `;
-    document.querySelector('#help-dialog .help-note').textContent=city.era===1760?'Explore this single-player city playground on foot or by coach. Share the streets with other coaches and townsfolk; buildings, ramparts and water constrain movement.':'Explore this single-player city playground on foot, by car, bicycle or scooter. Share the streets with simulated traffic and pedestrians. Available rides start near each starting point; buildings and water constrain movement.';
-    $('district-label').textContent=city.name.toUpperCase();
-    document.querySelector('#pause-overlay h2').textContent=`${city.name} can wait.`;
-    $('sources-btn').firstChild.textContent=`Map data © OpenStreetMap contributors · ODbL${city.furniture&&/Mapillary/i.test(city.attribution||'')?' · Mapillary':''}${/Digiroad/.test(city.attribution)?' · Digiroad CC BY':''}${city.terrain?/National Land Survey/.test(city.terrain.source)?' · NLS elevation CC BY':' · Mapterhorn elevation':''} `;
-    document.querySelector('.minimap-caption').firstChild.textContent=`${city.name.toUpperCase()} CENTRE `;
-   }
-   if(extensions.length){
-    const names=extensions.map(e=>e.title).join(' and ');
-    document.querySelector('#map-dialog .dialog-copy').textContent=`Two kilometres around the cathedral, plus the ${names} corridor (dashed outline). Pick a starting point, then find your own way.`;
-    document.querySelector('#map-dialog .map-caption span').textContent='2 KM RADIUS + EXTENSIONS';
-    const note=document.createElement('p');note.className='help-note';
-    note.textContent=`Map extensions: ${extensions.map(e=>`${e.title} — ${e.provenance.note||`City of Helsinki data fetched ${e.provenance.fetchedAt} (CC BY 4.0); ${e.counts.inferredForestTrees.toLocaleString('en')} forest trees are inferred inside mapped forest areas`}`).join('; ')}. Route crop outlines © OpenStreetMap contributors (ODbL). Seurasaari is car-free in reality.`;
-    $('data-counts').after(note);
-   }
+   cityDialogs(city,extensions,helsinki,$); // src/main-page.js
    if(city.id.startsWith('copenhagen')&&CITIES[city.id==='copenhagen'?'copenhagen-1760':'copenhagen']){const b=$('era-btn');b.hidden=false;$('era-label').textContent=city.id==='copenhagen'?'1760':'Today';{const m=document.querySelector('[data-action="era"]');if(m){m.hidden=false;$('mobile-era-value').textContent=city.id==='copenhagen'?'1760':'Today';}}b.addEventListener('click',()=>{if(!ready||police?.busted||started&&paused)return;eraJump();$('world').focus();});} // also from the welcome card, which says "Press Y"
    if(eraArrival?.to===city.id&&eraArrival.look){try{look.set(eraArrival.look,{instant:true});}catch{}} // the time of day and weather carry over
    if(eraArrival?.to===city.id){showEraCard(city.era===1760?'1760':'today',true);setTimeout(()=>{if(!started)start();},300);} // arriving from the other century: straight into the game
    if(requestedStart&&!pickStart(data.landmarks,requestedStart))toast(`No start called “${requestedStart}”. Starting at ${firstStart.name}.`);
    installMapillaryAttribution(city);
    {const a=document.createElement('a');a.href='/THIRD_PARTY_LICENSES.txt';a.textContent='Open-source software notices ↗';a.target='_blank';a.rel='noreferrer';document.querySelector('#sources-dialog .source-links').append(a);}
-   $('world').setAttribute('aria-label',`3D view of ${city.name}, explored ${city.era===1760?'on foot or by coach':'on foot, by car, bike or scooter'}`);
-   document.querySelector('#help-dialog .dialog-copy').textContent=city.era===1760?`Explore ${city.name} by coach or on foot. Follow the line: a yellow beam is a pick-up, teal the drop-off, red a saga step, blue a race start. The minimap stays north-up.`:`Explore ${city.name} by car, on foot, by bicycle or on a scooter. Follow the purple line: a yellow beam is a pick-up, teal the drop-off, red a saga step, purple a race start. The minimap stays north-up.`;
-   if(city.era===1760)for(const el of document.querySelectorAll('.help-grid span')){const t={'Handbrake / bike or scooter brake':'Rein in','Enter a nearby car / ride':'Board your coach','Recover car':'Recover coach','Get out / get off':'Step down','Accelerate / reverse':'Drive on / back up','Travel to 1760 / back to today':'Back to today'}[english(el)];if(t)el.textContent=t;if(/^(Car horn|Radio: next \/ previous station)$/.test(english(el))){el.nextElementSibling?.remove();el.remove();}} // no horn or radio on a coach // 1760: a coach, no bikes or scooters
-   if(touchScreen)document.querySelector('#help-dialog .dialog-copy').textContent=`Steer with the arrow buttons: tap for a little, hold for more (or Thumb or Tilt: Menu > Steering), hold Go, Brake to slow down and reverse. Stopped, the button above the controls gets you out${city.era===1760?' or back on your coach':', onto a bike or into a car'}. Walk up to someone and tap Say hello. Yellow beam: a pick-up. Teal: the drop-off. Red: a saga step. ${city.era===1760?'Blue':'Purple'}: a race start. Menu has the city map, the journal and the camera.`;
-   finale.coach=city.era===1760;if(city.era===1760){const n=document.querySelector('#busted-overlay .end-note');if(n)n.textContent='Continue puts you back on the street right here, coach mended and wanted level cleared · Restart returns to your starting point';const h=[...document.querySelectorAll('.controls-hint span')].find(e=>/Recover car/.test(english(e)));if(h)h.lastChild.textContent=' Recover coach';} // 1760 has no car: the BUSTED card said 'car repaired'
-   if(city.era===1760)for(const row of document.querySelectorAll('.boot-controls>div')){const dt=row.querySelector('dt'),t=english(dt);if(/radio/i.test(t||'')){row.remove();continue;}const n={'Handbrake':'Rein in','Use a nearby car or ride':'Board your coach','Recover car':'Recover coach','Get out / get off':'Step down','1760 / horn / FPS':'Back to today / FPS'}[t];if(n)dt.textContent=n;if(t==='1760 / horn / FPS')row.querySelector('dd').innerHTML='<kbd>Y</kbd> / <kbd>P</kbd>';} // the 1760 welcome card listed the car, horn and radio
+   helpTexts(city,touchScreen,finale,$); // src/main-page.js
    const helpGrid=document.querySelector('#help-dialog .help-grid');if(helpGrid)$('pause-controls').append(helpGrid.cloneNode(true));
    updateHUD(0);
    // Read-only diagnostics for smoke tests and performance inspection.

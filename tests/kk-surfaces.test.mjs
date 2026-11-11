@@ -1,3 +1,4 @@
+import {mainSource} from './helpers/main-source.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
@@ -20,7 +21,7 @@ test('natural stone is drawn as setts and gravel as gravel, where the city\'s re
  assert.ok(gravel.every(t=>t.rgb.every((c,i)=>Math.abs(c-grit[i])<1e-3)));
  const near=(l,x,z,r)=>l.filter(t=>Math.hypot(t.x-x,t.z-z)<r).length;
  assert.ok(near(gravel,-720,-38,120)>100,'Ørstedsparken\'s gravel paths');assert.ok(near(stone,-450,-290,120)>50,'stone round Israels Plads');
- const main=readFileSync(new URL('../src/main.js',import.meta.url),'utf8');assert.match(main,/vGround\.y>0\.059&&vGround\.y<0\.065/,'the ground shader\'s gravel band');
+ const main=mainSource;assert.match(main,/vGround\.y>0\.059&&vGround\.y<0\.065/,'the ground shader\'s gravel band');
 });
 
 test('none of it covers a road, a house or the water',()=>{

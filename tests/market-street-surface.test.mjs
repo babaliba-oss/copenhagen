@@ -1,3 +1,4 @@
+import {mainSource} from './helpers/main-source.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
@@ -28,7 +29,7 @@ test('granite setts shader is anisotropically filtered and patched into every se
  assert.match(shader.fragmentShader,/graniteSetts\(vStreetStone,settFp,0\.800,settGloss\)/);
  assert.match(shader.fragmentShader,/roughnessFactor\*=1\.-settGloss/);assert.match(shader.vertexShader,/modelMatrix/);
  assert.equal(material.customProgramCacheKey(),'setts-test');
- const main=readFileSync('src/main.js','utf8');assert.match(main,/GRANITE_SETTS_GLSL\+shader\.fragmentShader/);
+ const main=mainSource;assert.match(main,/GRANITE_SETTS_GLSL\+shader\.fragmentShader/);
  assert.match(readFileSync('src/kauppatori.js','utf8'),/addGraniteSetts\(/);
 });
 test('smeared Allas shells map to flat photo-guided colours; City Hall keeps its batches',()=>{

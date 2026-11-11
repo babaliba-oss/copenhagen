@@ -1,3 +1,4 @@
+import {mainSource} from './helpers/main-source.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
@@ -58,6 +59,6 @@ test('rock hill is a collision obstacle that encloses the church and stays off m
 });
 
 test('main.js replaces the municipal shell and registers the obstacle',()=>{
- const src=readFileSync(new URL('../src/main.js',import.meta.url),'utf8');
+ const src=mainSource;
  assert.match(src,/USPENSKI\.ratu\]\.includes\(p\.ratu\)/);assert.match(src,/\.\.\.uspenski\.obstacles/);assert.match(src,/createUspenskiCathedral\(\)/);
 });

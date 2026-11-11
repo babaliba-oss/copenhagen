@@ -1,6 +1,7 @@
 // The Danish language option (src/i18n.js, src/i18n-da.js): which language is chosen, English as the fallback, every
 // dictionary key still in the English source, and the start card, HUD, help, pause card, first-time prompts, jobs,
 // ranks and races coming out Danish.
+import {mainSource} from './helpers/main-source.mjs';
 import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs';import path from 'node:path';
 const {pickLang,forCity,useDictionary,t,translateTree,english,currentLang}=await import('../src/i18n.js'),da=(await import('../src/i18n-da.js')).default;
 const {JOBS,JOBS_1760,SAGAS,CHARACTERS}=await import('../src/copenhagen/data.js'),{PROMPT_IDS,promptText}=await import('../src/prompts.js'),{GAME_LINE,shareSaid}=await import('../src/copenhagen/share.js');
@@ -104,7 +105,7 @@ test('English players load nothing extra: the dictionary is only ever imported o
  for(const f of walk('src')){const s=read(f);assert.ok(!/import[^;(]*from\s*['"][^'"]*i18n-da\.js['"]/.test(s),f);}
  assert.match(read('src/i18n.js'),/if\(chosen!=='da'\)return chosen;[\s\S]*import\('\.\/i18n-da\.js'\)/);
  assert.match(read('src/bootstrap.js'),/initLanguage\(\);[\s\S]*import\('\.\/main\.js'\)/,'chosen before the game loads');
- assert.match(read('src/main.js'),/track\('start',\{lang:currentLang\(\)\}\)/);
+ assert.match(mainSource,/track\('start',\{lang:currentLang\(\)\}\)/);
 });
 
 // ---- the surfaces ----

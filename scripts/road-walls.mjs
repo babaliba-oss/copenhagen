@@ -34,7 +34,7 @@ const roads=new SpatialIndex(data.roads.filter(r=>!/Koroke/.test(r.kind||'')));
 const index=JSON.parse(readFileSync(dir+'buildings3d-index.json')),dup=new Set(JSON.parse(readFileSync(dir+'duplicates.json')));
 {const kk=new Map();for(const t of index.tiles)for(const p of t.parts)if(p.id.startsWith('kk-osm-'))kk.set(p.id.slice(3),p.bbox);
  for(const t of index.tiles)for(const p of t.parts){const b=kk.get(p.id),a=p.bbox;if(!b)continue;const share=Math.max(0,Math.min(a[2],b[2])-Math.max(a[0],b[0]))*Math.max(0,Math.min(a[3],b[3])-Math.max(a[1],b[1]))/Math.max(1e-6,(a[2]-a[0])*(a[3]-a[1]));if(share>=.5)dup.add(t.file+':'+p.start);}} // main.js: the OpenStreetMap box inside the model's own building
-if(era1760){const GONE=eval(readFileSync('src/main.js','utf8').match(/const GONE=(\/\^.*?\/[a-z]*);/)[1]),late=new Set(JSON.parse(readFileSync(dir+'era.json')).anachronisms||[]);
+if(era1760){const GONE=eval(readFileSync('src/main-parts.js','utf8').match(/const GONE=(\/\^.*?\/[a-z]*);/)[1]),late=new Set(JSON.parse(readFileSync(dir+'era.json')).anachronisms||[]);
  const wet=([a,b,c,d])=>{const ix=(c-a)*.25,iz=(d-b)*.25;return [[(a+c)/2,(b+d)/2],[a+ix,b+iz],[c-ix,b+iz],[a+ix,d-iz],[c-ix,d-iz]].filter(([x,z])=>inWaterPolygons(data.water,x,z)).length>=4;};
  for(const t of index.tiles)for(const p of t.parts)if(late.has(p.id)||hidden.has(p.id)||p.name&&GONE.test(p.name)||p.embankment||/vold|bastion|batteri|skanse|krudt/i.test(p.name||'')||wet(p.bbox))dup.add(t.file+':'+p.start);} // not drawn in 1760
 const out=[],seen=new Set();let metres=0;const parts=new Set();

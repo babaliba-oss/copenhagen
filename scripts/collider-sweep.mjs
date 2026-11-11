@@ -9,7 +9,7 @@ import {SpatialIndex,pointInPolygon,inWaterPolygons} from '../src/geo.js';
 const city=process.argv[2]||'copenhagen-1760',MIN=+(process.argv[3]||12),root=`public/cities/${city}`;
 const idx=JSON.parse(fs.readFileSync(path.join(root,'buildings3d-index.json'),'utf8'));
 const pack=JSON.parse(zlib.gunzipSync(fs.readFileSync(path.join(root,'city.pack'))));
-let gone=null;if(city.endsWith('1760')){const src=fs.readFileSync('src/main.js','utf8'),m=src.match(/const GONE=(\/\^.*?\/[a-z]*);/);if(m)gone=eval(m[1]);}
+let gone=null;if(city.endsWith('1760')){const src=fs.readFileSync('src/main-parts.js','utf8'),m=src.match(/const GONE=(\/\^.*?\/[a-z]*);/);if(m)gone=eval(m[1]);}
 const dups=new Set((()=>{try{return JSON.parse(fs.readFileSync(path.join(root,'duplicates.json'),'utf8'));}catch{return [];}})());
 // main.js: in 1760 a part with 4 of 5 points of its box on mapped water (boats, pontoons drawn as buildings) is hidden
 const afloat=p=>{if(!gone)return false;const [a,b,c,d]=p.bbox,ix=(c-a)*.25,iz=(d-b)*.25;return [[(a+c)/2,(b+d)/2],[a+ix,b+iz],[c-ix,b+iz],[a+ix,d-iz],[c-ix,d-iz]].filter(([x,z])=>inWaterPolygons(pack.water,x,z)).length>=4;};
