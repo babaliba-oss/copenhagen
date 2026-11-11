@@ -37,8 +37,15 @@ export function createRails(data){
  steel.forEach(b=>b.dispose());
  if(masts.length){
   const mg=mergeGeometries([new THREE.CylinderGeometry(.09,.12,7,6).translate(0,3.5,0),new THREE.BoxGeometry(.08,.08,2.8).translate(0,6.6,1.3).rotateY(Math.PI/2)].map(x=>x.toNonIndexed()));
-  const im=new THREE.InstancedMesh(mg,new THREE.MeshStandardMaterial({color:'#6d7477',metalness:.5,roughness:.5}),masts.length),m4=new THREE.Matrix4(),q=new THREE.Quaternion(),UP=new THREE.Vector3(0,1,0),one=new THREE.Vector3(1,1,1),v=new THREE.Vector3();
-  masts.forEach(([x,z,yaw],i)=>im.setMatrixAt(i,m4.compose(v.set(x,groundAt(x,z),z),q.setFromAxisAngle(UP,yaw),one)));im.computeBoundingSphere();im.castShadow=true;im.name='Catenary masts';group.add(im);
+  // In 300 m cells, each gone beyond 450 m (THREE.LOD with an empty far level): one mesh for the whole railway was drawn
+  // with its shadow from anywhere in town, 86,000 triangles a frame at Nyhavn for masts a kilometre off.
+  const mat=new THREE.MeshStandardMaterial({color:'#6d7477',metalness:.5,roughness:.5}),m4=new THREE.Matrix4(),q=new THREE.Quaternion(),UP=new THREE.Vector3(0,1,0),one=new THREE.Vector3(1,1,1),v=new THREE.Vector3(),byCell=new Map();
+  for(const mast of masts){const k=Math.floor(mast[0]/300)+','+Math.floor(mast[1]/300);if(!byCell.has(k))byCell.set(k,[]);byCell.get(k).push(mast);}
+  for(const list of byCell.values()){
+   const cx=list.reduce((a,b)=>a+b[0],0)/list.length,cz=list.reduce((a,b)=>a+b[1],0)/list.length,im=new THREE.InstancedMesh(mg,mat,list.length);
+   list.forEach(([x,z,yaw],i)=>im.setMatrixAt(i,m4.compose(v.set(x-cx,groundAt(x,z),z-cz),q.setFromAxisAngle(UP,yaw),one)));im.computeBoundingSphere();im.castShadow=true;im.name='Catenary masts';
+   const lod=new THREE.LOD();lod.position.set(cx,0,cz);lod.addLevel(im,0);lod.addLevel(new THREE.Object3D(),450);lod.name='Catenary masts';group.add(lod);
+  }
  }
  return {group};
 }

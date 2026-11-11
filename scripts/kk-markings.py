@@ -31,7 +31,7 @@ srgb = lambda h: [((v / 255) / 12.92 if v / 255 <= .04045 else ((v / 255 + .055)
 Y = .095
 PAINT = {'white': srgb('dedbcf'), 'yellow': srgb('d6ae48'), 'blue': srgb('2f63ab'), 'red': srgb('9a4a3c')}
 TYPES = {'Hvidafmærkning': 'white', 'Fodgængerfelt': 'white', 'Pileafmærkning': 'white',
-         'Vejbump': 'white', 'Gul afmærkning': 'yellow', 'Servicemarkering (10m regel)': 'yellow',
+         'Vejbump': 'white', 'Gul afmærkning': 'yellow',  # not 'Servicemarkering (10m regel)': the register draws each as a 1.5 m symbol (the real one is a hand-sized triangle on the kerb): 2,277 big yellow triangles lay in the road
          'Blå cykelfelt': 'blue', 'Rød belægning (OB)': 'red'}
 SIMPLIFY = {'Hvidafmærkning': .02, 'Gul afmærkning': .02, 'Pileafmærkning': .03, 'Vejbump': .04, 'Fodgængerfelt': .02}
 CELL, TILE, GRID = 100.0, 300.0, 16.0  # work cells; the surface chunks' grid (surfaces/<kx>_<kz>.bin); coverage cells

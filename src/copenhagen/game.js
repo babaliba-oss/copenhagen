@@ -467,10 +467,11 @@ export function createCopenhagenGame({scene,city,mobilityData,cityData,toast,sou
   filming=cinematic;
   player=actor;if(running&&!storyShown){storyShown=true;for(const id of ['cph-job','cph-saga']){const el=$(id);if(el){el.classList.remove('settled');clearTimeout(el.__settle);el.__settle=setTimeout(()=>el.classList.add('settled'),10000);}}} /* the cards' 10 s story ran out behind the start card: job 1's tip was never seen */started=running;if(!actor)return;
   // (The morning paper no longer opens by itself at the start: players found the pop-up confusing. paper() still shows it.)
-  {save.nisser??=[];const {m,q,v,one,zero}=NT,now=performance.now()/1000;
+  {save.nisser??=[];const {m,q,v,one}=NT,now=performance.now()/1000;let shown=0;
    for(const n of nisser){const got=save.nisser.includes(n.i);if(!got&&running&&!cinematic&&Math.hypot(n.p[0]-actor.x,n.p[1]-actor.z)<2.6){save.nisser.push(n.i);save.money+=ERA==='h'?24:150;persist();banner('Nisse found!',`${save.nisser.length} of ${nisser.length} · +${ERA==='h'?24:150} ${UNIT}`,'pass');}
-    nisseMesh.setMatrixAt(n.i,m.compose(v.set(n.p[0],groundAt(n.p[0],n.p[1])+.05+Math.abs(Math.sin(now*2+n.i))*.12,n.p[1]),q.setFromAxisAngle(THREE.Object3D.DEFAULT_UP,now*.8+n.i),save.nisser.includes(n.i)?zero:one));}
-   nisseMesh.instanceMatrix.needsUpdate=true;}
+    if(got||Math.hypot(n.p[0]-actor.x,n.p[1]-actor.z)>220)continue; // only the nisser near enough to see are drawn: all of them, found or streets away, cost 58,000 triangles a frame (with their shadows)
+    nisseMesh.setMatrixAt(shown++,m.compose(v.set(n.p[0],groundAt(n.p[0],n.p[1])+.05+Math.abs(Math.sin(now*2+n.i))*.12,n.p[1]),q.setFromAxisAngle(THREE.Object3D.DEFAULT_UP,now*.8+n.i),one));}
+   nisseMesh.count=shown;nisseMesh.visible=shown>0;nisseMesh.instanceMatrix.needsUpdate=true;}
   if(pant){const n=pant.update(dt,actor,{collect:running&&!cinematic});if(n){const before=save.pant||0;save.pant=before+n;save.money+=n*PANT_KR;persist();clink();if(!before)toast(`Empty can: +${PANT_KR} kr pant, the bottle deposit. You find them by benches and bins.`); /* the first one: 'pant 1' by the money meant nothing to a newcomer */
     const t=PANT_TITLES.find(([k])=>before<k&&save.pant>=k);if(t)banner(t[1],`${save.pant} cans · ${fmtKr(save.pant*PANT_KR)} ${UNIT} in pant`,'pass');}}
   if(travelMode!==mode){mode=travelMode;routeFor=null;}

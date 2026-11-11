@@ -71,13 +71,16 @@ export class CityCyclists{
   for(let tries=0;tries<40;tries++){
    const k=Math.floor(this.random()*(E.length+this.linkList.length)),e=k<E.length?E[k]:this.linkList[k-E.length];if(e.length<15||e.crossing)continue;
    if(e.bikeTraffic!==undefined&&this.random()>e.bikeTraffic/BUSY_BIKES)continue; // measured cyclists (mobility.json bikeTraffic): a quiet street is picked less often
-   const m=e.points[Math.floor(e.points.length/2)],d=hypot(m[0]-player.x,m[1]-player.z);if(d<40||d>340)continue;
-   if(d<160&&player.heading!==undefined){const fx=-Math.sin(player.heading),fz=-Math.cos(player.heading);if(((m[0]-player.x)*fx+(m[1]-player.z)*fz)/d>.2)continue;} // not popping up ahead
+   const mid=e.points[Math.floor(e.points.length/2)];if(hypot(mid[0]-player.x,mid[1]-player.z)>500)continue;
+   const o=this.offset(e);if(o===null)continue;
+   // Tested where the rider is put, not at the street's middle: on a long street its start can be right at the player
+   // while its middle is 100 m off and behind (a rider appeared in the junction the player was driving into).
+   const s0=this.random()*e.length*.5,at=routePoint(e,s0,o),m=[at.x,at.z],d=hypot(m[0]-player.x,m[1]-player.z);if(d<60||d>340)continue;
+   if(d<200&&player.heading!==undefined){const fx=-Math.sin(player.heading),fz=-Math.cos(player.heading);if(((m[0]-player.x)*fx+(m[1]-player.z)*fz)/d>.2)continue;} // not popping up ahead
    if(this.visibilityTest&&d<260&&tries<30&&this.visibilityTest({x:m[0],z:m[1]}))continue; // nor anywhere else the camera looks
-   if(this.offset(e)===null)continue;
    const route=[e];let total=e.length,cur=e;
    while(total<700){const next=this.onward(cur,(this.roads.outgoing[cur.to]||[]).map(i=>typeof i==='number'?E[i]:i).filter(n=>n.to!==cur.from&&n.length>4&&!n.crossing&&this.offset(n)!==null));if(!next.length)break;cur=this.pick(next);route.push(cur);total+=cur.length;}
-   r.route=route;r.leg=0;r.s=this.random()*e.length*.5;r.speed=r.cruise*.8;return true;
+   r.route=route;r.leg=0;r.s=s0;r.speed=r.cruise*.8;return true;
   }
   r.route=null;return false;
  }
