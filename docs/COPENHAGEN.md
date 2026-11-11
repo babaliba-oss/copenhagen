@@ -458,7 +458,7 @@ agent, as any server does; both say they do not store them.
 | --- | --- | --- |
 | `pageview` | `city`, `era` (today / 1760), `device` (phone / desktop) | main.js, once the map is known |
 | `ready` | `seconds` to the start button: under 5 s, 5-10 s, 10-20 s, 20-40 s, 40-80 s, over 80 s | main.js |
-| `start` | | main.js `start()` |
+| `start` | `lang` (en / da) | main.js `start()` |
 | `job_pickup` | | game.js, the first pick-up after each page load |
 | `job_delivered` | `index` (the job's number in the list) | game.js |
 | `saga_start`, `saga_finish` | `id` | game.js |
@@ -468,6 +468,35 @@ agent, as any server does; both say they do not store them.
 | `busted` | | main.js `setBusted()` |
 
 A new event: call `track()` and add it to this table.
+
+### Language: English and Danish (src/i18n.js, src/i18n-da.js)
+
+The code and `index.html` are English. With Danish chosen, the page's text is translated where it is shown: one
+`MutationObserver` (i18n.js) looks every text the game puts on the page up in one dictionary, `src/i18n-da.js`
+(English: Danish), and writes the Danish in its place. A text with no entry stays English. English players load
+neither the dictionary (its own file, about 40 kB, 16 kB gzipped) nor the observer.
+
+- Which language: `?lang=da` or `?lang=en`, else the choice saved by the EN / DA switch (`localStorage` `cph-lang`),
+  else Danish for a Danish browser (`navigator.language` starts with `da`), else English. Copenhagen and 1760 only.
+- The switch is on the start card (top right) and at the foot of the pause card. It saves the choice and loads the
+  page again.
+- **A new or reworded string:** write it in English in the code as before, then add `'English': 'Dansk'` to
+  `src/i18n-da.js`. `tests/i18n.test.mjs` fails when a key is no longer in the English source, so a reworded
+  string is found there. Keep the Danish short and plain; place names stay as they are.
+- Keys follow the text as the page gets it:
+  - `'Car recovered.'`: a whole text. Parts joined with ` · ` are looked up one by one, and so are two sentences
+    with no entry of their own.
+  - `'Promoted: {}'`, `'{n} cans'`, `'Press {k}'`: `{}` is anything (a name, looked up in turn), `{n}` a number,
+    `{k}` a key's name. The Danish side says `{1}`, `{2}`. Numbers come out the Danish way (1.500 kr, 1,2 km).
+  - `'Deliver to <1> in {n} s'`: `<1>`, `<2>` stand for the elements inside a sentence (`<b>`, `<kbd>`); they are
+    kept and put where the Danish has them.
+- To see what is still English: open `?lang=da`, play, and run `__i18nMissed()` in the console.
+- Code that reads text back from the page must use `english(el)` (i18n.js), not `textContent`: main.js does for the
+  1760 help rows and the phone's card tabs. `aria-label`s are not translated (the code reads some back).
+- `t('English')` gives the Danish for text that never reaches the page as text (the shared line, share.js).
+- Still English: the sagas' stories and lore cards, what the characters and passers-by say (their voices are English
+  too), the morning paper, text drawn on a canvas (the big map's "click to travel here", the treasure map's
+  "Part 1 of 3"), the sources list, error pages and screen-reader labels.
 
 ### Trailer footage (src/cinematic.js, src/cine-drive.js)
 

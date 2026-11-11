@@ -193,3 +193,12 @@ body.tilt-steer #touch-controls>div:first-child{visibility:hidden}
 
 /* No location tag or coordinate readout on screen: the minimap and street name already say where you are. */
 .location-tag,#location-readout{display:none!important}
+
+/* EN / DA (src/i18n.js): top right on the start card, under "Share the game" on the pause card */
+.lang-toggle{display:inline-flex;gap:2px;padding:2px;border:1px solid #30312e26;border-radius:8px;background:#fffdf8cc}
+.lang-toggle button{min-width:36px;min-height:28px;padding:0 8px;border-radius:6px;background:none;color:#67645c;font:600 12px/16px 'DM Sans',sans-serif;letter-spacing:.06em;cursor:pointer}
+.lang-toggle button[aria-pressed="true"]{background:#30312e;color:#fff;cursor:default}
+#intro .lang-toggle{position:absolute;top:12px;right:12px}
+#pause-overlay .lang-toggle{flex:none}
+@media(pointer:coarse){.lang-toggle button{min-width:40px;min-height:36px}}
+@media(max-height:540px) and (min-width:560px){#intro .lang-toggle{top:24px;right:calc(50% + 16px)}} /* a phone held sideways: beside the logo, at the end of the left column (the right one starts with the starting point) */
