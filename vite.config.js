@@ -8,7 +8,7 @@ function dataHashes(){
  const walk=d=>{for(const e of fs.readdirSync(d,{withFileTypes:true})){const p=path.join(d,e.name);if(e.isDirectory())walk(p);else{const rel=p.slice(root.length+1).split(path.sep).join('/'),parts=rel.split('/');
   const key=parts[0]==='cities'&&parts.length>3?parts.slice(0,3).join('/')+'/':parts[0]==='data'&&parts.length>2?parts.slice(0,2).join('/')+'/':rel;
   let h=groups.get(key);if(!h)groups.set(key,h=crypto.createHash('sha1'));h.update(rel);h.update(fs.readFileSync(p));}}};
- for(const d of ['cities','data','models','materials'])if(fs.existsSync(path.join(root,d)))walk(path.join(root,d));
+ for(const d of ['cities/copenhagen','cities/copenhagen-1760','models','materials'])if(fs.existsSync(path.join(root,d)))walk(path.join(root,d)); // only what siteOnly leaves in the build
  for(const [k,h] of groups)out[k]=h.digest('hex').slice(0,10);
  return out;
 }
@@ -22,6 +22,10 @@ const compactPacks={name:'compact-city-packs',apply:'build',configResolved(c){ou
   else if(e.name==='furniture.json')fs.writeFileSync(p,JSON.stringify(slimFurniture(JSON.parse(fs.readFileSync(p,'utf8')))));
   else if(e.name==='bus-corridors.json')fs.writeFileSync(p,JSON.stringify(compactBusCorridors(JSON.parse(fs.readFileSync(p,'utf8')))));}};
  walk(outDir);}}; // the configured folder: with --outDir the packs went out uncompacted
+// The site is Copenhagen only: Helsinki (public/data) and Tampere stay in the repo because the engine's tests run on them, but are not deployed.
+const siteOnly={name:'site-only',apply:'build',closeBundle(){
+ for(const d of ['data','cities/tampere'])fs.rmSync(path.join(outDir,d),{recursive:true,force:true});
+ const p=path.join(outDir,'cities/index.json');if(fs.existsSync(p)){const j=JSON.parse(fs.readFileSync(p,'utf8'));j.cities=j.cities.filter(c=>c.id.startsWith('copenhagen'));fs.writeFileSync(p,JSON.stringify(j));}}};
 // @dgreenheck/ez-tree inlines 20 textures as base64 (about 4 MB of the main script, all decoded at start-up).
 // Production swaps them for the 512 px copies in public/ez-tree (scripts/ez-tree-textures.py); maps the game
 // never reads become a single pixel.
@@ -33,4 +37,4 @@ const slimTreeTextures={name:'slim-ez-tree-textures',apply:'build',transform(cod
  if(n!==Object.keys(map).length)this.warn(`ez-tree textures: replaced ${n} of ${Object.keys(map).length}; rerun scripts/ez-tree-textures.py`);
  return {code:out,map:null};
 }};
-export default defineConfig(({command})=>({define:{__BUILD_ID__:JSON.stringify(Date.now().toString(36)),__DATA_HASHES__:command==='build'?JSON.stringify(dataHashes()):'null'},plugins:[compactPacks,slimTreeTextures],build:{rollupOptions:{output:{manualChunks:{three:['three']}}}}}));
+export default defineConfig(({command})=>({define:{__BUILD_ID__:JSON.stringify(Date.now().toString(36)),__DATA_HASHES__:command==='build'?JSON.stringify(dataHashes()):'null'},plugins:[siteOnly,compactPacks,slimTreeTextures],build:{rollupOptions:{output:{manualChunks:{three:['three']}}}}}));

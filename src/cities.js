@@ -26,7 +26,7 @@ export function slug(text){
 
 export function selectCity(search=''){
  const id=slug(new URLSearchParams(search).get('city')||(CITIES[SITE_CITY]?SITE_CITY:DEFAULT_CITY));
- const city=CITIES[id];
+ const city=CITIES[id]||CITIES[SITE_CITY]; // a city this build doesn't carry (old ?city=helsinki links) opens the site's own
  if(!city)throw Error(`City “${id}” is not in this build yet. Available: ${Object.values(CITIES).map(c=>c.name).join(', ')}.`);
  return city;
 }
