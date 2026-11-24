@@ -71,6 +71,15 @@ def union_near(geoms, tree, g):
     return shapely.union_all(geoms[i]) if len(i) else shapely.Polygon()
 
 city = json.loads(read(ROOT + 'city.pack'))
+FIT = f'cities/{CID}/kerb-fit.json'  # undo scripts/kerb-fit.py first (run it again after this)
+if os.path.exists(FIT) and not DRY:
+    fit = json.load(open(FIT, encoding='utf8'))
+    city['roads'] = [r for r in city['roads'] if not r.get('kerbFit')] + list(fit['roads'].values())
+    city['pavement'] = [p for p in city['pavement'] if not str(p.get('id', '')).startswith('kerb-fit-')]
+    if fit.get('cars'):
+        pk = json.load(open(ROOT + 'parked.json', encoding='utf8')); pk['cars'] += fit['cars']
+        json.dump(pk, open(ROOT + 'parked.json', 'w', encoding='utf8'), separators=(',', ':'), ensure_ascii=False)
+    os.remove(FIT)
 # undo an earlier run
 rerun = any(str(r.get('id', '')).startswith('kk-kerb-') for r in city['roads'])  # else a fresh city.pack (city-build.mjs)
 city['roads'] = [r for r in city['roads'] if not str(r.get('id', '')).startswith('kk-kerb-')]
@@ -84,7 +93,8 @@ tiles, changed, track_tris = {}, set(), []
 for rec in index:
     a = np.frombuffer(read(ROOT + rec['file'] + '.pack'), np.float32).reshape(-1, 6)
     a = a[:len(a) // 3 * 3].reshape(-1, 3, 6)
-    keep = ~(np.all(np.abs(a[:, :, 1] - Y_ROAD) < 1e-4, axis=1) | np.all(np.abs(a[:, :, 1] - Y_TRACK) < 1e-4, axis=1) | np.all(np.abs(a[:, :, 1] - Y_PAVE) < 1e-4, axis=1))
+    keep = ~(np.all(np.abs(a[:, :, 1] - Y_ROAD) < 1e-4, axis=1) | np.all(np.abs(a[:, :, 1] - Y_TRACK) < 1e-4, axis=1) | np.all(np.abs(a[:, :, 1] - Y_PAVE) < 1e-4, axis=1)
+             | np.all(np.abs(a[:, :, 1] - .077) < 1e-4, axis=1))  # kerb-fit.py's cover
     if not keep.all(): changed.add(rec['file'])
     a = tiles[rec['file']] = a[keep]
     sel = (np.abs(a[:, 0, 1] - .05) < 1e-4) & (a[:, 0, 3] - a[:, 0, 5] > .15)  # the cycle tracks (c8b8a5)

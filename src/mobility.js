@@ -99,7 +99,7 @@ export function approachingPedestrian(person,car,lateral=5.5){ // lateral: how f
  const speed=Math.abs(car.speed||0);if(speed<2)return false;
  const vx=-Math.sin(car.heading||0)*car.speed,vz=-Math.cos(car.heading||0)*car.speed,dx=person.x-car.x,dz=person.z-car.z;
  const t=(dx*vx+dz*vz)/(speed*speed);
- return t>-.15&&t<2.2&&hypot(dx-vx*Math.max(0,t),dz-vz*Math.max(0,t))<lateral&&hypot(dx,dz)<Math.min(28,8+speed*1.7);
+ return t>-.15&&t<2.2&&hypot(dx-vx*Math.max(0,t),dz-vz*Math.max(0,t))<lateral&&hypot(dx,dz)<Math.min(22,6+speed*1.4); // reach: 20 m ahead at 50 km/h (was 28 m from 35 km/h)
 }
 // Whether the player's approach makes a walker run (flee below). Only a car (or the 1760 coach) does: on foot, on a bike
 // or a scooter the player passes without anyone running. A walker on the pavement beside a car that keeps to the road
@@ -108,8 +108,12 @@ export function approachingPedestrian(person,car,lateral=5.5){ // lateral: how f
 // set the whole pavement running.
 export function threatens(person,player,roads){
  if(player.travelMode&&player.travelMode!=='car')return false;
- if(!approachingPedestrian(person,player,5.5))return false; /* the wide test first: two road lookups a walker a frame (300 walkers) for nobody near the car's line */
- return !(roads?.at(player.x,player.z)&&!roads.at(person.x,person.z))||approachingPedestrian(person,player,2);
+ if(!approachingPedestrian(person,player,4))return false; /* the wide test first: two road lookups a walker a frame (300 walkers) for nobody near the car's line */
+ // Off the road (a square, a pedestrian street, the quays) a car rolling at walking pace or a little more (under 18 km/h)
+ // only moves those right in its way; faster, anyone within 4 m of its line runs. Before, any car past 7 km/h on Nyhavn's
+ // quay or Strøget sent everyone 5.5 m either side of it running, and the whole quay seemed to flee the player.
+ const offRoad=!(roads?.at(player.x,player.z)&&!roads.at(person.x,person.z));
+ return offRoad&&Math.abs(player.speed||0)>5?true:approachingPedestrian(person,player,2);
 }
 // Recycle a car that has made no real progress this long when it is away from the player (last resort).
 const STALLED_AFTER=40;

@@ -4,7 +4,7 @@
 Where no pavement polygon is mapped (much of Nyhavn), the rendered ground stopped at the carriageway's edge and the bare
 terrain, half a metre below street level (terrain-mesh.js), showed between the road and the facades: a dark trench along
 the foot of the houses, with the ground under each building (its mapped outline, surfaceChunks) as a pale line beyond it.
-This fills what lies within 5 m of a road and is covered by nothing else (no surface, building or water) with pavement,
+This fills what lies within 5 m of a road (or, on a quay, within 12 m of the water and 30 m of a road) and is covered by nothing else (no surface, building or water) with pavement,
 appended to the existing surface chunks at 4.5 cm: in the pavement band (the ground shader's slab texture) and under
 the mapped pavement (5 cm), so it never covers a mapped surface. Rerunnable: earlier fill (y = 4.5 cm) is dropped first.
 
@@ -19,6 +19,7 @@ from shapely.ops import unary_union
 CID = next((a for a in sys.argv[1:] if not a.startswith('--')), 'copenhagen'); DRY = '--dry' in sys.argv  # --dry: report only
 ROOT = f'public/cities/{CID}/'
 FILL_Y, REACH, CELL = .045, 5.0, 300.0
+QUAY, QUAY_REACH = 12.0, 30.0  # quays: land within QUAY of the water and QUAY_REACH of a street
 srgb = lambda h: [((v / 255) / 12.92 if v / 255 <= .04045 else ((v / 255 + .055) / 1.055) ** 2.4) for v in bytes.fromhex(h)]
 COLOR = np.array(srgb('dfdcd1'), np.float32)  # the mapped pavement's colour (world-formats.mjs)
 
@@ -47,6 +48,7 @@ for rec in index:
 print(CID, len(tiles), 'surface chunks,', sum(len(t) for t in tiles.values()), 'triangles')
 
 roads = polygons(city['roads']); solid = polygons(city['buildings']) + polygons(city['water'])
+water = polygons(city['water']); water_tree = shapely.STRtree(water)
 road_tree, solid_tree = shapely.STRtree(roads), shapely.STRtree(solid)
 tri_all = np.concatenate([t[:, :, [0, 2]] for t in tiles.values()])
 tri_geoms = shapely.polygons(np.concatenate([tri_all, tri_all[:, :1]], axis=1))
@@ -57,9 +59,15 @@ added, area = {}, 0.0
 for kx in range(math.floor(x0 / CELL), math.floor(x1 / CELL) + 1):
     for kz in range(math.floor(z0 / CELL), math.floor(z1 / CELL) + 1):
         cell = box(kx * CELL, kz * CELL, (kx + 1) * CELL, (kz + 1) * CELL)
-        near = road_tree.query(cell.buffer(REACH))
+        near = road_tree.query(cell.buffer(QUAY_REACH))
         if not len(near): continue
-        corridor = unary_union([roads[i] for i in near]).buffer(REACH, quad_segs=2).intersection(cell)
+        rd = unary_union([roads[i] for i in near])
+        corridor = rd.buffer(REACH, quad_segs=2).intersection(cell)
+        wi = water_tree.query(cell.buffer(QUAY))
+        if len(wi):  # a quay: the land between a street and the water within QUAY of it (Nyhavn's canal head was bare terrain
+            # sloping down to the water, a dark drop between the road and the canal)
+            wet = unary_union([water[i] for i in wi])
+            corridor = corridor.union(rd.buffer(QUAY_REACH, quad_segs=2).intersection(wet.buffer(QUAY, quad_segs=2)).intersection(cell))
         if corridor.is_empty: continue
         covered = [tri_geoms[i] for i in tri_tree.query(corridor)] + [solid[i] for i in solid_tree.query(corridor)]
         fill = corridor.difference(unary_union(covered)) if covered else corridor

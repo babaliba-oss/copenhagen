@@ -17,13 +17,12 @@ for(const r of index){const b=unzip(readFileSync(new URL(r.file+'.pack',dir))),a
 const is=(t,h)=>t.rgb.every((c,i)=>Math.abs(c-lin(h)[i])<1e-3),white=paint.filter(t=>is(t,'dedbcf')),blue=paint.filter(t=>is(t,'2f63ab'));
 const near=(l,x,z,r)=>l.filter(t=>Math.hypot(t.x-x,t.z-z)<r).length;
 
-test('the city\'s zebra crossings, lane lines and blue cycle crossings are painted at Rådhuspladsen, Kongens Nytorv and Dronning Louises Bro',()=>{
+test('the city\'s zebra crossings and lane lines are painted at Rådhuspladsen, Kongens Nytorv and Dronning Louises Bro, and no blue fields',()=>{
  assert.ok(paint.length>200000&&paint.length<320000,`${paint.length} triangles of paint`);
- assert.ok(white.length>paint.length*.9&&blue.length>2000,`${white.length} white, ${blue.length} blue`);
+ assert.ok(white.length>paint.length*.9&&blue.length===0,`${white.length} white, ${blue.length} blue`); // the blue cycle fields came out as solid slabs (kk-markings.py)
  assert.ok(near(white,-501.9,494.3,4)>=10,'zebra over H.C. Andersens Boulevard at Rådhuspladsen');
- assert.ok(near(blue,-507.7,481.2,6)>=3,'blue cycle crossing beside it');
  assert.ok(near(white,597.8,36.4,4)>=6,'zebra at Kongens Nytorv');
- assert.ok(near(blue,-633.5,-730.4,6)>=3&&near(white,-690.8,-684.9,4)>=6,'blue cycle crossing and zebra at the Dronning Louises Bro end of Nørre Søgade');
+ assert.ok(near(white,-690.8,-684.9,4)>=6,'zebra at the Dronning Louises Bro end of Nørre Søgade');
 });
 
 test('paint lies on the drawn carriageway or cycle track, never on a footway or a house',()=>{
@@ -42,5 +41,5 @@ test('no generated dashes or zebra stripes where the city\'s paint is drawn; the
 
 test('today\'s Copenhagen credits the city\'s road-marking register',()=>{
  const today=JSON.parse(readFileSync(new URL('../public/cities/index.json',import.meta.url),'utf8')).cities.find(c=>c.id==='copenhagen');
- assert.match(today.attribution,/Road markings \(lane and stop lines, zebra crossings, arrows, blue cycle crossings\): Københavns Kommune, Afmærkning, CC BY 4\.0 \(wfs-kbhkort\.kk\.dk\)/);
+ assert.match(today.attribution,/Road markings \(lane and stop lines, zebra crossings, arrows\): Københavns Kommune, Afmærkning, CC BY 4\.0 \(wfs-kbhkort\.kk\.dk\)/);
 });

@@ -107,7 +107,7 @@ surfaceMaterial.onBeforeCompile=shader=>{
   // darker or paler each, faded out where a stone is smaller than a pixel, and a slow drift where feet and bikes wear it.
   float s1=groundHash(floor(vGround.xz*26.0)),s2=groundHash(floor(vGround.xz*61.0)+5.3),fine=mix(0.5,s1*0.6+s2*0.4,1.0-smoothstep(0.02,0.09,footprint));
   diffuseColor.rgb*=(0.86+0.28*fine)*(1.0+(groundNoise(vGround.xz/5.0)-0.5)*0.16);grain=0.0;gRough=0.95;
- }else if(vGround.y>0.04&&vGround.y<0.06){
+ }else if(vGround.y>0.04&&vGround.y<0.06||vGround.y>0.0755&&vGround.y<0.079){ // 7.7 cm: carriageway past the city's kerb, drawn over as pavement or cycle track (scripts/kerb-fit.py)
   #ifdef ASPHALT_CYCLE_TRACKS
   // Copenhagen's cycle tracks are asphalt, a shade lighter than the carriageway (the data paints them red-beige).
   if(diffuseColor.r-diffuseColor.b>0.15){vec2 cu=vGround.xz/2.1;diffuseColor.rgb=textureGrad(tAsphaltC,cu,GDX/2.1,GDY/2.1).rgb*vec3(1.0,0.97,0.93)*1.9*(1.0+(groundNoise(vGround.xz/7.0)-0.5)*0.1);gN=textureGrad(tAsphaltN,cu,GDX/2.1,GDY/2.1).xyz*2.0-1.0;gNw=.7*texFade;gRough=textureGrad(tAsphaltR,cu,GDX/2.1,GDY/2.1).r;grain=0.0;} // cycle track: the same scanned asphalt, a shade lighter

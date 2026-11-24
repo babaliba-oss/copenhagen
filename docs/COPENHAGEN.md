@@ -93,6 +93,8 @@ node scripts/road-walls.mjs copenhagen && node scripts/indoor-items.mjs copenhag
 python3 scripts/kk-kerbs.py <kk data dir>/wfs copenhagen     # last, today only, and again after any surface-dissolve.mjs: the
                                                     # carriageways out to the city's kerb lines (k101 vejkant, below); then
                                                     # everything that reads the road's width, in this order:
+python3 scripts/kerb-fit.py <kk data dir>/wfs copenhagen     # the carriageways cut back where they run on past a kerb (below)
+python3 scripts/water-fixes.py copenhagen           # straight quay edges where the water outline zig-zags (Nyhavn's canal head)
 node scripts/road-walls.mjs copenhagen
 python3 scripts/kk-shelters.py <kk data dir>/wfs copenhagen && python3 scripts/kk-water-toilets.py <kk data dir>/wfs copenhagen
 python3 scripts/kk-signs.py <kk data dir>/wfs copenhagen   # the city's road signs (k101 skilte_total, below)
@@ -104,6 +106,7 @@ python3 scripts/frb-furniture.py <frb dir> copenhagen   # Frederiksberg's bins, 
 python3 scripts/surface-fill.py copenhagen && python3 scripts/kk-surfaces.py <kk data dir>/wfs copenhagen
 python3 scripts/kk-markings.py <kk data dir>/wfs copenhagen
 node scripts/furniture-ground.mjs copenhagen && node scripts/indoor-items.mjs copenhagen
+python3 scripts/bin-spacing.py copenhagen           # one Mapillary bin per 8 m on each side of a street (below)
 node scripts/shelter-walks.mjs copenhagen --fix && node scripts/kerb-walks.mjs copenhagen   # footways round the bus shelters, then the walkers' cut
 ```
 
@@ -150,6 +153,26 @@ at 6.8 cm, the tracks at 5.2 cm and the paved-over track at 5.3 cm, all dropped 
 width against the kerbs -1.7 m -> +0.2 m), 273,000 m² of cycle track from the kerb out (58,000 m² of the old one paved
 over), 5,200 furniture items moved out of the road and 630 dropped; parked cars 3,025 -> 13,235, the city's road-marking
 paint kept 67,500 -> 74,500 m².
+
+### Carriageways cut back to the kerb (scripts/kerb-fit.py)
+
+kk-kerbs.py only widens. Where an OpenStreetMap carriageway lies off the real street its far side ran on over the
+kerb (asphalt across corners and round Marmorkirken, on Vesterbrogade and Nørrebrogade) and the widening strips
+stopped in odd blobs beside it. `kerb-fit.py` takes GeoDanmark's carriageway kerbs (vejkant, Kørevej) a metre at a
+time: the road side is the side nearer the traffic's centrelines (mobility.json), and the band beyond it reaches out
+(1-5 m) as far as the way back from it to its nearest centreline still crosses a kerb, so a kerb with traffic on both
+sides cuts nothing. What of the band the drawn carriageway covers, less a strip round each lane (lane offset + 1.2 m),
+is cut: city.pack's road polygons lose it (originals in `cities/copenhagen/kerb-fit.json`), it becomes pavement there
+(`kerb-fit-*`), and the surface chunks draw it over the road at 7.7 cm (the ground shader's pavement band), as cycle
+track where it lies between the kerb and a cycle track's outer edge. Parked cars standing in it are set aside (kept in
+the side file). kk-markings.py keeps its paint off it; kk-kerbs.py undoes it on a rerun. 2026-11-24: 220,600 m² in
+8,744 pieces, 4,006 road polygons cut, 664 parked cars set aside.
+
+Also since 2026-11-24: kk-markings.py no longer paints the register's blue cycle fields (`Blå cykelfelt`: drawn solid,
+they came out as big blue slabs across junction mouths), surface-fill.py also paves unmapped quays (land within 12 m of
+the water and 30 m of a street; Nyhavn's canal head was bare ground), and `bin-spacing.py` keeps one Mapillary bin of
+each group within 8 m on the same side of a street (the detector's repeat sightings stood in rows of two and three;
+363 of 3,822 dropped).
 
 ### Current roadworks (scripts/kk-roadworks.py)
 
@@ -611,8 +634,7 @@ figure too. `?procedural` turns the rigged and baked ones off.
   in the vertex colours. It keeps the template's skeleton, so the M_/W_ clips play on it unchanged. Built this way:
   `W_Victorian` (template W_Medieval, arm=72), `W_Merchant` (the merchant's wife, W_Medieval, arm=80), `M_Shipboy` (the
   Royal Navy ship boy, M_Suit, T-pose, `skip=Gun_low,Sword_`), `M_Sailor1`–`6` (the pirate crew, M_Suit, one `crop` per
-  figure, arm 66–85, `hips=0.5`) for 1760, and `M_Pmariano` (M_Casual_2, arm=67) and `W_Dress` ("Woman Dress 2", W_Formal, arm=48,
-  `skip=eye_,eyelash_,tooth`) today. Check a build by posing it with
+  figure, arm 66–85, `hips=0.5`) for 1760, and `M_Pmariano` (M_Casual_2, arm=67) today (`W_Dress`, built the same way, was taken out in 2026-11: a bikini top and a short skirt on the street). Check a build by posing it with
   a clip before shipping it (hands, hips): a wrong arm angle bends the arms, a wrong hip height the legs.
 - Static models (ships, props, standing figures) go through `scripts/models/flatten_model.py <in> <out.glb> [tris=]
   [k=] [length=|height=|scale=] [yaw=] [base=] [thin=] [minpart=] [tex=|matex=|colors=] [predecimate=]`: texture

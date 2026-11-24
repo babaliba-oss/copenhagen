@@ -14,7 +14,7 @@ async function model(name){
  const rig=name.startsWith('W_')?'_w':name.startsWith('R_')?'_r':'',[g,a]=await Promise.all([load(name+'.glb.gz'),load(`anims${rig}.glb.gz`)]);
  const box=new THREE.Box3().setFromObject(g.scene);return {name,scene:g.scene,clips:Object.fromEntries(a.animations.map(c=>[c.name,c])),height:Math.min(1.87,box.max.y-box.min.y)};
 }
-const models=await Promise.all(['M_Suit','W_Dress','R_CoolMan'].map(model));
+const models=await Promise.all(['M_Suit','W_Formal','R_CoolMan'].map(model));
 const idle=m=>{const root=clone(m.scene),mixer=new THREE.AnimationMixer(root);mixer.clipAction(m.clips.Idle).play();mixer.setTime(0);root.updateMatrixWorld(true);return root;};
 const at=b=>b.getWorldPosition(new THREE.Vector3());
 

@@ -3,8 +3,8 @@
 in EPSG:4326, CC BY 4.0), drawn as paint on today's carriageways and cycle tracks. The register's polygons are the painted
 shapes themselves (each zebra stripe, lane line, stop line, give-way tooth and arrow), so they are appended to the existing
 surface chunks as flat triangles at 9.5 cm (2.5 cm over the road at 7 cm; the ground shader's catch-all band keeps their
-colour): white lines, zebra crossings, arrows and speed-bump teeth in white, yellow lines in yellow, the blue cycle
-crossings in blue and the red bus surface in red. No new meshes or draw calls.
+colour): white lines, zebra crossings, arrows and speed-bump teeth in white, yellow lines in yellow and the red bus surface in red
+(not the blue cycle fields). No new meshes or draw calls.
 
 Every marking is clipped to what is drawn: the road band of the surface chunks (not the traffic islands; with the strips
 kk-kerbs.py adds out to the city's kerbs) and the cycle tracks, less the houses. Edge lines beyond the drawn kerb (roads
@@ -32,7 +32,8 @@ Y = .095
 PAINT = {'white': srgb('dedbcf'), 'yellow': srgb('d6ae48'), 'blue': srgb('2f63ab'), 'red': srgb('9a4a3c')}
 TYPES = {'Hvidafmærkning': 'white', 'Fodgængerfelt': 'white', 'Pileafmærkning': 'white',
          'Vejbump': 'white', 'Gul afmærkning': 'yellow',  # not 'Servicemarkering (10m regel)': the register draws each as a 1.5 m symbol (the real one is a hand-sized triangle on the kerb): 2,277 big yellow triangles lay in the road
-         'Blå cykelfelt': 'blue', 'Rød belægning (OB)': 'red'}
+         'Rød belægning (OB)': 'red'}  # not 'Blå cykelfelt': drawn solid, the register's blue cycle fields came out as big blue slabs
+                                         # across junction mouths and along kerbs (the real ones are faded strips across a junction)
 SIMPLIFY = {'Hvidafmærkning': .02, 'Gul afmærkning': .02, 'Pileafmærkning': .03, 'Vejbump': .04, 'Fodgængerfelt': .02}
 CELL, TILE, GRID = 100.0, 300.0, 16.0  # work cells; the surface chunks' grid (surfaces/<kx>_<kz>.bin); coverage cells
 
@@ -50,7 +51,7 @@ def polygons(items):
 
 city = json.loads(read(ROOT + 'city.pack'))
 index = json.load(open(ROOT + 'surface-index.json'))
-tiles, changed, road_tris, cycle_tris, paved_tris = {}, set(), [], [], []
+tiles, changed, road_tris, cycle_tris, paved_tris, cover_tris = {}, set(), [], [], [], []
 for rec in index:
     a = np.frombuffer(read(ROOT + rec['file'] + '.pack'), np.float32).reshape(-1, 6)
     a = a[:len(a) // 3 * 3].reshape(-1, 3, 6)
@@ -61,12 +62,14 @@ for rec in index:
     road = ((np.abs(y - .07) < 1e-4) | (np.abs(y - .068) < 1e-4)) & (a[:, 0, 3] < .6)  # carriageway (asphalt, setts, pavers; out to the kerb, kk-kerbs.py), not the pale islands
     cyc = ((np.abs(y - .05) < 1e-4) | (np.abs(y - .052) < 1e-4)) & (a[:, 0, 3] - a[:, 0, 5] > .15)  # cycle-track asphalt (c8b8a5)
     paved = np.abs(y - .053) < 1e-4  # old track paved over by kk-kerbs.py
-    for sel, out in ((road, road_tris), (cyc, cycle_tris), (paved, paved_tris)):
+    covered = np.abs(y - .077) < 1e-4  # carriageway past the kerb, drawn over as pavement (kerb-fit.py)
+    for sel, out in ((road, road_tris), (cyc, cycle_tris), (paved, paved_tris), (covered, cover_tris)):
         if sel.any(): out.append(a[sel][:, :, [0, 2]])
 mk = lambda arr: shapely.polygons(np.concatenate([arr, arr[:, :1]], axis=1)) if len(arr) else np.array([])
 road_tris = mk(np.concatenate(road_tris)); cycle_tris = mk(np.concatenate(cycle_tris)); paved_tris = mk(np.concatenate(paved_tris)) if paved_tris else np.array([])
 road_tris = road_tris[shapely.area(road_tris) > 1e-4]; cycle_tris = cycle_tris[shapely.area(cycle_tris) > 1e-4]
-rtree, ctree, ptree = shapely.STRtree(road_tris), shapely.STRtree(cycle_tris), shapely.STRtree(paved_tris)
+cover_tris = mk(np.concatenate(cover_tris)) if cover_tris else np.array([])
+rtree, ctree, ptree, vtree = shapely.STRtree(road_tris), shapely.STRtree(cycle_tris), shapely.STRtree(paved_tris), shapely.STRtree(cover_tris)
 houses = polygons(city['buildings'])
 if os.path.exists(ROOT + 'kk-footprints.json'): houses += polygons(json.load(open(ROOT + 'kk-footprints.json')))
 htree = shapely.STRtree(houses)
@@ -101,6 +104,8 @@ for (kx, kz), items in sorted(cells.items()):
     pi = ptree.query(cell, 'intersects')
     if len(pi) and not cyc.is_empty: cyc = cyc.difference(shapely.union_all(paved_tris[pi]))
     mask = shapely.union(road, cyc).intersection(cell)
+    vi = vtree.query(cell, 'intersects')
+    if len(vi): mask = mask.difference(shapely.union_all(cover_tris[vi]))
     hi = htree.query(cell, 'intersects')
     if len(hi): mask = mask.difference(shapely.union_all([houses[i] for i in hi]))
     mask = mask.buffer(0)
